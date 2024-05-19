@@ -45,7 +45,7 @@ type KodeReconciler struct {
 // +kubebuilder:rbac:groups=kode.jacero.io,resources=kodes,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=kode.jacero.io,resources=kodes/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=kode.jacero.io,resources=kodes/finalizers,verbs=update
-// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
 
@@ -61,21 +61,19 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
+	// Ensure the StatefulSet and Service exist
+	if err := r.ensureResource(ctx, kode, r.ensureStatefulSet); err != nil {
+		return ctrl.Result{}, err
+	}
+	if err := r.ensureResource(ctx, kode, r.ensureService); err != nil {
+		return ctrl.Result{}, err
+	}
+
 	// Ensure the PVC exists if storage is specified
-	if kode.Spec.Storage != nil {
-		if err := r.ensurePVC(ctx, kode); err != nil {
+	if kode.Spec.Storage != nil && kode.Spec.Storage.Enable {
+		if err := r.ensureStorage(ctx, kode); err != nil {
 			return ctrl.Result{}, err
 		}
-	}
-
-	// Ensure the Deployment exists
-	if err := r.ensureDeployment(ctx, kode); err != nil {
-		return ctrl.Result{}, err
-	}
-
-	// Ensure the Service exists
-	if err := r.ensureService(ctx, kode); err != nil {
-		return ctrl.Result{}, err
 	}
 
 	// Update the status
@@ -87,7 +85,18 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	return ctrl.Result{}, nil
 }
 
+// ensureStorage ensures that the storage for the specified Kode instance is properly configured.
+func (r *KodeReconciler) ensureStorage(ctx context.Context, kode *kodev1alpha1.Kode) error {
+	if kode.Spec.Storage.Name != "" {
+		// If PVC is set, create a new PVC
+		return r.ensurePVC(ctx, kode)
+	}
+	return nil
+}
+
+// ensurePVC ensures that the PersistentVolumeClaim (PVC) exists for the specified Kode instance.
 func (r *KodeReconciler) ensurePVC(ctx context.Context, kode *kodev1alpha1.Kode) error {
+	// Create the PVC object
 	pvc := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kode.Spec.Storage.Name,
@@ -102,44 +111,55 @@ func (r *KodeReconciler) ensurePVC(ctx context.Context, kode *kodev1alpha1.Kode)
 			},
 		},
 	}
-	if pvc.ObjectMeta.Name == "" {
-		pvc.ObjectMeta.Name = kode.Name
-	}
+
+	// Set the StorageClassName if specified
 	if kode.Spec.Storage.StorageClassName != "" {
 		pvc.Spec.StorageClassName = &kode.Spec.Storage.StorageClassName
 	}
 
+	// Set the Name if specified
+	if kode.Spec.Storage.Name != "" {
+		pvc.ObjectMeta.Name = kode.Spec.Storage.Name
+	}
+
+	// Set the owner reference to the Kode instance
 	if err := controllerutil.SetControllerReference(kode, pvc, r.Scheme); err != nil {
 		return err
 	}
 
+	// Check if the PVC already exists
 	foundPVC := &corev1.PersistentVolumeClaim{}
 	err := r.Get(ctx, types.NamespacedName{Name: pvc.Name, Namespace: pvc.Namespace}, foundPVC)
 	if err != nil && client.IgnoreNotFound(err) != nil {
 		return err
 	}
 
+	// Create the PVC
 	if err != nil && client.IgnoreNotFound(err) == nil {
-		log := log.FromContext(ctx)
-		log.Info("Creating PVC", "Namespace", pvc.Namespace, "Name", pvc.Name)
+		r.Log.Info("Creating PVC", "Namespace", pvc.Namespace, "Name", pvc.Name)
 		return r.Create(ctx, pvc)
 	}
 
 	return nil
 }
 
-func (r *KodeReconciler) ensureDeployment(ctx context.Context, kode *kodev1alpha1.Kode) error {
+func (r *KodeReconciler) ensureStatefulSet(ctx context.Context, kode *kodev1alpha1.Kode) error {
 	replicas := int32(1)
-	deploy := &appsv1.Deployment{
+	defaultWorkspace := kode.Spec.DefaultWorkspace
+	if defaultWorkspace == "" {
+		defaultWorkspace = kode.Spec.ConfigPath + "/workspace"
+	}
+	statefulSet := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kode.Name,
 			Namespace: kode.Namespace,
 		},
-		Spec: appsv1.DeploymentSpec{
+		Spec: appsv1.StatefulSetSpec{
 			Replicas: &replicas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: map[string]string{"app": "code-server"},
 			},
+			ServiceName: kode.Name,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels: map[string]string{"app": "code-server"},
@@ -149,101 +169,52 @@ func (r *KodeReconciler) ensureDeployment(ctx context.Context, kode *kodev1alpha
 						Name:  "code-server",
 						Image: kode.Spec.Image,
 						Env: []corev1.EnvVar{
-							{
-								Name:  "PUID",
-								Value: fmt.Sprintf("%d", kode.Spec.PUID),
-							},
-							{
-								Name:  "PGID",
-								Value: fmt.Sprintf("%d", kode.Spec.PGID),
-							},
-							{
-								Name:  "TZ",
-								Value: kode.Spec.TZ,
-							},
-							{
-								Name:  "PASSWORD",
-								Value: kode.Spec.Password,
-							},
-							{
-								Name:  "HASHED_PASSWORD",
-								Value: kode.Spec.HashedPassword,
-							},
-							{
-								Name:  "SUDO_PASSWORD",
-								Value: kode.Spec.SudoPassword,
-							},
-							{
-								Name:  "SUDO_PASSWORD_HASH",
-								Value: kode.Spec.SudoPasswordHash,
-							},
-							{
-								Name:  "PROXY_DOMAIN",
-								Value: kode.Spec.ProxyDomain,
-							},
-							{
-								Name:  "DEFAULT_WORKSPACE",
-								Value: kode.Spec.DefaultWorkspace,
-							},
+							{Name: "PUID", Value: fmt.Sprintf("%d", kode.Spec.PUID)},
+							{Name: "PGID", Value: fmt.Sprintf("%d", kode.Spec.PGID)},
+							{Name: "TZ", Value: kode.Spec.TZ},
+							{Name: "PASSWORD", Value: kode.Spec.Password},
+							{Name: "HASHED_PASSWORD", Value: kode.Spec.HashedPassword},
+							{Name: "SUDO_PASSWORD", Value: kode.Spec.SudoPassword},
+							{Name: "SUDO_PASSWORD_HASH", Value: kode.Spec.SudoPasswordHash},
+							{Name: "DEFAULT_WORKSPACE", Value: defaultWorkspace},
 						},
-						Ports: []corev1.ContainerPort{{
-							ContainerPort: kode.Spec.ServicePort,
-						}},
-						VolumeMounts: []corev1.VolumeMount{
-							{
-								Name:      "config-volume",
-								MountPath: "/config",
-							},
-						},
+						Ports: []corev1.ContainerPort{{ContainerPort: kode.Spec.ServicePort}},
 					}},
-					Volumes: []corev1.Volume{
-						{
-							Name: "config-volume",
-							VolumeSource: corev1.VolumeSource{
-								HostPath: &corev1.HostPathVolumeSource{
-									Path: kode.Spec.ConfigPath,
-								},
-							},
-						},
-					},
 				},
 			},
 		},
 	}
 
-	if kode.Spec.Storage != nil {
-		deploy.Spec.Template.Spec.Containers[0].VolumeMounts = append(deploy.Spec.Template.Spec.Containers[0].VolumeMounts, corev1.VolumeMount{
-			Name:      "pvc-volume",
-			MountPath: kode.Spec.ConfigPath,
-		})
-		deploy.Spec.Template.Spec.Volumes = append(deploy.Spec.Template.Spec.Volumes, corev1.Volume{
-			Name: "pvc-volume",
+	if kode.Spec.Storage != nil && kode.Spec.Storage.Enable {
+		volumeMount := corev1.VolumeMount{Name: "config-volume", MountPath: kode.Spec.ConfigPath}
+		volume := corev1.Volume{
+			Name: "pvc-config-volume",
 			VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 					ClaimName: kode.Spec.Storage.Name,
 				},
 			},
-		})
+		}
+		statefulSet.Spec.Template.Spec.Containers[0].VolumeMounts = append(statefulSet.Spec.Template.Spec.Containers[0].VolumeMounts, volumeMount)
+		statefulSet.Spec.Template.Spec.Volumes = append(statefulSet.Spec.Template.Spec.Volumes, volume)
 	}
 
-	if err := controllerutil.SetControllerReference(kode, deploy, r.Scheme); err != nil {
+	if err := controllerutil.SetControllerReference(kode, statefulSet, r.Scheme); err != nil {
 		return err
 	}
 
-	found := &appsv1.Deployment{}
-	err := r.Get(ctx, types.NamespacedName{Name: deploy.Name, Namespace: deploy.Namespace}, found)
+	found := &appsv1.StatefulSet{}
+	err := r.Get(ctx, types.NamespacedName{Name: statefulSet.Name, Namespace: statefulSet.Namespace}, found)
 	if err != nil && client.IgnoreNotFound(err) != nil {
 		return err
 	}
 
 	if err != nil && client.IgnoreNotFound(err) == nil {
-		log := log.FromContext(ctx)
-		log.Info("Creating Deployment", "Namespace", deploy.Namespace, "Name", deploy.Name)
-		return r.Create(ctx, deploy)
-	} else if !reflect.DeepEqual(deploy.Spec, found.Spec) {
-		found.Spec = deploy.Spec
-		log := log.FromContext(ctx)
-		log.Info("Updating Deployment", "Namespace", deploy.Namespace, "Name", deploy.Name)
+		r.Log.Info("Creating StatefulSet", "Namespace", statefulSet.Namespace, "Name", statefulSet.Name)
+		return r.Create(ctx, statefulSet)
+	} else if !reflect.DeepEqual(statefulSet.Spec, found.Spec) {
+		found.Spec = statefulSet.Spec
+		r.Log.Info("Updating StatefulSet", "Namespace", statefulSet.Namespace, "Name", statefulSet.Name)
 		return r.Update(ctx, found)
 	}
 
@@ -277,13 +248,11 @@ func (r *KodeReconciler) ensureService(ctx context.Context, kode *kodev1alpha1.K
 	}
 
 	if err != nil && client.IgnoreNotFound(err) == nil {
-		log := log.FromContext(ctx)
-		log.Info("Creating Service", "Namespace", service.Namespace, "Name", service.Name)
+		r.Log.Info("Creating Service", "Namespace", service.Namespace, "Name", service.Name)
 		return r.Create(ctx, service)
 	} else if !reflect.DeepEqual(service.Spec, found.Spec) {
 		found.Spec = service.Spec
-		log := log.FromContext(ctx)
-		log.Info("Updating Service", "Namespace", service.Namespace, "Name", service.Name)
+		r.Log.Info("Updating Service", "Namespace", service.Namespace, "Name", service.Name)
 		return r.Update(ctx, found)
 	}
 
@@ -291,15 +260,19 @@ func (r *KodeReconciler) ensureService(ctx context.Context, kode *kodev1alpha1.K
 }
 
 func (r *KodeReconciler) getAvailableReplicas(ctx context.Context, kode *kodev1alpha1.Kode) int32 {
-	deploy := &appsv1.Deployment{}
-	_ = r.Get(ctx, types.NamespacedName{Name: kode.Name, Namespace: kode.Namespace}, deploy)
-	return deploy.Status.AvailableReplicas
+	statefulSet := &appsv1.StatefulSet{}
+	_ = r.Get(ctx, types.NamespacedName{Name: kode.Name, Namespace: kode.Namespace}, statefulSet)
+	return statefulSet.Status.AvailableReplicas
+}
+
+func (r *KodeReconciler) ensureResource(ctx context.Context, kode *kodev1alpha1.Kode, ensureFunc func(context.Context, *kodev1alpha1.Kode) error) error {
+	return ensureFunc(ctx, kode)
 }
 
 func (r *KodeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&kodev1alpha1.Kode{}).
-		Owns(&appsv1.Deployment{}).
+		Owns(&appsv1.StatefulSet{}).
 		Owns(&corev1.Service{}).
 		Owns(&corev1.PersistentVolumeClaim{}).
 		Complete(r)

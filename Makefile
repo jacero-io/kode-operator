@@ -86,10 +86,10 @@ build: manifests generate fmt vet ## Build manager binary.
 run: manifests generate fmt vet ## Run a controller from your host.
 	go run ./cmd/main.go
 
-.PHONY: run-delve
-run-delve: manifests generate fmt vet
-    go build -gcflags "all=-trimpath=$(shell go env GOPATH)" -o bin/manager main.go
-    dlv --listen=:2345 --headless=true --api-version=2 --accept-multiclient exec ./bin/manager
+# .PHONY: run-delve
+# run-delve: manifests generate fmt vet
+#     go build -gcflags "all=-trimpath=$(shell go env GOPATH)" -o bin/manager main.go
+#     dlv --listen=:2345 --headless=true --api-version=2 --accept-multiclient exec ./bin/manager
 
 # If you wish to build the manager image targeting other platforms you can use the --platform flag.
 # (i.e. docker build --platform linux/arm64). However, you must enable docker buildKit for it.

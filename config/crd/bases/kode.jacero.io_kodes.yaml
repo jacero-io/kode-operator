@@ -39,17 +39,26 @@ spec:
           spec:
             description: KodeSpec defines the desired state of Kode
             properties:
+              args:
+                description: Specifies the envs
+                items:
+                  type: string
+                type: array
               configPath:
                 default: /config
                 description: ConfigPath is the path to the config directory for code-server
                 minLength: 1
                 type: string
               defaultWorkspace:
-                default: /config/workspace
                 description: DefaultWorkspace is the default workspace directory for
-                  code-server
+                  code-server (eg. /config/workspace)
                 minLength: 1
                 type: string
+              envs:
+                description: Specifies the envs
+                items:
+                  type: string
+                type: array
               hashedPassword:
                 description: HashedPassword is the hashed password for code-server
                 type: string
@@ -65,13 +74,12 @@ spec:
               pgid:
                 default: 1000
                 description: PGID is the group ID for the code-server process
+                format: int64
                 type: integer
-              proxyDomain:
-                description: ProxyDomain is the proxy domain for code-server
-                type: string
               puid:
                 default: 1000
                 description: PUID is the user ID for the code-server process
+                format: int64
                 type: integer
               servicePort:
                 description: ServicePort is the port for the code-server service
@@ -81,6 +89,9 @@ spec:
               storage:
                 description: Storage specifies the storage configuration for code-server
                 properties:
+                  enable:
+                    description: Enable specifies whether storage is enabled or not
+                    type: boolean
                   name:
                     description: Name is the name of the PersistentVolumeClaim for
                       code-server
@@ -91,10 +102,9 @@ spec:
                     type: string
                   storageClassName:
                     description: StorageClassName is the storage class name for the
-                      PVC
+                      PVC. When empty the controller will use the default storage
+                      class.
                     type: string
-                required:
-                - name
                 type: object
               sudoPassword:
                 description: SudoPassword is the sudo password for code-server
@@ -103,8 +113,11 @@ spec:
                 description: SudoPasswordHash is the hashed sudo password for code-server
                 type: string
               tz:
-                default: Etc/UTC
+                default: Europe/Stocholm
                 description: TZ is the timezone for the code-server process
+                type: string
+              url:
+                description: URL specifies the url for used to access the code-server
                 type: string
             required:
             - image
