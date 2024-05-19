@@ -1,0 +1,4 @@
+## Append samples of your project ##
+resources:
+- kode_v1alpha1_kode.yaml
+#+kubebuilder:scaffold:manifestskustomizesamples

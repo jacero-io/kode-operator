@@ -1,0 +1,23 @@
+# permissions for end users to view kodes.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  labels:
+    app.kubernetes.io/name: kode-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: kode-viewer-role
+rules:
+- apiGroups:
+  - kode.jacero.io
+  resources:
+  - kodes
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - kode.jacero.io
+  resources:
+  - kodes/status
+  verbs:
+  - get
