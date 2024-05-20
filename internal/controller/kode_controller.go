@@ -39,9 +39,10 @@ import (
 
 // code-server configuration constants
 const (
-	CodeServerImage         = "lscr.io/linuxserver/code-server:latest"
-	CodeServerPort          = 8443
-	CodeServerContainerName = "code-server"
+	CodeServerImage           = "lscr.io/linuxserver/code-server:latest"
+	CodeServerPort            = 8443
+	CodeServerContainerName   = "code-server"
+	PersistentVolumeClaimName = "kode-pvc"
 )
 
 type KodeReconciler struct {
@@ -137,7 +138,7 @@ func (r *KodeReconciler) constructPVC(kode *kodev1alpha1.Kode) *corev1.Persisten
 	log := r.Log.WithName("constructPVC")
 	pvc := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      kode.Name + "-pvc",
+			Name:      PersistentVolumeClaimName,
 			Namespace: kode.Namespace,
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{
@@ -256,7 +257,7 @@ func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode) *appsv1.De
 			Name: "kode-storage",
 			VolumeSource: corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: kode.Name + "-pvc",
+					ClaimName: PersistentVolumeClaimName,
 				},
 			},
 		}
