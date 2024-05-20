@@ -25,16 +25,23 @@ import (
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/equality"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+)
+
+// code-server configuration constants
+const (
+	CodeServerImage         = "lscr.io/linuxserver/code-server:latest"
+	CodeServerPort          = 8443
+	CodeServerContainerName = "code-server"
 )
 
 type KodeReconciler struct {
@@ -50,57 +57,90 @@ type KodeReconciler struct {
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
 
+// logKodeManifest add structured logging for the Kode manifest to improve visibility for debugging
+func logKodeManifest(log logr.Logger, kode *kodev1alpha1.Kode) {
+	log.V(1).Info("Kode Manifest",
+		"Name", kode.Name,
+		"Namespace", kode.Namespace,
+		"Image", kode.Spec.Image,
+		"TZ", kode.Spec.TZ,
+		"PUID", kode.Spec.PUID,
+		"PGID", kode.Spec.PGID,
+		"URL", kode.Spec.URL,
+		"ServicePort", kode.Spec.ServicePort,
+		"Envs", fmt.Sprintf("%v", kode.Spec.Envs),
+		"Args", fmt.Sprintf("%v", kode.Spec.Args),
+		"Password", kode.Spec.Password,
+		"HashedPassword", kode.Spec.HashedPassword,
+		"SudoPassword", kode.Spec.SudoPassword,
+		"SudoPasswordHash", kode.Spec.SudoPasswordHash,
+		"ConfigPath", kode.Spec.ConfigPath,
+		"DefaultWorkspace", kode.Spec.DefaultWorkspace,
+		"Storage", fmt.Sprintf("%v", kode.Spec.Storage),
+	)
+}
+
 func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	log := r.Log.WithName("Reconcile")
 	// Fetch the Kode instance
 	kode := &kodev1alpha1.Kode{}
-	r.Log.Info("Fetching Kode instance", "Namespace", req.Namespace, "Name", req.Name)
+	log.Info("Fetching Kode instance", "Namespace", req.Namespace, "Name", req.Name)
+	logKodeManifest(log, kode)
 	if err := r.Get(ctx, req.NamespacedName, kode); err != nil {
 		if client.IgnoreNotFound(err) != nil {
-			r.Log.Error(err, "Failed to fetch Kode instance", "Namespace", req.Namespace, "Name", req.Name)
+			log.Error(err, "Failed to fetch Kode instance", "Namespace", req.Namespace, "Name", req.Name)
 		}
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-	r.Log.Info("Successfully fetched Kode instance", "Namespace", req.Namespace, "Name", req.Name)
 
 	// Ensure the Deployment and Service exist
-	r.Log.Info("Ensuring Deployment exists", "Namespace", kode.Namespace, "Name", kode.Name)
+	log.Info("Ensuring Deployment exists", "Namespace", kode.Namespace, "Name", kode.Name)
 	if err := r.ensureDeployment(ctx, kode); err != nil {
 		return ctrl.Result{}, err
 	}
-	r.Log.Info("Deployment ensured", "Namespace", kode.Namespace, "Name", kode.Name)
-	r.Log.Info("Ensuring Service exists", "Namespace", kode.Namespace, "Name", kode.Name)
+	log.Info("Ensuring Service exists", "Namespace", kode.Namespace, "Name", kode.Name)
 	if err := r.ensureService(ctx, kode); err != nil {
 		return ctrl.Result{}, err
 	}
-	r.Log.Info("Service ensured", "Namespace", kode.Namespace, "Name", kode.Name)
 
 	// Ensure PVC exists
 	if !reflect.DeepEqual(kode.Spec.Storage, kodev1alpha1.KodeStorageSpec{}) {
-		r.Log.Info("Ensuring Storage exists", "Namespace", kode.Namespace, "Name", kode.Name)
+		log.Info("Ensuring Storage exists", "Namespace", kode.Namespace, "Name", kode.Name)
 		if _, err := r.ensurePVC(ctx, kode); err != nil {
 			return ctrl.Result{}, err
 		}
-		r.Log.Info("Storage ensured", "Namespace", kode.Namespace, "Name", kode.Name)
 	}
-
-	// Update the status
-	r.Log.Info("Updating Kode status", "Namespace", kode.Namespace, "Name", kode.Name)
-	kode.Status.AvailableReplicas = r.getAvailableReplicas(ctx, kode)
-	if err := r.Status().Update(ctx, kode); err != nil {
-		return ctrl.Result{}, err
-	}
-	r.Log.Info("Kode status updated", "Namespace", kode.Namespace, "Name", kode.Name)
 
 	return ctrl.Result{}, nil
 }
 
-func (r *KodeReconciler) ensurePVC(ctx context.Context, kode *kodev1alpha1.Kode) (*v1.PersistentVolumeClaim, error) {
-	pvc := &v1.PersistentVolumeClaim{
+// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ensurePVC ensures that the PersistentVolumeClaim exists for the Kode instance
+func (r *KodeReconciler) ensurePVC(ctx context.Context, kode *kodev1alpha1.Kode) (*corev1.PersistentVolumeClaim, error) {
+	log := r.Log.WithName("ensurePVC")
+	log.Info("Ensuring PVC exists", "Namespace", kode.Namespace, "Name", kode.Name)
+	pvc, err := r.getOrCreatePVC(ctx, kode)
+	if err != nil {
+		log.Error(err, "Failed to get or create PVC", "Namespace", kode.Namespace, "Name", kode.Name)
+		return nil, err
+	}
+	if err := r.updatePVCIfNecessary(ctx, kode, pvc); err != nil {
+		log.Error(err, "Failed to update PVC if necessary", "Namespace", kode.Namespace, "Name", kode.Name)
+		return nil, err
+	}
+	log.Info("Successfully ensured PVC", "Namespace", kode.Namespace, "Name", kode.Name)
+	return pvc, nil
+}
+
+// constructPVC constructs a PersistentVolumeClaim for the Kode instance
+func (r *KodeReconciler) constructPVC(kode *kodev1alpha1.Kode) *corev1.PersistentVolumeClaim {
+	log := r.Log.WithName("constructPVC")
+	pvc := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kode.Name + "-pvc",
 			Namespace: kode.Namespace,
 		},
-		Spec: v1.PersistentVolumeClaimSpec{
+		Spec: corev1.PersistentVolumeClaimSpec{
 			AccessModes: kode.Spec.Storage.AccessModes,
 			Resources:   kode.Spec.Storage.Resources,
 		},
@@ -108,68 +148,127 @@ func (r *KodeReconciler) ensurePVC(ctx context.Context, kode *kodev1alpha1.Kode)
 	if kode.Spec.Storage.StorageClassName != nil {
 		pvc.Spec.StorageClassName = kode.Spec.Storage.StorageClassName
 	}
+	logPVCManifest(log, pvc)
+	return pvc
+}
 
-	// Set the Kode instance as the owner and controller
+// getOrCreatePVC gets or creates a PersistentVolumeClaim for the Kode instance
+func (r *KodeReconciler) getOrCreatePVC(ctx context.Context, kode *kodev1alpha1.Kode) (*corev1.PersistentVolumeClaim, error) {
+	log := r.Log.WithName("getOrCreatePVC")
+	pvc := r.constructPVC(kode)
 	if err := controllerutil.SetControllerReference(kode, pvc, r.Scheme); err != nil {
 		return nil, err
 	}
 
-	// Check if this PVC already exists
-	found := &v1.PersistentVolumeClaim{}
+	found := &corev1.PersistentVolumeClaim{}
 	err := r.Get(ctx, types.NamespacedName{Name: pvc.Name, Namespace: pvc.Namespace}, found)
-	if err != nil && errors.IsNotFound(err) {
-		r.Log.Info("Creating a new PVC", "Namespace", pvc.Namespace, "Name", pvc.Name)
-		err = r.Create(ctx, pvc)
-		if err != nil {
-			return nil, err
+	if err != nil {
+		if errors.IsNotFound(err) {
+			log.Info("Creating a new PVC", "Namespace", pvc.Namespace, "Name", pvc.Name)
+			if err := r.Create(ctx, pvc); err != nil {
+				return nil, err
+			}
+			return pvc, nil
 		}
-		return pvc, nil
-	} else if err != nil {
 		return nil, err
-	}
-
-	// Update the PVC if it exists and is different
-	if !equality.Semantic.DeepEqual(found.Spec, pvc.Spec) {
-		found.Spec = pvc.Spec
-		r.Log.Info("Updating existing PVC", "Namespace", pvc.Namespace, "Name", pvc.Name)
-		err = r.Update(ctx, found)
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	return found, nil
 }
 
+// updatePVCIfNecessary updates the PVC if the desired state is different from the existing state
+func (r *KodeReconciler) updatePVCIfNecessary(ctx context.Context, kode *kodev1alpha1.Kode, existingPVC *corev1.PersistentVolumeClaim) error {
+	log := r.Log.WithName("updatePVCIfNecessary")
+	desiredPVC := r.constructPVC(kode)
+	if !equality.Semantic.DeepEqual(existingPVC.Spec, desiredPVC.Spec) {
+		existingPVC.Spec = desiredPVC.Spec
+		log.Info("Updating existing PVC", "Namespace", existingPVC.Namespace, "Name", existingPVC.Name)
+		return r.Update(ctx, existingPVC)
+	}
+	return nil
+}
+
+// logPVCManifest add structured logging for the PVC manifest to improve visibility for debugging
+func logPVCManifest(log logr.Logger, pvc *corev1.PersistentVolumeClaim) {
+	log.V(1).Info("PVC Manifest",
+		"Name", pvc.Name,
+		"Namespace", pvc.Namespace,
+		"AccessModes", fmt.Sprintf("%v", pvc.Spec.AccessModes),
+		"Resources", fmt.Sprintf("Requests: %v, Limits: %v", pvc.Spec.Resources.Requests, pvc.Spec.Resources.Limits),
+		"StorageClassName", pvc.Spec.StorageClassName,
+	)
+}
+
+// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ensureDeployment ensures that the Deployment exists for the Kode instance
 func (r *KodeReconciler) ensureDeployment(ctx context.Context, kode *kodev1alpha1.Kode) error {
+	log := r.Log.WithName("ensureDeployment")
+
+	log.Info("Ensuring Deployment exists", "Namespace", kode.Namespace, "Name", kode.Name)
+
+	deployment, err := r.getOrCreateDeployment(ctx, kode)
+	if err != nil {
+		log.Error(err, "Failed to get or create Deployment", "Namespace", kode.Namespace, "Name", kode.Name)
+		return err
+	}
+
+	if err := r.updateDeploymentIfNecessary(ctx, deployment); err != nil {
+		log.Error(err, "Failed to update Deployment if necessary", "Namespace", deployment.Namespace, "Name", deployment.Name)
+		return err
+	}
+
+	log.Info("Successfully ensured Deployment", "Namespace", kode.Namespace, "Name", kode.Name)
+
+	return nil
+}
+
+// constructDeployment constructs a Deployment for the Kode instance
+func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode) *appsv1.Deployment {
+	log := r.Log.WithName("constructDeployment")
 	replicas := int32(1)
 	defaultWorkspace := kode.Spec.DefaultWorkspace
 	if defaultWorkspace == "" {
 		defaultWorkspace = kode.Spec.ConfigPath + "/workspace"
 	}
 
-	// Define the PVC volume
-	volume := corev1.Volume{
-		Name: "kode-storage",
-		VolumeSource: corev1.VolumeSource{
-			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-				ClaimName: kode.Name + "-pvc",
-			},
+	containers := []corev1.Container{{
+		Name:  CodeServerContainerName,
+		Image: kode.Spec.Image,
+		Env: []corev1.EnvVar{
+			{Name: "PUID", Value: fmt.Sprintf("%d", kode.Spec.PUID)},
+			{Name: "PGID", Value: fmt.Sprintf("%d", kode.Spec.PGID)},
+			{Name: "TZ", Value: kode.Spec.TZ},
+			{Name: "PASSWORD", Value: kode.Spec.Password},
+			{Name: "HASHED_PASSWORD", Value: kode.Spec.HashedPassword},
+			{Name: "SUDO_PASSWORD", Value: kode.Spec.SudoPassword},
+			{Name: "SUDO_PASSWORD_HASH", Value: kode.Spec.SudoPasswordHash},
+			{Name: "DEFAULT_WORKSPACE", Value: defaultWorkspace},
 		},
-	}
+		Ports: []corev1.ContainerPort{{ContainerPort: kode.Spec.ServicePort}},
+	}}
 
-	// Define the volume mount
-	volumeMount := corev1.VolumeMount{
-		Name:      "kode-storage",
-		MountPath: kode.Spec.ConfigPath,
-	}
+	volumes := []corev1.Volume{}
+	volumeMounts := []corev1.VolumeMount{}
 
-	// Check if the PVC exists
-	pvcExists := false
-	pvc := &corev1.PersistentVolumeClaim{}
-	err := r.Get(ctx, types.NamespacedName{Name: kode.Name + "-pvc", Namespace: kode.Namespace}, pvc)
-	if err == nil {
-		pvcExists = true
+	// Add volume and volume mount if storage is defined
+	if !reflect.DeepEqual(kode.Spec.Storage, kodev1alpha1.KodeStorageSpec{}) {
+		volume := corev1.Volume{
+			Name: "kode-storage",
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: kode.Name + "-pvc",
+				},
+			},
+		}
+
+		volumeMount := corev1.VolumeMount{
+			Name:      "kode-storage",
+			MountPath: kode.Spec.ConfigPath,
+		}
+
+		volumes = append(volumes, volume)
+		volumeMounts = append(volumeMounts, volumeMount)
+		containers[0].VolumeMounts = volumeMounts
 	}
 
 	deployment := &appsv1.Deployment{
@@ -180,78 +279,154 @@ func (r *KodeReconciler) ensureDeployment(ctx context.Context, kode *kodev1alpha
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: map[string]string{"app": "code-server"},
+				MatchLabels: map[string]string{"app": CodeServerContainerName},
 			},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: map[string]string{"app": "code-server"},
+					Labels: map[string]string{"app": CodeServerContainerName},
 				},
 				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{{
-						Name:  "code-server",
-						Image: kode.Spec.Image,
-						Env: []corev1.EnvVar{
-							{Name: "PUID", Value: fmt.Sprintf("%d", kode.Spec.PUID)},
-							{Name: "PGID", Value: fmt.Sprintf("%d", kode.Spec.PGID)},
-							{Name: "TZ", Value: kode.Spec.TZ},
-							{Name: "PASSWORD", Value: kode.Spec.Password},
-							{Name: "HASHED_PASSWORD", Value: kode.Spec.HashedPassword},
-							{Name: "SUDO_PASSWORD", Value: kode.Spec.SudoPassword},
-							{Name: "SUDO_PASSWORD_HASH", Value: kode.Spec.SudoPasswordHash},
-							{Name: "DEFAULT_WORKSPACE", Value: defaultWorkspace},
-						},
-						Ports: []corev1.ContainerPort{{ContainerPort: kode.Spec.ServicePort}},
-						VolumeMounts: []corev1.VolumeMount{
-							volumeMount,
-						},
-					}},
-					Volumes: []corev1.Volume{
-						volume,
-					},
+					Containers: containers,
+					Volumes:    volumes,
 				},
 			},
 		},
 	}
 
-	// Add volume and volume mount if PVC exists
-	if pvcExists {
-		deployment.Spec.Template.Spec.Containers[0].VolumeMounts = []corev1.VolumeMount{volumeMount}
-		deployment.Spec.Template.Spec.Volumes = []corev1.Volume{volume}
-	}
+	logDeploymentManifest(log, deployment)
+	return deployment
+}
+
+// getOrCreateDeployment gets or creates a Deployment for the Kode instance
+func (r *KodeReconciler) getOrCreateDeployment(ctx context.Context, kode *kodev1alpha1.Kode) (*appsv1.Deployment, error) {
+	log := r.Log.WithName("getOrCreateDeployment")
+	deployment := r.constructDeployment(kode)
 
 	if err := controllerutil.SetControllerReference(kode, deployment, r.Scheme); err != nil {
-		return err
+		return nil, err
 	}
 
 	found := &appsv1.Deployment{}
-	err = r.Get(ctx, types.NamespacedName{Name: deployment.Name, Namespace: deployment.Namespace}, found)
-	if err != nil && client.IgnoreNotFound(err) != nil {
-		return err
+	err := r.Get(ctx, types.NamespacedName{Name: deployment.Name, Namespace: deployment.Namespace}, found)
+	if err != nil {
+		if client.IgnoreNotFound(err) != nil {
+			return nil, err
+		}
+		log.Info("Creating Deployment", "Namespace", deployment.Namespace, "Name", deployment.Name)
+		if err := r.Create(ctx, deployment); err != nil {
+			log.Error(err, "Failed to create Deployment", "Namespace", deployment.Namespace, "Name", deployment.Name)
+			return nil, err
+		}
+		log.Info("Deployment created", "Namespace", deployment.Namespace, "Name", deployment.Name)
 	}
 
-	if err != nil && client.IgnoreNotFound(err) == nil {
-		r.Log.Info("Creating Deployment", "Namespace", deployment.Namespace, "Name", deployment.Name)
-		r.Log.V(1).Info("Deployment Spec", "Spec", deployment.Spec)
-		if err := r.Create(ctx, deployment); err != nil {
-			r.Log.Error(err, "Failed to create Deployment", "Namespace", deployment.Namespace, "Name", deployment.Name)
+	return deployment, nil
+}
+
+// updateDeploymentIfNecessary updates the Deployment if the desired state is different from the existing state
+func (r *KodeReconciler) updateDeploymentIfNecessary(ctx context.Context, deployment *appsv1.Deployment) error {
+	log := r.Log.WithName("updateDeploymentIfNecessary")
+
+	found := &appsv1.Deployment{}
+	err := r.Get(ctx, types.NamespacedName{Name: deployment.Name, Namespace: deployment.Namespace}, found)
+	if err != nil {
+		if client.IgnoreNotFound(err) != nil {
+			log.Error(err, "Failed to get Deployment", "Namespace", deployment.Namespace, "Name", deployment.Name)
 			return err
 		}
-		r.Log.Info("Deployment created", "Namespace", deployment.Namespace, "Name", deployment.Name)
-	} else if !reflect.DeepEqual(deployment.Spec, found.Spec) {
-		found.Spec = deployment.Spec
-		r.Log.Info("Updating Deployment", "Namespace", deployment.Namespace, "Name", deployment.Name)
-		r.Log.V(1).Info("Deployment Spec", "Spec", found.Spec)
-		if err := r.Update(ctx, found); err != nil {
-			r.Log.Error(err, "Failed to update Deployment", "Namespace", deployment.Namespace, "Name", deployment.Name)
-			return err
-		}
-		r.Log.Info("Deployment updated", "Namespace", deployment.Namespace, "Name", deployment.Name)
+		log.Info("Deployment not found, skipping update", "Namespace", deployment.Namespace, "Name", deployment.Name)
+		return nil
 	}
+
+	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		if err := r.Get(ctx, types.NamespacedName{Name: deployment.Name, Namespace: deployment.Namespace}, found); err != nil {
+			return err
+		}
+
+		if !reflect.DeepEqual(deployment.Spec, found.Spec) {
+			found.Spec = deployment.Spec
+			log.Info("Updating Deployment due to spec change", "Namespace", found.Namespace, "Name", found.Name)
+			return r.Update(ctx, found)
+		}
+		return nil
+	})
+
+	if retryErr != nil {
+		log.Error(retryErr, "Failed to update Deployment after retrying", "Namespace", deployment.Namespace, "Name", deployment.Name)
+		return retryErr
+	}
+
+	log.Info("Deployment is up-to-date", "Namespace", deployment.Namespace, "Name", deployment.Name)
 
 	return nil
 }
 
+// logDeploymentManifest add structured logging for the Deployment manifest to improve visibility for debugging
+func logDeploymentManifest(log logr.Logger, deployment *appsv1.Deployment) {
+	log.V(1).Info("Deployment Manifest",
+		"Name", deployment.Name,
+		"Namespace", deployment.Namespace,
+		"Replicas", *deployment.Spec.Replicas,
+		"Image", deployment.Spec.Template.Spec.Containers[0].Image,
+		"Ports", fmt.Sprintf("%v", deployment.Spec.Template.Spec.Containers[0].Ports),
+		"Env", fmt.Sprintf("%v", deployment.Spec.Template.Spec.Containers[0].Env),
+		"VolumeMounts", fmt.Sprintf("%v", deployment.Spec.Template.Spec.Containers[0].VolumeMounts),
+		"Volumes", fmt.Sprintf("%v", deployment.Spec.Template.Spec.Volumes),
+	)
+}
+
+// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// ensureService ensures that the Service exists for the Kode instance
 func (r *KodeReconciler) ensureService(ctx context.Context, kode *kodev1alpha1.Kode) error {
+	log := r.Log.WithName("ensureService")
+
+	log.Info("Ensuring Service exists", "Namespace", kode.Namespace, "Name", kode.Name)
+
+	service, err := r.getOrCreateService(ctx, kode)
+	if err != nil {
+		log.Error(err, "Failed to get or create Service", "Namespace", kode.Namespace, "Name", kode.Name)
+		return err
+	}
+
+	if err := r.updateServiceIfNecessary(ctx, service); err != nil {
+		log.Error(err, "Failed to update Service if necessary", "Namespace", service.Namespace, "Name", service.Name)
+		return err
+	}
+
+	log.Info("Successfully ensured Service", "Namespace", kode.Namespace, "Name", kode.Name)
+
+	return nil
+}
+
+// getOrCreateService gets or creates a Service for the Kode instance
+func (r *KodeReconciler) getOrCreateService(ctx context.Context, kode *kodev1alpha1.Kode) (*corev1.Service, error) {
+	log := r.Log.WithName("getOrCreateService")
+	service := r.constructService(kode)
+
+	if err := controllerutil.SetControllerReference(kode, service, r.Scheme); err != nil {
+		return nil, err
+	}
+
+	found := &corev1.Service{}
+	err := r.Get(ctx, types.NamespacedName{Name: service.Name, Namespace: service.Namespace}, found)
+	if err != nil {
+		if client.IgnoreNotFound(err) != nil {
+			return nil, err
+		}
+		log.Info("Creating Service", "Namespace", service.Namespace, "Name", service.Name)
+		if err := r.Create(ctx, service); err != nil {
+			log.Error(err, "Failed to create Service", "Namespace", service.Namespace, "Name", service.Name)
+			return nil, err
+		}
+		log.Info("Service created", "Namespace", service.Namespace, "Name", service.Name)
+	}
+
+	return service, nil
+}
+
+// constructService constructs a Service for the Kode instance
+func (r *KodeReconciler) constructService(kode *kodev1alpha1.Kode) *corev1.Service {
+	log := r.Log.WithName("constructService")
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kode.Name,
@@ -266,49 +441,42 @@ func (r *KodeReconciler) ensureService(ctx context.Context, kode *kodev1alpha1.K
 			}},
 		},
 	}
+	logServiceManifest(log, service)
+	return service
+}
 
-	if err := controllerutil.SetControllerReference(kode, service, r.Scheme); err != nil {
-		return err
-	}
-
+// updateServiceIfNecessary updates the Service if the desired state is different from the existing state
+func (r *KodeReconciler) updateServiceIfNecessary(ctx context.Context, service *corev1.Service) error {
+	log := r.Log.WithName("updateServiceIfNecessary")
 	found := &corev1.Service{}
 	err := r.Get(ctx, types.NamespacedName{Name: service.Name, Namespace: service.Namespace}, found)
-	if err != nil && client.IgnoreNotFound(err) != nil {
-		return err
-	}
-
-	if err != nil && client.IgnoreNotFound(err) == nil {
-		r.Log.Info("Creating Service", "Namespace", service.Namespace, "Name", service.Name)
-		if err := r.Create(ctx, service); err != nil {
-			r.Log.Error(err, "Failed to create Service", "Namespace", service.Namespace, "Name", service.Name)
+	if err != nil {
+		if client.IgnoreNotFound(err) != nil {
 			return err
 		}
-		r.Log.Info("Service created", "Namespace", service.Namespace, "Name", service.Name)
-	} else if !reflect.DeepEqual(service.Spec, found.Spec) {
+		return nil
+	}
+
+	if !reflect.DeepEqual(service.Spec, found.Spec) {
 		found.Spec = service.Spec
-		r.Log.Info("Updating Service", "Namespace", service.Namespace, "Name", service.Name)
-		if err := r.Update(ctx, found); err != nil {
-			r.Log.Error(err, "Failed to update Service", "Namespace", service.Namespace, "Name", service.Name)
-			return err
-		}
-		r.Log.Info("Service updated", "Namespace", service.Namespace, "Name", service.Name)
+		log.Info("Updating Service", "Namespace", found.Namespace, "Name", found.Name)
+		return r.Update(ctx, found)
 	}
-
 	return nil
 }
 
-func (r *KodeReconciler) getAvailableReplicas(ctx context.Context, kode *kodev1alpha1.Kode) int32 {
-	deployment := &appsv1.Deployment{}
-	_ = r.Get(ctx, types.NamespacedName{Name: kode.Name, Namespace: kode.Namespace}, deployment)
-	return deployment.Status.AvailableReplicas
-}
-
-func (r *KodeReconciler) ensureResource(ctx context.Context, kode *kodev1alpha1.Kode, ensureFunc func(context.Context, *kodev1alpha1.Kode) error) error {
-	return ensureFunc(ctx, kode)
+// logServiceManifest add structured logging for the Service manifest to improve visibility for debugging
+func logServiceManifest(log logr.Logger, service *corev1.Service) {
+	log.V(1).Info("Service Manifest",
+		"Name", service.Name,
+		"Namespace", service.Namespace,
+		"Selector", fmt.Sprintf("%v", service.Spec.Selector),
+		"Ports", fmt.Sprintf("%v", service.Spec.Ports),
+	)
 }
 
 func (r *KodeReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	r.Log = ctrl.Log.WithName("controllers").WithName("Kode")
+	r.Log = ctrl.Log.WithName("Kode")
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&kodev1alpha1.Kode{}).
 		Owns(&appsv1.Deployment{}).

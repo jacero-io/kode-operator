@@ -6,14 +6,16 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: kode-sample
 spec:
-  image: lscr.io/linuxserver/code-server:latest
+  # image: lscr.io/linuxserver/code-server:latest
+  # image: lscr.io/linuxserver/code-server:4.89.0
+  image: lscr.io/linuxserver/code-server:4.89.1
   servicePort: 8443
   password: "password1"
-  # storage:
-  #   accessModes:
-  #     - ReadWriteOnce
-  #   resources:
-  #     requests:
-  #       storage: 1Gi
-  #   storageClassName: standard
-  #   mountPath: /config
+  storage:
+    accessModes:
+      - ReadWriteOnce
+    resources:
+      requests:
+        storage: 1Gi
+    storageClassName: standard
+    mountPath: /config
