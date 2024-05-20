@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -28,6 +29,7 @@ import (
 type KodeSpec struct {
 	// Image is the Docker image for code-server
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Required
 	// +kubebuilder:default="lscr.io/linuxserver/code-server:latest"
 	Image string `json:"image"`
 
@@ -48,7 +50,8 @@ type KodeSpec struct {
 
 	// ServicePort is the port for the code-server service
 	// +kubebuilder:validation:Minimum=1
-	ServicePort int32 `json:"servicePort"`
+	// +kubebuilder:default=8443
+	ServicePort int32 `json:"servicePort,omitempty"`
 
 	// Specifies the envs
 	Envs []string `json:"envs,omitempty" protobuf:"bytes,9,opt,name=envs"`
@@ -58,6 +61,7 @@ type KodeSpec struct {
 
 	// Password is the password for code-server
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Required
 	Password string `json:"password"`
 
 	// HashedPassword is the hashed password for code-server
@@ -71,6 +75,7 @@ type KodeSpec struct {
 
 	// ConfigPath is the path to the config directory for code-server
 	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Required
 	// +kubebuilder:default=/config
 	ConfigPath string `json:"configPath,omitempty"`
 
@@ -79,23 +84,22 @@ type KodeSpec struct {
 	DefaultWorkspace string `json:"defaultWorkspace,omitempty"`
 
 	// Storage specifies the storage configuration for code-server
-	Storage *StorageSpec `json:"storage,omitempty"`
+	Storage KodeStorageSpec `json:"storage,omitempty"`
 }
 
-// StorageSpec defines the desired state of storage for Kode
-type StorageSpec struct {
-	// Name is the name of the PersistentVolumeClaim for code-server
-	Name string `json:"name,omitempty"`
+// KodeStorageSpec defines the storage configuration for code-server
+type KodeStorageSpec struct {
+	// AccessModes specifies the access modes for the persistent volume
+	AccessModes []corev1.PersistentVolumeAccessMode `json:"accessModes,omitempty"`
 
-	// StorageClassName is the storage class name for the PVC. When empty the controller will use the default storage class.
-	StorageClassName string `json:"storageClassName,omitempty"`
+	// StorageClassName specifies the storage class name for the persistent volume
+	StorageClassName *string `json:"storageClassName,omitempty"`
 
-	// Size is the storage request size for the PVC
-	// +kubebuilder:validation:MinLength=1
-	Size string `json:"size,omitempty"`
+	// Resources specifies the resource requirements for the persistent volume
+	Resources corev1.VolumeResourceRequirements `json:"resources,omitempty"`
 
-	// Enable specifies whether storage is enabled or not
-	Enable bool `json:"enable,omitempty"`
+	// HostPath specifies the host path for the persistent volume
+	HostPath *corev1.HostPathVolumeSource `json:"hostPath,omitempty"`
 }
 
 // KodeConditionType describes the type of state of code server condition

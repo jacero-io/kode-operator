@@ -18,12 +18,10 @@ package controller
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
-	"k8s.io/apimachinery/pkg/api/resource"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -74,7 +72,7 @@ var _ = Describe("Kode Controller", func() {
 			Expect(k8sClient.Delete(ctx, kode)).To(Succeed())
 		})
 
-		It("should create a StatefulSet and Service for the resource", func() {
+		It("should create a Deployment and Service for the resource", func() {
 			By("reconciling the created resource")
 			controllerReconciler := &KodeReconciler{
 				Client: k8sClient,
@@ -86,13 +84,13 @@ var _ = Describe("Kode Controller", func() {
 			})
 			Expect(err).NotTo(HaveOccurred())
 
-			By("checking if the StatefulSet has been created")
-			statefulSet := &appsv1.StatefulSet{}
+			By("checking if the Deployment has been created")
+			deployment := &appsv1.Deployment{}
 			Eventually(func() error {
-				return k8sClient.Get(ctx, typeNamespacedName, statefulSet)
+				return k8sClient.Get(ctx, typeNamespacedName, deployment)
 			}, time.Second*5, time.Millisecond*500).Should(Succeed())
 
-			Expect(statefulSet.Spec.Template.Spec.Containers[0].Image).To(Equal("lscr.io/linuxserver/code-server:latest"))
+			Expect(deployment.Spec.Template.Spec.Containers[0].Image).To(Equal("lscr.io/linuxserver/code-server:latest"))
 
 			By("checking if the Service has been created")
 			service := &corev1.Service{}
@@ -103,7 +101,7 @@ var _ = Describe("Kode Controller", func() {
 			Expect(service.Spec.Ports[0].Port).To(Equal(int32(8443)))
 		})
 
-		It("should update the StatefulSet when the Kode resource is updated", func() {
+		It("should update the Deployment when the Kode resource is updated", func() {
 			By("reconciling the created resource")
 			controllerReconciler := &KodeReconciler{
 				Client: k8sClient,
@@ -123,95 +121,12 @@ var _ = Describe("Kode Controller", func() {
 			kode.Spec.Image = "lscr.io/linuxserver/code-server:latest"
 			Expect(k8sClient.Update(ctx, kode)).To(Succeed())
 
-			By("checking if the StatefulSet has been updated")
-			statefulSet := &appsv1.StatefulSet{}
+			By("checking if the Deployment has been updated")
+			deployment := &appsv1.Deployment{}
 			Eventually(func() string {
-				_ = k8sClient.Get(ctx, typeNamespacedName, statefulSet)
-				return statefulSet.Spec.Template.Spec.Containers[0].Image
+				_ = k8sClient.Get(ctx, typeNamespacedName, deployment)
+				return deployment.Spec.Template.Spec.Containers[0].Image
 			}, time.Second*5, time.Millisecond*500).Should(Equal("lscr.io/linuxserver/code-server:latest"))
-		})
-
-		It("should create a PVC for the resource if specified", func() {
-			By("updating the Kode resource to specify storage")
-			kode := &kodev1alpha1.Kode{}
-			err := k8sClient.Get(ctx, typeNamespacedName, kode)
-			Expect(err).NotTo(HaveOccurred())
-
-			kode.Spec.Storage = &kodev1alpha1.StorageSpec{
-				Name: "test-pvc",
-				Size: "1Gi",
-			}
-			Expect(k8sClient.Update(ctx, kode)).To(Succeed())
-
-			By("reconciling the updated resource")
-			controllerReconciler := &KodeReconciler{
-				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
-			}
-
-			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
-			})
-			Expect(err).NotTo(HaveOccurred())
-
-			By("checking if the PVC has been created")
-			pvc := &corev1.PersistentVolumeClaim{}
-			Eventually(func() error {
-				return k8sClient.Get(ctx, types.NamespacedName{Name: "test-pvc", Namespace: resourceNamespace}, pvc)
-			}, time.Second*5, time.Millisecond*500).Should(Succeed())
-
-			Expect(pvc.Spec.Resources.Requests[corev1.ResourceStorage]).To(Equal(resource.MustParse("1Gi")))
-		})
-
-		It("should update the PVC when the Kode resource is updated", func() {
-			By("updating the Kode resource to specify storage")
-			kode := &kodev1alpha1.Kode{}
-			err := k8sClient.Get(ctx, typeNamespacedName, kode)
-			Expect(err).NotTo(HaveOccurred())
-
-			kode.Spec.Storage = &kodev1alpha1.StorageSpec{
-				Name: "test-pvc",
-				Size: "1Gi",
-			}
-			Expect(k8sClient.Update(ctx, kode)).To(Succeed())
-
-			By("reconciling the updated resource")
-			controllerReconciler := &KodeReconciler{
-				Client: k8sClient,
-				Scheme: k8sClient.Scheme(),
-			}
-
-			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
-			})
-			Expect(err).NotTo(HaveOccurred())
-
-			By("checking if the PVC has been created")
-			pvc := &corev1.PersistentVolumeClaim{}
-			Eventually(func() error {
-				return k8sClient.Get(ctx, types.NamespacedName{Name: "test-pvc", Namespace: resourceNamespace}, pvc)
-			}, time.Second*5, time.Millisecond*500).Should(Succeed())
-
-			Expect(pvc.Spec.Resources.Requests[corev1.ResourceStorage]).To(Equal(resource.MustParse("1Gi")))
-
-			By("updating the Kode resource to change the PVC size")
-			kode.Spec.Storage.Size = "2Gi"
-			Expect(k8sClient.Update(ctx, kode)).To(Succeed())
-
-			By("reconciling the updated resource")
-			_, err = controllerReconciler.Reconcile(ctx, reconcile.Request{
-				NamespacedName: typeNamespacedName,
-			})
-			Expect(err).NotTo(HaveOccurred())
-
-			By("checking if the PVC has been updated")
-			Eventually(func() error {
-				_ = k8sClient.Get(ctx, types.NamespacedName{Name: "test-pvc", Namespace: resourceNamespace}, pvc)
-				if pvc.Spec.Resources.Requests[corev1.ResourceStorage] != resource.MustParse("2Gi") {
-					return fmt.Errorf("PVC size not updated")
-				}
-				return nil
-			}, time.Second*5, time.Millisecond*500).Should(Succeed())
 		})
 	})
 })

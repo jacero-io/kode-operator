@@ -8,9 +8,12 @@ metadata:
 spec:
   image: lscr.io/linuxserver/code-server:latest
   servicePort: 8443
-  password: "password"
-  storage:
-    enable: true
-    # name: my-code-server-pvc
-    # storageClassName: standard
-    # size: 10Gi
+  password: "password1"
+  # storage:
+  #   accessModes:
+  #     - ReadWriteOnce
+  #   resources:
+  #     requests:
+  #       storage: 1Gi
+  #   storageClassName: standard
+  #   mountPath: /config

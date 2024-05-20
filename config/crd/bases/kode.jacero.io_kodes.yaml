@@ -82,6 +82,7 @@ spec:
                 format: int64
                 type: integer
               servicePort:
+                default: 8443
                 description: ServicePort is the port for the code-server service
                 format: int32
                 minimum: 1
@@ -89,21 +90,63 @@ spec:
               storage:
                 description: Storage specifies the storage configuration for code-server
                 properties:
-                  enable:
-                    description: Enable specifies whether storage is enabled or not
-                    type: boolean
-                  name:
-                    description: Name is the name of the PersistentVolumeClaim for
-                      code-server
-                    type: string
-                  size:
-                    description: Size is the storage request size for the PVC
-                    minLength: 1
-                    type: string
+                  accessModes:
+                    description: AccessModes specifies the access modes for the persistent
+                      volume
+                    items:
+                      type: string
+                    type: array
+                  hostPath:
+                    description: HostPath specifies the host path for the persistent
+                      volume
+                    properties:
+                      path:
+                        description: |-
+                          path of the directory on the host.
+                          If the path is a symlink, it will follow the link to the real path.
+                          More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath
+                        type: string
+                      type:
+                        description: |-
+                          type for HostPath Volume
+                          Defaults to ""
+                          More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath
+                        type: string
+                    required:
+                    - path
+                    type: object
+                  resources:
+                    description: Resources specifies the resource requirements for
+                      the persistent volume
+                    properties:
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: |-
+                          Limits describes the maximum amount of compute resources allowed.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: |-
+                          Requests describes the minimum amount of compute resources required.
+                          If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+                          otherwise to an implementation-defined value. Requests cannot exceed Limits.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                        type: object
+                    type: object
                   storageClassName:
-                    description: StorageClassName is the storage class name for the
-                      PVC. When empty the controller will use the default storage
-                      class.
+                    description: StorageClassName specifies the storage class name
+                      for the persistent volume
                     type: string
                 type: object
               sudoPassword:
@@ -122,7 +165,6 @@ spec:
             required:
             - image
             - password
-            - servicePort
             type: object
           status:
             description: KodeStatus defines the observed state of Kode
