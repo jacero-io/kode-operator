@@ -187,6 +187,92 @@ var _ = Describe("Kode Controller", func() {
 			Expect(pvc.Spec.Resources.Requests[corev1.ResourceStorage]).To(Equal(resource.MustParse("1Gi")))
 		})
 
+		It("should update the PersistentVolumeClaim when the storage specification changes", func() {
+			By("updating the Kode resource to change the storage specification")
+			kode := &kodev1alpha1.Kode{}
+			err := k8sClient.Get(ctx, typeNamespacedName, kode)
+			Expect(err).NotTo(HaveOccurred())
+
+			kode.Spec.Storage = kodev1alpha1.KodeStorageSpec{
+				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+				Resources: corev1.VolumeResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceStorage: resource.MustParse("2Gi"),
+					},
+				},
+			}
+
+			err = k8sClient.Update(ctx, kode)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("checking if the PersistentVolumeClaim has been updated")
+			pvc := &corev1.PersistentVolumeClaim{}
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, types.NamespacedName{Name: resourceName + "-pvc", Namespace: resourceNamespace}, pvc)
+				if err != nil {
+					return false
+				}
+				return pvc.Spec.Resources.Requests[corev1.ResourceStorage] == resource.MustParse("2Gi")
+			}, time.Second*10, time.Millisecond*250).Should(BeTrue())
+		})
+
+		// It("should not update immutable fields of the PersistentVolumeClaim", func() {
+		// 	By("creating the Kode resource with initial storage specification")
+		// 	kode := &kodev1alpha1.Kode{}
+		// 	err := k8sClient.Get(ctx, typeNamespacedName, kode)
+		// 	Expect(err).NotTo(HaveOccurred())
+
+		// 	kode.Spec.Storage = kodev1alpha1.KodeStorageSpec{
+		// 		AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+		// 		Resources: corev1.VolumeResourceRequirements{
+		// 			Requests: corev1.ResourceList{
+		// 				corev1.ResourceStorage: resource.MustParse("1Gi"),
+		// 			},
+		// 		},
+		// 		StorageClassName: stringPtr("standard"),
+		// 	}
+
+		// 	err = k8sClient.Update(ctx, kode)
+		// 	Expect(err).NotTo(HaveOccurred())
+
+		// 	By("checking if the PersistentVolumeClaim has been created")
+		// 	pvc := &corev1.PersistentVolumeClaim{}
+		// 	Eventually(func() bool {
+		// 		err := k8sClient.Get(ctx, types.NamespacedName{Name: resourceName + "-pvc", Namespace: resourceNamespace}, pvc)
+		// 		if err != nil {
+		// 			return false
+		// 		}
+		// 		return true
+		// 	}, time.Second*10, time.Millisecond*250).Should(BeTrue())
+
+		// 	Expect(pvc.Spec.AccessModes).To(ContainElement(corev1.ReadWriteOnce))
+		// 	Expect(pvc.Spec.Resources.Requests[corev1.ResourceStorage]).To(Equal(resource.MustParse("1Gi")))
+		// 	Expect(*pvc.Spec.StorageClassName).To(Equal("standard"))
+
+		// 	By("updating the Kode resource to change an immutable field of the PVC")
+		// 	kode.Spec.Storage = kodev1alpha1.KodeStorageSpec{
+		// 		AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteMany}, // Immutable field change
+		// 		Resources: corev1.VolumeResourceRequirements{
+		// 			Requests: corev1.ResourceList{
+		// 				corev1.ResourceStorage: resource.MustParse("1Gi"),
+		// 			},
+		// 		},
+		// 		StorageClassName: stringPtr("standard"),
+		// 	}
+
+		// 	err = k8sClient.Update(ctx, kode)
+		// 	Expect(err).NotTo(HaveOccurred())
+
+		// 	By("checking if the PersistentVolumeClaim has not been updated with the immutable field change")
+		// 	Eventually(func() bool {
+		// 		err := k8sClient.Get(ctx, types.NamespacedName{Name: resourceName + "-pvc", Namespace: resourceNamespace}, pvc)
+		// 		if err != nil {
+		// 			return false
+		// 		}
+		// 		return pvc.Spec.AccessModes[0] == corev1.ReadWriteOnce // Should remain unchanged
+		// 	}, time.Second*10, time.Millisecond*250).Should(BeTrue())
+		// })
+
 		It("should handle missing required fields gracefully", func() {
 			By("creating the custom resource with missing required fields")
 			invalidKode := &kodev1alpha1.Kode{
@@ -228,49 +314,6 @@ var _ = Describe("Kode Controller", func() {
 			Expect(deployment.Spec.Template.Spec.Containers[0].Image).To(Equal("invalid-image-name"))
 		})
 
-		It("should update the PersistentVolumeClaim when the storage specification changes", func() {
-			By("updating the Kode resource to include storage")
-			kode := &kodev1alpha1.Kode{}
-			err := k8sClient.Get(ctx, typeNamespacedName, kode)
-			Expect(err).NotTo(HaveOccurred())
-
-			kode.Spec.Storage = kodev1alpha1.KodeStorageSpec{
-				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-				Resources: corev1.VolumeResourceRequirements{
-					Requests: corev1.ResourceList{
-						corev1.ResourceStorage: resource.MustParse("1Gi"),
-					},
-				},
-			}
-
-			err = k8sClient.Update(ctx, kode)
-			Expect(err).NotTo(HaveOccurred())
-
-			By("checking if the PersistentVolumeClaim has been created")
-			pvc := &corev1.PersistentVolumeClaim{}
-			Eventually(func() bool {
-				err := k8sClient.Get(ctx, types.NamespacedName{Name: resourceName + "-pvc", Namespace: resourceNamespace}, pvc)
-				return err == nil
-			}, time.Second*10, time.Millisecond*250).Should(BeTrue())
-
-			Expect(pvc.Spec.AccessModes).To(ContainElement(corev1.ReadWriteOnce))
-			Expect(pvc.Spec.Resources.Requests[corev1.ResourceStorage]).To(Equal(resource.MustParse("1Gi")))
-
-			By("updating the Kode resource to change the storage specification")
-			kode.Spec.Storage.Resources.Requests[corev1.ResourceStorage] = resource.MustParse("2Gi")
-			err = k8sClient.Update(ctx, kode)
-			Expect(err).NotTo(HaveOccurred())
-
-			By("checking if the PersistentVolumeClaim has been updated")
-			Eventually(func() bool {
-				err := k8sClient.Get(ctx, types.NamespacedName{Name: resourceName + "-pvc", Namespace: resourceNamespace}, pvc)
-				if err != nil {
-					return false
-				}
-				return pvc.Spec.Resources.Requests[corev1.ResourceStorage] == resource.MustParse("2Gi")
-			}, time.Second*10, time.Millisecond*250).Should(BeTrue())
-		})
-
 		It("should handle an invalid port number", func() {
 			By("creating the custom resource with an invalid port number")
 			invalidPortKode := &kodev1alpha1.Kode{
@@ -289,3 +332,7 @@ var _ = Describe("Kode Controller", func() {
 		})
 	})
 })
+
+func stringPtr(s string) *string {
+	return &s
+}
