@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"path/filepath"
 	"time"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -48,7 +49,9 @@ var _ = Describe("Kode Controller", func() {
 	BeforeEach(func() {
 		By("bootstrapping test environment")
 		ctx, cancel = context.WithCancel(context.Background())
-		testEnv = &envtest.Environment{}
+		testEnv = &envtest.Environment{
+			CRDDirectoryPaths: []string{filepath.Join("..", "..", "config", "crd", "bases")},
+		}
 
 		cfg, err := testEnv.Start()
 		Expect(err).NotTo(HaveOccurred())
