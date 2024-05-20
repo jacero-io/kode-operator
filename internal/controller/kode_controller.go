@@ -126,7 +126,7 @@ func (r *KodeReconciler) ensurePVC(ctx context.Context, kode *kodev1alpha1.Kode)
 	if err != nil {
 		return pvc, err
 	}
-	
+
 	return pvc, r.updatePVCIfNecessary(ctx, kode, pvc)
 }
 
