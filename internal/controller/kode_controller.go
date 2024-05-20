@@ -119,23 +119,21 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 // ensurePVC ensures that the PersistentVolumeClaim exists for the Kode instance
 func (r *KodeReconciler) ensurePVC(ctx context.Context, kode *kodev1alpha1.Kode) (*corev1.PersistentVolumeClaim, error) {
 	log := r.Log.WithName("ensurePVC")
+
 	log.Info("Ensuring PVC exists", "Namespace", kode.Namespace, "Name", kode.Name)
+
 	pvc, err := r.getOrCreatePVC(ctx, kode)
 	if err != nil {
-		log.Error(err, "Failed to get or create PVC", "Namespace", kode.Namespace, "Name", kode.Name)
-		return nil, err
+		return pvc, err
 	}
-	if err := r.updatePVCIfNecessary(ctx, kode, pvc); err != nil {
-		log.Error(err, "Failed to update PVC if necessary", "Namespace", kode.Namespace, "Name", kode.Name)
-		return nil, err
-	}
-	log.Info("Successfully ensured PVC", "Namespace", kode.Namespace, "Name", kode.Name)
-	return pvc, nil
+	
+	return pvc, r.updatePVCIfNecessary(ctx, kode, pvc)
 }
 
 // constructPVC constructs a PersistentVolumeClaim for the Kode instance
 func (r *KodeReconciler) constructPVC(kode *kodev1alpha1.Kode) *corev1.PersistentVolumeClaim {
 	log := r.Log.WithName("constructPVC")
+
 	pvc := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      PersistentVolumeClaimName,
@@ -149,13 +147,16 @@ func (r *KodeReconciler) constructPVC(kode *kodev1alpha1.Kode) *corev1.Persisten
 	if kode.Spec.Storage.StorageClassName != nil {
 		pvc.Spec.StorageClassName = kode.Spec.Storage.StorageClassName
 	}
+
 	logPVCManifest(log, pvc)
+
 	return pvc
 }
 
 // getOrCreatePVC gets or creates a PersistentVolumeClaim for the Kode instance
 func (r *KodeReconciler) getOrCreatePVC(ctx context.Context, kode *kodev1alpha1.Kode) (*corev1.PersistentVolumeClaim, error) {
 	log := r.Log.WithName("getOrCreatePVC")
+
 	pvc := r.constructPVC(kode)
 	if err := controllerutil.SetControllerReference(kode, pvc, r.Scheme); err != nil {
 		return nil, err
@@ -181,11 +182,15 @@ func (r *KodeReconciler) getOrCreatePVC(ctx context.Context, kode *kodev1alpha1.
 func (r *KodeReconciler) updatePVCIfNecessary(ctx context.Context, kode *kodev1alpha1.Kode, existingPVC *corev1.PersistentVolumeClaim) error {
 	log := r.Log.WithName("updatePVCIfNecessary")
 	desiredPVC := r.constructPVC(kode)
-	if !equality.Semantic.DeepEqual(existingPVC.Spec, desiredPVC.Spec) {
-		existingPVC.Spec = desiredPVC.Spec
-		log.Info("Updating existing PVC", "Namespace", existingPVC.Namespace, "Name", existingPVC.Name)
+
+	// Only update mutable fields: Resources.Requests
+	if !equality.Semantic.DeepEqual(existingPVC.Spec.Resources.Requests, desiredPVC.Spec.Resources.Requests) {
+		existingPVC.Spec.Resources.Requests = desiredPVC.Spec.Resources.Requests
+		log.Info("Updating existing PVC resources", "Namespace", existingPVC.Namespace, "Name", existingPVC.Name)
 		return r.Update(ctx, existingPVC)
 	}
+
+	log.Info("PVC is up-to-date", "Namespace", existingPVC.Namespace, "Name", existingPVC.Name)
 	return nil
 }
 
