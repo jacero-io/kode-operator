@@ -60,6 +60,13 @@ type KodeReconciler struct {
 
 // logKodeManifest add structured logging for the Kode manifest to improve visibility for debugging
 func logKodeManifest(log logr.Logger, kode *kodev1alpha1.Kode) {
+	mask := func(s string) string {
+		if len(s) > 4 {
+			return s[:2] + "****" + s[len(s)-2:]
+		}
+		return "****"
+	}
+
 	log.V(1).Info("Kode Manifest",
 		"Name", kode.Name,
 		"Namespace", kode.Namespace,
@@ -71,10 +78,10 @@ func logKodeManifest(log logr.Logger, kode *kodev1alpha1.Kode) {
 		"ServicePort", kode.Spec.ServicePort,
 		"Envs", fmt.Sprintf("%v", kode.Spec.Envs),
 		"Args", fmt.Sprintf("%v", kode.Spec.Args),
-		"Password", kode.Spec.Password,
-		"HashedPassword", kode.Spec.HashedPassword,
-		"SudoPassword", kode.Spec.SudoPassword,
-		"SudoPasswordHash", kode.Spec.SudoPasswordHash,
+		"Password", mask(kode.Spec.Password),
+		"HashedPassword", mask(kode.Spec.HashedPassword),
+		"SudoPassword", mask(kode.Spec.SudoPassword),
+		"SudoPasswordHash", mask(kode.Spec.SudoPasswordHash),
 		"ConfigPath", kode.Spec.ConfigPath,
 		"DefaultWorkspace", kode.Spec.DefaultWorkspace,
 		"Storage", fmt.Sprintf("%v", kode.Spec.Storage),

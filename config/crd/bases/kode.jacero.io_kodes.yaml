@@ -54,6 +54,18 @@ spec:
                   code-server (eg. /config/workspace)
                 minLength: 1
                 type: string
+              envoyProxyRef:
+                description: EnvoyProxyRef is an optional reference to an EnvoyProxy
+                  configuration
+                properties:
+                  name:
+                    description: |-
+                      Name of the referent.
+                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                      TODO: Add other useful fields. apiVersion, kind, uid?
+                    type: string
+                type: object
+                x-kubernetes-map-type: atomic
               envs:
                 description: Specifies the envs
                 items:

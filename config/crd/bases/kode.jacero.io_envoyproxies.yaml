@@ -1,0 +1,151 @@
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
+  name: envoyproxies.kode.jacero.io
+spec:
+  group: kode.jacero.io
+  names:
+    kind: EnvoyProxy
+    listKind: EnvoyProxyList
+    plural: envoyproxies
+    singular: envoyproxy
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: EnvoyProxy is the Schema for the envoyproxies API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: EnvoyProxySpec defines the desired state of EnvoyProxy
+            properties:
+              clusters:
+                description: Clusters is a list of references to EnvoyCluster objects
+                items:
+                  description: EnvoyClusterRef represents a reference to an EnvoyCluster
+                  properties:
+                    name:
+                      description: Name of the EnvoyCluster
+                      type: string
+                    namespace:
+                      description: Namespace of the EnvoyCluster
+                      type: string
+                  required:
+                  - name
+                  - namespace
+                  type: object
+                minItems: 1
+                type: array
+              httpFilters:
+                description: HTTPFilters is a list of Envoy HTTP filters to be applied
+                items:
+                  description: HTTPFilter represents an individual HTTP filter configuration
+                  properties:
+                    name:
+                      type: string
+                    typed_config:
+                      description: TypedConfig represents the typed configuration
+                        for an Envoy filter
+                      properties:
+                        '@type':
+                          type: string
+                        failure_mode_allow:
+                          type: boolean
+                        grpc_service:
+                          description: GRPCService represents the gRPC service configuration
+                          properties:
+                            envoy_grpc:
+                              description: EnvoyGRPC represents the Envoy gRPC configuration
+                              properties:
+                                cluster_name:
+                                  type: string
+                              required:
+                              - cluster_name
+                              type: object
+                            timeout:
+                              type: string
+                          required:
+                          - envoy_grpc
+                          - timeout
+                          type: object
+                        http_service:
+                          description: HTTPService represents the HTTP service configuration
+                          properties:
+                            server_uri:
+                              description: ServerURI represents the server URI configuration
+                              properties:
+                                cluster:
+                                  type: string
+                                timeout:
+                                  type: string
+                                uri:
+                                  type: string
+                              required:
+                              - cluster
+                              - timeout
+                              - uri
+                              type: object
+                          required:
+                          - server_uri
+                          type: object
+                        transport_api_version:
+                          type: string
+                        with_request_body:
+                          description: WithRequestBody represents the request body
+                            configuration
+                          properties:
+                            allow_partial_message:
+                              type: boolean
+                            max_request_bytes:
+                              type: integer
+                          required:
+                          - allow_partial_message
+                          - max_request_bytes
+                          type: object
+                      required:
+                      - '@type'
+                      type: object
+                  required:
+                  - name
+                  - typed_config
+                  type: object
+                minItems: 1
+                type: array
+              image:
+                default: envoyproxy/envoy:v1.30-latest
+                description: Image is the Docker image for the Envoy proxy
+                minLength: 1
+                type: string
+            required:
+            - clusters
+            - httpFilters
+            - image
+            type: object
+          status:
+            description: EnvoyProxyStatus defines the observed state of EnvoyProxy
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}

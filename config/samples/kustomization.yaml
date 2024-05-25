@@ -1,4 +1,5 @@
 ## Append samples of your project ##
 resources:
 - kode_v1alpha1_kode.yaml
+- kode_v1alpha1_envoyproxy.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

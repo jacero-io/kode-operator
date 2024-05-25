@@ -18,7 +18,6 @@ package v1alpha1
 
 import (
 	corev1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -49,6 +48,9 @@ type KodeSpec struct {
 	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:default=8443
 	ServicePort int32 `json:"servicePort,omitempty"`
+
+	// EnvoyProxyRef is an optional reference to an EnvoyProxy configuration
+	EnvoyProxyRef *corev1.LocalObjectReference `json:"envoyProxyRef,omitempty"`
 
 	// Specifies the envs
 	Envs []string `json:"envs,omitempty" protobuf:"bytes,9,opt,name=envs"`
@@ -118,7 +120,7 @@ type KodeCondition struct {
 	// Type of code server condition.
 	Type KodeConditionType `json:"type"`
 	// Status of the condition, one of True, False, Unknown.
-	Status v1.ConditionStatus `json:"status"`
+	Status corev1.ConditionStatus `json:"status"`
 	// The reason for the condition's last transition.
 	Reason string `json:"reason,omitempty"`
 	// A human readable message indicating details about the transition.
