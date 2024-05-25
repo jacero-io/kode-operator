@@ -43,6 +43,32 @@ rules:
 - apiGroups:
   - kode.jacero.io
   resources:
+  - envoyclusters
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - kode.jacero.io
+  resources:
+  - envoyclusters/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - kode.jacero.io
+  resources:
+  - envoyclusters/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
+  - kode.jacero.io
+  resources:
   - envoyproxies
   verbs:
   - create

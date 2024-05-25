@@ -284,6 +284,15 @@ func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode) *appsv1.De
 		containers[0].VolumeMounts = volumeMounts
 	}
 
+	// Add EnvoyProxy sidecar if specified
+	if kode.Spec.EnvoyProxyRef != nil {
+		podSpec := corev1.PodSpec{
+			Containers: containers,
+			Volumes:    volumes,
+		}
+		addEnvoyProxySidecar(&podSpec, kode.Spec.EnvoyProxyRef)
+	}
+
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kode.Name,

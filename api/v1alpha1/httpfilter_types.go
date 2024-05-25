@@ -16,16 +16,7 @@ limitations under the License.
 
 package v1alpha1
 
-// TypedConfig represents the typed configuration for an Envoy filter
-type TypedConfig struct {
-	Type                string         `json:"@type"`
-	TransportAPIVersion string       `json:"transport_api_version,omitempty"`
-	HTTPService         *HTTPService  `json:"http_service,omitempty"`
-	WithRequestBody     *WithRequestBody `json:"with_request_body,omitempty"`
-	FailureModeAllow    *bool         `json:"failure_mode_allow,omitempty"`
-	GRPCService         *GRPCService  `json:"grpc_service,omitempty"`
-}
-
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // HTTPService represents the HTTP service configuration
 type HTTPService struct {
 	ServerURI ServerURI `json:"server_uri"`
@@ -38,12 +29,7 @@ type ServerURI struct {
 	Timeout string `json:"timeout"`
 }
 
-// WithRequestBody represents the request body configuration
-type WithRequestBody struct {
-	MaxRequestBytes     int  `json:"max_request_bytes"`
-	AllowPartialMessage bool `json:"allow_partial_message"`
-}
-
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // GRPCService represents the gRPC service configuration
 type GRPCService struct {
 	EnvoyGRPC EnvoyGRPC `json:"envoy_grpc"`
@@ -53,6 +39,23 @@ type GRPCService struct {
 // EnvoyGRPC represents the Envoy gRPC configuration
 type EnvoyGRPC struct {
 	ClusterName string `json:"cluster_name"`
+}
+
+// TypedConfig represents the typed configuration for an Envoy filter
+type TypedConfig struct {
+	Type                string           `json:"@type"`
+	TransportAPIVersion string           `json:"transport_api_version,omitempty"`
+	HTTPService         *HTTPService     `json:"http_service,omitempty"`
+	WithRequestBody     *WithRequestBody `json:"with_request_body,omitempty"`
+	FailureModeAllow    *bool            `json:"failure_mode_allow,omitempty"`
+	GRPCService         *GRPCService     `json:"grpc_service,omitempty"`
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// WithRequestBody represents the request body configuration
+type WithRequestBody struct {
+	MaxRequestBytes     int  `json:"max_request_bytes"`
+	AllowPartialMessage bool `json:"allow_partial_message"`
 }
 
 // HTTPFilter represents an individual HTTP filter configuration

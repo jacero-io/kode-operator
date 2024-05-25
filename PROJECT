@@ -26,4 +26,13 @@ resources:
   kind: EnvoyProxy
   path: github.com/emil-jacero/kode-operator/api/v1alpha1
   version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: jacero.io
+  group: kode
+  kind: EnvoyCluster
+  path: github.com/emil-jacero/kode-operator/api/v1alpha1
+  version: v1alpha1
 version: "3"
