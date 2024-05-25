@@ -1,0 +1,190 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: kodes.kode.jacero.io
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
+  labels:
+  {{- include "chart.labels" . | nindent 4 }}
+spec:
+  group: kode.jacero.io
+  names:
+    kind: Kode
+    listKind: KodeList
+    plural: kodes
+    singular: kode
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: Kode is the Schema for the kodes API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: KodeSpec defines the desired state of Kode
+            properties:
+              args:
+                description: Specifies the envs
+                items:
+                  type: string
+                type: array
+              configPath:
+                default: /config
+                description: ConfigPath is the path to the config directory for code-server
+                minLength: 1
+                type: string
+              defaultWorkspace:
+                description: DefaultWorkspace is the default workspace directory for
+                  code-server (eg. /config/workspace)
+                minLength: 1
+                type: string
+              envs:
+                description: Specifies the envs
+                items:
+                  type: string
+                type: array
+              hashedPassword:
+                description: HashedPassword is the hashed password for code-server
+                type: string
+              image:
+                default: lscr.io/linuxserver/code-server:latest
+                description: Image is the Docker image for code-server
+                minLength: 1
+                type: string
+              password:
+                description: Password is the password for code-server
+                minLength: 1
+                type: string
+              pgid:
+                default: 1000
+                description: PGID is the group ID for the code-server process
+                format: int64
+                type: integer
+              puid:
+                default: 1000
+                description: PUID is the user ID for the code-server process
+                format: int64
+                type: integer
+              servicePort:
+                default: 8443
+                description: ServicePort is the port for the code-server service
+                format: int32
+                minimum: 1
+                type: integer
+              storage:
+                description: Storage specifies the storage configuration for code-server
+                properties:
+                  accessModes:
+                    description: AccessModes specifies the access modes for the persistent
+                      volume
+                    items:
+                      type: string
+                    type: array
+                  hostPath:
+                    description: HostPath specifies the host path for the persistent
+                      volume
+                    properties:
+                      path:
+                        description: |-
+                          path of the directory on the host.
+                          If the path is a symlink, it will follow the link to the real path.
+                          More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath
+                        type: string
+                      type:
+                        description: |-
+                          type for HostPath Volume
+                          Defaults to ""
+                          More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath
+                        type: string
+                    required:
+                    - path
+                    type: object
+                  resources:
+                    description: Resources specifies the resource requirements for the
+                      persistent volume
+                    properties:
+                      limits:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: |-
+                          Limits describes the maximum amount of compute resources allowed.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                        type: object
+                      requests:
+                        additionalProperties:
+                          anyOf:
+                          - type: integer
+                          - type: string
+                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                          x-kubernetes-int-or-string: true
+                        description: |-
+                          Requests describes the minimum amount of compute resources required.
+                          If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+                          otherwise to an implementation-defined value. Requests cannot exceed Limits.
+                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                        type: object
+                    type: object
+                  storageClassName:
+                    description: StorageClassName specifies the storage class name for
+                      the persistent volume
+                    type: string
+                type: object
+              sudoPassword:
+                description: SudoPassword is the sudo password for code-server
+                type: string
+              sudoPasswordHash:
+                description: SudoPasswordHash is the hashed sudo password for code-server
+                type: string
+              tz:
+                default: Europe/Stocholm
+                description: TZ is the timezone for the code-server process
+                type: string
+              url:
+                description: URL specifies the url for used to access the code-server
+                type: string
+            required:
+            - image
+            - password
+            type: object
+          status:
+            description: KodeStatus defines the observed state of Kode
+            properties:
+              availableReplicas:
+                format: int32
+                minimum: 0
+                type: integer
+            required:
+            - availableReplicas
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
