@@ -4,20 +4,21 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.14.0
-  name: envoyproxies.kode.jacero.io
+  name: envoyproxytemplates.kode.jacero.io
 spec:
   group: kode.jacero.io
   names:
-    kind: EnvoyProxy
-    listKind: EnvoyProxyList
-    plural: envoyproxies
-    singular: envoyproxy
-  scope: Namespaced
+    kind: EnvoyProxyTemplate
+    listKind: EnvoyProxyTemplateList
+    plural: envoyproxytemplates
+    singular: envoyproxytemplate
+  scope: Cluster
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: EnvoyProxy is the Schema for the envoyproxies API
+        description: EnvoyProxyTemplate is the Schema for the envoyproxytemplates
+          API
         properties:
           apiVersion:
             description: |-
@@ -37,25 +38,8 @@ spec:
           metadata:
             type: object
           spec:
-            description: EnvoyProxySpec defines the desired state of EnvoyProxy
+            description: EnvoyProxyTemplateSpec defines the desired state of EnvoyProxyTemplate
             properties:
-              clusters:
-                description: Clusters is a list of references to EnvoyCluster objects
-                items:
-                  description: EnvoyClusterRef represents a reference to an EnvoyCluster
-                  properties:
-                    name:
-                      description: Name of the EnvoyCluster
-                      type: string
-                    namespace:
-                      description: Namespace of the EnvoyCluster
-                      type: string
-                  required:
-                  - name
-                  - namespace
-                  type: object
-                minItems: 1
-                type: array
               httpFilters:
                 description: HTTPFilters is a list of Envoy HTTP filters to be applied
                 items:
@@ -72,7 +56,9 @@ spec:
                         failure_mode_allow:
                           type: boolean
                         grpc_service:
-                          description: GRPCService represents the gRPC service configuration
+                          description: |-
+                            //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+                            GRPCService represents the gRPC service configuration
                           properties:
                             envoy_grpc:
                               description: EnvoyGRPC represents the Envoy gRPC configuration
@@ -89,7 +75,9 @@ spec:
                           - timeout
                           type: object
                         http_service:
-                          description: HTTPService represents the HTTP service configuration
+                          description: |-
+                            //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+                            HTTPService represents the HTTP service configuration
                           properties:
                             server_uri:
                               description: ServerURI represents the server URI configuration
@@ -111,8 +99,9 @@ spec:
                         transport_api_version:
                           type: string
                         with_request_body:
-                          description: WithRequestBody represents the request body
-                            configuration
+                          description: |-
+                            //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+                            WithRequestBody represents the request body configuration
                           properties:
                             allow_partial_message:
                               type: boolean
@@ -137,12 +126,11 @@ spec:
                 minLength: 1
                 type: string
             required:
-            - clusters
             - httpFilters
             - image
             type: object
           status:
-            description: EnvoyProxyStatus defines the observed state of EnvoyProxy
+            description: EnvoyProxyTemplateStatus defines the observed state of EnvoyProxyTemplate
             type: object
         type: object
     served: true

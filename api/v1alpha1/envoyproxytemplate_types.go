@@ -20,8 +20,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EnvoyProxySpec defines the desired state of EnvoyProxy
-type EnvoyProxySpec struct {
+type EnvoyProxyTemplateReference struct {
+	// Kind is the kind of the reference (for EnvoyProxyTemplate)
+	Kind string `json:"kind"`
+
+	// Name is the name of the EnvoyProxyTemplate
+	Name string `json:"name"`
+}
+
+// EnvoyProxyTemplateSpec defines the desired state of EnvoyProxyTemplate
+type EnvoyProxyTemplateSpec struct {
 	// Image is the Docker image for the Envoy proxy
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:Required
@@ -31,48 +39,36 @@ type EnvoyProxySpec struct {
 	// HTTPFilters is a list of Envoy HTTP filters to be applied
 	// +kubebuilder:validation:MinItems=1
 	HTTPFilters []HTTPFilter `json:"httpFilters"`
-
-	// Clusters is a list of references to EnvoyCluster objects
-	// +kubebuilder:validation:MinItems=1
-	Clusters []EnvoyClusterRef `json:"clusters"`
 }
 
-// EnvoyClusterRef represents a reference to an EnvoyCluster
-type EnvoyClusterRef struct {
-	// Name of the EnvoyCluster
-	Name string `json:"name"`
-
-	// Namespace of the EnvoyCluster
-	Namespace string `json:"namespace"`
-}
-
-// EnvoyProxyStatus defines the observed state of EnvoyProxy
-type EnvoyProxyStatus struct {
+// EnvoyProxyTemplateStatus defines the observed state of EnvoyProxyTemplate
+type EnvoyProxyTemplateStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:resource:scope=Cluster
 
-// EnvoyProxy is the Schema for the envoyproxies API
-type EnvoyProxy struct {
+// EnvoyProxyTemplate is the Schema for the envoyproxytemplates API
+type EnvoyProxyTemplate struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   EnvoyProxySpec   `json:"spec,omitempty"`
-	Status EnvoyProxyStatus `json:"status,omitempty"`
+	Spec   EnvoyProxyTemplateSpec   `json:"spec,omitempty"`
+	Status EnvoyProxyTemplateStatus `json:"status,omitempty"`
 }
 
-// +kubebuilder:object:root=true
+//+kubebuilder:object:root=true
 
-// EnvoyProxyList contains a list of EnvoyProxy
-type EnvoyProxyList struct {
+// EnvoyProxyTemplateList contains a list of EnvoyProxyTemplate
+type EnvoyProxyTemplateList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []EnvoyProxy `json:"items"`
+	Items           []EnvoyProxyTemplate `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&EnvoyProxy{}, &EnvoyProxyList{})
+	SchemeBuilder.Register(&EnvoyProxyTemplate{}, &EnvoyProxyTemplateList{})
 }

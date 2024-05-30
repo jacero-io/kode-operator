@@ -39,66 +39,6 @@ spec:
           spec:
             description: KodeSpec defines the desired state of Kode
             properties:
-              args:
-                description: Specifies the envs
-                items:
-                  type: string
-                type: array
-              configPath:
-                default: /config
-                description: ConfigPath is the path to the config directory for code-server
-                minLength: 1
-                type: string
-              defaultWorkspace:
-                description: DefaultWorkspace is the default workspace directory for
-                  code-server (eg. /config/workspace)
-                minLength: 1
-                type: string
-              envoyProxyRef:
-                description: EnvoyProxyRef is an optional reference to an EnvoyProxy
-                  configuration
-                properties:
-                  name:
-                    description: |-
-                      Name of the referent.
-                      More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                      TODO: Add other useful fields. apiVersion, kind, uid?
-                    type: string
-                type: object
-                x-kubernetes-map-type: atomic
-              envs:
-                description: Specifies the envs
-                items:
-                  type: string
-                type: array
-              hashedPassword:
-                description: HashedPassword is the hashed password for code-server
-                type: string
-              image:
-                default: lscr.io/linuxserver/code-server:latest
-                description: Image is the Docker image for code-server
-                minLength: 1
-                type: string
-              password:
-                description: Password is the password for code-server
-                minLength: 1
-                type: string
-              pgid:
-                default: 1000
-                description: PGID is the group ID for the code-server process
-                format: int64
-                type: integer
-              puid:
-                default: 1000
-                description: PUID is the user ID for the code-server process
-                format: int64
-                type: integer
-              servicePort:
-                default: 8443
-                description: ServicePort is the port for the code-server service
-                format: int32
-                minimum: 1
-                type: integer
               storage:
                 description: Storage specifies the storage configuration for code-server
                 properties:
@@ -108,25 +48,6 @@ spec:
                     items:
                       type: string
                     type: array
-                  hostPath:
-                    description: HostPath specifies the host path for the persistent
-                      volume
-                    properties:
-                      path:
-                        description: |-
-                          path of the directory on the host.
-                          If the path is a symlink, it will follow the link to the real path.
-                          More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath
-                        type: string
-                      type:
-                        description: |-
-                          type for HostPath Volume
-                          Defaults to ""
-                          More info: https://kubernetes.io/docs/concepts/storage/volumes#hostpath
-                        type: string
-                    required:
-                    - path
-                    type: object
                   resources:
                     description: Resources specifies the resource requirements for
                       the persistent volume
@@ -161,22 +82,21 @@ spec:
                       for the persistent volume
                     type: string
                 type: object
-              sudoPassword:
-                description: SudoPassword is the sudo password for code-server
-                type: string
-              sudoPasswordHash:
-                description: SudoPasswordHash is the hashed sudo password for code-server
-                type: string
-              tz:
-                default: Europe/Stocholm
-                description: TZ is the timezone for the code-server process
-                type: string
-              url:
-                description: URL specifies the url for used to access the code-server
-                type: string
+              templateRef:
+                description: TemplateRef is the reference to the KodeTemplate configuration
+                properties:
+                  kind:
+                    description: Kind is the kind of the reference (for KodeTemplate)
+                    type: string
+                  name:
+                    description: Name is the name of the KodeTemplate
+                    type: string
+                required:
+                - kind
+                - name
+                type: object
             required:
-            - image
-            - password
+            - templateRef
             type: object
           status:
             description: KodeStatus defines the observed state of Kode

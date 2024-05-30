@@ -1,9 +1,9 @@
 apiVersion: kode.jacero.io/v1alpha1
-kind: EnvoyProxy
+kind: EnvoyProxyTemplate
 metadata:
   labels:
     app.kubernetes.io/name: kode-operator
     app.kubernetes.io/managed-by: kustomize
-  name: envoyproxy-sample
+  name: envoyproxytemplate-sample
 spec:
   # TODO(user): Add fields here

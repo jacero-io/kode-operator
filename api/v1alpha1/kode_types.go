@@ -23,64 +23,8 @@ import (
 
 // KodeSpec defines the desired state of Kode
 type KodeSpec struct {
-	// Image is the Docker image for code-server
-	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default="lscr.io/linuxserver/code-server:latest"
-	Image string `json:"image"`
-
-	// TZ is the timezone for the code-server process
-	// +kubebuilder:default="Europe/Stocholm"
-	TZ string `json:"tz,omitempty"`
-
-	// PUID is the user ID for the code-server process
-	// +kubebuilder:default=1000
-	PUID int64 `json:"puid,omitempty"`
-
-	// PGID is the group ID for the code-server process
-	// +kubebuilder:default=1000
-	PGID int64 `json:"pgid,omitempty"`
-
-	// URL specifies the url for used to access the code-server
-	URL string `json:"url,omitempty" protobuf:"bytes,7,opt,name=url"`
-
-	// ServicePort is the port for the code-server service
-	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:default=8443
-	ServicePort int32 `json:"servicePort,omitempty"`
-
-	// EnvoyProxyRef is an optional reference to an EnvoyProxy configuration
-	EnvoyProxyRef *corev1.LocalObjectReference `json:"envoyProxyRef,omitempty"`
-
-	// Specifies the envs
-	Envs []string `json:"envs,omitempty" protobuf:"bytes,9,opt,name=envs"`
-
-	// Specifies the envs
-	Args []string `json:"args,omitempty" protobuf:"bytes,10,opt,name=args"`
-
-	// Password is the password for code-server
-	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:Required
-	Password string `json:"password"`
-
-	// HashedPassword is the hashed password for code-server
-	HashedPassword string `json:"hashedPassword,omitempty"`
-
-	// SudoPassword is the sudo password for code-server
-	SudoPassword string `json:"sudoPassword,omitempty"`
-
-	// SudoPasswordHash is the hashed sudo password for code-server
-	SudoPasswordHash string `json:"sudoPasswordHash,omitempty"`
-
-	// ConfigPath is the path to the config directory for code-server
-	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=/config
-	ConfigPath string `json:"configPath,omitempty"`
-
-	// DefaultWorkspace is the default workspace directory for code-server (eg. /config/workspace)
-	// +kubebuilder:validation:MinLength=1
-	DefaultWorkspace string `json:"defaultWorkspace,omitempty"`
+	// TemplateRef is the reference to the KodeTemplate configuration
+	TemplateRef KodeTemplateReference `json:"templateRef"`
 
 	// Storage specifies the storage configuration for code-server
 	Storage KodeStorageSpec `json:"storage,omitempty"`
@@ -96,9 +40,6 @@ type KodeStorageSpec struct {
 
 	// Resources specifies the resource requirements for the persistent volume
 	Resources corev1.VolumeResourceRequirements `json:"resources,omitempty"`
-
-	// HostPath specifies the host path for the persistent volume
-	HostPath *corev1.HostPathVolumeSource `json:"hostPath,omitempty"`
 }
 
 // KodeConditionType describes the type of state of code server condition

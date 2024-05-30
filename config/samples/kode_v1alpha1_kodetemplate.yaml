@@ -1,9 +1,9 @@
 apiVersion: kode.jacero.io/v1alpha1
-kind: EnvoyCluster
+kind: KodeTemplate
 metadata:
   labels:
     app.kubernetes.io/name: kode-operator
     app.kubernetes.io/managed-by: kustomize
-  name: envoycluster-sample
+  name: kodetemplate-sample
 spec:
   # TODO(user): Add fields here
