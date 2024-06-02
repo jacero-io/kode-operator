@@ -87,6 +87,9 @@ spec:
                 properties:
                   kind:
                     description: Kind is the kind of the reference (for KodeTemplate)
+                    enum:
+                    - WebtopTemplate
+                    - CodeServerTemplate
                     type: string
                   name:
                     description: Name is the name of the KodeTemplate
@@ -101,12 +104,10 @@ spec:
           status:
             description: KodeStatus defines the observed state of Kode
             properties:
-              availableReplicas:
-                format: int32
-                minimum: 0
-                type: integer
+              ready:
+                type: boolean
             required:
-            - availableReplicas
+            - ready
             type: object
         type: object
     served: true

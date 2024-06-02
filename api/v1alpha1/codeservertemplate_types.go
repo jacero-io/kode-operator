@@ -20,21 +20,27 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type KodeTemplateReference struct {
-	// Kind is the kind of the reference (for KodeTemplate)
-	Kind string `json:"kind"`
+// CodeServerTemplateSpec defines the desired state of CodeServerTemplate
+type CodeServerTemplateSpec struct {
+	// EnvoyProxyRef is the reference to the EnvoyProxy configuration
+	EnvoyProxyTemplateRef EnvoyProxyTemplateReference `json:"envoyProxyTemplateRef,omitempty"`
 
-	// Name is the name of the KodeTemplate
-	Name string `json:"name"`
-}
-
-// KodeTemplateSpec defines the desired state of KodeTemplate
-type KodeTemplateSpec struct {
-	// Image is the Docker image for code-server
+	// Image is the container image for code-server
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default="lscr.io/linuxserver/code-server:latest"
 	Image string `json:"image"`
+
+	// Port is the port for the code-server process. Used by EnvoyProxy to expose the service.
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default=3000
+	Port int32 `json:"port,omitempty"`
+
+	// Specifies the envs
+	Envs []string `json:"envs,omitempty" protobuf:"bytes,9,opt,name=envs"`
+
+	// Specifies the envs
+	Args []string `json:"args,omitempty" protobuf:"bytes,10,opt,name=args"`
 
 	// TZ is the timezone for the code-server process
 	// +kubebuilder:default="Europe/Stockholm"
@@ -48,19 +54,10 @@ type KodeTemplateSpec struct {
 	// +kubebuilder:default=1000
 	PGID int64 `json:"pgid,omitempty"`
 
-	// URL specifies the url for used to access the code-server
-	URL string `json:"url,omitempty" protobuf:"bytes,7,opt,name=url"`
-
-	// ServicePort is the port for the code-server service
-	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:default=8443
-	ServicePort int32 `json:"servicePort,omitempty"`
-
-	// Specifies the envs
-	Envs []string `json:"envs,omitempty" protobuf:"bytes,9,opt,name=envs"`
-
-	// Specifies the envs
-	Args []string `json:"args,omitempty" protobuf:"bytes,10,opt,name=args"`
+	// ProxyDomain specifies the domain to proxy for code-server
+	// +kubebuilder:validation:Description="If this optional variable is set, this domain will be proxied for subdomain proxying."
+	// +kubebuilder:validation:MinLength=1
+	ProxyDomain string `json:"proxyDomain,omitempty"`
 
 	// Password is the password for code-server
 	// +kubebuilder:validation:MinLength=1
@@ -85,39 +82,35 @@ type KodeTemplateSpec struct {
 	// DefaultWorkspace is the default workspace directory for code-server (eg. /config/workspace)
 	// +kubebuilder:validation:MinLength=1
 	DefaultWorkspace string `json:"defaultWorkspace,omitempty"`
-
-	// EnvoyProxyRef is the reference to the EnvoyProxy configuration
-	EnvoyProxyTemplateRef EnvoyProxyTemplateReference `json:"envoyProxyTemplateRef"`
 }
 
-// KodeTemplateStatus defines the observed state of KodeTemplate
-type KodeTemplateStatus struct {
+// CodeServerTemplateStatus defines the observed state of CodeServerTemplate
+type CodeServerTemplateStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
-// +kubebuilder:resource:scope=Cluster
 
-// KodeTemplate is the Schema for the kodetemplates API
-type KodeTemplate struct {
+// CodeServerTemplate is the Schema for the codeservertemplates API
+type CodeServerTemplate struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   KodeTemplateSpec   `json:"spec,omitempty"`
-	Status KodeTemplateStatus `json:"status,omitempty"`
+	Spec   CodeServerTemplateSpec   `json:"spec,omitempty"`
+	Status CodeServerTemplateStatus `json:"status,omitempty"`
 }
 
-//+kubebuilder:object:root=true
+// +kubebuilder:object:root=true
 
-// KodeTemplateList contains a list of KodeTemplate
-type KodeTemplateList struct {
+// CodeServerTemplateList contains a list of CodeServerTemplate
+type CodeServerTemplateList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []KodeTemplate `json:"items"`
+	Items           []CodeServerTemplate `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&KodeTemplate{}, &KodeTemplateList{})
+	SchemeBuilder.Register(&CodeServerTemplate{}, &CodeServerTemplateList{})
 }

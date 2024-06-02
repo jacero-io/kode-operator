@@ -21,6 +21,20 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	WebtopTemplateKind = "WebtopTemplate"
+	CodeServerTemplateKind = "CodeServerTemplate"
+)
+
+type KodeTemplateReference struct {
+	// Kind is the kind of the reference (for KodeTemplate)
+	// +kubebuilder:validation:Enum=WebtopTemplate;CodeServerTemplate
+	Kind string `json:"kind"`
+
+	// Name is the name of the KodeTemplate
+	Name string `json:"name"`
+}
+
 // KodeSpec defines the desired state of Kode
 type KodeSpec struct {
 	// TemplateRef is the reference to the KodeTemplate configuration
@@ -42,40 +56,9 @@ type KodeStorageSpec struct {
 	Resources corev1.VolumeResourceRequirements `json:"resources,omitempty"`
 }
 
-// KodeConditionType describes the type of state of code server condition
-type KodeConditionType string
-
-const (
-	// ServerCreated means the code server has been accepted by the system.
-	ServerCreated KodeConditionType = "ServerCreated"
-	// ServerReady means the code server has been ready for usage.
-	ServerReady KodeConditionType = "ServerReady"
-	// ServerRecycled means the code server has been recycled totally.
-	ServerRecycled KodeConditionType = "ServerRecycled"
-	// ServerInactive means the code server will be marked inactive if `InactiveAfterSeconds` elapsed
-	ServerInactive KodeConditionType = "ServerInactive"
-)
-
-// ServerCondition describes the state of the code server at a certain point.
-type KodeCondition struct {
-	// Type of code server condition.
-	Type KodeConditionType `json:"type"`
-	// Status of the condition, one of True, False, Unknown.
-	Status corev1.ConditionStatus `json:"status"`
-	// The reason for the condition's last transition.
-	Reason string `json:"reason,omitempty"`
-	// A human readable message indicating details about the transition.
-	Message string `json:"message,omitempty"`
-	// The last time this condition was updated.
-	LastUpdateTime metav1.Time `json:"lastUpdateTime,omitempty"`
-	// Last time the condition transitioned from one status to another.
-	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`
-}
-
 // KodeStatus defines the observed state of Kode
 type KodeStatus struct {
-	// +kubebuilder:validation:Minimum=0
-	AvailableReplicas int32 `json:"availableReplicas"`
+    Ready bool `json:"ready"`
 }
 
 //+kubebuilder:object:root=true

@@ -1,23 +1,27 @@
-# permissions for end users to view kodetemplates.
+# permissions for end users to edit codeservertemplates.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
     app.kubernetes.io/name: kode-operator
     app.kubernetes.io/managed-by: kustomize
-  name: kodetemplate-viewer-role
+  name: codeservertemplate-editor-role
 rules:
 - apiGroups:
   - kode.jacero.io
   resources:
-  - kodetemplates
+  - codeservertemplates
   verbs:
+  - create
+  - delete
   - get
   - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - kode.jacero.io
   resources:
-  - kodetemplates/status
+  - codeservertemplates/status
   verbs:
   - get

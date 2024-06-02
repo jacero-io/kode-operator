@@ -4,20 +4,21 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.14.0
-  name: kodetemplates.kode.jacero.io
+  name: codeservertemplates.kode.jacero.io
 spec:
   group: kode.jacero.io
   names:
-    kind: KodeTemplate
-    listKind: KodeTemplateList
-    plural: kodetemplates
-    singular: kodetemplate
-  scope: Cluster
+    kind: CodeServerTemplate
+    listKind: CodeServerTemplateList
+    plural: codeservertemplates
+    singular: codeservertemplate
+  scope: Namespaced
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: KodeTemplate is the Schema for the kodetemplates API
+        description: CodeServerTemplate is the Schema for the codeservertemplates
+          API
         properties:
           apiVersion:
             description: |-
@@ -37,7 +38,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: KodeTemplateSpec defines the desired state of KodeTemplate
+            description: CodeServerTemplateSpec defines the desired state of CodeServerTemplate
             properties:
               args:
                 description: Specifies the envs
@@ -77,7 +78,7 @@ spec:
                 type: string
               image:
                 default: lscr.io/linuxserver/code-server:latest
-                description: Image is the Docker image for code-server
+                description: Image is the container image for code-server
                 minLength: 1
                 type: string
               password:
@@ -89,16 +90,21 @@ spec:
                 description: PGID is the group ID for the code-server process
                 format: int64
                 type: integer
+              port:
+                default: 3000
+                description: Port is the port for the code-server process. Used by
+                  EnvoyProxy to expose the service.
+                format: int32
+                minimum: 1
+                type: integer
+              proxyDomain:
+                description: ProxyDomain specifies the domain to proxy for code-server
+                minLength: 1
+                type: string
               puid:
                 default: 1000
                 description: PUID is the user ID for the code-server process
                 format: int64
-                type: integer
-              servicePort:
-                default: 8443
-                description: ServicePort is the port for the code-server service
-                format: int32
-                minimum: 1
                 type: integer
               sudoPassword:
                 description: SudoPassword is the sudo password for code-server
@@ -110,16 +116,12 @@ spec:
                 default: Europe/Stockholm
                 description: TZ is the timezone for the code-server process
                 type: string
-              url:
-                description: URL specifies the url for used to access the code-server
-                type: string
             required:
-            - envoyProxyTemplateRef
             - image
             - password
             type: object
           status:
-            description: KodeTemplateStatus defines the observed state of KodeTemplate
+            description: CodeServerTemplateStatus defines the observed state of CodeServerTemplate
             type: object
         type: object
     served: true
