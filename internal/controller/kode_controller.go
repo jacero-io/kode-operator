@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"path"
 	"reflect"
 	"time"
 
@@ -144,18 +145,15 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	}
 
 	// Ensure the Deployment and Service exist
-	// log.Info("Ensuring Deployment exists", "Namespace", kode.Namespace, "Name", kode.Name)
 	if err := r.ensureDeployment(ctx, kode, kodeTemplate, envoyProxyTemplate); err != nil {
 		return ctrl.Result{}, err
 	}
-	// log.Info("Ensuring Service exists", "Namespace", kode.Namespace, "Name", kode.Name)
 	if err := r.ensureService(ctx, kode, kodeTemplate); err != nil {
 		return ctrl.Result{}, err
 	}
 
 	// Ensure PVC exists
 	if !reflect.DeepEqual(kode.Spec.Storage, kodev1alpha1.KodeStorageSpec{}) {
-		// log.Info("Ensuring Storage exists", "Namespace", kode.Namespace, "Name", kode.Name)
 		if _, err := r.ensurePVC(ctx, kode); err != nil {
 			return ctrl.Result{}, err
 		}
@@ -314,13 +312,13 @@ func (r *KodeReconciler) getOrCreateDeployment(ctx context.Context, kode *kodev1
 // constructDeployment constructs a Deployment for the Kode instance
 func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode, kodeTemplate *kodev1alpha1.KodeTemplate, envoyProxyTemplate *kodev1alpha1.EnvoyProxyTemplate) *appsv1.Deployment {
 	log := r.Log.WithName("constructDeployment")
-	replicas := int32(1)
 
+	replicas := int32(1)
 	ContainerName := "kode-" + kode.Name
 
-	workspace := kodeTemplate.Spec.Home + kodeTemplate.Spec.DefaultWorkspace
+	workspace := path.Join(kodeTemplate.Spec.Home, kodeTemplate.Spec.DefaultWorkspace)
 	if kode.Spec.Workspace != "" {
-		workspace = kodeTemplate.Spec.Home + kode.Spec.Workspace
+		workspace = path.Join(kodeTemplate.Spec.Home, kode.Spec.Workspace)
 	}
 
 	labels := map[string]string{
@@ -395,8 +393,8 @@ func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode, kodeTempla
 				},
 				Spec: corev1.PodSpec{
 					InitContainers: initContainers,
-					Containers: containers,
-					Volumes:    volumes,
+					Containers:     containers,
+					Volumes:        volumes,
 				},
 			},
 		},
