@@ -26,42 +26,11 @@ package bootstrap
     typed_config: "@type": "type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog"
 }]
 
-#ListenerHTTP: #Listener & {
-    name: "listener_http"
+#Listener0: #Listener & {
+    name: "listener_0"
     address: #Address & { socket_address: {
         address: "0.0.0.0"
-        port_value: 80
-        }
-    }
-    filter_chains: [{
-        filters: [{
-            name: "envoy.filters.network.http_connection_manager.http"
-            typed_config: {
-                "@type": "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager"
-				stat_prefix: "ingress_http"
-                access_log: #AccessLog
-                http_filters: [#HTTPFilterRouter]
-                route_config: {
-                    name: "local_route"
-                    virtual_hosts: [{
-                        name: "local_service"
-                        domains: ["*"]
-                        routes: [{
-                            match: {prefix: "/"}
-                            redirect: https_redirect: true
-                        }]
-                    }]
-                }
-            }
-        }]
-    }]
-}
-
-#ListenerHTTPS: #Listener & {
-    name: "listener_https"
-    address: #Address & { socket_address: {
-        address: "0.0.0.0"
-        port_value: 443
+        port_value: 8000
         }
     }
     filter_chains: [{
@@ -126,7 +95,7 @@ package bootstrap
 
 #BootstrapConfig: {
     clusters: #Clusters & [#ExtAuthzOPAService]
-    listeners: #Listeners & [#ListenerHTTP, #ListenerHTTPS]
+    listeners: #Listeners & [#Listener0]
 }
 
 admin: #AdminServer
