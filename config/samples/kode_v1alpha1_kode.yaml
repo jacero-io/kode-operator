@@ -6,8 +6,10 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: kode-sample
 spec:
-  image: lscr.io/linuxserver/code-server:latest
-  servicePort: 8443
+  templateRef:
+    kind: KodeTemplate
+    name: kodetemplate-sample
+  user: "user1"
   password: "password1"
   # storage:
   #   accessModes:

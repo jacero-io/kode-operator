@@ -16,50 +16,34 @@ limitations under the License.
 
 package v1alpha1
 
-// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// HTTPService represents the HTTP service configuration
-type HTTPService struct {
-	ServerURI ServerURI `json:"server_uri"`
-}
-
-// ServerURI represents the server URI configuration
-type ServerURI struct {
-	URI     string `json:"uri"`
-	Cluster string `json:"cluster"`
-	Timeout string `json:"timeout"`
-}
-
-// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// GRPCService represents the gRPC service configuration
-type GRPCService struct {
-	EnvoyGRPC EnvoyGRPC `json:"envoy_grpc"`
-	Timeout   string    `json:"timeout"`
-}
-
-// EnvoyGRPC represents the Envoy gRPC configuration
-type EnvoyGRPC struct {
-	ClusterName string `json:"cluster_name"`
-}
+import (
+	"k8s.io/apimachinery/pkg/runtime"
+)
 
 // TypedConfig represents the typed configuration for an Envoy filter
 type TypedConfig struct {
-	Type                string           `json:"@type"`
-	TransportAPIVersion string           `json:"transport_api_version,omitempty"`
-	HTTPService         *HTTPService     `json:"http_service,omitempty"`
-	WithRequestBody     *WithRequestBody `json:"with_request_body,omitempty"`
-	FailureModeAllow    *bool            `json:"failure_mode_allow,omitempty"`
-	GRPCService         *GRPCService     `json:"grpc_service,omitempty"`
-}
+	// Type is the type of the configuration
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Description=Type of the configuration
+	// +kubebuilder:validation:Required
+	Type string `json:"@type"`
 
-// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-// WithRequestBody represents the request body configuration
-type WithRequestBody struct {
-	MaxRequestBytes     int  `json:"max_request_bytes"`
-	AllowPartialMessage bool `json:"allow_partial_message"`
+	// Config is the configuration for the filter
+	// +kubebuilder:validation:Description=Configuration for the filter
+	Config runtime.RawExtension `json:"config,omitempty"`
 }
 
 // HTTPFilter represents an individual HTTP filter configuration
 type HTTPFilter struct {
-	Name        string      `json:"name"`
+	// Name is the name of the HTTP filter
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Description=Name of the HTTP filter
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// TypedConfig is the typed configuration for the HTTP filter
+	// It is intentionally the same as the Envoy filter's typed_config field to make it easier to copy-paste
+	// +kubebuilder:validation:Description=Typed configuration for the HTTP filter. It is intentionally the same as the Envoy filter's typed_config field to make it easier to copy-paste
+	// +kubebuilder:validation:Required
 	TypedConfig TypedConfig `json:"typed_config"`
 }

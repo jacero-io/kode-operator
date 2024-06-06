@@ -46,71 +46,22 @@ spec:
                   description: HTTPFilter represents an individual HTTP filter configuration
                   properties:
                     name:
+                      description: Name is the name of the HTTP filter
+                      minLength: 1
                       type: string
                     typed_config:
-                      description: TypedConfig represents the typed configuration
-                        for an Envoy filter
+                      description: |-
+                        TypedConfig is the typed configuration for the HTTP filter
+                        It is intentionally the same as the Envoy filter's typed_config field to make it easier to copy-paste
                       properties:
                         '@type':
+                          description: Type is the type of the configuration
+                          minLength: 1
                           type: string
-                        failure_mode_allow:
-                          type: boolean
-                        grpc_service:
-                          description: |-
-                            //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-                            GRPCService represents the gRPC service configuration
-                          properties:
-                            envoy_grpc:
-                              description: EnvoyGRPC represents the Envoy gRPC configuration
-                              properties:
-                                cluster_name:
-                                  type: string
-                              required:
-                              - cluster_name
-                              type: object
-                            timeout:
-                              type: string
-                          required:
-                          - envoy_grpc
-                          - timeout
+                        config:
+                          description: Config is the configuration for the filter
                           type: object
-                        http_service:
-                          description: |-
-                            //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-                            HTTPService represents the HTTP service configuration
-                          properties:
-                            server_uri:
-                              description: ServerURI represents the server URI configuration
-                              properties:
-                                cluster:
-                                  type: string
-                                timeout:
-                                  type: string
-                                uri:
-                                  type: string
-                              required:
-                              - cluster
-                              - timeout
-                              - uri
-                              type: object
-                          required:
-                          - server_uri
-                          type: object
-                        transport_api_version:
-                          type: string
-                        with_request_body:
-                          description: |-
-                            //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-                            WithRequestBody represents the request body configuration
-                          properties:
-                            allow_partial_message:
-                              type: boolean
-                            max_request_bytes:
-                              type: integer
-                          required:
-                          - allow_partial_message
-                          - max_request_bytes
-                          type: object
+                          x-kubernetes-preserve-unknown-fields: true
                       required:
                       - '@type'
                       type: object

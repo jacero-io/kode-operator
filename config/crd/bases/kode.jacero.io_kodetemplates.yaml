@@ -4,21 +4,20 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.14.0
-  name: codeservertemplates.kode.jacero.io
+  name: kodetemplates.kode.jacero.io
 spec:
   group: kode.jacero.io
   names:
-    kind: CodeServerTemplate
-    listKind: CodeServerTemplateList
-    plural: codeservertemplates
-    singular: codeservertemplate
-  scope: Namespaced
+    kind: KodeTemplate
+    listKind: KodeTemplateList
+    plural: kodetemplates
+    singular: kodetemplate
+  scope: Cluster
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: CodeServerTemplate is the Schema for the codeservertemplates
-          API
+        description: KodeTemplate is the Schema for the kodetemplates API
         properties:
           apiVersion:
             description: |-
@@ -38,25 +37,23 @@ spec:
           metadata:
             type: object
           spec:
-            description: CodeServerTemplateSpec defines the desired state of CodeServerTemplate
+            description: KodeTemplateSpec defines the desired state of KodeTemplate
             properties:
               args:
-                description: Specifies the envs
+                description: Specifies the args
                 items:
                   type: string
                 type: array
-              configPath:
-                default: /config
-                description: ConfigPath is the path to the config directory for code-server
-                minLength: 1
-                type: string
               defaultWorkspace:
-                description: DefaultWorkspace is the default workspace directory for
-                  code-server (eg. /config/workspace)
-                minLength: 1
+                default: workspace
+                description: DefaultWorkspace is the default workspace directory.
+                  Defaults to 'workspace'.
+                minLength: 3
+                pattern: ^[^/].*$
                 type: string
               envoyProxyTemplateRef:
-                description: EnvoyProxyRef is the reference to the EnvoyProxy configuration
+                description: EnvoyProxyTemplateRef is the reference to the EnvoyProxy
+                  configuration
                 properties:
                   kind:
                     description: Kind is the kind of the reference (for EnvoyProxyTemplate)
@@ -73,55 +70,41 @@ spec:
                 items:
                   type: string
                 type: array
-              hashedPassword:
-                description: HashedPassword is the hashed password for code-server
+              home:
+                default: /config
+                description: Home is the path to the directory for the user data
+                minLength: 3
                 type: string
               image:
-                default: lscr.io/linuxserver/code-server:latest
-                description: Image is the container image for code-server
-                minLength: 1
-                type: string
-              password:
-                description: Password is the password for code-server
+                description: Image is the container image for the service
                 minLength: 1
                 type: string
               pgid:
                 default: 1000
-                description: PGID is the group ID for the code-server process
+                description: PGID is the group ID for the service process
                 format: int64
                 type: integer
               port:
                 default: 3000
-                description: Port is the port for the code-server process. Used by
-                  EnvoyProxy to expose the service.
+                description: Port is the port for the service process. Used by EnvoyProxy
+                  to expose the service.
                 format: int32
                 minimum: 1
                 type: integer
-              proxyDomain:
-                description: ProxyDomain specifies the domain to proxy for code-server
-                minLength: 1
-                type: string
               puid:
                 default: 1000
-                description: PUID is the user ID for the code-server process
+                description: PUID is the user ID for the service process
                 format: int64
                 type: integer
-              sudoPassword:
-                description: SudoPassword is the sudo password for code-server
-                type: string
-              sudoPasswordHash:
-                description: SudoPasswordHash is the hashed sudo password for code-server
-                type: string
               tz:
-                default: Europe/Stockholm
-                description: TZ is the timezone for the code-server process
+                default: UTC
+                description: TZ is the timezone for the service process
                 type: string
             required:
             - image
-            - password
             type: object
           status:
-            description: CodeServerTemplateStatus defines the observed state of CodeServerTemplate
+            description: KodeTemplateStatus defines the observed state of KodeTemplate
             type: object
         type: object
     served: true

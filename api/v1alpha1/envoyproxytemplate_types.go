@@ -28,6 +28,12 @@ type EnvoyProxyTemplateReference struct {
 	Name string `json:"name"`
 }
 
+type HTTPFilterRouter struct {
+	// Name is the name of the HTTP filter
+	// +kubebuilder:default="envoy.filters.http.router"
+	Name string `json:"name"`
+}
+
 // EnvoyProxyTemplateSpec defines the desired state of EnvoyProxyTemplate
 type EnvoyProxyTemplateSpec struct {
 	// Image is the Docker image for the Envoy proxy

@@ -116,9 +116,8 @@ var _ = Describe("Kode Controller", func() {
 					Name: "test-kodetemplate",
 				},
 				Spec: kodev1alpha1.KodeTemplateSpec{
-					Image:       "lscr.io/linuxserver/code-server:latest",
-					ServicePort: 8443,
-					Password:    "password",
+					Image: "lscr.io/linuxserver/code-server:latest",
+					Port:  8443,
 					EnvoyProxyTemplateRef: kodev1alpha1.EnvoyProxyTemplateReference{
 						Kind: "EnvoyProxyTemplate",
 						Name: "test-envoyproxytemplate",
@@ -285,9 +284,8 @@ var _ = Describe("Kode Controller", func() {
 					Name: "invalid-image-template",
 				},
 				Spec: kodev1alpha1.KodeTemplateSpec{
-					Image:       "invalid-image-name",
-					ServicePort: 8443,
-					Password:    "password",
+					Image: "invalid-image-name",
+					Port:  8443,
 				},
 			}
 			err = k8sClient.Create(ctx, invalidImageKodeTemplate)

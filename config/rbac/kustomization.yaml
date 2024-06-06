@@ -14,10 +14,8 @@ resources:
 # default, aiding admins in cluster management. Those roles are
 # not used by the Project itself. You can comment the following lines
 # if you do not want those helpers be installed with your Project.
-- webtoptemplate_editor_role.yaml
-- webtoptemplate_viewer_role.yaml
-- codeservertemplate_editor_role.yaml
-- codeservertemplate_viewer_role.yaml
+- kodetemplate_editor_role.yaml
+- kodetemplate_viewer_role.yaml
 - envoyproxytemplate_editor_role.yaml
 - envoyproxytemplate_viewer_role.yaml
 - kode_editor_role.yaml

@@ -1,118 +1,82 @@
+/*
+Copyright 2024.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package controller
 
 import (
 	"fmt"
 
-	"encoding/json"
-
 	kodev1alpha1 "github.com/emil-jacero/kode-operator/api/v1alpha1"
-	"gopkg.in/yaml.v2"
+	corev1 "k8s.io/api/core/v1"
+
+	"cuelang.org/go/cue/cuecontext"
+	"cuelang.org/go/cue/load"
+	"cuelang.org/go/encoding/yaml"
 )
+
+// type ContainerRestartPolicy string
 
 const (
-	EnvoyProxyContainerName = "envoy-proxy"
-	EnvoyConfigVolumeName   = "envoy-config"
-	EnvoyConfigMountPath    = "/etc/envoy"
+	// RestartPolicyAlways ContainerRestartPolicy = "Always"
+	envoyCfgFileName         = "bootstrap.yaml"
+	EnvoyProxyContainerImage = "envoyproxy/envoy:v1.30.0"
+	EnvoyProxyContainerName  = "envoy-proxy"
 )
 
-func generateEnvoyProxyConfig(envoyProxyTemplate kodev1alpha1.EnvoyProxyTemplate) (string, error) {
-	// Convert the struct to JSON
-	jsonData, err := json.Marshal(envoyProxyTemplate)
-	if err != nil {
-		return "", fmt.Errorf("error marshalling to JSON: %w", err)
+// GetRenderedBootstrapConfigOptions contains the options for rendering the bootstrap config.
+func GetRenderedBootstrapConfig() (string, error) {
+	// Create a new CUE context
+	ctx := cuecontext.New()
+
+	// Load the CUE instance from the bootstrap.cue and bootstrap_schema.cue files
+	inst := load.Instances([]string{"bootstrap.cue", "bootstrap_schema.cue"}, nil)[0]
+	if inst.Err != nil {
+		return "", fmt.Errorf("failed to load instance: %v", inst.Err)
 	}
 
-	// Convert JSON to YAML
-	var yamlData map[string]interface{}
-	if err := json.Unmarshal(jsonData, &yamlData); err != nil {
-		return "", fmt.Errorf("error unmarshalling JSON to map: %w", err)
-	}
-	yamlBytes, err := yaml.Marshal(yamlData)
-	if err != nil {
-		return "", fmt.Errorf("error marshalling to YAML: %w", err)
+	// Build the CUE value from the instance
+	value := ctx.BuildInstance(inst)
+	if value.Err() != nil {
+		return "", fmt.Errorf("failed to build instance: %v", value.Err())
 	}
 
+	// Convert the CUE value to YAML
+	yamlBytes, err := yaml.Encode(value)
+	if err != nil {
+		return "", fmt.Errorf("failed to encode YAML: %v", err)
+	}
+
+	// Return the resulting YAML as a string
 	return string(yamlBytes), nil
 }
 
-// createEnvoyConfigMap creates a ConfigMap for the EnvoyProxy configuration
-// func createEnvoyConfigMap(ctx context.Context, c client.Client, namespace string, proxyRef *corev1.ObjectReference) (*corev1.ConfigMap, error) {
-// 	envoyProxy := &kodev1alpha1.EnvoyProxy{}
-// 	err := c.Get(ctx, client.ObjectKey{
-// 		Namespace: proxyRef.Namespace,
-// 		Name:      proxyRef.Name,
-// 	}, envoyProxy)
-// 	if err != nil {
-// 		return nil, err
-// 	}
-
-// 	configMap := &corev1.ConfigMap{
-// 		ObjectMeta: metav1.ObjectMeta{
-// 			Name:      proxyRef.Name + "-config",
-// 			Namespace: namespace,
-// 		},
-// 		Data: map[string]string{
-// 			"envoy.yaml": envoyProxy.Spec.Config, // Assuming EnvoyProxySpec has a Config field with the configuration in string format
-// 		},
-// 	}
-
-// 	if err := c.Create(ctx, configMap); err != nil {
-// 		return nil, err
-// 	}
-
-// 	return configMap, nil
-// }
-
-// addEnvoyProxySidecar mutates a PodSpec to include the EnvoyProxy sidecar
-// func addEnvoyProxySidecar(ctx context.Context, c client.Client, namespace string, podSpec *corev1.PodSpec, proxyRef *corev1.ObjectReference) error {
-// 	configMap, err := createEnvoyConfigMap(ctx, c, namespace, proxyRef)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	envoyProxy := &kodev1alpha1.EnvoyProxy{}
-// 	err = c.Get(ctx, client.ObjectKey{
-// 		Namespace: proxyRef.Namespace,
-// 		Name:      proxyRef.Name,
-// 	}, envoyProxy)
-// 	if err != nil {
-// 		return err
-// 	}
-
-// 	envoyContainer := corev1.Container{
-// 		Name:  EnvoyProxyContainerName,
-// 		Image: envoyProxy.Spec.Image, // Assuming EnvoyProxySpec has an Image field
-// 		VolumeMounts: []corev1.VolumeMount{
-// 			{
-// 				Name:      EnvoyConfigVolumeName,
-// 				MountPath: EnvoyConfigMountPath,
-// 				SubPath:   "envoy.yaml",
-// 			},
-// 		},
-// 		Ports: []corev1.ContainerPort{
-// 			{
-// 				Name:          "http",
-// 				ContainerPort: 80,
-// 			},
-// 			{
-// 				Name:          "https",
-// 				ContainerPort: 443,
-// 			},
-// 		},
-// 	}
-
-// 	// Add the volume for the ConfigMap
-// 	podSpec.Volumes = append(podSpec.Volumes, corev1.Volume{
-// 		Name: EnvoyConfigVolumeName,
-// 		VolumeSource: corev1.VolumeSource{
-// 			ConfigMap: &corev1.ConfigMapVolumeSource{
-// 				LocalObjectReference: corev1.LocalObjectReference{
-// 					Name: configMap.Name,
-// 				},
-// 			},
-// 		},
-// 	})
-
-// 	podSpec.Containers = append(podSpec.Containers, envoyContainer)
-// 	return nil
-// }
+func constructEnvoyProxyContainer(kodeTemplate *kodev1alpha1.KodeTemplate, envoyProxyTemplate *kodev1alpha1.EnvoyProxyTemplate) (corev1.Container, error) {
+	config, err := GetRenderedBootstrapConfig()
+	if err != nil {
+		return corev1.Container{}, err
+	}
+	return corev1.Container{
+		Name:  EnvoyProxyContainerName,
+		Image: EnvoyProxyContainerImage,
+		Args: []string{
+			"--config-yaml", config,
+		},
+		Ports: []corev1.ContainerPort{
+			{Name: "http", ContainerPort: 8000},
+		},
+		// RestartPolicy: "Always",
+	}, nil
+}

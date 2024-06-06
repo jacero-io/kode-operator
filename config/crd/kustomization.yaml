@@ -4,8 +4,7 @@
 resources:
 - bases/kode.jacero.io_kodes.yaml
 - bases/kode.jacero.io_envoyproxytemplates.yaml
-- bases/kode.jacero.io_codeservertemplates.yaml
-- bases/kode.jacero.io_webtoptemplates.yaml
+- bases/kode.jacero.io_kodetemplates.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patches:
@@ -17,8 +16,7 @@ patches:
 # patches here are for enabling the CA injection for each CRD
 #- path: patches/cainjection_in_kodes.yaml
 #- path: patches/cainjection_in_envoyproxytemplates.yaml
-#- path: patches/cainjection_in_codeservertemplates.yaml
-#- path: patches/cainjection_in_webtoptemplates.yaml
+#- path: patches/cainjection_in_kodetemplates.yaml
 #+kubebuilder:scaffold:crdkustomizecainjectionpatch
 
 # [WEBHOOK] To enable webhook, uncomment the following section

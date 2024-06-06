@@ -21,14 +21,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-const (
-	WebtopTemplateKind = "WebtopTemplate"
-	CodeServerTemplateKind = "CodeServerTemplate"
-)
-
 type KodeTemplateReference struct {
 	// Kind is the kind of the reference (for KodeTemplate)
-	// +kubebuilder:validation:Enum=WebtopTemplate;CodeServerTemplate
+	// +kubebuilder:validation:Enum=KodeTemplate
 	Kind string `json:"kind"`
 
 	// Name is the name of the KodeTemplate
@@ -40,11 +35,37 @@ type KodeSpec struct {
 	// TemplateRef is the reference to the KodeTemplate configuration
 	TemplateRef KodeTemplateReference `json:"templateRef"`
 
-	// Storage specifies the storage configuration for code-server
+	// User is the HTTP Basic auth username or the user the container should run as, abc is default.
+	// +kubebuilder:validation:Description="User is the HTTP Basic auth username or the user the container should run as. Defaults to 'abc'."
+	// +kubebuilder:default="abc"
+	User string `json:"user,omitempty"`
+
+	// Password HTTP Basic auth password. If unset there will be no auth
+	// +kubebuilder:validation:Description="HTTP Basic auth password. If unset, there will be no authentication."
+	Password string `json:"password,omitempty"`
+
+	// ExistingSecret is a reference to an existing secret containing user and password.
+	// +kubebuilder:validation:Description="ExistingSecret is a reference to an existing secret containing user and password. If set, User and Password fields are ignored."
+	ExistingSecret string `json:"existingSecret,omitempty"`
+
+	// Home is the path to the directory for the user data
+	// +kubebuilder:validation:Description="Home is the path to the directory for the user data. Defaults to '/config'."
+	// +kubebuilder:validation:MinLength=3
+	// +kubebuilder:default=/config
+	Home string `json:"home,omitempty"`
+
+	// Workspace is the user specified workspace directory (e.g. my-workspace)
+	// +kubebuilder:validation:Description="User specified workspace directory (e.g. my-workspace)."
+	// +kubebuilder:validation:MinLength=3
+	// +kubebuilder:validation:Pattern="^[^/].*$"
+	Workspace string `json:"workspace,omitempty"`
+
+	// Storage specifies the storage configuration
+	// +kubebuilder:validation:Description="Storage configuration."
 	Storage KodeStorageSpec `json:"storage,omitempty"`
 }
 
-// KodeStorageSpec defines the storage configuration for code-server
+// KodeStorageSpec defines the storage configuration
 type KodeStorageSpec struct {
 	// AccessModes specifies the access modes for the persistent volume
 	AccessModes []corev1.PersistentVolumeAccessMode `json:"accessModes,omitempty"`
@@ -58,7 +79,7 @@ type KodeStorageSpec struct {
 
 // KodeStatus defines the observed state of Kode
 type KodeStatus struct {
-    Ready bool `json:"ready"`
+	Ready bool `json:"ready"`
 }
 
 //+kubebuilder:object:root=true
