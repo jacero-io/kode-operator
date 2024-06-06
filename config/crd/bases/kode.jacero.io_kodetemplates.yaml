@@ -203,12 +203,22 @@ spec:
                 description: PUID is the user ID for the service process
                 format: int64
                 type: integer
+              type:
+                description: Type is the type of container to use. Can be one of 'code-server',
+                  'webtop', 'devcontainers', 'jupyter'.
+                enum:
+                - code-server
+                - webtop
+                - devcontainers
+                - jupyter
+                type: string
               tz:
                 default: UTC
                 description: TZ is the timezone for the service process
                 type: string
             required:
             - image
+            - type
             type: object
           status:
             description: KodeTemplateStatus defines the observed state of KodeTemplate

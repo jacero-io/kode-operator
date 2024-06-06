@@ -9,6 +9,7 @@ spec:
   # envoyProxyTemplateRef:
   #   kind: EnvoyProxyTemplate
   #   name: envoyproxytemplate-sample
+  type: code-server
   image: lscr.io/linuxserver/code-server:latest
   tz: "Europe/Stockholm"
   puid: 1000
