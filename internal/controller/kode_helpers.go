@@ -31,35 +31,35 @@ import (
 
 const (
 	// RestartPolicyAlways ContainerRestartPolicy = "Always"
-	envoyCfgFileName         = "bootstrap.yaml"
-	EnvoyProxyContainerName  = "envoy-proxy"
+	envoyCfgFileName        = "bootstrap.yaml"
+	EnvoyProxyContainerName = "envoy-proxy"
 )
 
 // GetRenderedBootstrapConfigOptions contains the options for rendering the bootstrap config.
 func GetRenderedBootstrapConfig(cueFiles []string) (string, error) {
-    // Create a new CUE context
-    ctx := cuecontext.New()
+	// Create a new CUE context
+	ctx := cuecontext.New()
 
-    // Load the CUE instance from the provided files
-    inst := load.Instances(cueFiles, nil)[0]
-    if inst.Err != nil {
-        return "", fmt.Errorf("failed to load CUE instance: %w", inst.Err)
-    }
+	// Load the CUE instance from the provided files
+	inst := load.Instances(cueFiles, nil)[0]
+	if inst.Err != nil {
+		return "", fmt.Errorf("failed to load CUE instance: %w", inst.Err)
+	}
 
-    // Build the CUE value from the instance
-    value := ctx.BuildInstance(inst)
-    if value.Err() != nil {
-        return "", fmt.Errorf("failed to build CUE instance: %w", value.Err())
-    }
+	// Build the CUE value from the instance
+	value := ctx.BuildInstance(inst)
+	if value.Err() != nil {
+		return "", fmt.Errorf("failed to build CUE instance: %w", value.Err())
+	}
 
-    // Convert the CUE value to YAML
-    yamlBytes, err := yaml.Encode(value)
-    if err != nil {
-        return "", fmt.Errorf("failed to encode YAML: %w", err)
-    }
+	// Convert the CUE value to YAML
+	yamlBytes, err := yaml.Encode(value)
+	if err != nil {
+		return "", fmt.Errorf("failed to encode YAML: %w", err)
+	}
 
-    // Return the resulting YAML as a string
-    return string(yamlBytes), nil
+	// Return the resulting YAML as a string
+	return string(yamlBytes), nil
 }
 
 // constructEnvoyProxyContainer constructs the Envoy Proxy container
@@ -67,14 +67,14 @@ func constructEnvoyProxyContainer(kodeTemplate *kodev1alpha1.KodeTemplate, envoy
 	// HTTPFilters := envoyProxyTemplate.Spec.HTTPFilters
 	// ContainerPort := kodeTemplate.Spec.Port
 
-    config, err := GetRenderedBootstrapConfig([]string{"internal/controller/cue/bootstrap.cue", "internal/controller/cue/bootstrap_schema.cue"})
-    if err != nil {
-        return corev1.Container{}, fmt.Errorf("error rendering bootstrap config: %w", err)
-    }
+	config, err := GetRenderedBootstrapConfig([]string{"internal/controller/cue/bootstrap.cue", "internal/controller/cue/bootstrap_schema.cue"})
+	if err != nil {
+		return corev1.Container{}, fmt.Errorf("error rendering bootstrap config: %w", err)
+	}
 
 	return corev1.Container{
 		Name:  EnvoyProxyContainerName,
-		Image: envoyProxyTemplate.Spec.Image,	
+		Image: envoyProxyTemplate.Spec.Image,
 		Args: []string{
 			"--config-yaml", config,
 		},
