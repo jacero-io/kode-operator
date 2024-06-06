@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"time"
 
 	kodev1alpha1 "github.com/emil-jacero/kode-operator/api/v1alpha1"
 	"github.com/go-logr/logr"
@@ -77,7 +78,7 @@ func logKodeManifest(log logr.Logger, kode *kodev1alpha1.Kode) {
 }
 
 func logKodeTemplateManifest(log logr.Logger, kodeTemplate *kodev1alpha1.KodeTemplate) {
-	log.V(1).Info("Kode Manifest",
+	log.V(1).Info("Kode Template Manifest",
 		"Name", kodeTemplate.Name,
 		"Namespace", kodeTemplate.Namespace,
 		"Image", kodeTemplate.Spec.Image,
@@ -117,9 +118,11 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	if kode.Spec.TemplateRef.Name != "" {
 		log.Info("Fetching KodeTemplate instance", "Name", kodeTemplateName)
 		if err := r.Get(ctx, kodeTemplateName, kodeTemplate); err != nil {
-			if client.IgnoreNotFound(err) != nil {
-				log.Error(err, "Failed to fetch KodeTemplate instance", "Name", kode.Spec.TemplateRef.Name)
+			if errors.IsNotFound(err) {
+				log.Info("KodeTemplate instance not found, requeuing", "Name", kodeTemplateName)
+				return ctrl.Result{RequeueAfter: 10 * time.Second}, nil // Retry after some time
 			}
+			log.Error(err, "Failed to fetch KodeTemplate instance", "Name", kode.Spec.TemplateRef.Name)
 			return ctrl.Result{}, client.IgnoreNotFound(err)
 		}
 	}
@@ -131,26 +134,28 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	if kodeTemplate.Spec.EnvoyProxyTemplateRef.Name != "" {
 		log.Info("Fetching EnvoyProxyTemplate instance", "Name", envoyProxyTemplateName)
 		if err := r.Get(ctx, envoyProxyTemplateName, envoyProxyTemplate); err != nil {
-			if client.IgnoreNotFound(err) != nil {
-				log.Error(err, "Failed to fetch EnvoyProxyTemplate instance", "Name", envoyProxyTemplateName)
+			if errors.IsNotFound(err) {
+				log.Info("EnvoyProxyTemplate instance not found, requeuing", "Name", envoyProxyTemplateName)
+				return ctrl.Result{RequeueAfter: 10 * time.Second}, nil // Retry after some time
 			}
+			log.Error(err, "Failed to fetch EnvoyProxyTemplate instance", "Name", envoyProxyTemplateName)
 			return ctrl.Result{}, client.IgnoreNotFound(err)
 		}
 	}
 
 	// Ensure the Deployment and Service exist
-	log.Info("Ensuring Deployment exists", "Namespace", kode.Namespace, "Name", kode.Name)
+	// log.Info("Ensuring Deployment exists", "Namespace", kode.Namespace, "Name", kode.Name)
 	if err := r.ensureDeployment(ctx, kode, kodeTemplate, envoyProxyTemplate); err != nil {
 		return ctrl.Result{}, err
 	}
-	log.Info("Ensuring Service exists", "Namespace", kode.Namespace, "Name", kode.Name)
+	// log.Info("Ensuring Service exists", "Namespace", kode.Namespace, "Name", kode.Name)
 	if err := r.ensureService(ctx, kode, kodeTemplate); err != nil {
 		return ctrl.Result{}, err
 	}
 
 	// Ensure PVC exists
 	if !reflect.DeepEqual(kode.Spec.Storage, kodev1alpha1.KodeStorageSpec{}) {
-		log.Info("Ensuring Storage exists", "Namespace", kode.Namespace, "Name", kode.Name)
+		// log.Info("Ensuring Storage exists", "Namespace", kode.Namespace, "Name", kode.Name)
 		if _, err := r.ensurePVC(ctx, kode); err != nil {
 			return ctrl.Result{}, err
 		}
@@ -166,7 +171,7 @@ func (r *KodeReconciler) validateReferences(kode *kodev1alpha1.Kode) error {
 	return nil
 }
 
-// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // ensurePVC ensures that the PersistentVolumeClaim exists for the Kode instance
 func (r *KodeReconciler) ensurePVC(ctx context.Context, kode *kodev1alpha1.Kode) (*corev1.PersistentVolumeClaim, error) {
 	log := r.Log.WithName("ensurePVC")
@@ -179,29 +184,6 @@ func (r *KodeReconciler) ensurePVC(ctx context.Context, kode *kodev1alpha1.Kode)
 	}
 
 	return pvc, r.updatePVCIfNecessary(ctx, kode, pvc)
-}
-
-// constructPVC constructs a PersistentVolumeClaim for the Kode instance
-func (r *KodeReconciler) constructPVC(kode *kodev1alpha1.Kode) *corev1.PersistentVolumeClaim {
-	log := r.Log.WithName("constructPVC")
-
-	pvc := &corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      PersistentVolumeClaimName,
-			Namespace: kode.Namespace,
-		},
-		Spec: corev1.PersistentVolumeClaimSpec{
-			AccessModes: kode.Spec.Storage.AccessModes,
-			Resources:   kode.Spec.Storage.Resources,
-		},
-	}
-	if kode.Spec.Storage.StorageClassName != nil {
-		pvc.Spec.StorageClassName = kode.Spec.Storage.StorageClassName
-	}
-
-	logPVCManifest(log, pvc)
-
-	return pvc
 }
 
 // getOrCreatePVC gets or creates a PersistentVolumeClaim for the Kode instance
@@ -245,6 +227,29 @@ func (r *KodeReconciler) updatePVCIfNecessary(ctx context.Context, kode *kodev1a
 	return nil
 }
 
+// constructPVC constructs a PersistentVolumeClaim for the Kode instance
+func (r *KodeReconciler) constructPVC(kode *kodev1alpha1.Kode) *corev1.PersistentVolumeClaim {
+	log := r.Log.WithName("constructPVC")
+
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      PersistentVolumeClaimName,
+			Namespace: kode.Namespace,
+		},
+		Spec: corev1.PersistentVolumeClaimSpec{
+			AccessModes: kode.Spec.Storage.AccessModes,
+			Resources:   kode.Spec.Storage.Resources,
+		},
+	}
+	if kode.Spec.Storage.StorageClassName != nil {
+		pvc.Spec.StorageClassName = kode.Spec.Storage.StorageClassName
+	}
+
+	logPVCManifest(log, pvc)
+
+	return pvc
+}
+
 // logPVCManifest add structured logging for the PVC manifest to improve visibility for debugging
 func logPVCManifest(log logr.Logger, pvc *corev1.PersistentVolumeClaim) {
 	log.V(1).Info("PVC Manifest",
@@ -279,6 +284,33 @@ func (r *KodeReconciler) ensureDeployment(ctx context.Context, kode *kodev1alpha
 	return nil
 }
 
+// getOrCreateDeployment gets or creates a Deployment for the Kode instance
+func (r *KodeReconciler) getOrCreateDeployment(ctx context.Context, kode *kodev1alpha1.Kode, kodeTemplate *kodev1alpha1.KodeTemplate, envoyProxyTemplate *kodev1alpha1.EnvoyProxyTemplate) (*appsv1.Deployment, error) {
+	log := r.Log.WithName("getOrCreateDeployment")
+	deployment := r.constructDeployment(kode, kodeTemplate, envoyProxyTemplate)
+
+	if err := controllerutil.SetControllerReference(kode, deployment, r.Scheme); err != nil {
+		return nil, err
+	}
+
+	found := &appsv1.Deployment{}
+	err := r.Get(ctx, types.NamespacedName{Name: deployment.Name, Namespace: deployment.Namespace}, found)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			log.Info("Creating Deployment", "Namespace", deployment.Namespace, "Name", deployment.Name)
+			if err := r.Create(ctx, deployment); err != nil {
+				log.Error(err, "Failed to create Deployment", "Namespace", deployment.Namespace, "Name", deployment.Name)
+				return nil, err
+			}
+			log.Info("Deployment created", "Namespace", deployment.Namespace, "Name", deployment.Name)
+		} else {
+			return nil, err
+		}
+	}
+
+	return deployment, nil
+}
+
 // constructDeployment constructs a Deployment for the Kode instance
 func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode, kodeTemplate *kodev1alpha1.KodeTemplate, envoyProxyTemplate *kodev1alpha1.EnvoyProxyTemplate) *appsv1.Deployment {
 	log := r.Log.WithName("constructDeployment")
@@ -297,7 +329,6 @@ func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode, kodeTempla
 		"kode-template.jacero.io/name": kodeTemplate.Name,
 	}
 
-	initContainers := []corev1.Container{}
 	containers := []corev1.Container{{
 		Name:  ContainerName,
 		Image: kodeTemplate.Spec.Image,
@@ -337,14 +368,14 @@ func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode, kodeTempla
 	}
 
 	// Add EnvoyProxy sidecar if specified
-	if !reflect.DeepEqual(envoyProxyTemplate, kodev1alpha1.EnvoyProxyTemplate{}) {
-		// envoySidecarInitContainer, err := constructEnvoyProxyContainer(kodeTemplate, envoyProxyTemplate)
+	initContainers := []corev1.Container{}
+	if kodeTemplate.Spec.EnvoyProxyTemplateRef.Name != "" {
 		envoySidecarContainer, err := constructEnvoyProxyContainer(kodeTemplate, envoyProxyTemplate)
 		if err != nil {
 			log.Error(err, "Failed to construct EnvoyProxy sidecar")
+		} else {
+			containers = append(containers, envoySidecarContainer)
 		}
-		// initContainers = append(initContainers, envoySidecarInitContainer)
-		containers = append(containers, envoySidecarContainer)
 	}
 
 	deployment := &appsv1.Deployment{
@@ -364,8 +395,8 @@ func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode, kodeTempla
 				},
 				Spec: corev1.PodSpec{
 					InitContainers: initContainers,
-					Containers:     containers,
-					Volumes:        volumes,
+					Containers: containers,
+					Volumes:    volumes,
 				},
 			},
 		},
@@ -373,32 +404,6 @@ func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode, kodeTempla
 
 	logDeploymentManifest(log, deployment)
 	return deployment
-}
-
-// getOrCreateDeployment gets or creates a Deployment for the Kode instance
-func (r *KodeReconciler) getOrCreateDeployment(ctx context.Context, kode *kodev1alpha1.Kode, kodeTemplate *kodev1alpha1.KodeTemplate, envoyProxyTemplate *kodev1alpha1.EnvoyProxyTemplate) (*appsv1.Deployment, error) {
-	log := r.Log.WithName("getOrCreateDeployment")
-	deployment := r.constructDeployment(kode, kodeTemplate, envoyProxyTemplate)
-
-	if err := controllerutil.SetControllerReference(kode, deployment, r.Scheme); err != nil {
-		return nil, err
-	}
-
-	found := &appsv1.Deployment{}
-	err := r.Get(ctx, types.NamespacedName{Name: deployment.Name, Namespace: deployment.Namespace}, found)
-	if err != nil {
-		if client.IgnoreNotFound(err) != nil {
-			return nil, err
-		}
-		log.Info("Creating Deployment", "Namespace", deployment.Namespace, "Name", deployment.Name)
-		if err := r.Create(ctx, deployment); err != nil {
-			log.Error(err, "Failed to create Deployment", "Namespace", deployment.Namespace, "Name", deployment.Name)
-			return nil, err
-		}
-		log.Info("Deployment created", "Namespace", deployment.Namespace, "Name", deployment.Name)
-	}
-
-	return deployment, nil
 }
 
 // updateDeploymentIfNecessary updates the Deployment if the desired state is different from the existing state
@@ -453,7 +458,7 @@ func logDeploymentManifest(log logr.Logger, deployment *appsv1.Deployment) {
 	)
 }
 
-// //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // ensureService ensures that the Service exists for the Kode instance
 func (r *KodeReconciler) ensureService(ctx context.Context, kode *kodev1alpha1.Kode, kodeTemplate *kodev1alpha1.KodeTemplate) error {
 	log := r.Log.WithName("ensureService")
@@ -488,15 +493,16 @@ func (r *KodeReconciler) getOrCreateService(ctx context.Context, kode *kodev1alp
 	found := &corev1.Service{}
 	err := r.Get(ctx, types.NamespacedName{Name: service.Name, Namespace: service.Namespace}, found)
 	if err != nil {
-		if client.IgnoreNotFound(err) != nil {
+		if errors.IsNotFound(err) {
+			log.Info("Creating Service", "Namespace", service.Namespace, "Name", service.Name)
+			if err := r.Create(ctx, service); err != nil {
+				log.Error(err, "Failed to create Service", "Namespace", service.Namespace, "Name", service.Name)
+				return nil, err
+			}
+			log.Info("Service created", "Namespace", service.Namespace, "Name", service.Name)
+		} else {
 			return nil, err
 		}
-		log.Info("Creating Service", "Namespace", service.Namespace, "Name", service.Name)
-		if err := r.Create(ctx, service); err != nil {
-			log.Error(err, "Failed to create Service", "Namespace", service.Namespace, "Name", service.Name)
-			return nil, err
-		}
-		log.Info("Service created", "Namespace", service.Namespace, "Name", service.Name)
 	}
 
 	return service, nil
