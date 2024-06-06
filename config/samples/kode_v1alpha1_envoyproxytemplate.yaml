@@ -8,9 +8,6 @@ metadata:
 spec:
   image: envoyproxy/envoy:v1.30-latest
   httpFilters:
-    - name: envoy.filters.http.router
-      typed_config:
-        '@type': type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
     - name: envoy.filters.http.ext_authz
       typed_config:
         '@type': type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz
@@ -24,3 +21,6 @@ spec:
               cluster_name: ext_authz-opa-service
             timeout: 0.250s
           transport_api_version: V3
+    - name: envoy.filters.http.router
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.http.router.v3.Router

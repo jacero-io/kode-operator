@@ -4,9 +4,14 @@ metadata:
   labels:
     app.kubernetes.io/name: kode-operator
     app.kubernetes.io/managed-by: kustomize
-  name: kodetemplate-code-server-sample
+  name: kodetemplate-codeserver-sample
 spec:
   # envoyProxyTemplateRef:
   #   kind: EnvoyProxyTemplate
   #   name: envoyproxytemplate-sample
   image: lscr.io/linuxserver/code-server:latest
+  tz: "Europe/Stockholm"
+  puid: 1000
+  pgid: 1000
+  home: /config
+  defaultWorkspace: workspace

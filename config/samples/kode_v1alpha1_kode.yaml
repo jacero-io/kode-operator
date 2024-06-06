@@ -4,13 +4,13 @@ metadata:
   labels:
     app.kubernetes.io/name: kode-operator
     app.kubernetes.io/managed-by: kustomize
-  name: kode-sample
+  name: kode-codeserver-sample
 spec:
   templateRef:
     kind: KodeTemplate
-    name: kodetemplate-sample
-  user: "user1"
-  password: "password1"
+    name: kodetemplate-codeserver-sample
+  user: user1
+  password: password1
   # storage:
   #   accessModes:
   #     - ReadWriteOnce
