@@ -42,7 +42,7 @@ func GetRenderedBootstrapConfig() (string, error) {
 	ctx := cuecontext.New()
 
 	// Load the CUE instance from the bootstrap.cue and bootstrap_schema.cue files
-	inst := load.Instances([]string{"bootstrap.cue", "bootstrap_schema.cue"}, nil)[0]
+	inst := load.Instances([]string{"internal/controller/cue/bootstrap.cue", "internal/controller/cue/bootstrap_schema.cue"}, nil)[0]
 	if inst.Err != nil {
 		return "", fmt.Errorf("failed to load instance: %v", inst.Err)
 	}
