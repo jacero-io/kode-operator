@@ -338,7 +338,10 @@ func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode, kodeTempla
 			{Name: "PASSWORD", Value: kode.Spec.Password},
 			{Name: "DEFAULT_WORKSPACE", Value: workspace},
 		},
-		Ports: []corev1.ContainerPort{{ContainerPort: kodeTemplate.Spec.Port}},
+		Ports: []corev1.ContainerPort{{
+			Name: 		   "kode-port",
+			ContainerPort: kodeTemplate.Spec.Port,
+		}},
 	}}
 
 	volumes := []corev1.Volume{}
