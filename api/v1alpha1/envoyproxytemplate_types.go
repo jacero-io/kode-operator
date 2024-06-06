@@ -27,6 +27,7 @@ type EnvoyProxyTemplateReference struct {
 	// Name is the name of the EnvoyProxyTemplate
 	Name string `json:"name"`
 }
+
 // EnvoyProxyTemplateSpec defines the desired state of EnvoyProxyTemplate
 type EnvoyProxyTemplateSpec struct {
 	// Image is the Docker image for the Envoy proxy

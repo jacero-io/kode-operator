@@ -349,8 +349,10 @@ func (in *KodeTemplateSpec) DeepCopyInto(out *KodeTemplateSpec) {
 	out.EnvoyProxyTemplateRef = in.EnvoyProxyTemplateRef
 	if in.Envs != nil {
 		in, out := &in.Envs, &out.Envs
-		*out = make([]string, len(*in))
-		copy(*out, *in)
+		*out = make([]v1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
 	}
 	if in.Args != nil {
 		in, out := &in.Args, &out.Args

@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -40,11 +41,11 @@ type KodeTemplateSpec struct {
 
 	// Specifies the envs
 	// +kubebuilder:validation:Description="Environment variables for the service."
-	Envs []string `json:"envs,omitempty" protobuf:"bytes,9,opt,name=envs"`
+	Envs []corev1.EnvVar `json:"envs,omitempty"`
 
 	// Specifies the args
 	// +kubebuilder:validation:Description="Arguments for the service."
-	Args []string `json:"args,omitempty" protobuf:"bytes,10,opt,name=args"`
+	Args []string `json:"args,omitempty"`
 
 	// TZ is the timezone for the service process
 	// +kubebuilder:validation:Description="Timezone for the service process. Defaults to 'UTC'."
