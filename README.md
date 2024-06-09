@@ -12,10 +12,12 @@
 - [ ] Full lifecycle of [Alnoda](https://docs.alnoda.org/about/intro/).
 - [ ] Full lifecycle of [Jupyter](https://jupyter.org/).
 - [ ] Authentication & Authorization using Envoy Proxy sidecar.
+  - [ ] [Envoy-prxoy] Add OIDC support
+  - [ ] [Envoy-prxoy] Add Basic Auth support
+- [ ] [Code-server] Ability to include user settings (e.g. extensions, settings.json, etc).
+- [ ] [Webtop] Ability to include user configuration (e.g. .profile, .bashrc, etc).
 - [ ] Backup up of user data to S3.
 - [ ] Restore of user data from S3.
-- [ ] [Code-server] Ability to include user settings (e.g. extensions, settings.json, etc)
-- [ ] [Webtop] Ability to include user configuration (e.g. .profile, .bashrc, etc)
 
 ## Getting Started
 
