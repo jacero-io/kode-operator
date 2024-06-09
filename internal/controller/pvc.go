@@ -34,18 +34,6 @@ func (r *KodeReconciler) ensurePVC(ctx context.Context, kode *kodev1alpha1.Kode)
 
 	log.Info("Ensuring PVC exists", "Namespace", kode.Namespace, "Name", kode.Name)
 
-	pvc, err := r.getOrCreatePVC(ctx, kode)
-	if err != nil {
-		return pvc, err
-	}
-
-	return pvc, r.updatePVCIfNecessary(ctx, kode, pvc)
-}
-
-// getOrCreatePVC gets or creates a PersistentVolumeClaim for the Kode instance
-func (r *KodeReconciler) getOrCreatePVC(ctx context.Context, kode *kodev1alpha1.Kode) (*corev1.PersistentVolumeClaim, error) {
-	log := r.Log.WithName("getOrCreatePVC")
-
 	pvc := r.constructPVC(kode)
 	if err := controllerutil.SetControllerReference(kode, pvc, r.Scheme); err != nil {
 		return nil, err
@@ -64,23 +52,18 @@ func (r *KodeReconciler) getOrCreatePVC(ctx context.Context, kode *kodev1alpha1.
 		return nil, err
 	}
 
-	return found, nil
-}
-
-// updatePVCIfNecessary updates the PVC if the desired state is different from the existing state
-func (r *KodeReconciler) updatePVCIfNecessary(ctx context.Context, kode *kodev1alpha1.Kode, existingPVC *corev1.PersistentVolumeClaim) error {
-	log := r.Log.WithName("updatePVCIfNecessary")
-	desiredPVC := r.constructPVC(kode)
-
 	// Only update mutable fields: Resources.Requests
-	if !equality.Semantic.DeepEqual(existingPVC.Spec.Resources.Requests, desiredPVC.Spec.Resources.Requests) {
-		existingPVC.Spec.Resources.Requests = desiredPVC.Spec.Resources.Requests
-		log.Info("Updating existing PVC resources", "Namespace", existingPVC.Namespace, "Name", existingPVC.Name)
-		return r.Update(ctx, existingPVC)
+	if !equality.Semantic.DeepEqual(found.Spec.Resources.Requests, pvc.Spec.Resources.Requests) {
+		found.Spec.Resources.Requests = pvc.Spec.Resources.Requests
+		log.Info("Updating existing PVC resources", "Namespace", found.Namespace, "Name", found.Name)
+		if err := r.Update(ctx, found); err != nil {
+			return nil, err
+		}
+	} else {
+		log.Info("PVC is up-to-date", "Namespace", found.Namespace, "Name", found.Name)
 	}
 
-	log.Info("PVC is up-to-date", "Namespace", existingPVC.Namespace, "Name", existingPVC.Name)
-	return nil
+	return found, nil
 }
 
 // constructPVC constructs a PersistentVolumeClaim for the Kode instance
