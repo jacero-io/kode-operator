@@ -15,5 +15,5 @@ spec:
   tz: "Europe/Stockholm"
   puid: 1000
   pgid: 1000
-  home: /config
+  defaultHome: /config
   defaultWorkspace: workspace

@@ -68,11 +68,11 @@ type KodeTemplateSpec struct {
 	// +kubebuilder:default=1000
 	PGID int64 `json:"pgid,omitempty"`
 
-	// Home is the path to the directory for the user data
-	// +kubebuilder:validation:Description="Home is the path to the directory for the user data. Defaults to '/config'."
+	// DefaultHome is the path to the directory for the user data
+	// +kubebuilder:validation:Description="Default home is the path to the directory for the user data. Defaults to '/config'."
 	// +kubebuilder:validation:MinLength=3
 	// +kubebuilder:default=/config
-	Home string `json:"home,omitempty"`
+	DefaultHome string `json:"defaultHome,omitempty"`
 
 	// DefaultWorkspace is the default directory for the kode instance on first launch. Defaults to 'workspace'.
 	// +kubebuilder:validation:Description="Default workspace is the default directory for the kode instance on first launch. Defaults to 'workspace'."

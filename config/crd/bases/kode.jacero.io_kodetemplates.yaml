@@ -44,6 +44,12 @@ spec:
                 items:
                   type: string
                 type: array
+              defaultHome:
+                default: /config
+                description: DefaultHome is the path to the directory for the user
+                  data
+                minLength: 3
+                type: string
               defaultWorkspace:
                 default: workspace
                 description: DefaultWorkspace is the default directory for the kode
@@ -177,11 +183,6 @@ spec:
                   - name
                   type: object
                 type: array
-              home:
-                default: /config
-                description: Home is the path to the directory for the user data
-                minLength: 3
-                type: string
               image:
                 description: Image is the container image for the service
                 minLength: 1

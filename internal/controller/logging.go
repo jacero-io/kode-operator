@@ -56,7 +56,7 @@ func logKodeTemplateManifest(log logr.Logger, kodeTemplate *kodev1alpha1.KodeTem
 		"Port", kodeTemplate.Spec.Port,
 		"Envs", fmt.Sprintf("%v", maskedEnvs),
 		"Args", fmt.Sprintf("%v", kodeTemplate.Spec.Args),
-		"Home", kodeTemplate.Spec.Home,
+		"Home", kodeTemplate.Spec.DefaultHome,
 		"DefaultWorkspace", kodeTemplate.Spec.DefaultWorkspace,
 	)
 }

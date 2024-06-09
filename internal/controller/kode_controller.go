@@ -82,7 +82,7 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	if kode.Spec.TemplateRef.Name != "" {
 		ContainerName := "kode-" + kode.Name
 		labels["app.kubernetes.io/name"] = ContainerName
-		labels["app.kubernetes.io/managed-by"] = "Kode Operator"
+		labels["app.kubernetes.io/managed-by"] = "kode-operator"
 		labels["kode.jacero.io/name"] = kode.Name
 		kodeTemplate = &kodev1alpha1.KodeTemplate{}
 		kodeTemplateName := client.ObjectKey{Name: kode.Spec.TemplateRef.Name}

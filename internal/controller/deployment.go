@@ -27,6 +27,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -82,10 +83,15 @@ func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode, labels map
 	log := r.Log.WithName("constructDeployment")
 
 	replicas := int32(1)
+	mountPath := kodeTemplate.Spec.DefaultHome
 
-	workspace := path.Join(kodeTemplate.Spec.Home, kodeTemplate.Spec.DefaultWorkspace)
+	workspace := path.Join(kodeTemplate.Spec.DefaultHome, kodeTemplate.Spec.DefaultWorkspace)
 	if kode.Spec.Workspace != "" {
-		workspace = path.Join(kodeTemplate.Spec.Home, kode.Spec.Workspace)
+		if kode.Spec.Home != "" {
+			workspace = path.Join(kode.Spec.Home, kode.Spec.Workspace)
+			mountPath = kode.Spec.Home
+		}
+		workspace = path.Join(kodeTemplate.Spec.DefaultHome, kode.Spec.Workspace)
 	}
 
 	var containers []corev1.Container
@@ -96,7 +102,7 @@ func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode, labels map
 		containers = constructWebtopContainers(kode, kodeTemplate)
 	}
 
-	volumes, volumeMounts := constructVolumesAndMounts(kode, kodeTemplate)
+	volumes, volumeMounts := constructVolumesAndMounts(mountPath, kode, kodeTemplate)
 	containers[0].VolumeMounts = volumeMounts
 
 	initContainers := []corev1.Container{}
@@ -114,6 +120,13 @@ func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode, labels map
 			Name:      kode.Name,
 			Namespace: kode.Namespace,
 			Labels:    labels,
+			OwnerReferences: []metav1.OwnerReference{
+				*metav1.NewControllerRef(kode, schema.GroupVersionKind{
+					Group:   kodev1alpha1.GroupVersion.Group,
+					Version: kodev1alpha1.GroupVersion.Version,
+					Kind:    "Kode",
+				}),
+			},
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
@@ -176,7 +189,7 @@ func constructWebtopContainers(kode *kodev1alpha1.Kode, kodeTemplate *kodev1alph
 	}}
 }
 
-func constructVolumesAndMounts(kode *kodev1alpha1.Kode, kodeTemplate *kodev1alpha1.KodeTemplate) ([]corev1.Volume, []corev1.VolumeMount) {
+func constructVolumesAndMounts(mountPath string, kode *kodev1alpha1.Kode, kodeTemplate *kodev1alpha1.KodeTemplate) ([]corev1.Volume, []corev1.VolumeMount) {
 	volumes := []corev1.Volume{}
 	volumeMounts := []corev1.VolumeMount{}
 
@@ -193,7 +206,7 @@ func constructVolumesAndMounts(kode *kodev1alpha1.Kode, kodeTemplate *kodev1alph
 
 		volumeMount := corev1.VolumeMount{
 			Name:      "kode-storage",
-			MountPath: kodeTemplate.Spec.Home,
+			MountPath: mountPath,
 		}
 
 		volumes = append(volumes, volume)

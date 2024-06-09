@@ -24,6 +24,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -74,6 +75,13 @@ func (r *KodeReconciler) constructService(kode *kodev1alpha1.Kode, labels map[st
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kode.Name,
 			Namespace: kode.Namespace,
+			OwnerReferences: []metav1.OwnerReference{
+				*metav1.NewControllerRef(kode, schema.GroupVersionKind{
+					Group:   kodev1alpha1.GroupVersion.Group,
+					Version: kodev1alpha1.GroupVersion.Version,
+					Kind:    "Kode",
+				}),
+			},
 		},
 		Spec: corev1.ServiceSpec{
 			Selector: labels,
