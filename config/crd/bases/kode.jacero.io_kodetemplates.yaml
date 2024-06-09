@@ -205,7 +205,7 @@ spec:
                 type: integer
               type:
                 description: Type is the type of container to use. Can be one of 'code-server',
-                  'webtop', 'devcontainers', 'jupyter'.
+                  'webtop', 'devcontainers', 'jupyter', 'alnoda'.
                 enum:
                 - code-server
                 - webtop

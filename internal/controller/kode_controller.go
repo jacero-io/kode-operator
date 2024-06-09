@@ -75,14 +75,14 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	}
 
 	// TODO: Does not recognize that kodeTemplate has been updated. If kodeTemplate is updated, the deployment should be updated as well.
-	// TODO: Should kodeTemplate be versioned?
 	// Fetch the KodeTemplate instance and EnvoyProxyTemplate instance
 	var kodeTemplate *kodev1alpha1.KodeTemplate
 	var envoyProxyTemplate *kodev1alpha1.EnvoyProxyTemplate
 
 	if kode.Spec.TemplateRef.Name != "" {
 		ContainerName := "kode-" + kode.Name
-		labels["app"] = ContainerName
+		labels["app.kubernetes.io/name"] = ContainerName
+		labels["app.kubernetes.io/managed-by"] = "Kode Operator"
 		labels["kode.jacero.io/name"] = kode.Name
 		kodeTemplate = &kodev1alpha1.KodeTemplate{}
 		kodeTemplateName := client.ObjectKey{Name: kode.Spec.TemplateRef.Name}
