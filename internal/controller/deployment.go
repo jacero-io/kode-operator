@@ -83,15 +83,16 @@ func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode, labels map
 	log := r.Log.WithName("constructDeployment")
 
 	replicas := int32(1)
-	mountPath := kodeTemplate.Spec.DefaultHome
 
 	workspace := path.Join(kodeTemplate.Spec.DefaultHome, kodeTemplate.Spec.DefaultWorkspace)
+	mountPath := kodeTemplate.Spec.DefaultHome
 	if kode.Spec.Workspace != "" {
 		if kode.Spec.Home != "" {
 			workspace = path.Join(kode.Spec.Home, kode.Spec.Workspace)
 			mountPath = kode.Spec.Home
-		}
+		} else {
 		workspace = path.Join(kodeTemplate.Spec.DefaultHome, kode.Spec.Workspace)
+		}
 	}
 
 	var containers []corev1.Container
