@@ -100,48 +100,17 @@ func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode, kodeTempla
 		"kode-template.jacero.io/name": kodeTemplate.Name,
 	}
 
-	containers := []corev1.Container{{
-		Name:  ContainerName,
-		Image: kodeTemplate.Spec.Image,
-		Env: []corev1.EnvVar{
-			{Name: "PUID", Value: fmt.Sprintf("%d", kodeTemplate.Spec.PUID)},
-			{Name: "PGID", Value: fmt.Sprintf("%d", kodeTemplate.Spec.PGID)},
-			{Name: "TZ", Value: kodeTemplate.Spec.TZ},
-			{Name: "USERNAME", Value: kode.Spec.User},
-			{Name: "PASSWORD", Value: kode.Spec.Password},
-			{Name: "DEFAULT_WORKSPACE", Value: workspace},
-		},
-		Ports: []corev1.ContainerPort{{
-			Name:          "kode-port",
-			ContainerPort: kodeTemplate.Spec.Port,
-		}},
-	}}
+	var containers []corev1.Container
 
-	volumes := []corev1.Volume{}
-	volumeMounts := []corev1.VolumeMount{}
-
-	// Add volume and volume mount if storage is defined
-	if !reflect.DeepEqual(kode.Spec.Storage, kodev1alpha1.KodeStorageSpec{}) {
-		volume := corev1.Volume{
-			Name: "kode-storage",
-			VolumeSource: corev1.VolumeSource{
-				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: PersistentVolumeClaimName,
-				},
-			},
-		}
-
-		volumeMount := corev1.VolumeMount{
-			Name:      "kode-storage",
-			MountPath: kodeTemplate.Spec.Home,
-		}
-
-		volumes = append(volumes, volume)
-		volumeMounts = append(volumeMounts, volumeMount)
-		containers[0].VolumeMounts = volumeMounts
+	if kodeTemplate.Spec.Type == "code-server" {
+		containers = constructCodeServerContainers(kode, kodeTemplate, workspace)
+	} else if kodeTemplate.Spec.Type == "webtop" {
+		containers = constructWebtopContainers(kode, kodeTemplate)
 	}
 
-	// Add EnvoyProxy sidecar if specified
+	volumes, volumeMounts := constructVolumesAndMounts(kode, kodeTemplate)
+	containers[0].VolumeMounts = volumeMounts
+
 	initContainers := []corev1.Container{}
 	if kodeTemplate.Spec.EnvoyProxyTemplateRef.Name != "" {
 		envoySidecarContainer, err := constructEnvoyProxyContainer(kodeTemplate, envoyProxyTemplate)
@@ -178,6 +147,70 @@ func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode, kodeTempla
 
 	logDeploymentManifest(log, deployment)
 	return deployment
+}
+
+func constructCodeServerContainers(kode *kodev1alpha1.Kode, kodeTemplate *kodev1alpha1.KodeTemplate, workspace string) []corev1.Container {
+	return []corev1.Container{{
+		Name:  "kode-" + kode.Name,
+		Image: kodeTemplate.Spec.Image,
+		Env: []corev1.EnvVar{
+			{Name: "PORT", Value: fmt.Sprintf("%d", kodeTemplate.Spec.Port)},
+			{Name: "PUID", Value: fmt.Sprintf("%d", kodeTemplate.Spec.PUID)},
+			{Name: "PGID", Value: fmt.Sprintf("%d", kodeTemplate.Spec.PGID)},
+			{Name: "TZ", Value: kodeTemplate.Spec.TZ},
+			{Name: "USERNAME", Value: kode.Spec.User},
+			{Name: "PASSWORD", Value: kode.Spec.Password},
+			{Name: "DEFAULT_WORKSPACE", Value: workspace},
+		},
+		Ports: []corev1.ContainerPort{{
+			Name:          "kode-port",
+			ContainerPort: 8443,
+		}},
+	}}
+}
+
+func constructWebtopContainers(kode *kodev1alpha1.Kode, kodeTemplate *kodev1alpha1.KodeTemplate) []corev1.Container {
+	return []corev1.Container{{
+		Name:  "kode-" + kode.Name,
+		Image: kodeTemplate.Spec.Image,
+		Env: []corev1.EnvVar{
+			{Name: "TZ", Value: kodeTemplate.Spec.TZ},
+			{Name: "CUSTOM_PORT", Value: fmt.Sprintf("%d", kodeTemplate.Spec.Port)},
+			{Name: "CUSTOM_USER", Value: kode.Spec.User},
+			{Name: "PASSWORD", Value: kode.Spec.Password},
+		},
+		Ports: []corev1.ContainerPort{{
+			Name:          "kode-port",
+			ContainerPort: kodeTemplate.Spec.Port,
+		}},
+	}}
+}
+
+func constructVolumesAndMounts(kode *kodev1alpha1.Kode, kodeTemplate *kodev1alpha1.KodeTemplate) ([]corev1.Volume, []corev1.VolumeMount) {
+	volumes := []corev1.Volume{}
+	volumeMounts := []corev1.VolumeMount{}
+
+	// Add volume and volume mount if storage is defined
+	if !reflect.DeepEqual(kode.Spec.Storage, kodev1alpha1.KodeStorageSpec{}) {
+		volume := corev1.Volume{
+			Name: "kode-storage",
+			VolumeSource: corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: PersistentVolumeClaimName,
+				},
+			},
+		}
+
+		volumeMount := corev1.VolumeMount{
+			Name:      "kode-storage",
+			MountPath: kodeTemplate.Spec.Home,
+		}
+
+		volumes = append(volumes, volume)
+		volumeMounts = append(volumeMounts, volumeMount)
+	}
+
+	return volumes, volumeMounts
 }
 
 // updateDeploymentIfNecessary updates the Deployment if the desired state is different from the existing state

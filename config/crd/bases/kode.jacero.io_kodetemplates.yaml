@@ -46,8 +46,8 @@ spec:
                 type: array
               defaultWorkspace:
                 default: workspace
-                description: DefaultWorkspace is the default workspace directory.
-                  Defaults to 'workspace'.
+                description: DefaultWorkspace is the default directory for the kode
+                  instance on first launch. Defaults to 'workspace'.
                 minLength: 3
                 pattern: ^[^/].*$
                 type: string

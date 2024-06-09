@@ -74,8 +74,8 @@ type KodeTemplateSpec struct {
 	// +kubebuilder:default=/config
 	Home string `json:"home,omitempty"`
 
-	// DefaultWorkspace is the default workspace directory. Defaults to 'workspace'.
-	// +kubebuilder:validation:Description="Default workspace directory. Defaults to 'workspace'."
+	// DefaultWorkspace is the default directory for the kode instance on first launch. Defaults to 'workspace'.
+	// +kubebuilder:validation:Description="Default workspace is the default directory for the kode instance on first launch. Defaults to 'workspace'."
 	// +kubebuilder:validation:MinLength=3
 	// +kubebuilder:validation:Pattern="^[^/].*$"
 	// +kubebuilder:default=workspace
