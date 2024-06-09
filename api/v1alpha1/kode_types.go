@@ -37,6 +37,11 @@ type KodeSpec struct {
 	// +kubebuilder:validation:Required
 	TemplateRef KodeTemplateReference `json:"templateRef"`
 
+	// TemplateVersion is the version of the KodeTemplate configuration
+	// +kubebuilder:validation:Description="Version of the KodeTemplate configuration."
+	// +kubebuilder:validation:default="latest"
+	TemplateVersion string `json:"templateVersion,omitempty"`
+
 	// User is the HTTP Basic auth username or the user the container should run as, abc is default.
 	// +kubebuilder:validation:Description="User is the HTTP Basic auth username or the user the container should run as. Defaults to 'abc'."
 	// +kubebuilder:default="abc"
