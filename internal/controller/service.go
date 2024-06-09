@@ -26,7 +26,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
@@ -36,29 +35,9 @@ func (r *KodeReconciler) ensureService(ctx context.Context, kode *kodev1alpha1.K
 
 	log.Info("Ensuring Service exists", "Namespace", kode.Namespace, "Name", kode.Name)
 
-	service, err := r.getOrCreateService(ctx, kode, labels, kodeTemplate)
-	if err != nil {
-		log.Error(err, "Failed to get or create Service", "Namespace", kode.Namespace, "Name", kode.Name)
-		return err
-	}
-
-	if err := r.updateServiceIfNecessary(ctx, service); err != nil {
-		log.Error(err, "Failed to update Service if necessary", "Namespace", service.Namespace, "Name", service.Name)
-		return err
-	}
-
-	log.Info("Successfully ensured Service", "Namespace", kode.Namespace, "Name", kode.Name)
-
-	return nil
-}
-
-// getOrCreateService gets or creates a Service for the Kode instance
-func (r *KodeReconciler) getOrCreateService(ctx context.Context, kode *kodev1alpha1.Kode, labels map[string]string, kodeTemplate *kodev1alpha1.KodeTemplate) (*corev1.Service, error) {
-	log := r.Log.WithName("getOrCreateService")
 	service := r.constructService(kode, labels, kodeTemplate)
-
 	if err := controllerutil.SetControllerReference(kode, service, r.Scheme); err != nil {
-		return nil, err
+		return err
 	}
 
 	found := &corev1.Service{}
@@ -68,15 +47,23 @@ func (r *KodeReconciler) getOrCreateService(ctx context.Context, kode *kodev1alp
 			log.Info("Creating Service", "Namespace", service.Namespace, "Name", service.Name)
 			if err := r.Create(ctx, service); err != nil {
 				log.Error(err, "Failed to create Service", "Namespace", service.Namespace, "Name", service.Name)
-				return nil, err
+				return err
 			}
 			log.Info("Service created", "Namespace", service.Namespace, "Name", service.Name)
 		} else {
-			return nil, err
+			return err
+		}
+	} else if !reflect.DeepEqual(service.Spec, found.Spec) {
+		found.Spec = service.Spec
+		log.Info("Updating Service", "Namespace", found.Namespace, "Name", found.Name)
+		if err := r.Update(ctx, found); err != nil {
+			log.Error(err, "Failed to update Service", "Namespace", found.Namespace, "Name", found.Name)
+			return err
 		}
 	}
 
-	return service, nil
+	log.Info("Successfully ensured Service", "Namespace", kode.Namespace, "Name", kode.Name)
+	return nil
 }
 
 // constructService constructs a Service for the Kode instance
@@ -99,24 +86,4 @@ func (r *KodeReconciler) constructService(kode *kodev1alpha1.Kode, labels map[st
 	}
 	logServiceManifest(log, service)
 	return service
-}
-
-// updateServiceIfNecessary updates the Service if the desired state is different from the existing state
-func (r *KodeReconciler) updateServiceIfNecessary(ctx context.Context, service *corev1.Service) error {
-	log := r.Log.WithName("updateServiceIfNecessary")
-	found := &corev1.Service{}
-	err := r.Get(ctx, types.NamespacedName{Name: service.Name, Namespace: service.Namespace}, found)
-	if err != nil {
-		if client.IgnoreNotFound(err) != nil {
-			return err
-		}
-		return nil
-	}
-
-	if !reflect.DeepEqual(service.Spec, found.Spec) {
-		found.Spec = service.Spec
-		log.Info("Updating Service", "Namespace", found.Namespace, "Name", found.Name)
-		return r.Update(ctx, found)
-	}
-	return nil
 }
