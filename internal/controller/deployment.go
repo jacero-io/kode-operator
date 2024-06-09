@@ -29,7 +29,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
@@ -39,29 +38,9 @@ func (r *KodeReconciler) ensureDeployment(ctx context.Context, kode *kodev1alpha
 
 	log.Info("Ensuring Deployment exists", "Namespace", kode.Namespace, "Name", kode.Name)
 
-	deployment, err := r.getOrCreateDeployment(ctx, kode, labels, kodeTemplate, envoyProxyTemplate)
-	if err != nil {
-		log.Error(err, "Failed to get or create Deployment", "Namespace", kode.Namespace, "Name", kode.Name)
-		return err
-	}
-
-	if err := r.updateDeploymentIfNecessary(ctx, deployment); err != nil {
-		log.Error(err, "Failed to update Deployment if necessary", "Namespace", deployment.Namespace, "Name", deployment.Name)
-		return err
-	}
-
-	log.Info("Successfully ensured Deployment", "Namespace", kode.Namespace, "Name", kode.Name)
-
-	return nil
-}
-
-// getOrCreateDeployment gets or creates a Deployment for the Kode instance
-func (r *KodeReconciler) getOrCreateDeployment(ctx context.Context, kode *kodev1alpha1.Kode, labels map[string]string, kodeTemplate *kodev1alpha1.KodeTemplate, envoyProxyTemplate *kodev1alpha1.EnvoyProxyTemplate) (*appsv1.Deployment, error) {
-	log := r.Log.WithName("getOrCreateDeployment")
 	deployment := r.constructDeployment(kode, labels, kodeTemplate, envoyProxyTemplate)
-
 	if err := controllerutil.SetControllerReference(kode, deployment, r.Scheme); err != nil {
-		return nil, err
+		return err
 	}
 
 	found := &appsv1.Deployment{}
@@ -71,15 +50,31 @@ func (r *KodeReconciler) getOrCreateDeployment(ctx context.Context, kode *kodev1
 			log.Info("Creating Deployment", "Namespace", deployment.Namespace, "Name", deployment.Name)
 			if err := r.Create(ctx, deployment); err != nil {
 				log.Error(err, "Failed to create Deployment", "Namespace", deployment.Namespace, "Name", deployment.Name)
-				return nil, err
+				return err
 			}
 			log.Info("Deployment created", "Namespace", deployment.Namespace, "Name", deployment.Name)
 		} else {
-			return nil, err
+			log.Error(err, "Failed to get Deployment", "Namespace", deployment.Namespace, "Name", deployment.Name)
+			return err
+		}
+	} else if !reflect.DeepEqual(deployment.Spec, found.Spec) {
+		retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			if err := r.Get(ctx, types.NamespacedName{Name: deployment.Name, Namespace: deployment.Namespace}, found); err != nil {
+				return err
+			}
+			found.Spec = deployment.Spec
+			log.Info("Updating Deployment due to spec change", "Namespace", found.Namespace, "Name", found.Name)
+			return r.Update(ctx, found)
+		})
+
+		if retryErr != nil {
+			log.Error(retryErr, "Failed to update Deployment after retrying", "Namespace", deployment.Namespace, "Name", deployment.Name)
+			return retryErr
 		}
 	}
 
-	return deployment, nil
+	log.Info("Successfully ensured Deployment", "Namespace", kode.Namespace, "Name", kode.Name)
+	return nil
 }
 
 // constructDeployment constructs a Deployment for the Kode instance
@@ -167,6 +162,8 @@ func constructWebtopContainers(kode *kodev1alpha1.Kode, kodeTemplate *kodev1alph
 		Name:  "kode-" + kode.Name,
 		Image: kodeTemplate.Spec.Image,
 		Env: []corev1.EnvVar{
+			{Name: "PUID", Value: fmt.Sprintf("%d", kodeTemplate.Spec.PUID)},
+			{Name: "PGID", Value: fmt.Sprintf("%d", kodeTemplate.Spec.PGID)},
 			{Name: "TZ", Value: kodeTemplate.Spec.TZ},
 			{Name: "CUSTOM_PORT", Value: fmt.Sprintf("%d", kodeTemplate.Spec.Port)},
 			{Name: "CUSTOM_USER", Value: kode.Spec.User},
@@ -204,42 +201,4 @@ func constructVolumesAndMounts(kode *kodev1alpha1.Kode, kodeTemplate *kodev1alph
 	}
 
 	return volumes, volumeMounts
-}
-
-// updateDeploymentIfNecessary updates the Deployment if the desired state is different from the existing state
-func (r *KodeReconciler) updateDeploymentIfNecessary(ctx context.Context, deployment *appsv1.Deployment) error {
-	log := r.Log.WithName("updateDeploymentIfNecessary")
-
-	found := &appsv1.Deployment{}
-	err := r.Get(ctx, types.NamespacedName{Name: deployment.Name, Namespace: deployment.Namespace}, found)
-	if err != nil {
-		if client.IgnoreNotFound(err) != nil {
-			log.Error(err, "Failed to get Deployment", "Namespace", deployment.Namespace, "Name", deployment.Name)
-			return err
-		}
-		log.Info("Deployment not found, skipping update", "Namespace", deployment.Namespace, "Name", deployment.Name)
-		return nil
-	}
-
-	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		if err := r.Get(ctx, types.NamespacedName{Name: deployment.Name, Namespace: deployment.Namespace}, found); err != nil {
-			return err
-		}
-
-		if !reflect.DeepEqual(deployment.Spec, found.Spec) {
-			found.Spec = deployment.Spec
-			log.Info("Updating Deployment due to spec change", "Namespace", found.Namespace, "Name", found.Name)
-			return r.Update(ctx, found)
-		}
-		return nil
-	})
-
-	if retryErr != nil {
-		log.Error(retryErr, "Failed to update Deployment after retrying", "Namespace", deployment.Namespace, "Name", deployment.Name)
-		return retryErr
-	}
-
-	log.Info("Deployment is up-to-date", "Namespace", deployment.Namespace, "Name", deployment.Name)
-
-	return nil
 }

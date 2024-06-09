@@ -74,6 +74,8 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		return ctrl.Result{}, err
 	}
 
+	// TODO: Does not recognize that kodeTemplate has been updated. If kodeTemplate is updated, the deployment should be updated as well.
+	// TODO: Should kodeTemplate be versioned?
 	// Fetch the KodeTemplate instance and EnvoyProxyTemplate instance
 	var kodeTemplate *kodev1alpha1.KodeTemplate
 	var envoyProxyTemplate *kodev1alpha1.EnvoyProxyTemplate
