@@ -4,13 +4,26 @@
 ## Description
 // TODO(user): An in-depth paragraph about your project and overview of use
 
+### Features
+
+- [ ] Full lifecycle of [Code-server](https://docs.linuxserver.io/images/docker-code-server/).
+- [ ] Full lifecycle of [Webtop](https://docs.linuxserver.io/images/docker-webtop/).
+- [ ] Full lifecycle of [DevContainers](https://containers.dev/).
+- [ ] Full lifecycle of [Alnoda](https://docs.alnoda.org/about/intro/).
+- [ ] Full lifecycle of [Jupyter](https://jupyter.org/).
+- [ ] Authentication & Authorization using Envoy Proxy sidecar.
+- [ ] Backup up of user data to S3.
+- [ ] Restore of user data from S3.
+- [ ] [Code-server] Ability to include user settings (e.g. extensions, settings.json, etc)
+- [ ] [Webtop] Ability to include user configuration (e.g. .profile, .bashrc, etc)
+
 ## Getting Started
 
 ### Prerequisites
 - go version v1.21.0+
 - docker version 17.03+.
-- kubectl version v1.11.3+.
-- Access to a Kubernetes v1.11.3+ cluster.
+- kubectl version v1.29.1+.
+- Access to a Kubernetes v1.29.1+ cluster.
 
 ### To Deploy on the cluster
 **Build and push your image to the location specified by `IMG`:**
