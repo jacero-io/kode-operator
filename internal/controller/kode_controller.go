@@ -54,6 +54,9 @@ type KodeReconciler struct {
 
 func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithName("Reconcile")
+
+	labels := map[string]string{}
+
 	// Fetch the Kode instance
 	kode := &kodev1alpha1.Kode{}
 	log.Info("Fetching Kode instance", "Namespace", req.Namespace, "Name", req.Name)
@@ -71,43 +74,54 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		return ctrl.Result{}, err
 	}
 
-	// Fetch the KodeTemplate instance referenced by TemplateRef
-	kodeTemplate := &kodev1alpha1.KodeTemplate{}
+	// Fetch the KodeTemplate instance and EnvoyProxyTemplate instance
+	var kodeTemplate *kodev1alpha1.KodeTemplate
+	var envoyProxyTemplate *kodev1alpha1.EnvoyProxyTemplate
+
 	if kode.Spec.TemplateRef.Name != "" {
+		ContainerName := "kode-" + kode.Name
+		labels["app"] = ContainerName
+		labels["kode.jacero.io/name"] = kode.Name
+		kodeTemplate = &kodev1alpha1.KodeTemplate{}
 		kodeTemplateName := client.ObjectKey{Name: kode.Spec.TemplateRef.Name}
 		log.Info("Fetching KodeTemplate instance", "Name", kode.Spec.TemplateRef.Name)
 		if err := r.Get(ctx, kodeTemplateName, kodeTemplate); err != nil {
 			if errors.IsNotFound(err) {
 				log.Info("KodeTemplate instance not found, requeuing", "Name", kode.Spec.TemplateRef.Name)
-				return ctrl.Result{RequeueAfter: LoopRetryTime}, nil // Retry after some time
+				return ctrl.Result{RequeueAfter: LoopRetryTime}, nil
 			}
 			log.Error(err, "Failed to fetch KodeTemplate instance", "Name", kode.Spec.TemplateRef.Name)
-			return ctrl.Result{}, client.IgnoreNotFound(err)
+			// Requeue on other errors, to keep trying indefinitely
+			return ctrl.Result{Requeue: true}, err
 		}
-	}
-	logKodeTemplateManifest(log, kodeTemplate)
+		log.Info("KodeTemplate instance found", "Name", kode.Spec.TemplateRef.Name)
+		labels["kode-template.jacero.io/name"] = kodeTemplate.Name
+		logKodeTemplateManifest(log, kodeTemplate)
 
-	// Fetch the EnvoyProxyTemplate instance referenced by EnvoyProxyTemplateReference
-	envoyProxyTemplate := &kodev1alpha1.EnvoyProxyTemplate{}
-	envoyProxyTemplateName := client.ObjectKey{Name: kodeTemplate.Spec.EnvoyProxyTemplateRef.Name}
-	if kodeTemplate.Spec.EnvoyProxyTemplateRef.Name != "" {
-		log.Info("Fetching EnvoyProxyTemplate instance", "Name", envoyProxyTemplateName)
-		if err := r.Get(ctx, envoyProxyTemplateName, envoyProxyTemplate); err != nil {
-			if errors.IsNotFound(err) {
-				log.Info("EnvoyProxyTemplate instance not found, requeuing", "Name", envoyProxyTemplateName)
-				return ctrl.Result{RequeueAfter: LoopRetryTime}, nil // Retry after some time
+		if kodeTemplate.Spec.EnvoyProxyTemplateRef.Name != "" {
+			envoyProxyTemplate = &kodev1alpha1.EnvoyProxyTemplate{}
+			envoyProxyTemplateName := client.ObjectKey{Name: kodeTemplate.Spec.EnvoyProxyTemplateRef.Name}
+			log.Info("Fetching EnvoyProxyTemplate instance", "Name", kodeTemplate.Spec.EnvoyProxyTemplateRef.Name)
+			if err := r.Get(ctx, envoyProxyTemplateName, envoyProxyTemplate); err != nil {
+				if errors.IsNotFound(err) {
+					log.Info("EnvoyProxyTemplate instance not found, requeuing", "Name", kodeTemplate.Spec.EnvoyProxyTemplateRef.Name)
+					return ctrl.Result{RequeueAfter: LoopRetryTime}, nil
+				}
+				log.Error(err, "Failed to fetch EnvoyProxyTemplate instance", "Name", kodeTemplate.Spec.EnvoyProxyTemplateRef.Name)
+				// Requeue on other errors, to keep trying indefinitely
+				return ctrl.Result{Requeue: true}, err
 			}
-			log.Error(err, "Failed to fetch EnvoyProxyTemplate instance", "Name", envoyProxyTemplateName)
-			return ctrl.Result{}, client.IgnoreNotFound(err)
+			log.Info("EnvoyProxyTemplate instance found", "Name", kodeTemplate.Spec.EnvoyProxyTemplateRef.Name)
+			labels["kode-envoy-proxy-template.jacero.io/name"] = kodeTemplate.Spec.EnvoyProxyTemplateRef.Name
+			logEnvoyProxyTemplateManifest(log, envoyProxyTemplate)
 		}
 	}
-	logEnvoyProxyTemplateManifest(log, envoyProxyTemplate)
 
 	// Ensure the Deployment and Service exist
-	if err := r.ensureDeployment(ctx, kode, kodeTemplate, envoyProxyTemplate); err != nil {
+	if err := r.ensureDeployment(ctx, kode, labels, kodeTemplate, envoyProxyTemplate); err != nil {
 		return ctrl.Result{}, err
 	}
-	if err := r.ensureService(ctx, kode, kodeTemplate); err != nil {
+	if err := r.ensureService(ctx, kode, labels, kodeTemplate); err != nil {
 		return ctrl.Result{}, err
 	}
 

@@ -31,12 +31,12 @@ import (
 )
 
 // ensureService ensures that the Service exists for the Kode instance
-func (r *KodeReconciler) ensureService(ctx context.Context, kode *kodev1alpha1.Kode, kodeTemplate *kodev1alpha1.KodeTemplate) error {
+func (r *KodeReconciler) ensureService(ctx context.Context, kode *kodev1alpha1.Kode, labels map[string]string, kodeTemplate *kodev1alpha1.KodeTemplate) error {
 	log := r.Log.WithName("ensureService")
 
 	log.Info("Ensuring Service exists", "Namespace", kode.Namespace, "Name", kode.Name)
 
-	service, err := r.getOrCreateService(ctx, kode, kodeTemplate)
+	service, err := r.getOrCreateService(ctx, kode, labels, kodeTemplate)
 	if err != nil {
 		log.Error(err, "Failed to get or create Service", "Namespace", kode.Namespace, "Name", kode.Name)
 		return err
@@ -53,9 +53,9 @@ func (r *KodeReconciler) ensureService(ctx context.Context, kode *kodev1alpha1.K
 }
 
 // getOrCreateService gets or creates a Service for the Kode instance
-func (r *KodeReconciler) getOrCreateService(ctx context.Context, kode *kodev1alpha1.Kode, kodeTemplate *kodev1alpha1.KodeTemplate) (*corev1.Service, error) {
+func (r *KodeReconciler) getOrCreateService(ctx context.Context, kode *kodev1alpha1.Kode, labels map[string]string, kodeTemplate *kodev1alpha1.KodeTemplate) (*corev1.Service, error) {
 	log := r.Log.WithName("getOrCreateService")
-	service := r.constructService(kode, kodeTemplate)
+	service := r.constructService(kode, labels, kodeTemplate)
 
 	if err := controllerutil.SetControllerReference(kode, service, r.Scheme); err != nil {
 		return nil, err
@@ -80,13 +80,8 @@ func (r *KodeReconciler) getOrCreateService(ctx context.Context, kode *kodev1alp
 }
 
 // constructService constructs a Service for the Kode instance
-func (r *KodeReconciler) constructService(kode *kodev1alpha1.Kode, kodeTemplate *kodev1alpha1.KodeTemplate) *corev1.Service {
+func (r *KodeReconciler) constructService(kode *kodev1alpha1.Kode, labels map[string]string, kodeTemplate *kodev1alpha1.KodeTemplate) *corev1.Service {
 	log := r.Log.WithName("constructService")
-	labels := map[string]string{
-		"app":                          "kode-" + kode.Name,
-		"kode.jacero.io/name":          kode.Name,
-		"kode-template.jacero.io/name": kodeTemplate.Name,
-	}
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{

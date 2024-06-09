@@ -33,6 +33,8 @@ type KodeTemplateReference struct {
 // KodeSpec defines the desired state of Kode
 type KodeSpec struct {
 	// TemplateRef is the reference to the KodeTemplate configuration
+	// +kubebuilder:validation:Description="Reference to the KodeTemplate configuration."
+	// +kubebuilder:validation:Required
 	TemplateRef KodeTemplateReference `json:"templateRef"`
 
 	// User is the HTTP Basic auth username or the user the container should run as, abc is default.

@@ -34,12 +34,12 @@ import (
 )
 
 // ensureDeployment ensures that the Deployment exists for the Kode instance
-func (r *KodeReconciler) ensureDeployment(ctx context.Context, kode *kodev1alpha1.Kode, kodeTemplate *kodev1alpha1.KodeTemplate, envoyProxyTemplate *kodev1alpha1.EnvoyProxyTemplate) error {
+func (r *KodeReconciler) ensureDeployment(ctx context.Context, kode *kodev1alpha1.Kode, labels map[string]string, kodeTemplate *kodev1alpha1.KodeTemplate, envoyProxyTemplate *kodev1alpha1.EnvoyProxyTemplate) error {
 	log := r.Log.WithName("ensureDeployment")
 
 	log.Info("Ensuring Deployment exists", "Namespace", kode.Namespace, "Name", kode.Name)
 
-	deployment, err := r.getOrCreateDeployment(ctx, kode, kodeTemplate, envoyProxyTemplate)
+	deployment, err := r.getOrCreateDeployment(ctx, kode, labels, kodeTemplate, envoyProxyTemplate)
 	if err != nil {
 		log.Error(err, "Failed to get or create Deployment", "Namespace", kode.Namespace, "Name", kode.Name)
 		return err
@@ -56,9 +56,9 @@ func (r *KodeReconciler) ensureDeployment(ctx context.Context, kode *kodev1alpha
 }
 
 // getOrCreateDeployment gets or creates a Deployment for the Kode instance
-func (r *KodeReconciler) getOrCreateDeployment(ctx context.Context, kode *kodev1alpha1.Kode, kodeTemplate *kodev1alpha1.KodeTemplate, envoyProxyTemplate *kodev1alpha1.EnvoyProxyTemplate) (*appsv1.Deployment, error) {
+func (r *KodeReconciler) getOrCreateDeployment(ctx context.Context, kode *kodev1alpha1.Kode, labels map[string]string, kodeTemplate *kodev1alpha1.KodeTemplate, envoyProxyTemplate *kodev1alpha1.EnvoyProxyTemplate) (*appsv1.Deployment, error) {
 	log := r.Log.WithName("getOrCreateDeployment")
-	deployment := r.constructDeployment(kode, kodeTemplate, envoyProxyTemplate)
+	deployment := r.constructDeployment(kode, labels, kodeTemplate, envoyProxyTemplate)
 
 	if err := controllerutil.SetControllerReference(kode, deployment, r.Scheme); err != nil {
 		return nil, err
@@ -83,21 +83,14 @@ func (r *KodeReconciler) getOrCreateDeployment(ctx context.Context, kode *kodev1
 }
 
 // constructDeployment constructs a Deployment for the Kode instance
-func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode, kodeTemplate *kodev1alpha1.KodeTemplate, envoyProxyTemplate *kodev1alpha1.EnvoyProxyTemplate) *appsv1.Deployment {
+func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode, labels map[string]string, kodeTemplate *kodev1alpha1.KodeTemplate, envoyProxyTemplate *kodev1alpha1.EnvoyProxyTemplate) *appsv1.Deployment {
 	log := r.Log.WithName("constructDeployment")
 
 	replicas := int32(1)
-	ContainerName := "kode-" + kode.Name
 
 	workspace := path.Join(kodeTemplate.Spec.Home, kodeTemplate.Spec.DefaultWorkspace)
 	if kode.Spec.Workspace != "" {
 		workspace = path.Join(kodeTemplate.Spec.Home, kode.Spec.Workspace)
-	}
-
-	labels := map[string]string{
-		"app":                          ContainerName,
-		"kode.jacero.io/name":          kode.Name,
-		"kode-template.jacero.io/name": kodeTemplate.Name,
 	}
 
 	var containers []corev1.Container
