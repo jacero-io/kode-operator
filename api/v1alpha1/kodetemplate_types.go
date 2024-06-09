@@ -27,8 +27,8 @@ type KodeTemplateSpec struct {
 	// +kubebuilder:validation:Description="Reference to the EnvoyProxy configuration."
 	EnvoyProxyTemplateRef EnvoyProxyTemplateReference `json:"envoyProxyTemplateRef,omitempty"`
 
-	// Type is the type of container to use. Can be one of 'code-server', 'webtop', 'devcontainers', 'jupyter'.
-	// +kubebuilder:validation:Description="Type of container to use. Can be one of 'code-server', 'webtop', 'devcontainers', 'jupyter'."
+	// Type is the type of container to use. Can be one of 'code-server', 'webtop', 'devcontainers', 'jupyter', 'alnoda'.
+	// +kubebuilder:validation:Description="Type of container to use. Can be one of 'code-server', 'webtop', 'devcontainers', 'jupyter', 'alnoda'."
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Enum=code-server;webtop;devcontainers;jupyter
 	Type string `json:"type"`
