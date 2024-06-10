@@ -4,20 +4,20 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.14.0
-  name: kodetemplates.kode.jacero.io
+  name: clusterkodetemplates.kode.jacero.io
 spec:
   group: kode.jacero.io
   names:
-    kind: KodeTemplate
-    listKind: KodeTemplateList
-    plural: kodetemplates
-    singular: kodetemplate
-  scope: Namespaced
+    kind: ClusterKodeTemplate
+    listKind: ClusterKodeTemplateList
+    plural: clusterkodetemplates
+    singular: clusterkodetemplate
+  scope: Cluster
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: KodeTemplate is the Schema for the kodetemplates API
+        description: ClusterKodeTemplate is the Schema for the kodetemplates API
         properties:
           apiVersion:
             description: |-

@@ -3,4 +3,6 @@ resources:
 - kode_v1alpha1_kode.yaml
 - kode_v1alpha1_kodetemplate.yaml
 # - kode_v1alpha1_envoyproxytemplate.yaml
+- kode_v1alpha1_clusterkodetemplate.yaml
+- kode_v1alpha1_clusterenvoyproxytemplate.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

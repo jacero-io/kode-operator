@@ -5,6 +5,8 @@ resources:
 - bases/kode.jacero.io_kodes.yaml
 - bases/kode.jacero.io_envoyproxytemplates.yaml
 - bases/kode.jacero.io_kodetemplates.yaml
+- bases/kode.jacero.io_clusterkodetemplates.yaml
+- bases/kode.jacero.io_clusterenvoyproxytemplates.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 patches:
@@ -17,6 +19,8 @@ patches:
 #- path: patches/cainjection_in_kodes.yaml
 #- path: patches/cainjection_in_envoyproxytemplates.yaml
 #- path: patches/cainjection_in_kodetemplates.yaml
+#- path: patches/cainjection_in_clusterkodetemplates.yaml
+#- path: patches/cainjection_in_clusterenvoyproxytemplates.yaml
 #+kubebuilder:scaffold:crdkustomizecainjectionpatch
 
 # [WEBHOOK] To enable webhook, uncomment the following section

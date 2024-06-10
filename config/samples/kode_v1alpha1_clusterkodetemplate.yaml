@@ -1,0 +1,18 @@
+apiVersion: kode.jacero.io/v1alpha1
+kind: ClusterKodeTemplate
+metadata:
+  labels:
+    app.kubernetes.io/name: kode-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: clusterkodetemplate-codeserver-sample
+spec:
+  # envoyProxyTemplateRef:
+  #   kind: EnvoyProxyTemplate
+  #   name: envoyproxytemplate-sample
+  type: code-server
+  image: lscr.io/linuxserver/code-server:latest
+  tz: "Europe/Stockholm"
+  puid: 1000
+  pgid: 1000
+  defaultHome: /config
+  defaultWorkspace: workspace

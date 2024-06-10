@@ -22,12 +22,21 @@ import (
 )
 
 type KodeTemplateReference struct {
-	// Kind is the kind of the reference (for KodeTemplate)
-	// +kubebuilder:validation:Enum=KodeTemplate
+	// Kind is the resource kind
+	// +kubebuilder:validation:Description="Resource kind"
+	// +kubebuilder:validation:Enum=KodeTemplate;ClusterKodeTemplate
 	Kind string `json:"kind"`
 
 	// Name is the name of the KodeTemplate
+	// +kubebuilder:validation:Description="Name of the KodeTemplate"
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Required
 	Name string `json:"name"`
+
+	// Namespace is the namespace of the KodeTemplate
+	// +kubebuilder:validation:Description="Namespace of the KodeTemplate"
+	// +kubebuilder:validation:MinLength=1
+	Namespace string `json:"namespace,omitempty"`
 }
 
 // KodeSpec defines the desired state of Kode

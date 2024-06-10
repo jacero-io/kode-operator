@@ -43,31 +43,31 @@ func logKodeManifest(log logr.Logger, kode *kodev1alpha1.Kode) {
 	)
 }
 
-// logKodeTemplateManifest add structured logging for the Kode Template manifest to improve visibility for debugging
-func logKodeTemplateManifest(log logr.Logger, kodeTemplate *kodev1alpha1.KodeTemplate) {
-	maskedEnvs := maskEnvs(kodeTemplate.Spec.Envs)
+// logSharedKodeTemplateManifest add structured logging for the Kode Template manifest to improve visibility for debugging
+func logSharedKodeTemplateManifest(log logr.Logger, name string, namespace string, spec kodev1alpha1.SharedKodeTemplateSpec) {
+	maskedEnvs := maskEnvs(spec.Envs)
 	log.V(1).Info("Kode Template Manifest",
-		"Name", kodeTemplate.Name,
-		"Namespace", kodeTemplate.Namespace,
-		"Image", kodeTemplate.Spec.Image,
-		"TZ", kodeTemplate.Spec.TZ,
-		"PUID", kodeTemplate.Spec.PUID,
-		"PGID", kodeTemplate.Spec.PGID,
-		"Port", kodeTemplate.Spec.Port,
+		"Name", name,
+		"Namespace", namespace,
+		"Image", spec.Image,
+		"TZ", spec.TZ,
+		"PUID", spec.PUID,
+		"PGID", spec.PGID,
+		"Port", spec.Port,
 		"Envs", fmt.Sprintf("%v", maskedEnvs),
-		"Args", fmt.Sprintf("%v", kodeTemplate.Spec.Args),
-		"Home", kodeTemplate.Spec.DefaultHome,
-		"DefaultWorkspace", kodeTemplate.Spec.DefaultWorkspace,
+		"Args", fmt.Sprintf("%v", spec.Args),
+		"Home", spec.DefaultHome,
+		"DefaultWorkspace", spec.DefaultWorkspace,
 	)
 }
 
-// logEnvoyProxyTemplateManifest add structured logging for the Envoy Proxy Template manifest to improve visibility for debugging
-func logEnvoyProxyTemplateManifest(log logr.Logger, envoyProxyTemplate *kodev1alpha1.EnvoyProxyTemplate) {
+// logSharedEnvoyProxyTemplateManifest add structured logging for the Envoy Proxy Template manifest to improve visibility for debugging
+func logSharedEnvoyProxyTemplateManifest(log logr.Logger, name string, namespace string, spec *kodev1alpha1.SharedEnvoyProxyTemplateSpec) {
 	log.V(1).Info("Envoy Proxy Template Manifest",
-		"Name", envoyProxyTemplate.Name,
-		"Namespace", envoyProxyTemplate.Namespace,
-		"Image", envoyProxyTemplate.Spec.Image,
-		"HTTPFilters", fmt.Sprintf("%v", envoyProxyTemplate.Spec.HTTPFilters),
+		"Name", name,
+		"Namespace", namespace,
+		"Image", spec.Image,
+		"HTTPFilters", fmt.Sprintf("%v", spec.HTTPFilters),
 	)
 }
 

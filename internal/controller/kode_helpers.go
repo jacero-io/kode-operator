@@ -31,7 +31,6 @@ import (
 
 const (
 	// RestartPolicyAlways ContainerRestartPolicy = "Always"
-	envoyCfgFileName        = "bootstrap.yaml"
 	EnvoyProxyContainerName = "envoy-proxy"
 )
 
@@ -63,7 +62,7 @@ func GetRenderedBootstrapConfig(cueFiles []string) (string, error) {
 }
 
 // constructEnvoyProxyContainer constructs the Envoy Proxy container
-func constructEnvoyProxyContainer(kodeTemplate *kodev1alpha1.KodeTemplate, envoyProxyTemplate *kodev1alpha1.EnvoyProxyTemplate) (corev1.Container, error) {
+func constructEnvoyProxyContainer(templateSpec kodev1alpha1.SharedKodeTemplateSpec, envoyProxyTemplate *kodev1alpha1.EnvoyProxyTemplate) (corev1.Container, error) {
 	// HTTPFilters := envoyProxyTemplate.Spec.HTTPFilters
 	// ContainerPort := kodeTemplate.Spec.Port
 
@@ -81,6 +80,5 @@ func constructEnvoyProxyContainer(kodeTemplate *kodev1alpha1.KodeTemplate, envoy
 		Ports: []corev1.ContainerPort{
 			{Name: "http", ContainerPort: 8000},
 		},
-		// RestartPolicy: "Always",
 	}, nil
 }

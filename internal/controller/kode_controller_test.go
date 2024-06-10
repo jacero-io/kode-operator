@@ -116,11 +116,13 @@ var _ = Describe("Kode Controller", func() {
 					Name: "test-kodetemplate",
 				},
 				Spec: kodev1alpha1.KodeTemplateSpec{
-					Image: "lscr.io/linuxserver/code-server:latest",
-					Port:  8443,
-					EnvoyProxyTemplateRef: kodev1alpha1.EnvoyProxyTemplateReference{
-						Kind: "EnvoyProxyTemplate",
-						Name: "test-envoyproxytemplate",
+					SharedKodeTemplateSpec: kodev1alpha1.SharedKodeTemplateSpec{
+						Image: "lscr.io/linuxserver/code-server:latest",
+						Port:  8443,
+						EnvoyProxyTemplateRef: kodev1alpha1.EnvoyProxyTemplateReference{
+							Kind: "EnvoyProxyTemplate",
+							Name: "test-envoyproxytemplate",
+						},
 					},
 				},
 			}
@@ -133,18 +135,42 @@ var _ = Describe("Kode Controller", func() {
 					Name: "test-envoyproxytemplate",
 				},
 				Spec: kodev1alpha1.EnvoyProxyTemplateSpec{
-					Image: "envoyproxy/envoy:v1.30-latest",
-					HTTPFilters: []kodev1alpha1.HTTPFilter{
-						{
-							Name: "envoy.filters.http.router",
-							TypedConfig: kodev1alpha1.TypedConfig{
-								Type: "type.googleapis.com/envoy.extensions.filters.http.router.v3.Router",
+					SharedEnvoyProxyTemplateSpec: kodev1alpha1.SharedEnvoyProxyTemplateSpec{
+						Image: "envoyproxy/envoy:v1.30-latest",
+						HTTPFilters: []kodev1alpha1.HTTPFilter{
+							{
+								Name: "envoy.filters.http.router",
+								TypedConfig: kodev1alpha1.TypedConfig{
+									Type: "type.googleapis.com/envoy.extensions.filters.http.router.v3.Router",
+								},
 							},
 						},
 					},
 				},
 			}
 			err = k8sClient.Create(ctx, envoyProxyTemplate)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("creating the custom resource for the Kind ClusterEnvoyProxyTemplate")
+			clusterEnvoyProxyTemplate := &kodev1alpha1.ClusterEnvoyProxyTemplate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-clusterenvoyproxytemplate",
+				},
+				Spec: kodev1alpha1.ClusterEnvoyProxyTemplateSpec{
+					SharedEnvoyProxyTemplateSpec: kodev1alpha1.SharedEnvoyProxyTemplateSpec{
+						Image: "envoyproxy/envoy:v1.30-latest",
+						HTTPFilters: []kodev1alpha1.HTTPFilter{
+							{
+								Name: "envoy.filters.http.router",
+								TypedConfig: kodev1alpha1.TypedConfig{
+									Type: "type.googleapis.com/envoy.extensions.filters.http.router.v3.Router",
+								},
+							},
+						},
+					},
+				},
+			}
+			err = k8sClient.Create(ctx, clusterEnvoyProxyTemplate)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -284,8 +310,10 @@ var _ = Describe("Kode Controller", func() {
 					Name: "invalid-image-template",
 				},
 				Spec: kodev1alpha1.KodeTemplateSpec{
-					Image: "invalid-image-name",
-					Port:  8443,
+					SharedKodeTemplateSpec: kodev1alpha1.SharedKodeTemplateSpec{
+						Image: "invalid-image-name",
+						Port:  8443,
+					},
 				},
 			}
 			err = k8sClient.Create(ctx, invalidImageKodeTemplate)

@@ -27,19 +27,18 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 // ensureDeployment ensures that the Deployment exists for the Kode instance
-func (r *KodeReconciler) ensureDeployment(ctx context.Context, kode *kodev1alpha1.Kode, labels map[string]string, kodeTemplate *kodev1alpha1.KodeTemplate, envoyProxyTemplate *kodev1alpha1.EnvoyProxyTemplate) error {
+func (r *KodeReconciler) ensureDeployment(ctx context.Context, kode *kodev1alpha1.Kode, labels map[string]string, kodeTemplate *kodev1alpha1.KodeTemplate, clusterKodeTemplate *kodev1alpha1.ClusterKodeTemplate, envoyProxyTemplate *kodev1alpha1.EnvoyProxyTemplate) error {
 	log := r.Log.WithName("ensureDeployment")
 
 	log.Info("Ensuring Deployment exists", "Namespace", kode.Namespace, "Name", kode.Name)
 
-	deployment := r.constructDeployment(kode, labels, kodeTemplate, envoyProxyTemplate)
+	deployment := r.constructDeployment(kode, labels, kodeTemplate, clusterKodeTemplate, envoyProxyTemplate)
 	if err := controllerutil.SetControllerReference(kode, deployment, r.Scheme); err != nil {
 		return err
 	}
@@ -79,36 +78,49 @@ func (r *KodeReconciler) ensureDeployment(ctx context.Context, kode *kodev1alpha
 }
 
 // constructDeployment constructs a Deployment for the Kode instance
-func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode, labels map[string]string, kodeTemplate *kodev1alpha1.KodeTemplate, envoyProxyTemplate *kodev1alpha1.EnvoyProxyTemplate) *appsv1.Deployment {
+func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode, labels map[string]string, kodeTemplate *kodev1alpha1.KodeTemplate, clusterKodeTemplate *kodev1alpha1.ClusterKodeTemplate, envoyProxyTemplate *kodev1alpha1.EnvoyProxyTemplate) *appsv1.Deployment {
 	log := r.Log.WithName("constructDeployment")
 
 	replicas := int32(1)
 
-	workspace := path.Join(kodeTemplate.Spec.DefaultHome, kodeTemplate.Spec.DefaultWorkspace)
-	mountPath := kodeTemplate.Spec.DefaultHome
+	var workspace string
+	var mountPath string
+	var templateType string
+	var templateSpec kodev1alpha1.SharedKodeTemplateSpec
+
+	if kodeTemplate != nil {
+		templateType = kodeTemplate.Spec.Type
+		templateSpec = kodeTemplate.Spec.SharedKodeTemplateSpec
+	} else if clusterKodeTemplate != nil {
+		templateType = clusterKodeTemplate.Spec.Type
+		templateSpec = clusterKodeTemplate.Spec.SharedKodeTemplateSpec
+	}
+
+	workspace = path.Join(templateSpec.DefaultHome, templateSpec.DefaultWorkspace)
+	mountPath = templateSpec.DefaultHome
 	if kode.Spec.Workspace != "" {
 		if kode.Spec.Home != "" {
 			workspace = path.Join(kode.Spec.Home, kode.Spec.Workspace)
 			mountPath = kode.Spec.Home
 		} else {
-		workspace = path.Join(kodeTemplate.Spec.DefaultHome, kode.Spec.Workspace)
+			workspace = path.Join(templateSpec.DefaultHome, kode.Spec.Workspace)
 		}
 	}
 
 	var containers []corev1.Container
 
-	if kodeTemplate.Spec.Type == "code-server" {
-		containers = constructCodeServerContainers(kode, kodeTemplate, workspace)
-	} else if kodeTemplate.Spec.Type == "webtop" {
-		containers = constructWebtopContainers(kode, kodeTemplate)
+	if templateType == "code-server" {
+		containers = constructCodeServerContainers(kode, templateSpec, workspace)
+	} else if templateType == "webtop" {
+		containers = constructWebtopContainers(kode, templateSpec)
 	}
 
-	volumes, volumeMounts := constructVolumesAndMounts(mountPath, kode, kodeTemplate)
+	volumes, volumeMounts := constructVolumesAndMounts(mountPath, kode)
 	containers[0].VolumeMounts = volumeMounts
 
 	initContainers := []corev1.Container{}
-	if kodeTemplate.Spec.EnvoyProxyTemplateRef.Name != "" {
-		envoySidecarContainer, err := constructEnvoyProxyContainer(kodeTemplate, envoyProxyTemplate)
+	if templateSpec.EnvoyProxyTemplateRef.Name != "" {
+		envoySidecarContainer, err := constructEnvoyProxyContainer(templateSpec, envoyProxyTemplate)
 		if err != nil {
 			log.Error(err, "Failed to construct EnvoyProxy sidecar")
 		} else {
@@ -121,13 +133,6 @@ func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode, labels map
 			Name:      kode.Name,
 			Namespace: kode.Namespace,
 			Labels:    labels,
-			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(kode, schema.GroupVersionKind{
-					Group:   kodev1alpha1.GroupVersion.Group,
-					Version: kodev1alpha1.GroupVersion.Version,
-					Kind:    "Kode",
-				}),
-			},
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
@@ -151,15 +156,15 @@ func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode, labels map
 	return deployment
 }
 
-func constructCodeServerContainers(kode *kodev1alpha1.Kode, kodeTemplate *kodev1alpha1.KodeTemplate, workspace string) []corev1.Container {
+func constructCodeServerContainers(kode *kodev1alpha1.Kode, templateSpec kodev1alpha1.SharedKodeTemplateSpec, workspace string) []corev1.Container {
 	return []corev1.Container{{
 		Name:  "kode-" + kode.Name,
-		Image: kodeTemplate.Spec.Image,
+		Image: templateSpec.Image,
 		Env: []corev1.EnvVar{
-			{Name: "PORT", Value: fmt.Sprintf("%d", kodeTemplate.Spec.Port)},
-			{Name: "PUID", Value: fmt.Sprintf("%d", kodeTemplate.Spec.PUID)},
-			{Name: "PGID", Value: fmt.Sprintf("%d", kodeTemplate.Spec.PGID)},
-			{Name: "TZ", Value: kodeTemplate.Spec.TZ},
+			{Name: "PORT", Value: fmt.Sprintf("%d", templateSpec.Port)},
+			{Name: "PUID", Value: fmt.Sprintf("%d", templateSpec.PUID)},
+			{Name: "PGID", Value: fmt.Sprintf("%d", templateSpec.PGID)},
+			{Name: "TZ", Value: templateSpec.TZ},
 			{Name: "USERNAME", Value: kode.Spec.User},
 			{Name: "PASSWORD", Value: kode.Spec.Password},
 			{Name: "DEFAULT_WORKSPACE", Value: workspace},
@@ -171,26 +176,26 @@ func constructCodeServerContainers(kode *kodev1alpha1.Kode, kodeTemplate *kodev1
 	}}
 }
 
-func constructWebtopContainers(kode *kodev1alpha1.Kode, kodeTemplate *kodev1alpha1.KodeTemplate) []corev1.Container {
+func constructWebtopContainers(kode *kodev1alpha1.Kode, templateSpec kodev1alpha1.SharedKodeTemplateSpec) []corev1.Container {
 	return []corev1.Container{{
 		Name:  "kode-" + kode.Name,
-		Image: kodeTemplate.Spec.Image,
+		Image: templateSpec.Image,
 		Env: []corev1.EnvVar{
-			{Name: "PUID", Value: fmt.Sprintf("%d", kodeTemplate.Spec.PUID)},
-			{Name: "PGID", Value: fmt.Sprintf("%d", kodeTemplate.Spec.PGID)},
-			{Name: "TZ", Value: kodeTemplate.Spec.TZ},
-			{Name: "CUSTOM_PORT", Value: fmt.Sprintf("%d", kodeTemplate.Spec.Port)},
+			{Name: "PUID", Value: fmt.Sprintf("%d", templateSpec.PUID)},
+			{Name: "PGID", Value: fmt.Sprintf("%d", templateSpec.PGID)},
+			{Name: "TZ", Value: templateSpec.TZ},
+			{Name: "CUSTOM_PORT", Value: fmt.Sprintf("%d", templateSpec.Port)},
 			{Name: "CUSTOM_USER", Value: kode.Spec.User},
 			{Name: "PASSWORD", Value: kode.Spec.Password},
 		},
 		Ports: []corev1.ContainerPort{{
 			Name:          "kode-port",
-			ContainerPort: kodeTemplate.Spec.Port,
+			ContainerPort: templateSpec.Port,
 		}},
 	}}
 }
 
-func constructVolumesAndMounts(mountPath string, kode *kodev1alpha1.Kode, kodeTemplate *kodev1alpha1.KodeTemplate) ([]corev1.Volume, []corev1.VolumeMount) {
+func constructVolumesAndMounts(mountPath string, kode *kodev1alpha1.Kode) ([]corev1.Volume, []corev1.VolumeMount) {
 	volumes := []corev1.Volume{}
 	volumeMounts := []corev1.VolumeMount{}
 

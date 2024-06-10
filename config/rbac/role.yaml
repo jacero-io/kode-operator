@@ -43,6 +43,14 @@ rules:
 - apiGroups:
   - kode.jacero.io
   resources:
+  - clusterkodetemplates
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - kode.jacero.io
+  resources:
   - kodes
   verbs:
   - create
@@ -66,3 +74,11 @@ rules:
   - get
   - patch
   - update
+- apiGroups:
+  - kode.jacero.io
+  resources:
+  - kodetemplates
+  verbs:
+  - get
+  - list
+  - watch

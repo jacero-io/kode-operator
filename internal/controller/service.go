@@ -24,19 +24,18 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 // ensureService ensures that the Service exists for the Kode instance
-func (r *KodeReconciler) ensureService(ctx context.Context, kode *kodev1alpha1.Kode, labels map[string]string, kodeTemplate *kodev1alpha1.KodeTemplate) error {
+func (r *KodeReconciler) ensureService(ctx context.Context, kode *kodev1alpha1.Kode, labels map[string]string, kodeTemplate *kodev1alpha1.KodeTemplate, clusterKodeTemplate *kodev1alpha1.ClusterKodeTemplate) error {
 	log := r.Log.WithName("ensureService")
 
 	log.Info("Ensuring Service exists", "Namespace", kode.Namespace, "Name", kode.Name)
 
-	service := r.constructService(kode, labels, kodeTemplate)
+	service := r.constructService(kode, labels, kodeTemplate, clusterKodeTemplate)
 	if err := controllerutil.SetControllerReference(kode, service, r.Scheme); err != nil {
 		return err
 	}
@@ -68,27 +67,27 @@ func (r *KodeReconciler) ensureService(ctx context.Context, kode *kodev1alpha1.K
 }
 
 // constructService constructs a Service for the Kode instance
-func (r *KodeReconciler) constructService(kode *kodev1alpha1.Kode, labels map[string]string, kodeTemplate *kodev1alpha1.KodeTemplate) *corev1.Service {
+func (r *KodeReconciler) constructService(kode *kodev1alpha1.Kode, labels map[string]string, kodeTemplate *kodev1alpha1.KodeTemplate, clusterKodeTemplate *kodev1alpha1.ClusterKodeTemplate) *corev1.Service {
 	log := r.Log.WithName("constructService")
+
+	var templateSpec kodev1alpha1.SharedKodeTemplateSpec
+	if kodeTemplate != nil {
+		templateSpec = kodeTemplate.Spec.SharedKodeTemplateSpec
+	} else if clusterKodeTemplate != nil {
+		templateSpec = clusterKodeTemplate.Spec.SharedKodeTemplateSpec
+	}
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kode.Name,
 			Namespace: kode.Namespace,
-			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(kode, schema.GroupVersionKind{
-					Group:   kodev1alpha1.GroupVersion.Group,
-					Version: kodev1alpha1.GroupVersion.Version,
-					Kind:    "Kode",
-				}),
-			},
 		},
 		Spec: corev1.ServiceSpec{
 			Selector: labels,
 			Ports: []corev1.ServicePort{{
 				Protocol:   corev1.ProtocolTCP,
-				Port:       kodeTemplate.Spec.Port,
-				TargetPort: intstr.FromInt(int(kodeTemplate.Spec.Port)),
+				Port:       templateSpec.Port,
+				TargetPort: intstr.FromInt(int(templateSpec.Port)),
 			}},
 		},
 	}

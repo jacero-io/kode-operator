@@ -20,37 +20,38 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EnvoyProxyTemplateSpec defines the desired state of EnvoyProxyTemplate
-type EnvoyProxyTemplateSpec struct {
+// ClusterEnvoyProxyTemplateSpec defines the desired state of ClusterEnvoyProxyTemplate
+type ClusterEnvoyProxyTemplateSpec struct {
 	SharedEnvoyProxyTemplateSpec `json:",inline"`
 }
 
-// EnvoyProxyTemplateStatus defines the observed state of EnvoyProxyTemplate
-type EnvoyProxyTemplateStatus struct {
+// ClusterEnvoyProxyTemplateStatus defines the observed state of ClusterEnvoyProxyTemplate
+type ClusterEnvoyProxyTemplateStatus struct {
 	SharedEnvoyProxyTemplateStatus `json:",inline"`
 }
 
-// +kubebuilder:object:root=true
-// +kubebuilder:subresource:status
+//+kubebuilder:object:root=true
+//+kubebuilder:subresource:status
+// +kubebuilder:resource:scope=Cluster
 
-// EnvoyProxyTemplate is the Schema for the envoyproxytemplates API
-type EnvoyProxyTemplate struct {
+// ClusterEnvoyProxyTemplate is the Schema for the clusterenvoyproxytemplates API
+type ClusterEnvoyProxyTemplate struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   EnvoyProxyTemplateSpec   `json:"spec,omitempty"`
-	Status EnvoyProxyTemplateStatus `json:"status,omitempty"`
+	Spec   ClusterEnvoyProxyTemplateSpec   `json:"spec,omitempty"`
+	Status ClusterEnvoyProxyTemplateStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 
-// EnvoyProxyTemplateList contains a list of EnvoyProxyTemplate
-type EnvoyProxyTemplateList struct {
+// ClusterEnvoyProxyTemplateList contains a list of ClusterEnvoyProxyTemplate
+type ClusterEnvoyProxyTemplateList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []EnvoyProxyTemplate `json:"items"`
+	Items           []ClusterEnvoyProxyTemplate `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&EnvoyProxyTemplate{}, &EnvoyProxyTemplateList{})
+	SchemeBuilder.Register(&ClusterEnvoyProxyTemplate{}, &ClusterEnvoyProxyTemplateList{})
 }

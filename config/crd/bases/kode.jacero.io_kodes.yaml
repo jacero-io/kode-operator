@@ -99,12 +99,18 @@ spec:
                 description: TemplateRef is the reference to the KodeTemplate configuration
                 properties:
                   kind:
-                    description: Kind is the kind of the reference (for KodeTemplate)
+                    description: Kind is the resource kind
                     enum:
                     - KodeTemplate
+                    - ClusterKodeTemplate
                     type: string
                   name:
                     description: Name is the name of the KodeTemplate
+                    minLength: 1
+                    type: string
+                  namespace:
+                    description: Namespace is the namespace of the KodeTemplate
+                    minLength: 1
                     type: string
                 required:
                 - kind

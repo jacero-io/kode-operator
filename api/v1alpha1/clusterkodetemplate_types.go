@@ -20,21 +20,22 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// KodeTemplateSpec defines the desired state of KodeTemplate
-type KodeTemplateSpec struct {
+// ClusterKodeTemplateSpec defines the desired state of ClusterKodeTemplate
+type ClusterKodeTemplateSpec struct {
 	SharedKodeTemplateSpec `json:",inline"`
 }
 
-// KodeTemplateStatus defines the observed state of KodeTemplate
-type KodeTemplateStatus struct {
+// ClusterKodeTemplateStatus defines the observed state of ClusterKodeTemplate
+type ClusterKodeTemplateStatus struct {
 	SharedKodeTemplateStatus `json:",inline"`
 }
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+// +kubebuilder:resource:scope=Cluster
 
-// KodeTemplate is the Schema for the kodetemplates API
-type KodeTemplate struct {
+// ClusterKodeTemplate is the Schema for the kodetemplates API
+type ClusterKodeTemplate struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
@@ -44,13 +45,13 @@ type KodeTemplate struct {
 
 //+kubebuilder:object:root=true
 
-// KodeTemplateList contains a list of KodeTemplate
-type KodeTemplateList struct {
+// ClusterKodeTemplateList contains a list of ClusterKodeTemplate
+type ClusterKodeTemplateList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []KodeTemplate `json:"items"`
+	Items           []ClusterKodeTemplate `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&KodeTemplate{}, &KodeTemplateList{})
+	SchemeBuilder.Register(&ClusterKodeTemplate{}, &ClusterKodeTemplateList{})
 }
