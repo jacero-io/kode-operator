@@ -91,30 +91,40 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 
 		if kode.Spec.TemplateRef.Kind == "KodeTemplate" {
 			kodeTemplate = &kodev1alpha1.KodeTemplate{}
-			kodeTemplateName := client.ObjectKey{Name: kode.Spec.TemplateRef.Name, Namespace: kode.Spec.TemplateRef.Namespace}
-			log.Info("Fetching KodeTemplate instance", "Name", kode.Spec.TemplateRef.Name, "Namespace", kode.Spec.TemplateRef.Namespace)
-			if err := r.Get(ctx, kodeTemplateName, kodeTemplate); err != nil {
+			kodeTemplateName := kode.Spec.TemplateRef.Name
+			templateNamespace := kode.Spec.TemplateRef.Namespace
+			if templateNamespace == "" {
+				templateNamespace = kode.Namespace
+			}
+			kodeTemplateNameObject := client.ObjectKey{Name: kodeTemplateName, Namespace: templateNamespace}
+			log.Info("Fetching KodeTemplate instance", "Name", kode.Spec.TemplateRef.Name, "Namespace", templateNamespace)
+			if err := r.Get(ctx, kodeTemplateNameObject, kodeTemplate); err != nil {
 				if errors.IsNotFound(err) {
-					log.Info("KodeTemplate instance not found, requeuing", "Name", kode.Spec.TemplateRef.Name)
+					log.Info("KodeTemplate instance not found in namespace, requeuing", "Namespace", templateNamespace, "Name", kodeTemplateName)
 					return ctrl.Result{RequeueAfter: LoopRetryTime}, nil
 				}
-				log.Error(err, "Failed to fetch KodeTemplate instance", "Name", kode.Spec.TemplateRef.Name)
+				log.Error(err, "Failed to fetch KodeTemplate instance", "Namespace", templateNamespace, "Name", kode.Spec.TemplateRef.Name)
 				return ctrl.Result{Requeue: true}, err
 			}
-			log.Info("KodeTemplate instance found", "Name", kode.Spec.TemplateRef.Name)
+			log.Info("KodeTemplate instance found", "Name", kodeTemplateName)
 			labels["kode-template.jacero.io/name"] = kodeTemplate.Name
 			logSharedKodeTemplateManifest(log, kodeTemplate.Name, kodeTemplate.Namespace, kodeTemplate.Spec.SharedKodeTemplateSpec)
 
 			if kodeTemplate.Spec.EnvoyProxyTemplateRef.Name != "" {
 				envoyProxyTemplate = &kodev1alpha1.EnvoyProxyTemplate{}
-				envoyProxyTemplateName := client.ObjectKey{Name: kodeTemplate.Spec.EnvoyProxyTemplateRef.Name, Namespace: kodeTemplate.Spec.EnvoyProxyTemplateRef.Namespace}
-				log.Info("Fetching EnvoyProxyTemplate instance", "Name", kodeTemplate.Spec.EnvoyProxyTemplateRef.Name)
-				if err := r.Get(ctx, envoyProxyTemplateName, envoyProxyTemplate); err != nil {
+				envoyProxyTemplateName := kodeTemplate.Spec.EnvoyProxyTemplateRef.Name
+				envoyTemplateNamespace := kodeTemplate.Spec.EnvoyProxyTemplateRef.Namespace
+				if envoyTemplateNamespace == "" {
+					envoyTemplateNamespace = kode.Namespace
+				}
+				envoyProxyTemplateNameObject := client.ObjectKey{Name: envoyProxyTemplateName, Namespace: envoyTemplateNamespace}
+				log.Info("Fetching EnvoyProxyTemplate instance", "Name", envoyProxyTemplateName, "Namespace", envoyTemplateNamespace)
+				if err := r.Get(ctx, envoyProxyTemplateNameObject, envoyProxyTemplate); err != nil {
 					if errors.IsNotFound(err) {
-						log.Info("EnvoyProxyTemplate instance not found, requeuing", "Name", kodeTemplate.Spec.EnvoyProxyTemplateRef.Name)
+						log.Info("EnvoyProxyTemplate instance not found in namespace, requeuing", "Namespace", templateNamespace, "Name", envoyProxyTemplateName)
 						return ctrl.Result{RequeueAfter: LoopRetryTime}, nil
 					}
-					log.Error(err, "Failed to fetch EnvoyProxyTemplate instance", "Name", kodeTemplate.Spec.EnvoyProxyTemplateRef.Name)
+					log.Error(err, "Failed to fetch EnvoyProxyTemplate instance", "Namespace", envoyTemplateNamespace, "Name", kodeTemplate.Spec.EnvoyProxyTemplateRef.Name)
 					return ctrl.Result{Requeue: true}, err
 				}
 				log.Info("EnvoyProxyTemplate instance found", "Name", envoyProxyTemplate.Name)
@@ -123,30 +133,32 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 			}
 		} else if kode.Spec.TemplateRef.Kind == "ClusterKodeTemplate" {
 			clusterKodeTemplate = &kodev1alpha1.ClusterKodeTemplate{}
-			clusterKodeTemplateName := client.ObjectKey{Name: kode.Spec.TemplateRef.Name}
-			log.Info("Fetching ClusterKodeTemplate instance", "Name", kode.Spec.TemplateRef.Name)
-			if err := r.Get(ctx, clusterKodeTemplateName, clusterKodeTemplate); err != nil {
+			clusterKodeTemplateName := kode.Spec.TemplateRef.Name
+			clusterKodeTemplateNameObject := client.ObjectKey{Name: clusterKodeTemplateName}
+			log.Info("Fetching ClusterKodeTemplate instance", "Name", clusterKodeTemplateName)
+			if err := r.Get(ctx, clusterKodeTemplateNameObject, clusterKodeTemplate); err != nil {
 				if errors.IsNotFound(err) {
-					log.Info("ClusterKodeTemplate instance not found, requeuing", "Name", kode.Spec.TemplateRef.Name)
+					log.Info("ClusterKodeTemplate instance not found, requeuing", "Name", clusterKodeTemplateName)
 					return ctrl.Result{RequeueAfter: LoopRetryTime}, nil
 				}
-				log.Error(err, "Failed to fetch ClusterKodeTemplate instance", "Name", kode.Spec.TemplateRef.Name)
+				log.Error(err, "Failed to fetch ClusterKodeTemplate instance", "Name", clusterKodeTemplateName)
 				return ctrl.Result{Requeue: true}, err
 			}
-			log.Info("ClusterKodeTemplate instance found", "Name", kode.Spec.TemplateRef.Name)
+			log.Info("ClusterKodeTemplate instance found", "Name", clusterKodeTemplateName)
 			labels["cluster-kode-template.jacero.io/name"] = clusterKodeTemplate.Name
 			logSharedKodeTemplateManifest(log, clusterKodeTemplate.Name, clusterKodeTemplate.Namespace, clusterKodeTemplate.Spec.SharedKodeTemplateSpec)
 
 			if clusterKodeTemplate.Spec.EnvoyProxyTemplateRef.Name != "" {
 				clusterEnvoyProxyTemplate = &kodev1alpha1.ClusterEnvoyProxyTemplate{}
-				clusterEnvoyProxyTemplateName := client.ObjectKey{Name: clusterKodeTemplate.Spec.EnvoyProxyTemplateRef.Name}
-				log.Info("Fetching EnvoyProxyTemplate instance", "Name", clusterKodeTemplate.Spec.EnvoyProxyTemplateRef.Name)
-				if err := r.Get(ctx, clusterEnvoyProxyTemplateName, clusterEnvoyProxyTemplate); err != nil {
+				clusterEnvoyProxyTemplateName := clusterKodeTemplate.Spec.EnvoyProxyTemplateRef.Name
+				clusterEnvoyProxyTemplateNameObject := client.ObjectKey{Name: clusterEnvoyProxyTemplateName}
+				log.Info("Fetching EnvoyProxyTemplate instance", "Name", clusterEnvoyProxyTemplateName)
+				if err := r.Get(ctx, clusterEnvoyProxyTemplateNameObject, clusterEnvoyProxyTemplate); err != nil {
 					if errors.IsNotFound(err) {
-						log.Info("EnvoyProxyTemplate instance not found, requeuing", "Name", clusterKodeTemplate.Spec.EnvoyProxyTemplateRef.Name)
+						log.Info("EnvoyProxyTemplate instance not found, requeuing", "Name", clusterEnvoyProxyTemplateName)
 						return ctrl.Result{RequeueAfter: LoopRetryTime}, nil
 					}
-					log.Error(err, "Failed to fetch EnvoyProxyTemplate instance", "Name", clusterKodeTemplate.Spec.EnvoyProxyTemplateRef.Name)
+					log.Error(err, "Failed to fetch EnvoyProxyTemplate instance", "Name", clusterEnvoyProxyTemplateName)
 					return ctrl.Result{Requeue: true}, err
 				}
 				log.Info("EnvoyProxyTemplate instance found", "Name", clusterEnvoyProxyTemplate.Name)
@@ -173,7 +185,6 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 
 	return ctrl.Result{}, nil
 }
-
 
 func (r *KodeReconciler) validateReferences(kode *kodev1alpha1.Kode) error {
 	if kode.Spec.TemplateRef.Kind != "KodeTemplate" && kode.Spec.TemplateRef.Kind != "ClusterKodeTemplate" {

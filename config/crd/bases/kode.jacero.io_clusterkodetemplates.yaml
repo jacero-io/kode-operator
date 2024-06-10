@@ -71,6 +71,11 @@ spec:
                     description: Name is the name of the EnvoyProxyTemplate or ClusterEnvoyProxyTemplate
                     minLength: 1
                     type: string
+                  namespace:
+                    description: Namespace is the namespace of the EnvoyProxyTemplate
+                      or ClusterEnvoyProxyTemplate
+                    minLength: 1
+                    type: string
                 required:
                 - kind
                 - name

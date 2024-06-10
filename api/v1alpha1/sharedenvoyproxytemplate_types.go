@@ -48,4 +48,9 @@ type EnvoyProxyTemplateReference struct {
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
+
+	// Namespace is the namespace of the EnvoyProxyTemplate or ClusterEnvoyProxyTemplate
+	// +kubebuilder:validation:Description="Namespace of the Envoy Proxy template"
+	// +kubebuilder:validation:MinLength=1
+	Namespace string `json:"namespace,omitempty"`
 }

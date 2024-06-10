@@ -86,3 +86,21 @@ type SharedKodeTemplateStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 }
+
+type KodeTemplateReference struct {
+	// Kind is the resource kind
+	// +kubebuilder:validation:Description="Resource kind"
+	// +kubebuilder:validation:Enum=KodeTemplate;ClusterKodeTemplate
+	Kind string `json:"kind"`
+
+	// Name is the name of the KodeTemplate
+	// +kubebuilder:validation:Description="Name of the KodeTemplate"
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Namespace is the namespace of the KodeTemplate
+	// +kubebuilder:validation:Description="Namespace of the KodeTemplate"
+	// +kubebuilder:validation:MinLength=1
+	Namespace string `json:"namespace,omitempty"`
+}
