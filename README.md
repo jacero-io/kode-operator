@@ -96,9 +96,8 @@ These are cluster scoped and namespace scoped template for the Envoy Proxy sidec
 
 ### Features
 
-- [ ] Full lifecycle of [Code-server](https://docs.linuxserver.io/images/docker-code-server/).
-- [ ] Full lifecycle of [Webtop](https://docs.linuxserver.io/images/docker-webtop/).
-- [ ] Full lifecycle of [DevContainers](https://containers.dev/).
+- [ ] *Full lifecycle of [Code-server](https://docs.linuxserver.io/images/docker-code-server/).
+- [ ] *Full lifecycle of [Webtop](https://docs.linuxserver.io/images/docker-webtop/).
 - [ ] Full lifecycle of [Alnoda](https://docs.alnoda.org/about/intro/).
 - [ ] Full lifecycle of [Jupyter](https://jupyter.org/).
 - [ ] Authentication & Authorization support using Envoy Proxy sidecar.
