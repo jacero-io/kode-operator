@@ -56,12 +56,6 @@ spec:
   type: code-server
   image: linuxserver/code-server:latest
   port: 8443
-  envs:
-    - name: TZ
-      value: UTC
-  args:
-    - --auth
-    - none
   tz: UTC
   puid: 1000
   pgid: 1000
@@ -83,11 +77,6 @@ spec:
   type: webtop
   image: linuxserver/webtop:ubuntu-mate
   port: 3000
-  envs:
-    - name: PUID
-      value: "1000"
-  args:
-    - --init
   tz: UTC
   puid: 1000
   pgid: 1000
