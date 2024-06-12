@@ -30,12 +30,14 @@ import (
 )
 
 // ensureService ensures that the Service exists for the Kode instance
-func (r *KodeReconciler) ensureService(ctx context.Context, kode *kodev1alpha1.Kode, labels map[string]string, kodeTemplate *kodev1alpha1.KodeTemplate, clusterKodeTemplate *kodev1alpha1.ClusterKodeTemplate) error {
-	log := r.Log.WithName("ensureService")
+func (r *KodeReconciler) ensureService(ctx context.Context, kode *kodev1alpha1.Kode,
+	labels map[string]string,
+	sharedKodeTemplateSpec *kodev1alpha1.SharedKodeTemplateSpec) error {
 
+	log := r.Log.WithName("ensureService")
 	log.Info("Ensuring Service exists", "Namespace", kode.Namespace, "Name", kode.Name)
 
-	service := r.constructService(kode, labels, kodeTemplate, clusterKodeTemplate)
+	service := r.constructService(kode, labels, sharedKodeTemplateSpec)
 	if err := controllerutil.SetControllerReference(kode, service, r.Scheme); err != nil {
 		return err
 	}
@@ -67,16 +69,11 @@ func (r *KodeReconciler) ensureService(ctx context.Context, kode *kodev1alpha1.K
 }
 
 // constructService constructs a Service for the Kode instance
-func (r *KodeReconciler) constructService(kode *kodev1alpha1.Kode, labels map[string]string, kodeTemplate *kodev1alpha1.KodeTemplate, clusterKodeTemplate *kodev1alpha1.ClusterKodeTemplate) *corev1.Service {
+func (r *KodeReconciler) constructService(kode *kodev1alpha1.Kode,
+	labels map[string]string,
+	sharedKodeTemplateSpec *kodev1alpha1.SharedKodeTemplateSpec) *corev1.Service {
+
 	log := r.Log.WithName("constructService")
-
-	var templateSpec kodev1alpha1.SharedKodeTemplateSpec
-	if kodeTemplate != nil {
-		templateSpec = kodeTemplate.Spec.SharedKodeTemplateSpec
-	} else if clusterKodeTemplate != nil {
-		templateSpec = clusterKodeTemplate.Spec.SharedKodeTemplateSpec
-	}
-
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kode.Name,
@@ -86,8 +83,8 @@ func (r *KodeReconciler) constructService(kode *kodev1alpha1.Kode, labels map[st
 			Selector: labels,
 			Ports: []corev1.ServicePort{{
 				Protocol:   corev1.ProtocolTCP,
-				Port:       templateSpec.Port,
-				TargetPort: intstr.FromInt(int(templateSpec.Port)),
+				Port:       sharedKodeTemplateSpec.Port,
+				TargetPort: intstr.FromInt(int(sharedKodeTemplateSpec.Port)),
 			}},
 		},
 	}

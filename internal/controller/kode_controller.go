@@ -77,20 +77,17 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		return ctrl.Result{}, err
 	}
 
-	// Fetch the KodeTemplate or ClusterKodeTemplate instance and EnvoyProxyTemplate instance
-	var kodeTemplate *kodev1alpha1.KodeTemplate
-	var clusterKodeTemplate *kodev1alpha1.ClusterKodeTemplate
-	var envoyProxyTemplate *kodev1alpha1.EnvoyProxyTemplate
-	var clusterEnvoyProxyTemplate *kodev1alpha1.ClusterEnvoyProxyTemplate
+	var sharedKodeTemplateSpec kodev1alpha1.SharedKodeTemplateSpec
+	var sharedEnvoyProxyTemplateSpec kodev1alpha1.SharedEnvoyProxyTemplateSpec
 
+	// Fetch the KodeTemplate or ClusterKodeTemplate instance and EnvoyProxyTemplate instance
 	if kode.Spec.TemplateRef.Name != "" {
-		ContainerName := "kode-" + kode.Name
-		labels["app.kubernetes.io/name"] = ContainerName
+		labels["app.kubernetes.io/name"] = "kode-" + kode.Name
 		labels["app.kubernetes.io/managed-by"] = "kode-operator"
 		labels["kode.jacero.io/name"] = kode.Name
 
 		if kode.Spec.TemplateRef.Kind == "KodeTemplate" {
-			kodeTemplate = &kodev1alpha1.KodeTemplate{}
+			kodeTemplate := &kodev1alpha1.KodeTemplate{}
 			kodeTemplateName := kode.Spec.TemplateRef.Name
 			templateNamespace := kode.Spec.TemplateRef.Namespace
 			if templateNamespace == "" {
@@ -108,10 +105,10 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 			}
 			log.Info("KodeTemplate instance found", "Name", kodeTemplateName)
 			labels["kode-template.jacero.io/name"] = kodeTemplate.Name
-			logSharedKodeTemplateManifest(log, kodeTemplate.Name, kodeTemplate.Namespace, kodeTemplate.Spec.SharedKodeTemplateSpec)
+			sharedKodeTemplateSpec = kodeTemplate.Spec.SharedKodeTemplateSpec
 
 			if kodeTemplate.Spec.EnvoyProxyTemplateRef.Name != "" {
-				envoyProxyTemplate = &kodev1alpha1.EnvoyProxyTemplate{}
+				envoyProxyTemplate := &kodev1alpha1.EnvoyProxyTemplate{}
 				envoyProxyTemplateName := kodeTemplate.Spec.EnvoyProxyTemplateRef.Name
 				envoyTemplateNamespace := kodeTemplate.Spec.EnvoyProxyTemplateRef.Namespace
 				if envoyTemplateNamespace == "" {
@@ -129,10 +126,10 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 				}
 				log.Info("EnvoyProxyTemplate instance found", "Name", envoyProxyTemplate.Name)
 				labels["kode-envoy-proxy-template.jacero.io/name"] = envoyProxyTemplate.Name
-				logSharedEnvoyProxyTemplateManifest(log, envoyProxyTemplate.Name, envoyProxyTemplate.Namespace, &envoyProxyTemplate.Spec.SharedEnvoyProxyTemplateSpec)
+				sharedEnvoyProxyTemplateSpec = envoyProxyTemplate.Spec.SharedEnvoyProxyTemplateSpec
 			}
 		} else if kode.Spec.TemplateRef.Kind == "ClusterKodeTemplate" {
-			clusterKodeTemplate = &kodev1alpha1.ClusterKodeTemplate{}
+			clusterKodeTemplate := &kodev1alpha1.ClusterKodeTemplate{}
 			clusterKodeTemplateName := kode.Spec.TemplateRef.Name
 			clusterKodeTemplateNameObject := client.ObjectKey{Name: clusterKodeTemplateName}
 			log.Info("Fetching ClusterKodeTemplate instance", "Name", clusterKodeTemplateName)
@@ -146,10 +143,10 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 			}
 			log.Info("ClusterKodeTemplate instance found", "Name", clusterKodeTemplateName)
 			labels["cluster-kode-template.jacero.io/name"] = clusterKodeTemplate.Name
-			logSharedKodeTemplateManifest(log, clusterKodeTemplate.Name, clusterKodeTemplate.Namespace, clusterKodeTemplate.Spec.SharedKodeTemplateSpec)
+			sharedKodeTemplateSpec = clusterKodeTemplate.Spec.SharedKodeTemplateSpec
 
 			if clusterKodeTemplate.Spec.EnvoyProxyTemplateRef.Name != "" {
-				clusterEnvoyProxyTemplate = &kodev1alpha1.ClusterEnvoyProxyTemplate{}
+				clusterEnvoyProxyTemplate := &kodev1alpha1.ClusterEnvoyProxyTemplate{}
 				clusterEnvoyProxyTemplateName := clusterKodeTemplate.Spec.EnvoyProxyTemplateRef.Name
 				clusterEnvoyProxyTemplateNameObject := client.ObjectKey{Name: clusterEnvoyProxyTemplateName}
 				log.Info("Fetching EnvoyProxyTemplate instance", "Name", clusterEnvoyProxyTemplateName)
@@ -163,16 +160,16 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 				}
 				log.Info("EnvoyProxyTemplate instance found", "Name", clusterEnvoyProxyTemplate.Name)
 				labels["kode-envoy-proxy-template.jacero.io/name"] = clusterEnvoyProxyTemplate.Name
-				logSharedEnvoyProxyTemplateManifest(log, clusterEnvoyProxyTemplate.Name, clusterEnvoyProxyTemplate.Namespace, &clusterEnvoyProxyTemplate.Spec.SharedEnvoyProxyTemplateSpec)
+				sharedEnvoyProxyTemplateSpec = clusterEnvoyProxyTemplate.Spec.SharedEnvoyProxyTemplateSpec
 			}
 		}
 	}
 
 	// Ensure the Deployment and Service exist
-	if err := r.ensureDeployment(ctx, kode, labels, kodeTemplate, clusterKodeTemplate, envoyProxyTemplate); err != nil {
+	if err := r.ensureDeployment(ctx, kode, labels, &sharedKodeTemplateSpec, &sharedEnvoyProxyTemplateSpec); err != nil {
 		return ctrl.Result{}, err
 	}
-	if err := r.ensureService(ctx, kode, labels, kodeTemplate, clusterKodeTemplate); err != nil {
+	if err := r.ensureService(ctx, kode, labels, &sharedKodeTemplateSpec); err != nil {
 		return ctrl.Result{}, err
 	}
 

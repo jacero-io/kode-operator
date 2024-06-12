@@ -37,12 +37,11 @@ spec:
     resources:
       requests:
         storage: 1Gi
-
 ```
 
 ### KodeTemplate & ClusterKodeTemplate
 
-These are cluster scoped and namespace scoped templates. A template contains an image and some default configuration for that image. A user can also include an Envoy Proxy configuration that is then applied to the sidecar of the resulting Kode instance.
+These are cluster scoped and namespace scoped templates. A template contains an image and some default configuration for that image. You can also include an Envoy Proxy configuration that is then applied to the sidecar of the resulting Kode instance.
 
 **Example for KodeTemplate:**
 
@@ -63,7 +62,6 @@ spec:
   defaultWorkspace: workspace
   envoyProxyTemplateRef:
     name: my-envoy-proxy-template
-
 ```
 
 **Example for ClusterKodeTemplate:**
@@ -84,7 +82,6 @@ spec:
   defaultWorkspace: workspace
   envoyProxyTemplateRef:
     name: my-envoy-proxy-template
-
 ```
 
 ### EnvoyProxyTemplate & ClusterEnvoyProxyTemplate
@@ -96,17 +93,15 @@ These are cluster scoped and namespace scoped template for the Envoy Proxy sidec
 
 ### Features
 
-- [ ] *Full lifecycle of [Code-server](https://docs.linuxserver.io/images/docker-code-server/).
-- [ ] *Full lifecycle of [Webtop](https://docs.linuxserver.io/images/docker-webtop/).
-- [ ] Full lifecycle of [Alnoda](https://docs.alnoda.org/about/intro/).
-- [ ] Full lifecycle of [Jupyter](https://jupyter.org/).
+- [ ] *Provisioning and update of [Code-server](https://docs.linuxserver.io/images/docker-code-server/).
+- [ ] *Provisioning and update of [Webtop](https://docs.linuxserver.io/images/docker-webtop/).
 - [ ] Authentication & Authorization support using Envoy Proxy sidecar.
   - [ ] [OAuth2](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/oauth2_filter)
   - [ ] [Basic Auth](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/basic_auth_filter.html#basic-auth)
   - [ ] [Ext_Authz](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/ext_authz_filter) HTTP and GRPC (Used by for example OPA)
 - [ ] [Code-server] User defined settings and data (e.g. extensions, settings.json, etc).
 - [ ] [Webtop] User defined settings and data (e.g. .profile, .bashrc, preinstalled software, etc).
-- [ ] Backup & Restore of user data to S3.
+- [ ] Backup & Restore of user data adn state to S3.
 
 ## Usage Scenarios
 

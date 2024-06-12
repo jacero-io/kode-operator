@@ -18,6 +18,7 @@ package v1alpha1
 
 import (
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // SharedKodeTemplateSpec defines the desired state of ClusterKodeTemplate
@@ -79,12 +80,27 @@ type SharedKodeTemplateSpec struct {
 	// +kubebuilder:validation:Pattern="^[^/].*$"
 	// +kubebuilder:default=workspace
 	DefaultWorkspace string `json:"defaultWorkspace,omitempty"`
+
+	// AllowPrivileged is a flag to allow privileged containers
+	// +kubebuilder:validation:Description="Flag to allow privileged containers."
+	// +kubebuilder:default=false
+	AllowPrivileged *bool `json:"allowPrivileged,omitempty"`
+
+	// Specifies the period before controller inactive the resource (delete all resources except volume).
+	// +kubebuilder:validation:Description="Period before controller inactive the resource (delete all resources except volume)."
+	// +kubebuilder:default=600
+	InactiveAfterSeconds *int64 `json:"inactiveAfterSeconds,omitempty"`
+
+	// Specifies the period before controller recycle the resource (delete all resources).
+	// +kubebuilder:validation:Description="Period before controller recycle the resource (delete all resources)."
+	// +kubebuilder:default=1200
+	RecycleAfterSeconds *int64 `json:"recycleAfterSeconds,omitempty"`
 }
 
 // SharedKodeTemplateStatus defines the observed state of ClusterKodeTemplate
 type SharedKodeTemplateStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// Conditions reflect the current state of the template
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
 }
 
 type KodeTemplateReference struct {

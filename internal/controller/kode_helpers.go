@@ -62,9 +62,11 @@ func GetRenderedBootstrapConfig(cueFiles []string) (string, error) {
 }
 
 // constructEnvoyProxyContainer constructs the Envoy Proxy container
-func constructEnvoyProxyContainer(templateSpec kodev1alpha1.SharedKodeTemplateSpec, envoyProxyTemplate *kodev1alpha1.EnvoyProxyTemplate) (corev1.Container, error) {
+func constructEnvoyProxyContainer(sharedKodeTemplateSpec *kodev1alpha1.SharedKodeTemplateSpec,
+	sharedEnvoyProxyTemplateSpec *kodev1alpha1.SharedEnvoyProxyTemplateSpec) (corev1.Container, error) {
+
 	// HTTPFilters := envoyProxyTemplate.Spec.HTTPFilters
-	// ContainerPort := kodeTemplate.Spec.Port
+	// ContainerPort := templateSpec.Spec.Port
 
 	config, err := GetRenderedBootstrapConfig([]string{"internal/controller/cue/bootstrap.cue", "internal/controller/cue/bootstrap_schema.cue"})
 	if err != nil {
@@ -73,7 +75,7 @@ func constructEnvoyProxyContainer(templateSpec kodev1alpha1.SharedKodeTemplateSp
 
 	return corev1.Container{
 		Name:  EnvoyProxyContainerName,
-		Image: envoyProxyTemplate.Spec.Image,
+		Image: sharedEnvoyProxyTemplateSpec.Image,
 		Args: []string{
 			"--config-yaml", config,
 		},

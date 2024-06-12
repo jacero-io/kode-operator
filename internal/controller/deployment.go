@@ -33,12 +33,17 @@ import (
 )
 
 // ensureDeployment ensures that the Deployment exists for the Kode instance
-func (r *KodeReconciler) ensureDeployment(ctx context.Context, kode *kodev1alpha1.Kode, labels map[string]string, kodeTemplate *kodev1alpha1.KodeTemplate, clusterKodeTemplate *kodev1alpha1.ClusterKodeTemplate, envoyProxyTemplate *kodev1alpha1.EnvoyProxyTemplate) error {
+func (r *KodeReconciler) ensureDeployment(ctx context.Context,
+	kode *kodev1alpha1.Kode,
+	labels map[string]string,
+	sharedKodeTemplateSpec *kodev1alpha1.SharedKodeTemplateSpec,
+	sharedEnvoyProxyTemplateSpec *kodev1alpha1.SharedEnvoyProxyTemplateSpec) error {
+
 	log := r.Log.WithName("ensureDeployment")
 
 	log.Info("Ensuring Deployment exists", "Namespace", kode.Namespace, "Name", kode.Name)
 
-	deployment := r.constructDeployment(kode, labels, kodeTemplate, clusterKodeTemplate, envoyProxyTemplate)
+	deployment := r.constructDeployment(kode, labels, sharedKodeTemplateSpec, sharedEnvoyProxyTemplateSpec)
 	if err := controllerutil.SetControllerReference(kode, deployment, r.Scheme); err != nil {
 		return err
 	}
@@ -78,49 +83,43 @@ func (r *KodeReconciler) ensureDeployment(ctx context.Context, kode *kodev1alpha
 }
 
 // constructDeployment constructs a Deployment for the Kode instance
-func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode, labels map[string]string, kodeTemplate *kodev1alpha1.KodeTemplate, clusterKodeTemplate *kodev1alpha1.ClusterKodeTemplate, envoyProxyTemplate *kodev1alpha1.EnvoyProxyTemplate) *appsv1.Deployment {
+func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode,
+	labels map[string]string,
+	sharedKodeTemplateSpec *kodev1alpha1.SharedKodeTemplateSpec,
+	sharedEnvoyProxyTemplateSpec *kodev1alpha1.SharedEnvoyProxyTemplateSpec) *appsv1.Deployment {
+
 	log := r.Log.WithName("constructDeployment")
 
 	replicas := int32(1)
 
 	var workspace string
 	var mountPath string
-	var templateType string
-	var templateSpec kodev1alpha1.SharedKodeTemplateSpec
 
-	if kodeTemplate != nil {
-		templateType = kodeTemplate.Spec.Type
-		templateSpec = kodeTemplate.Spec.SharedKodeTemplateSpec
-	} else if clusterKodeTemplate != nil {
-		templateType = clusterKodeTemplate.Spec.Type
-		templateSpec = clusterKodeTemplate.Spec.SharedKodeTemplateSpec
-	}
-
-	workspace = path.Join(templateSpec.DefaultHome, templateSpec.DefaultWorkspace)
-	mountPath = templateSpec.DefaultHome
+	workspace = path.Join(sharedKodeTemplateSpec.DefaultHome, sharedKodeTemplateSpec.DefaultWorkspace)
+	mountPath = sharedKodeTemplateSpec.DefaultHome
 	if kode.Spec.Workspace != "" {
 		if kode.Spec.Home != "" {
 			workspace = path.Join(kode.Spec.Home, kode.Spec.Workspace)
 			mountPath = kode.Spec.Home
 		} else {
-			workspace = path.Join(templateSpec.DefaultHome, kode.Spec.Workspace)
+			workspace = path.Join(sharedKodeTemplateSpec.DefaultHome, kode.Spec.Workspace)
 		}
 	}
 
 	var containers []corev1.Container
 
-	if templateType == "code-server" {
-		containers = constructCodeServerContainers(kode, templateSpec, workspace)
-	} else if templateType == "webtop" {
-		containers = constructWebtopContainers(kode, templateSpec)
+	if sharedKodeTemplateSpec.Type == "code-server" {
+		containers = constructCodeServerContainers(kode, sharedKodeTemplateSpec, workspace)
+	} else if sharedKodeTemplateSpec.Type == "webtop" {
+		containers = constructWebtopContainers(kode, sharedKodeTemplateSpec)
 	}
 
 	volumes, volumeMounts := constructVolumesAndMounts(mountPath, kode)
 	containers[0].VolumeMounts = volumeMounts
 
 	initContainers := []corev1.Container{}
-	if templateSpec.EnvoyProxyTemplateRef.Name != "" {
-		envoySidecarContainer, err := constructEnvoyProxyContainer(templateSpec, envoyProxyTemplate)
+	if sharedKodeTemplateSpec.EnvoyProxyTemplateRef.Name != "" {
+		envoySidecarContainer, err := constructEnvoyProxyContainer(sharedKodeTemplateSpec, sharedEnvoyProxyTemplateSpec)
 		if err != nil {
 			log.Error(err, "Failed to construct EnvoyProxy sidecar")
 		} else {
@@ -156,7 +155,10 @@ func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode, labels map
 	return deployment
 }
 
-func constructCodeServerContainers(kode *kodev1alpha1.Kode, templateSpec kodev1alpha1.SharedKodeTemplateSpec, workspace string) []corev1.Container {
+func constructCodeServerContainers(kode *kodev1alpha1.Kode,
+	templateSpec *kodev1alpha1.SharedKodeTemplateSpec,
+	workspace string) []corev1.Container {
+
 	return []corev1.Container{{
 		Name:  "kode-" + kode.Name,
 		Image: templateSpec.Image,
@@ -176,7 +178,9 @@ func constructCodeServerContainers(kode *kodev1alpha1.Kode, templateSpec kodev1a
 	}}
 }
 
-func constructWebtopContainers(kode *kodev1alpha1.Kode, templateSpec kodev1alpha1.SharedKodeTemplateSpec) []corev1.Container {
+func constructWebtopContainers(kode *kodev1alpha1.Kode,
+	templateSpec *kodev1alpha1.SharedKodeTemplateSpec) []corev1.Container {
+
 	return []corev1.Container{{
 		Name:  "kode-" + kode.Name,
 		Image: templateSpec.Image,

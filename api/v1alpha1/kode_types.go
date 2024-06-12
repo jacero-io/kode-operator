@@ -56,6 +56,19 @@ type KodeSpec struct {
 	// Storage specifies the storage configuration
 	// +kubebuilder:validation:Description="Storage configuration."
 	Storage KodeStorageSpec `json:"storage,omitempty"`
+
+	// UserConfig specifies a git repository URL to get user configuration from
+	// +kubebuilder:validation:Description="Git repository URL to get user configuration from."
+	UserConfig string `json:"userConfig,omitempty"`
+
+	// Privileged specifies if the container should run in privileged mode. Only set to true if you know what you are doing.
+	// +kubebuilder:validation:Description="Specifies if the container should run in privileged mode. Only set to true if you know what you are doing."
+	// +kubebuilder:default=false
+	Privileged *bool `json:"privileged,omitempty"`
+
+	// InitPlugins specifies the plugins to be installed on the first start
+	// +kubebuilder:validation:Description="Plugins to be installed on the first start."
+	InitPlugins map[string][]string `json:"initPlugins,omitempty"`
 }
 
 // KodeStorageSpec defines the storage configuration
@@ -70,9 +83,37 @@ type KodeStorageSpec struct {
 	Resources corev1.VolumeResourceRequirements `json:"resources,omitempty"`
 }
 
+type ConditionType string
+
+const (
+	// Created means the code server has been accepted by the system.
+	Created ConditionType = "Created"
+	// Ready means the code server has been ready for usage.
+	Ready ConditionType = "Ready"
+	// Recycled means the code server has been recycled totally.
+	Recycled ConditionType = "Recycled"
+	// Inactive means the code server will be marked inactive if `InactiveAfterSeconds` elapsed
+	Inactive ConditionType = "Inactive"
+)
+
+type Condition struct {
+	// Type of code server condition.
+	Type ConditionType `json:"type"`
+	// Status of the condition, one of True, False, Unknown.
+	Status corev1.ConditionStatus `json:"status"`
+	// The reason for the condition's last transition.
+	Reason string `json:"reason,omitempty"`
+	// A human readable message indicating details about the transition.
+	Message string `json:"message,omitempty"`
+	// The last time this condition was updated.
+	LastUpdateTime metav1.Time `json:"lastUpdateTime,omitempty"`
+	// Last time the condition transitioned from one status to another.
+	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`
+}
+
 // KodeStatus defines the observed state of Kode
 type KodeStatus struct {
-	Ready bool `json:"ready"`
+	Conditions []Condition `json:"conditions,omitempty" protobuf:"bytes,1,opt,name=conditions"`
 }
 
 //+kubebuilder:object:root=true
