@@ -26,6 +26,9 @@ package bootstrap
     typed_config: "@type": "type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog"
 }]
 
+// Define go httpFilter
+#GoHttpFilters: [...#HTTPFilter]
+
 #Listener0: #Listener & {
     name: "listener_0"
     address: #Address & { socket_address: {
@@ -43,7 +46,7 @@ package bootstrap
                 upgrade_configs: [{
                     upgrade_type: "websocket"
                 }]
-                http_filters: [#ExtAuthzOPAServiceFilter,#HTTPFilterRouter]
+                http_filters: #GoHttpFilters
                 route_config: {
                     name: "local_route"
                     virtual_hosts: [{
@@ -94,8 +97,8 @@ package bootstrap
 }
 
 #BootstrapConfig: {
-    clusters: #Clusters & [#ExtAuthzOPAService]
     listeners: #Listeners & [#Listener0]
+    clusters: #Clusters & [#ExtAuthzOPAService]
 }
 
 admin: #AdminServer

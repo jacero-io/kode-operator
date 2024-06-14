@@ -22,12 +22,12 @@ import (
 
 // EnvoyProxyTemplateSpec defines the desired state of EnvoyProxyTemplate
 type EnvoyProxyTemplateSpec struct {
-	SharedEnvoyProxyTemplateSpec `json:",inline"`
+	EnvoyProxyConfigSpec `json:",inline"`
 }
 
 // EnvoyProxyTemplateStatus defines the observed state of EnvoyProxyTemplate
 type EnvoyProxyTemplateStatus struct {
-	SharedEnvoyProxyTemplateStatus `json:",inline"`
+	EnvoyProxyStatus `json:",inline"`
 }
 
 // +kubebuilder:object:root=true

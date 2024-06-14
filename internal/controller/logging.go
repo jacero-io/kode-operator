@@ -62,7 +62,7 @@ func logSharedKodeTemplateManifest(log logr.Logger, name string, namespace strin
 }
 
 // logSharedEnvoyProxyTemplateManifest add structured logging for the Envoy Proxy Template manifest to improve visibility for debugging
-func logSharedEnvoyProxyTemplateManifest(log logr.Logger, name string, namespace string, spec *kodev1alpha1.SharedEnvoyProxyTemplateSpec) {
+func logSharedEnvoyProxyTemplateManifest(log logr.Logger, name string, namespace string, spec *kodev1alpha1.EnvoyProxyConfigSpec) {
 	log.V(1).Info("Envoy Proxy Template Manifest",
 		"Name", name,
 		"Namespace", namespace,

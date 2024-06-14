@@ -12,10 +12,10 @@ spec:
     name: clusterkodetemplate-codeserver-sample
   user: user1
   password: password1
-  storage:
-    accessModes:
-      - ReadWriteOnce
-    resources:
-      requests:
-        storage: 1Gi
-    storageClassName: standard
+  # storage:
+  #   accessModes:
+  #     - ReadWriteOnce
+  #   resources:
+  #     requests:
+  #       storage: 1Gi
+  #   storageClassName: standard

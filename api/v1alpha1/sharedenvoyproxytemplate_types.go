@@ -16,8 +16,73 @@ limitations under the License.
 
 package v1alpha1
 
-// EnvoyProxyTemplateSpec defines the desired state of EnvoyProxyTemplate
-type SharedEnvoyProxyTemplateSpec struct {
+import runtime "k8s.io/apimachinery/pkg/runtime"
+
+type SocketAddress struct {
+	// Address is the address of the socket
+	// +kubebuilder:validation:Required
+	Address string `json:"address"`
+
+	// PortValue is the port of the socket
+	// +kubebuilder:validation:Required
+	PortValue int `json:"port_value"`
+}
+
+type Endpoints struct {
+	// Address is the address of the load balancer endpoint
+	// +kubebuilder:validation:Required
+	Address string `json:"address"`
+}
+
+type LbEndpoints struct {
+	// LbEndpoints is a list of load balancer endpoints
+	// +kubebuilder:validation:Required
+	En []Endpoints `json:"lb_endpoints"`
+}
+
+type LoadAssignment struct {
+	// ClusterName is the name of the cluster
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Required
+	ClusterName string `json:"cluster_name"`
+
+	// Endpoints is a list of endpoints
+	// +kubebuilder:validation:Required
+	Endpoints []LbEndpoints `json:"lb_endpoints"`
+}
+
+type Cluster struct {
+	// Name is the name of the cluster
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// ConnectTimeout is the timeout for connecting to the cluster
+	// +kubebuilder:validation:Required
+	ConnectTimeout string `json:"connect_timeout"`
+
+	// Type is the type of the cluster
+	// +kubebuilder:validation:Required
+	// +kube:validation:Enum=STRICT_DNS;LOGICAL_DNS;STATIC;EDS;ORIGINAL_DST;ENVIRONMENT_VARIABLE
+	// +kube:validation:default=STRICT_DNS
+	Type string `json:"type"`
+
+	// LbPolicy is the load balancing policy for the cluster
+	// +kubebuilder:validation:Required
+	// +kube:validation:Enum=ROUND_ROBIN;LEAST_REQUEST;RANDOM;RING_HASH;MAGLEV;ORIGINAL_DST_LB;CLUSTER_PROVIDED
+	LbPolicy string `json:"lb_policy"`
+
+	// TypedExtensionProtocolOptions is a map of typed extension protocol options
+	// +kubebuilder:validation:Optional
+	TypedExtensionProtocolOptions runtime.RawExtension `json:"typed_extension_protocol_options,omitempty"`
+
+	// LoadAssignment is the load assignment for the cluster
+	// +kubebuilder:validation:Required
+	LoadAssignment LoadAssignment `json:"load_assignment"`
+}
+
+// Spec for the EnvoyProxyConfig.
+type EnvoyProxyConfigSpec struct {
 	// Image is the Docker image for the Envoy proxy
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:Required
@@ -25,18 +90,22 @@ type SharedEnvoyProxyTemplateSpec struct {
 	Image string `json:"image"`
 
 	// HTTPFilters is a list of Envoy HTTP filters to be applied
-	// +kubebuilder:validation:MinItems=1
-	HTTPFilters []HTTPFilter `json:"httpFilters"`
+	// +kubebuilder:validation:Description="HTTP filters to be applied"
+    HTTPFilters []HTTPFilter `json:"filters"`
+
+	// Clusters is a list of Envoy clusters
+	// +kubebuilder:validation:Description="Envoy clusters"
+	Clusters []Cluster `json:"clusters"`
 }
 
-// EnvoyProxyTemplateStatus defines the observed state of EnvoyProxyTemplate
-type SharedEnvoyProxyTemplateStatus struct {
+// EnvoyProxyStatus defines the observed state of EnvoyProxy
+type EnvoyProxyStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 }
 
-// EnvoyProxyTemplateReference is a reference to an EnvoyProxyTemplate or ClusterEnvoyProxyTemplate
-type EnvoyProxyTemplateReference struct {
+// EnvoyProxyReference is a reference to an EnvoyProxyTemplate or ClusterEnvoyProxyTemplate
+type EnvoyProxyReference struct {
 	// Kind is the resource kind
 	// +kubebuilder:validation:Description="Resource kind"
 	// +kubebuilder:validation:Enum=EnvoyProxyTemplate;ClusterEnvoyProxyTemplate

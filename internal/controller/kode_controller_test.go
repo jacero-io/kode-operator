@@ -9,6 +9,7 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -29,6 +30,15 @@ var _ = Describe("Kode Controller", func() {
 		k8sManager ctrl.Manager
 		reconciler *KodeReconciler
 	)
+
+	var RouterFilter = kodev1alpha1.HTTPFilter{
+		Name: "envoy.filters.http.router",
+		TypedConfig: runtime.RawExtension{
+			Raw: []byte(`{
+				"@type": "type.googleapis.com/envoy.extensions.filters.http.router.v3.Router"
+			}`),
+		},
+	}
 
 	BeforeEach(func() {
 		By("bootstrapping test environment")
@@ -119,7 +129,7 @@ var _ = Describe("Kode Controller", func() {
 					SharedKodeTemplateSpec: kodev1alpha1.SharedKodeTemplateSpec{
 						Image: "lscr.io/linuxserver/code-server:latest",
 						Port:  8443,
-						EnvoyProxyTemplateRef: kodev1alpha1.EnvoyProxyTemplateReference{
+						EnvoyProxyTemplateRef: kodev1alpha1.EnvoyProxyReference{
 							Kind: "EnvoyProxyTemplate",
 							Name: "test-envoyproxytemplate",
 						},
@@ -135,16 +145,9 @@ var _ = Describe("Kode Controller", func() {
 					Name: "test-envoyproxytemplate",
 				},
 				Spec: kodev1alpha1.EnvoyProxyTemplateSpec{
-					SharedEnvoyProxyTemplateSpec: kodev1alpha1.SharedEnvoyProxyTemplateSpec{
-						Image: "envoyproxy/envoy:v1.30-latest",
-						HTTPFilters: []kodev1alpha1.HTTPFilter{
-							{
-								Name: "envoy.filters.http.router",
-								TypedConfig: kodev1alpha1.TypedConfig{
-									Type: "type.googleapis.com/envoy.extensions.filters.http.router.v3.Router",
-								},
-							},
-						},
+					EnvoyProxyConfigSpec: kodev1alpha1.EnvoyProxyConfigSpec{
+						Image:       "envoyproxy/envoy:v1.30-latest",
+						HTTPFilters: []kodev1alpha1.HTTPFilter{RouterFilter},
 					},
 				},
 			}
@@ -157,16 +160,9 @@ var _ = Describe("Kode Controller", func() {
 					Name: "test-clusterenvoyproxytemplate",
 				},
 				Spec: kodev1alpha1.ClusterEnvoyProxyTemplateSpec{
-					SharedEnvoyProxyTemplateSpec: kodev1alpha1.SharedEnvoyProxyTemplateSpec{
-						Image: "envoyproxy/envoy:v1.30-latest",
-						HTTPFilters: []kodev1alpha1.HTTPFilter{
-							{
-								Name: "envoy.filters.http.router",
-								TypedConfig: kodev1alpha1.TypedConfig{
-									Type: "type.googleapis.com/envoy.extensions.filters.http.router.v3.Router",
-								},
-							},
-						},
+					EnvoyProxyConfigSpec: kodev1alpha1.EnvoyProxyConfigSpec{
+						Image:       "envoyproxy/envoy:v1.30-latest",
+						HTTPFilters: []kodev1alpha1.HTTPFilter{RouterFilter},
 					},
 				},
 			}

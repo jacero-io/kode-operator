@@ -48,10 +48,23 @@ spec:
                 description: Home is the path to the directory for the user data
                 minLength: 3
                 type: string
+              initPlugins:
+                additionalProperties:
+                  items:
+                    type: string
+                  type: array
+                description: InitPlugins specifies the plugins to be installed on
+                  the first start
+                type: object
               password:
                 description: Password HTTP Basic auth password. If unset there will
                   be no auth
                 type: string
+              privileged:
+                default: false
+                description: Privileged specifies if the container should run in privileged
+                  mode. Only set to true if you know what you are doing.
+                type: boolean
               storage:
                 description: Storage specifies the storage configuration
                 properties:
@@ -121,6 +134,10 @@ spec:
                 description: User is the HTTP Basic auth username or the user the
                   container should run as, abc is default.
                 type: string
+              userConfig:
+                description: UserConfig specifies a git repository URL to get user
+                  configuration from
+                type: string
               workspace:
                 description: Workspace is the user specified workspace directory (e.g.
                   my-workspace)
@@ -133,10 +150,36 @@ spec:
           status:
             description: KodeStatus defines the observed state of Kode
             properties:
-              ready:
-                type: boolean
-            required:
-            - ready
+              conditions:
+                items:
+                  properties:
+                    lastTransitionTime:
+                      description: Last time the condition transitioned from one status
+                        to another.
+                      format: date-time
+                      type: string
+                    lastUpdateTime:
+                      description: The last time this condition was updated.
+                      format: date-time
+                      type: string
+                    message:
+                      description: A human readable message indicating details about
+                        the transition.
+                      type: string
+                    reason:
+                      description: The reason for the condition's last transition.
+                      type: string
+                    status:
+                      description: Status of the condition, one of True, False, Unknown.
+                      type: string
+                    type:
+                      description: Type of code server condition.
+                      type: string
+                  required:
+                  - status
+                  - type
+                  type: object
+                type: array
             type: object
         type: object
     served: true

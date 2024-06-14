@@ -6,9 +6,9 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: clusterkodetemplate-codeserver-sample
 spec:
-  # envoyProxyTemplateRef:
-  #   kind: EnvoyProxyTemplate
-  #   name: envoyproxytemplate-sample
+  envoyProxyTemplateRef:
+    kind: ClusterEnvoyProxyTemplate
+    name: clusterenvoyproxytemplate-sample
   type: code-server
   image: lscr.io/linuxserver/code-server:latest
   tz: "Europe/Stockholm"

@@ -37,7 +37,7 @@ func (r *KodeReconciler) ensureDeployment(ctx context.Context,
 	kode *kodev1alpha1.Kode,
 	labels map[string]string,
 	sharedKodeTemplateSpec *kodev1alpha1.SharedKodeTemplateSpec,
-	sharedEnvoyProxyTemplateSpec *kodev1alpha1.SharedEnvoyProxyTemplateSpec) error {
+	sharedEnvoyProxyTemplateSpec *kodev1alpha1.EnvoyProxyConfigSpec) error {
 
 	log := r.Log.WithName("ensureDeployment")
 
@@ -86,7 +86,7 @@ func (r *KodeReconciler) ensureDeployment(ctx context.Context,
 func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode,
 	labels map[string]string,
 	sharedKodeTemplateSpec *kodev1alpha1.SharedKodeTemplateSpec,
-	sharedEnvoyProxyTemplateSpec *kodev1alpha1.SharedEnvoyProxyTemplateSpec) *appsv1.Deployment {
+	sharedEnvoyProxyTemplateSpec *kodev1alpha1.EnvoyProxyConfigSpec) *appsv1.Deployment {
 
 	log := r.Log.WithName("constructDeployment")
 
@@ -119,11 +119,13 @@ func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode,
 
 	initContainers := []corev1.Container{}
 	if sharedKodeTemplateSpec.EnvoyProxyTemplateRef.Name != "" {
-		envoySidecarContainer, err := constructEnvoyProxyContainer(sharedKodeTemplateSpec, sharedEnvoyProxyTemplateSpec)
+		log.Info("EnvoyProxyTemplateRef is defined", "Name", sharedKodeTemplateSpec.EnvoyProxyTemplateRef.Name)
+		envoySidecarContainer, err := constructEnvoyProxyContainer(&log, sharedKodeTemplateSpec, sharedEnvoyProxyTemplateSpec)
 		if err != nil {
 			log.Error(err, "Failed to construct EnvoyProxy sidecar")
 		} else {
 			containers = append(containers, envoySidecarContainer)
+			log.Info("Added EnvoyProxy sidecar container")
 		}
 	}
 

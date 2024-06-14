@@ -78,7 +78,7 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	}
 
 	var sharedKodeTemplateSpec kodev1alpha1.SharedKodeTemplateSpec
-	var sharedEnvoyProxyTemplateSpec kodev1alpha1.SharedEnvoyProxyTemplateSpec
+	var sharedEnvoyProxyTemplateSpec kodev1alpha1.EnvoyProxyConfigSpec
 
 	// Fetch the KodeTemplate or ClusterKodeTemplate instance and EnvoyProxyTemplate instance
 	if kode.Spec.TemplateRef.Name != "" {
@@ -90,11 +90,13 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 			kodeTemplate := &kodev1alpha1.KodeTemplate{}
 			kodeTemplateName := kode.Spec.TemplateRef.Name
 			templateNamespace := kode.Spec.TemplateRef.Namespace
+
 			if templateNamespace == "" {
 				templateNamespace = kode.Namespace
 			}
 			kodeTemplateNameObject := client.ObjectKey{Name: kodeTemplateName, Namespace: templateNamespace}
 			log.Info("Fetching KodeTemplate instance", "Name", kode.Spec.TemplateRef.Name, "Namespace", templateNamespace)
+
 			if err := r.Get(ctx, kodeTemplateNameObject, kodeTemplate); err != nil {
 				if errors.IsNotFound(err) {
 					log.Info("KodeTemplate instance not found in namespace, requeuing", "Namespace", templateNamespace, "Name", kodeTemplateName)
@@ -114,6 +116,7 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 				if envoyTemplateNamespace == "" {
 					envoyTemplateNamespace = kode.Namespace
 				}
+
 				envoyProxyTemplateNameObject := client.ObjectKey{Name: envoyProxyTemplateName, Namespace: envoyTemplateNamespace}
 				log.Info("Fetching EnvoyProxyTemplate instance", "Name", envoyProxyTemplateName, "Namespace", envoyTemplateNamespace)
 				if err := r.Get(ctx, envoyProxyTemplateNameObject, envoyProxyTemplate); err != nil {
@@ -126,12 +129,13 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 				}
 				log.Info("EnvoyProxyTemplate instance found", "Name", envoyProxyTemplate.Name)
 				labels["kode-envoy-proxy-template.jacero.io/name"] = envoyProxyTemplate.Name
-				sharedEnvoyProxyTemplateSpec = envoyProxyTemplate.Spec.SharedEnvoyProxyTemplateSpec
+				sharedEnvoyProxyTemplateSpec = envoyProxyTemplate.Spec.EnvoyProxyConfigSpec
 			}
 		} else if kode.Spec.TemplateRef.Kind == "ClusterKodeTemplate" {
 			clusterKodeTemplate := &kodev1alpha1.ClusterKodeTemplate{}
 			clusterKodeTemplateName := kode.Spec.TemplateRef.Name
 			clusterKodeTemplateNameObject := client.ObjectKey{Name: clusterKodeTemplateName}
+			
 			log.Info("Fetching ClusterKodeTemplate instance", "Name", clusterKodeTemplateName)
 			if err := r.Get(ctx, clusterKodeTemplateNameObject, clusterKodeTemplate); err != nil {
 				if errors.IsNotFound(err) {
@@ -160,7 +164,7 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 				}
 				log.Info("EnvoyProxyTemplate instance found", "Name", clusterEnvoyProxyTemplate.Name)
 				labels["kode-envoy-proxy-template.jacero.io/name"] = clusterEnvoyProxyTemplate.Name
-				sharedEnvoyProxyTemplateSpec = clusterEnvoyProxyTemplate.Spec.SharedEnvoyProxyTemplateSpec
+				sharedEnvoyProxyTemplateSpec = clusterEnvoyProxyTemplate.Spec.EnvoyProxyConfigSpec
 			}
 		}
 	}

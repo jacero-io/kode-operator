@@ -17,27 +17,43 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"k8s.io/apimachinery/pkg/runtime"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
-// TypedConfig represents the typed configuration for an Envoy filter
-type TypedConfig struct {
-	// Type is the type of the configuration
-	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:Description=Type of the configuration
-	// +kubebuilder:validation:Required
-	Type string `json:"@type"`
+// // ExtAuthFilter represents an individual HTTP filter configuration
+// type ExtAuthFilter struct {
+// 	// Name is the name of the HTTP filter
+// 	// +kubebuilder:validation:Description=Name of the HTTP filter
+// 	// +kubebuilder:validation:MinLength=1
+// 	// +kubebuilder:validation:Required
+// 	Name string `json:"name"`
 
-	// Config is the configuration for the filter
-	// +kubebuilder:validation:Description=Configuration for the filter
-	Config runtime.RawExtension `json:"config,omitempty"`
-}
+// 	// TypedConfig is the typed configuration for the HTTP filter
+// 	// It is intentionally the same as the Envoy filter's typed_config field to make it easier to copy-paste
+// 	// +kubebuilder:validation:Description=Typed configuration for the HTTP filter. It is intentionally the same as the Envoy filter's typed_config field to make it easier to copy-paste
+// 	// +kubebuilder:validation:Required
+// 	TypedConfig envoy_filter_ext_auth_v3.ExtAuthz `json:"typed_config"`
+// }
+
+// type RouterFilter struct {
+// 	// Name is the name of the HTTP filter
+// 	// +kubebuilder:validation:Description=Name of the HTTP filter
+// 	// +kubebuilder:validation:MinLength=1
+// 	// +kubebuilder:validation:Required
+// 	Name string `json:"name"`
+
+// 	// TypedConfig is the typed configuration for the HTTP filter
+// 	// It is intentionally the same as the Envoy filter's typed_config field to make it easier to copy-paste
+// 	// +kubebuilder:validation:Description=Typed configuration for the HTTP filter. It is intentionally the same as the Envoy filter's typed_config field to make it easier to copy-paste
+// 	// +kubebuilder:validation:Required
+// 	TypedConfig envoy_filter_router_v3.Router `json:"typed_config"`
+// }
 
 // HTTPFilter represents an individual HTTP filter configuration
 type HTTPFilter struct {
 	// Name is the name of the HTTP filter
-	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:Description=Name of the HTTP filter
+	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
@@ -45,5 +61,5 @@ type HTTPFilter struct {
 	// It is intentionally the same as the Envoy filter's typed_config field to make it easier to copy-paste
 	// +kubebuilder:validation:Description=Typed configuration for the HTTP filter. It is intentionally the same as the Envoy filter's typed_config field to make it easier to copy-paste
 	// +kubebuilder:validation:Required
-	TypedConfig TypedConfig `json:"typed_config"`
+	TypedConfig runtime.RawExtension `json:"typed_config"`
 }

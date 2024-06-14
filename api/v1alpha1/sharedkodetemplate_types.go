@@ -25,7 +25,7 @@ import (
 type SharedKodeTemplateSpec struct {
 	// EnvoyProxyTemplateRef is the reference to the EnvoyProxy configuration
 	// +kubebuilder:validation:Description="Reference to the EnvoyProxy configuration."
-	EnvoyProxyTemplateRef EnvoyProxyTemplateReference `json:"envoyProxyTemplateRef,omitempty"`
+	EnvoyProxyTemplateRef EnvoyProxyReference `json:"envoyProxyTemplateRef,omitempty"`
 
 	// Type is the type of container to use. Can be one of 'code-server', 'webtop', 'devcontainers', 'jupyter', 'alnoda'.
 	// +kubebuilder:validation:Description="Type of container to use. Can be one of 'code-server', 'webtop', 'devcontainers', 'jupyter', 'alnoda'."
