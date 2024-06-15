@@ -144,49 +144,7 @@ kubectl apply -f code-server-template.yaml
 kubectl apply -f my-code-server.yaml
 ```
 
-### Scenario 2: Deploying Jupyter Notebooks
-
-You need to provide Jupyter Notebooks for your data science team to perform data analysis and research.
-
-**1. Create a KodeTemplate for Jupyter:**
-
-```yaml
-apiVersion: v1alpha1
-kind: KodeTemplate
-metadata:
-  name: jupyter-template
-spec:
-  type: jupyter
-  image: jupyter/base-notebook:latest
-  port: 8888
-  defaultHome: /home/jovyan
-  defaultWorkspace: notebooks
-```
-
-**2. Create a Kode Instance Using the Template:**
-
-```yaml
-apiVersion: v1alpha1
-kind: Kode
-metadata:
-  name: my-jupyter
-spec:
-  templateRef:
-    kind: KodeTemplate
-    name: jupyter-template
-  user: datascientist
-  password: securepassword
-  workspace: data-analysis
-```
-
-**3. Apply the Configuration:**
-
-```yaml
-kubectl apply -f jupyter-template.yaml
-kubectl apply -f my-jupyter.yaml
-```
-
-### Scenario 3: Using Envoy Proxy for Authentication
+### Scenario 2: Using Envoy Proxy for Authentication
 
 You want to secure your Code-server environment using Envoy Proxy with Basic Auth.
 
@@ -199,7 +157,7 @@ metadata:
   name: basic-auth-proxy
 spec:
   auth:
-    type: basic
+    type: basic-auth
 ```
 
 **2. Create a KodeTemplate with Envoy Proxy Configuration:**
@@ -212,7 +170,6 @@ metadata:
 spec:
   type: code-server
   image: linuxserver/code-server:latest
-  port: 3000
   envoyProxyTemplateRef:
     name: basic-auth-proxy
   defaultHome: /config
