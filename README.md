@@ -54,10 +54,7 @@ metadata:
 spec:
   type: code-server
   image: linuxserver/code-server:latest
-  port: 3000
   tz: UTC
-  puid: 1000
-  pgid: 1000
   defaultHome: /config
   defaultWorkspace: workspace
   envoyProxyTemplateRef:
@@ -70,14 +67,11 @@ spec:
 apiVersion: kode.jacero.io/v1alpha1
 kind: KodeClusterTemplate
 metadata:
-  name: my-cluster-kode-template
+  name: my-kode-cluster-template
 spec:
   type: webtop
   image: linuxserver/webtop:ubuntu-mate
-  port: 3000
   tz: UTC
-  puid: 1000
-  pgid: 1000
   defaultHome: /config
   defaultWorkspace: workspace
   envoyProxyTemplateRef:

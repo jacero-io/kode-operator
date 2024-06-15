@@ -29,6 +29,12 @@ import (
 // TODO: If the KodeClusterTemplate is deleted, DO NOT delete the Kode instance
 // TODO: If the EnvoyProxyConfig is deleted, DO NOT delete the Kode instance
 // TODO: If the EnvoyProxyClusterConfig is deleted, DO NOT delete the Kode instance
+// TODO: If EnvoyProxyConfig is not found, create kode without envoy proxy.
+// TODO: If EnvoyProxyClusterConfig is not found, create kode without envoy proxy.
+// TODO: If EnvoyProxyConfig is found, create kode with envoy proxy.
+// TODO: If EnvoyProxyClusterConfig is not found, create kode with envoy proxy.
+// TODO: If Kodetemplate is not found, return error.
+// TODO: If KodeClusterTemplate is not found, return error.
 
 // TODO: Make sure that the port number that is specified in the KodeTemplate or KodeClusterTemplate is applied everywhere it is needed
 
