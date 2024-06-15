@@ -23,8 +23,3 @@ spec:
     - name: envoy.filters.http.router
       typed_config:
         '@type': type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
-  clusters:
-    - name: example-cluster
-      type: STATIC
-      connect_timeout: "5s"
-      lb_policy: ROUND_ROBIN

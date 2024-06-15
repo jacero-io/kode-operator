@@ -30,22 +30,6 @@ resources:
     namespaced: true
   domain: jacero.io
   group: kode
-  kind: CodeServerTemplate
-  path: github.com/emil-jacero/kode-operator/api/v1alpha1
-  version: v1alpha1
-- api:
-    crdVersion: v1
-    namespaced: true
-  domain: jacero.io
-  group: kode
-  kind: WebtopTemplate
-  path: github.com/emil-jacero/kode-operator/api/v1alpha1
-  version: v1alpha1
-- api:
-    crdVersion: v1
-    namespaced: true
-  domain: jacero.io
-  group: kode
   kind: KodeTemplate
   path: github.com/emil-jacero/kode-operator/api/v1alpha1
   version: v1alpha1
