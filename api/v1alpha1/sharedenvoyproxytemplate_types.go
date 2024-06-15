@@ -28,16 +28,28 @@ type SocketAddress struct {
 	PortValue int `json:"port_value"`
 }
 
-type Endpoints struct {
+type Address struct {
+	// SocketAddress is the socket address
+	// +kubebuilder:validation:Required
+	SocketAddress SocketAddress `json:"socket_address"`
+}
+
+type Endpoint struct {
 	// Address is the address of the load balancer endpoint
 	// +kubebuilder:validation:Required
-	Address string `json:"address"`
+	Address Address `json:"address"`
 }
 
 type LbEndpoints struct {
+	// Endpoints is a list of endpoints
+	// +kubebuilder:validation:Required
+	Endpoint []Endpoint `json:"endpoint"`
+}
+
+type Endpoints struct {
 	// LbEndpoints is a list of load balancer endpoints
 	// +kubebuilder:validation:Required
-	En []Endpoints `json:"lb_endpoints"`
+	LbEndpoints []LbEndpoints `json:"lb_endpoints"`
 }
 
 type LoadAssignment struct {
@@ -48,7 +60,7 @@ type LoadAssignment struct {
 
 	// Endpoints is a list of endpoints
 	// +kubebuilder:validation:Required
-	Endpoints []LbEndpoints `json:"lb_endpoints"`
+	Endpoints []Endpoints `json:"endpoints"`
 }
 
 type Cluster struct {
@@ -78,7 +90,7 @@ type Cluster struct {
 
 	// LoadAssignment is the load assignment for the cluster
 	// +kubebuilder:validation:Required
-	LoadAssignment LoadAssignment `json:"load_assignment"`
+	//LoadAssignment LoadAssignment `json:"load_assignment"`
 }
 
 // Spec for the EnvoyProxyConfig.
@@ -91,11 +103,11 @@ type EnvoyProxyConfigSpec struct {
 
 	// HTTPFilters is a list of Envoy HTTP filters to be applied
 	// +kubebuilder:validation:Description="HTTP filters to be applied"
-    HTTPFilters []HTTPFilter `json:"filters"`
+	HTTPFilters []HTTPFilter `json:"filters"`
 
 	// Clusters is a list of Envoy clusters
 	// +kubebuilder:validation:Description="Envoy clusters"
-	Clusters []Cluster `json:"clusters"`
+	Clusters []Cluster `json:"clusters,omitempty"`
 }
 
 // EnvoyProxyStatus defines the observed state of EnvoyProxy

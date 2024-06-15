@@ -132,7 +132,7 @@ func constructEnvoyProxyContainer(log *logr.Logger,
 
 	// ContainerPort := templateSpec.Spec.Port
 	config, err := GetRenderedBootstrapConfig(log, GetRenderedBootstrapConfigOptions{
-		CueFiles:    []string{"internal/controller/bootstrap.cue"},
+		CueFiles:    []string{"internal/controller/bootstrap.cue", "internal/controller/bootstrap_schema.cue"},
 		HTTPFilters: sharedEnvoyProxyTemplateSpec.HTTPFilters,
 	})
 	if err != nil {

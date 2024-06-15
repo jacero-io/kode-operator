@@ -135,7 +135,7 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 			clusterKodeTemplate := &kodev1alpha1.ClusterKodeTemplate{}
 			clusterKodeTemplateName := kode.Spec.TemplateRef.Name
 			clusterKodeTemplateNameObject := client.ObjectKey{Name: clusterKodeTemplateName}
-			
+
 			log.Info("Fetching ClusterKodeTemplate instance", "Name", clusterKodeTemplateName)
 			if err := r.Get(ctx, clusterKodeTemplateNameObject, clusterKodeTemplate); err != nil {
 				if errors.IsNotFound(err) {
