@@ -1,19 +1,3 @@
-/*
-Copyright 2024.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package controller
 
 import (
@@ -25,6 +9,7 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -36,6 +21,23 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+// TODO: If the KodeTemplate is updated, force a reconcile of the Kode instance
+// TODO: If the KodeClusterTemplate is updated, force a reconcile of the Kode instance
+// TODO: If the EnvoyProxyConfig is updated, force a reconcile of the Kode instance
+// TODO: If the EnvoyProxyClusterConfig is updated, force a reconcile of the Kode instance
+// TODO: If the KodeTemplate is deleted, DO NOT delete the Kode instance
+// TODO: If the KodeClusterTemplate is deleted, DO NOT delete the Kode instance
+// TODO: If the EnvoyProxyConfig is deleted, DO NOT delete the Kode instance
+// TODO: If the EnvoyProxyClusterConfig is deleted, DO NOT delete the Kode instance
+// TODO: If EnvoyProxyConfig is not found, create kode without envoy proxy.
+// TODO: If EnvoyProxyClusterConfig is not found, create kode without envoy proxy.
+// TODO: If EnvoyProxyConfig is found, create kode with envoy proxy.
+// TODO: If EnvoyProxyClusterConfig is not found, create kode with envoy proxy.
+// TODO: If Kodetemplate is not found, return error.
+// TODO: If KodeClusterTemplate is not found, return error.
+
+// TODO: Make sure that the port number that is specified in the KodeTemplate or KodeClusterTemplate is applied everywhere it is needed
+
 var _ = Describe("Kode Controller", func() {
 	var (
 		ctx        context.Context
@@ -45,6 +47,15 @@ var _ = Describe("Kode Controller", func() {
 		k8sManager ctrl.Manager
 		reconciler *KodeReconciler
 	)
+
+	var RouterFilter = kodev1alpha1.HTTPFilter{
+		Name: "envoy.filters.http.router",
+		TypedConfig: runtime.RawExtension{
+			Raw: []byte(`{
+				"@type": "type.googleapis.com/envoy.extensions.filters.http.router.v3.Router"
+			}`),
+		},
+	}
 
 	BeforeEach(func() {
 		By("bootstrapping test environment")
@@ -109,12 +120,70 @@ var _ = Describe("Kode Controller", func() {
 					Namespace: resourceNamespace,
 				},
 				Spec: kodev1alpha1.KodeSpec{
-					Image:       "lscr.io/linuxserver/code-server:latest",
-					ServicePort: 8443,
-					Password:    "password",
+					TemplateRef: kodev1alpha1.KodeTemplateReference{
+						Kind: "KodeTemplate",
+						Name: "test-kodetemplate",
+					},
+					Storage: kodev1alpha1.KodeStorageSpec{
+						AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+						Resources: corev1.VolumeResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceStorage: resource.MustParse("1Gi"),
+							},
+						},
+					},
 				},
 			}
 			err := k8sClient.Create(ctx, kode)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("creating the custom resource for the Kind KodeTemplate")
+			kodeTemplate := &kodev1alpha1.KodeTemplate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-kodetemplate",
+				},
+				Spec: kodev1alpha1.KodeTemplateSpec{
+					SharedKodeTemplateSpec: kodev1alpha1.SharedKodeTemplateSpec{
+						Image: "lscr.io/linuxserver/code-server:latest",
+						Port:  3000,
+						EnvoyProxyRef: kodev1alpha1.EnvoyProxyReference{
+							Kind: "EnvoyProxyConfig",
+							Name: "test-envoyproxytemplate",
+						},
+					},
+				},
+			}
+			err = k8sClient.Create(ctx, kodeTemplate)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("creating the custom resource for the Kind EnvoyProxyConfig")
+			envoyProxyConfig := &kodev1alpha1.EnvoyProxyConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-envoyproxytemplate",
+				},
+				Spec: kodev1alpha1.EnvoyProxyConfigSpec{
+					SharedEnvoyProxyConfigSpec: kodev1alpha1.SharedEnvoyProxyConfigSpec{
+						Image:       "envoyproxy/envoy:v1.30-latest",
+						HTTPFilters: []kodev1alpha1.HTTPFilter{RouterFilter},
+					},
+				},
+			}
+			err = k8sClient.Create(ctx, envoyProxyConfig)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("creating the custom resource for the Kind EnvoyProxyClusterConfig")
+			clusterEnvoyProxyTemplate := &kodev1alpha1.EnvoyProxyClusterConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "test-clusterenvoyproxytemplate",
+				},
+				Spec: kodev1alpha1.EnvoyProxyClusterConfigSpec{
+					SharedEnvoyProxyConfigSpec: kodev1alpha1.SharedEnvoyProxyConfigSpec{
+						Image:       "envoyproxy/envoy:v1.30-latest",
+						HTTPFilters: []kodev1alpha1.HTTPFilter{RouterFilter},
+					},
+				},
+			}
+			err = k8sClient.Create(ctx, clusterEnvoyProxyTemplate)
 			Expect(err).NotTo(HaveOccurred())
 		})
 
@@ -125,6 +194,20 @@ var _ = Describe("Kode Controller", func() {
 			Expect(err).NotTo(HaveOccurred())
 
 			Expect(k8sClient.Delete(ctx, kode)).To(Succeed())
+
+			By("deleting the custom resource for the Kind KodeTemplate")
+			kodeTemplate := &kodev1alpha1.KodeTemplate{}
+			err = k8sClient.Get(ctx, types.NamespacedName{Name: "test-kodetemplate"}, kodeTemplate)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(k8sClient.Delete(ctx, kodeTemplate)).To(Succeed())
+
+			By("deleting the custom resource for the Kind EnvoyProxyConfig")
+			envoyProxyConfig := &kodev1alpha1.EnvoyProxyConfig{}
+			err = k8sClient.Get(ctx, types.NamespacedName{Name: "test-envoyproxytemplate"}, envoyProxyConfig)
+			Expect(err).NotTo(HaveOccurred())
+
+			Expect(k8sClient.Delete(ctx, envoyProxyConfig)).To(Succeed())
 		})
 
 		It("should create a Deployment for the Kode resource", func() {
@@ -152,27 +235,10 @@ var _ = Describe("Kode Controller", func() {
 				return true
 			}, time.Second*10, time.Millisecond*250).Should(BeTrue())
 
-			Expect(service.Spec.Ports[0].Port).To(Equal(int32(8443)))
+			Expect(service.Spec.Ports[0].Port).To(Equal(int32(3000)))
 		})
 
 		It("should create a PersistentVolumeClaim for the Kode resource if storage is defined", func() {
-			By("updating the Kode resource to include storage")
-			kode := &kodev1alpha1.Kode{}
-			err := k8sClient.Get(ctx, typeNamespacedName, kode)
-			Expect(err).NotTo(HaveOccurred())
-
-			kode.Spec.Storage = kodev1alpha1.KodeStorageSpec{
-				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-				Resources: corev1.VolumeResourceRequirements{
-					Requests: corev1.ResourceList{
-						corev1.ResourceStorage: resource.MustParse("1Gi"),
-					},
-				},
-			}
-
-			err = k8sClient.Update(ctx, kode)
-			Expect(err).NotTo(HaveOccurred())
-
 			By("checking if the PersistentVolumeClaim has been created")
 			pvc := &corev1.PersistentVolumeClaim{}
 			Eventually(func() bool {
@@ -216,63 +282,6 @@ var _ = Describe("Kode Controller", func() {
 			}, time.Second*10, time.Millisecond*250).Should(BeTrue())
 		})
 
-		// It("should not update immutable fields of the PersistentVolumeClaim", func() {
-		// 	By("creating the Kode resource with initial storage specification")
-		// 	kode := &kodev1alpha1.Kode{}
-		// 	err := k8sClient.Get(ctx, typeNamespacedName, kode)
-		// 	Expect(err).NotTo(HaveOccurred())
-
-		// 	kode.Spec.Storage = kodev1alpha1.KodeStorageSpec{
-		// 		AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-		// 		Resources: corev1.VolumeResourceRequirements{
-		// 			Requests: corev1.ResourceList{
-		// 				corev1.ResourceStorage: resource.MustParse("1Gi"),
-		// 			},
-		// 		},
-		// 		StorageClassName: stringPtr("standard"),
-		// 	}
-
-		// 	err = k8sClient.Update(ctx, kode)
-		// 	Expect(err).NotTo(HaveOccurred())
-
-		// 	By("checking if the PersistentVolumeClaim has been created")
-		// 	pvc := &corev1.PersistentVolumeClaim{}
-		// 	Eventually(func() bool {
-		// 		err := k8sClient.Get(ctx, types.NamespacedName{Name: resourceName + "-pvc", Namespace: resourceNamespace}, pvc)
-		// 		if err != nil {
-		// 			return false
-		// 		}
-		// 		return true
-		// 	}, time.Second*10, time.Millisecond*250).Should(BeTrue())
-
-		// 	Expect(pvc.Spec.AccessModes).To(ContainElement(corev1.ReadWriteOnce))
-		// 	Expect(pvc.Spec.Resources.Requests[corev1.ResourceStorage]).To(Equal(resource.MustParse("1Gi")))
-		// 	Expect(*pvc.Spec.StorageClassName).To(Equal("standard"))
-
-		// 	By("updating the Kode resource to change an immutable field of the PVC")
-		// 	kode.Spec.Storage = kodev1alpha1.KodeStorageSpec{
-		// 		AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteMany}, // Immutable field change
-		// 		Resources: corev1.VolumeResourceRequirements{
-		// 			Requests: corev1.ResourceList{
-		// 				corev1.ResourceStorage: resource.MustParse("1Gi"),
-		// 			},
-		// 		},
-		// 		StorageClassName: stringPtr("standard"),
-		// 	}
-
-		// 	err = k8sClient.Update(ctx, kode)
-		// 	Expect(err).NotTo(HaveOccurred())
-
-		// 	By("checking if the PersistentVolumeClaim has not been updated with the immutable field change")
-		// 	Eventually(func() bool {
-		// 		err := k8sClient.Get(ctx, types.NamespacedName{Name: resourceName + "-pvc", Namespace: resourceNamespace}, pvc)
-		// 		if err != nil {
-		// 			return false
-		// 		}
-		// 		return pvc.Spec.AccessModes[0] == corev1.ReadWriteOnce // Should remain unchanged
-		// 	}, time.Second*10, time.Millisecond*250).Should(BeTrue())
-		// })
-
 		It("should handle missing required fields gracefully", func() {
 			By("creating the custom resource with missing required fields")
 			invalidKode := &kodev1alpha1.Kode{
@@ -281,7 +290,10 @@ var _ = Describe("Kode Controller", func() {
 					Namespace: resourceNamespace,
 				},
 				Spec: kodev1alpha1.KodeSpec{
-					Image: "lscr.io/linuxserver/code-server:latest",
+					TemplateRef: kodev1alpha1.KodeTemplateReference{
+						Kind: "KodeTemplate",
+						Name: "missing-template",
+					},
 				},
 			}
 			err := k8sClient.Create(ctx, invalidKode)
@@ -296,12 +308,28 @@ var _ = Describe("Kode Controller", func() {
 					Namespace: resourceNamespace,
 				},
 				Spec: kodev1alpha1.KodeSpec{
-					Image:       "invalid-image-name",
-					ServicePort: 8443,
-					Password:    "password",
+					TemplateRef: kodev1alpha1.KodeTemplateReference{
+						Kind: "KodeTemplate",
+						Name: "invalid-image-template",
+					},
 				},
 			}
 			err := k8sClient.Create(ctx, invalidImageKode)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("creating the KodeTemplate with an invalid image name")
+			invalidImageKodeTemplate := &kodev1alpha1.KodeTemplate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "invalid-image-template",
+				},
+				Spec: kodev1alpha1.KodeTemplateSpec{
+					SharedKodeTemplateSpec: kodev1alpha1.SharedKodeTemplateSpec{
+						Image: "invalid-image-name",
+						Port:  3000,
+					},
+				},
+			}
+			err = k8sClient.Create(ctx, invalidImageKodeTemplate)
 			Expect(err).NotTo(HaveOccurred())
 
 			By("checking if the Deployment has been created")
@@ -322,9 +350,10 @@ var _ = Describe("Kode Controller", func() {
 					Namespace: resourceNamespace,
 				},
 				Spec: kodev1alpha1.KodeSpec{
-					Image:       "lscr.io/linuxserver/code-server:latest",
-					ServicePort: -1,
-					Password:    "password",
+					TemplateRef: kodev1alpha1.KodeTemplateReference{
+						Kind: "KodeTemplate",
+						Name: "invalid-port-template",
+					},
 				},
 			}
 			err := k8sClient.Create(ctx, invalidPortKode)
@@ -332,7 +361,3 @@ var _ = Describe("Kode Controller", func() {
 		})
 	})
 })
-
-func stringPtr(s string) *string {
-	return &s
-}

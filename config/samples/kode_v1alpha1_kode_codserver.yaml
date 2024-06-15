@@ -1,0 +1,21 @@
+---
+apiVersion: kode.jacero.io/v1alpha1
+kind: Kode
+metadata:
+  labels:
+    app.kubernetes.io/name: kode-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: kode-codeserver-sample
+spec:
+  templateRef:
+    kind: KodeClusterTemplate
+    name: kodeclustertemplate-codeserver-sample
+  user: user1
+  password: password1
+  # storage:
+  #   accessModes:
+  #     - ReadWriteOnce
+  #   resources:
+  #     requests:
+  #       storage: 1Gi
+  #   storageClassName: standard

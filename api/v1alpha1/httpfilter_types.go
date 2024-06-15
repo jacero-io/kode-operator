@@ -16,47 +16,50 @@ limitations under the License.
 
 package v1alpha1
 
-// TypedConfig represents the typed configuration for an Envoy filter
-type TypedConfig struct {
-	Type                string         `json:"@type"`
-	TransportAPIVersion string       `json:"transport_api_version,omitempty"`
-	HTTPService         *HTTPService  `json:"http_service,omitempty"`
-	WithRequestBody     *WithRequestBody `json:"with_request_body,omitempty"`
-	FailureModeAllow    *bool         `json:"failure_mode_allow,omitempty"`
-	GRPCService         *GRPCService  `json:"grpc_service,omitempty"`
-}
+import (
+	runtime "k8s.io/apimachinery/pkg/runtime"
+)
 
-// HTTPService represents the HTTP service configuration
-type HTTPService struct {
-	ServerURI ServerURI `json:"server_uri"`
-}
+// // ExtAuthFilter represents an individual HTTP filter configuration
+// type ExtAuthFilter struct {
+// 	// Name is the name of the HTTP filter
+// 	// +kubebuilder:validation:Description=Name of the HTTP filter
+// 	// +kubebuilder:validation:MinLength=1
+// 	// +kubebuilder:validation:Required
+// 	Name string `json:"name"`
 
-// ServerURI represents the server URI configuration
-type ServerURI struct {
-	URI     string `json:"uri"`
-	Cluster string `json:"cluster"`
-	Timeout string `json:"timeout"`
-}
+// 	// TypedConfig is the typed configuration for the HTTP filter
+// 	// It is intentionally the same as the Envoy filter's typed_config field to make it easier to copy-paste
+// 	// +kubebuilder:validation:Description=Typed configuration for the HTTP filter. It is intentionally the same as the Envoy filter's typed_config field to make it easier to copy-paste
+// 	// +kubebuilder:validation:Required
+// 	TypedConfig envoy_filter_ext_auth_v3.ExtAuthz `json:"typed_config"`
+// }
 
-// WithRequestBody represents the request body configuration
-type WithRequestBody struct {
-	MaxRequestBytes     int  `json:"max_request_bytes"`
-	AllowPartialMessage bool `json:"allow_partial_message"`
-}
+// type RouterFilter struct {
+// 	// Name is the name of the HTTP filter
+// 	// +kubebuilder:validation:Description=Name of the HTTP filter
+// 	// +kubebuilder:validation:MinLength=1
+// 	// +kubebuilder:validation:Required
+// 	Name string `json:"name"`
 
-// GRPCService represents the gRPC service configuration
-type GRPCService struct {
-	EnvoyGRPC EnvoyGRPC `json:"envoy_grpc"`
-	Timeout   string    `json:"timeout"`
-}
-
-// EnvoyGRPC represents the Envoy gRPC configuration
-type EnvoyGRPC struct {
-	ClusterName string `json:"cluster_name"`
-}
+// 	// TypedConfig is the typed configuration for the HTTP filter
+// 	// It is intentionally the same as the Envoy filter's typed_config field to make it easier to copy-paste
+// 	// +kubebuilder:validation:Description=Typed configuration for the HTTP filter. It is intentionally the same as the Envoy filter's typed_config field to make it easier to copy-paste
+// 	// +kubebuilder:validation:Required
+// 	TypedConfig envoy_filter_router_v3.Router `json:"typed_config"`
+// }
 
 // HTTPFilter represents an individual HTTP filter configuration
 type HTTPFilter struct {
-	Name        string      `json:"name"`
-	TypedConfig TypedConfig `json:"typed_config"`
+	// Name is the name of the HTTP filter
+	// +kubebuilder:validation:Description=Name of the HTTP filter
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// TypedConfig is the typed configuration for the HTTP filter
+	// It is intentionally the same as the Envoy filter's typed_config field to make it easier to copy-paste
+	// +kubebuilder:validation:Description=Typed configuration for the HTTP filter. It is intentionally the same as the Envoy filter's typed_config field to make it easier to copy-paste
+	// +kubebuilder:validation:Required
+	TypedConfig runtime.RawExtension `json:"typed_config"`
 }

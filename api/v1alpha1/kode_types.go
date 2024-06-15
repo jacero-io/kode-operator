@@ -21,72 +21,75 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// KodeSpec defines the desired state of Kode
-type KodeSpec struct {
-	// Image is the Docker image for code-server
+type KodeTemplateReference struct {
+	// Kind is the resource kind
+	// +kubebuilder:validation:Description="Resource kind"
+	// +kubebuilder:validation:Enum=KodeTemplate;KodeClusterTemplate
+	Kind string `json:"kind"`
+
+	// Name is the name of the KodeTemplate
+	// +kubebuilder:validation:Description="Name of the KodeTemplate"
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:Required
-	// +kubebuilder:default="lscr.io/linuxserver/code-server:latest"
-	Image string `json:"image"`
+	Name string `json:"name"`
 
-	// TZ is the timezone for the code-server process
-	// +kubebuilder:default="Europe/Stocholm"
-	TZ string `json:"tz,omitempty"`
-
-	// PUID is the user ID for the code-server process
-	// +kubebuilder:default=1000
-	PUID int64 `json:"puid,omitempty"`
-
-	// PGID is the group ID for the code-server process
-	// +kubebuilder:default=1000
-	PGID int64 `json:"pgid,omitempty"`
-
-	// URL specifies the url for used to access the code-server
-	URL string `json:"url,omitempty" protobuf:"bytes,7,opt,name=url"`
-
-	// ServicePort is the port for the code-server service
-	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:default=8443
-	ServicePort int32 `json:"servicePort,omitempty"`
-
-	// EnvoyProxyRef is an optional reference to an EnvoyProxy configuration
-	EnvoyProxyRef *corev1.LocalObjectReference `json:"envoyProxyRef,omitempty"`
-
-	// Specifies the envs
-	Envs []string `json:"envs,omitempty" protobuf:"bytes,9,opt,name=envs"`
-
-	// Specifies the envs
-	Args []string `json:"args,omitempty" protobuf:"bytes,10,opt,name=args"`
-
-	// Password is the password for code-server
+	// Namespace is the namespace of the KodeTemplate
+	// +kubebuilder:validation:Description="Namespace of the KodeTemplate"
 	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:Required
-	Password string `json:"password"`
-
-	// HashedPassword is the hashed password for code-server
-	HashedPassword string `json:"hashedPassword,omitempty"`
-
-	// SudoPassword is the sudo password for code-server
-	SudoPassword string `json:"sudoPassword,omitempty"`
-
-	// SudoPasswordHash is the hashed sudo password for code-server
-	SudoPasswordHash string `json:"sudoPasswordHash,omitempty"`
-
-	// ConfigPath is the path to the config directory for code-server
-	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default=/config
-	ConfigPath string `json:"configPath,omitempty"`
-
-	// DefaultWorkspace is the default workspace directory for code-server (eg. /config/workspace)
-	// +kubebuilder:validation:MinLength=1
-	DefaultWorkspace string `json:"defaultWorkspace,omitempty"`
-
-	// Storage specifies the storage configuration for code-server
-	Storage KodeStorageSpec `json:"storage,omitempty"`
+	Namespace string `json:"namespace,omitempty"`
 }
 
-// KodeStorageSpec defines the storage configuration for code-server
+// KodeSpec defines the desired state of Kode
+type KodeSpec struct {
+	// TemplateRef is the reference to the KodeTemplate configuration
+	// +kubebuilder:validation:Description="Reference to the KodeTemplate configuration."
+	// +kubebuilder:validation:Required
+	TemplateRef KodeTemplateReference `json:"templateRef"`
+
+	// User is the HTTP Basic auth username or the user the container should run as, abc is default.
+	// +kubebuilder:validation:Description="User is the HTTP Basic auth username or the user the container should run as. Defaults to 'abc'."
+	// +kubebuilder:default="abc"
+	User string `json:"user,omitempty"`
+
+	// Password HTTP Basic auth password. If unset there will be no auth
+	// +kubebuilder:validation:Description="HTTP Basic auth password. If unset, there will be no authentication."
+	Password string `json:"password,omitempty"`
+
+	// ExistingSecret is a reference to an existing secret containing user and password.
+	// +kubebuilder:validation:Description="ExistingSecret is a reference to an existing secret containing user and password. If set, User and Password fields are ignored."
+	ExistingSecret string `json:"existingSecret,omitempty"`
+
+	// Home is the path to the directory for the user data
+	// +kubebuilder:validation:Description="Home is the path to the directory for the user data. Defaults to '/config'."
+	// +kubebuilder:validation:MinLength=3
+	// +kubebuilder:default=/config
+	Home string `json:"home,omitempty"`
+
+	// Workspace is the user specified workspace directory (e.g. my-workspace)
+	// +kubebuilder:validation:Description="User specified workspace directory (e.g. my-workspace)."
+	// +kubebuilder:validation:MinLength=3
+	// +kubebuilder:validation:Pattern="^[^/].*$"
+	Workspace string `json:"workspace,omitempty"`
+
+	// Storage specifies the storage configuration
+	// +kubebuilder:validation:Description="Storage configuration."
+	Storage KodeStorageSpec `json:"storage,omitempty"`
+
+	// UserConfig specifies a git repository URL to get user configuration from
+	// +kubebuilder:validation:Description="Git repository URL to get user configuration from."
+	UserConfig string `json:"userConfig,omitempty"`
+
+	// Privileged specifies if the container should run in privileged mode. Only set to true if you know what you are doing.
+	// +kubebuilder:validation:Description="Specifies if the container should run in privileged mode. Only set to true if you know what you are doing."
+	// +kubebuilder:default=false
+	Privileged *bool `json:"privileged,omitempty"`
+
+	// InitPlugins specifies the plugins to be installed on the first start
+	// +kubebuilder:validation:Description="Plugins to be installed on the first start."
+	InitPlugins map[string][]string `json:"initPlugins,omitempty"`
+}
+
+// KodeStorageSpec defines the storage configuration
 type KodeStorageSpec struct {
 	// AccessModes specifies the access modes for the persistent volume
 	AccessModes []corev1.PersistentVolumeAccessMode `json:"accessModes,omitempty"`
@@ -96,29 +99,24 @@ type KodeStorageSpec struct {
 
 	// Resources specifies the resource requirements for the persistent volume
 	Resources corev1.VolumeResourceRequirements `json:"resources,omitempty"`
-
-	// HostPath specifies the host path for the persistent volume
-	HostPath *corev1.HostPathVolumeSource `json:"hostPath,omitempty"`
 }
 
-// KodeConditionType describes the type of state of code server condition
-type KodeConditionType string
+type ConditionType string
 
 const (
-	// ServerCreated means the code server has been accepted by the system.
-	ServerCreated KodeConditionType = "ServerCreated"
-	// ServerReady means the code server has been ready for usage.
-	ServerReady KodeConditionType = "ServerReady"
-	// ServerRecycled means the code server has been recycled totally.
-	ServerRecycled KodeConditionType = "ServerRecycled"
-	// ServerInactive means the code server will be marked inactive if `InactiveAfterSeconds` elapsed
-	ServerInactive KodeConditionType = "ServerInactive"
+	// Created means the code server has been accepted by the system.
+	Created ConditionType = "Created"
+	// Ready means the code server has been ready for usage.
+	Ready ConditionType = "Ready"
+	// Recycled means the code server has been recycled totally.
+	Recycled ConditionType = "Recycled"
+	// Inactive means the code server will be marked inactive if `InactiveAfterSeconds` elapsed
+	Inactive ConditionType = "Inactive"
 )
 
-// ServerCondition describes the state of the code server at a certain point.
-type KodeCondition struct {
+type Condition struct {
 	// Type of code server condition.
-	Type KodeConditionType `json:"type"`
+	Type ConditionType `json:"type"`
 	// Status of the condition, one of True, False, Unknown.
 	Status corev1.ConditionStatus `json:"status"`
 	// The reason for the condition's last transition.
@@ -133,8 +131,7 @@ type KodeCondition struct {
 
 // KodeStatus defines the observed state of Kode
 type KodeStatus struct {
-	// +kubebuilder:validation:Minimum=0
-	AvailableReplicas int32 `json:"availableReplicas"`
+	Conditions []Condition `json:"conditions,omitempty" protobuf:"bytes,1,opt,name=conditions"`
 }
 
 //+kubebuilder:object:root=true

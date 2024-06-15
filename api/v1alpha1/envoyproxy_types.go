@@ -16,63 +16,80 @@ limitations under the License.
 
 package v1alpha1
 
-import (
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-)
+import runtime "k8s.io/apimachinery/pkg/runtime"
 
-// EnvoyProxySpec defines the desired state of EnvoyProxy
-type EnvoyProxySpec struct {
-	// Image is the Docker image for the Envoy proxy
+type SocketAddress struct {
+	// Address is the address of the socket
+	// +kubebuilder:validation:Required
+	Address string `json:"address"`
+
+	// PortValue is the port of the socket
+	// +kubebuilder:validation:Required
+	PortValue int `json:"port_value"`
+}
+
+type Address struct {
+	// SocketAddress is the socket address
+	// +kubebuilder:validation:Required
+	SocketAddress SocketAddress `json:"socket_address"`
+}
+
+type Endpoint struct {
+	// Address is the address of the load balancer endpoint
+	// +kubebuilder:validation:Required
+	Address Address `json:"address"`
+}
+
+type LbEndpoint struct {
+	// Endpoints is a list of endpoints
+	// +kubebuilder:validation:Required
+	Endpoint Endpoint `json:"endpoint"`
+}
+
+type Endpoints struct {
+	// LbEndpoints is the load balancer endpoints
+	// +kubebuilder:validation:Required
+	LbEndpoints []LbEndpoint `json:"lb_endpoints"`
+}
+
+type LoadAssignment struct {
+	// ClusterName is the name of the cluster
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:Required
-	// +kubebuilder:default="envoyproxy/envoy:v1.30-latest"
-	Image string `json:"image"`
+	ClusterName string `json:"cluster_name"`
 
-	// HTTPFilters is a list of Envoy HTTP filters to be applied
-	// +kubebuilder:validation:MinItems=1
-	HTTPFilters []HTTPFilter `json:"httpFilters"`
-
-	// Clusters is a list of references to EnvoyCluster objects
-	// +kubebuilder:validation:MinItems=1
-	Clusters []EnvoyClusterRef `json:"clusters"`
+	// Endpoints is a list of endpoints
+	// +kubebuilder:validation:Required
+	Endpoints []Endpoints `json:"endpoints"`
 }
 
-// EnvoyClusterRef represents a reference to an EnvoyCluster
-type EnvoyClusterRef struct {
-	// Name of the EnvoyCluster
+type Cluster struct {
+	// Name is the name of the cluster
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
-	// Namespace of the EnvoyCluster
-	Namespace string `json:"namespace"`
-}
+	// ConnectTimeout is the timeout for connecting to the cluster
+	// +kubebuilder:validation:Required
+	ConnectTimeout string `json:"connect_timeout"`
 
-// EnvoyProxyStatus defines the observed state of EnvoyProxy
-type EnvoyProxyStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-}
+	// Type is the type of the cluster
+	// +kubebuilder:validation:Required
+	// +kube:validation:Enum=STRICT_DNS;LOGICAL_DNS;STATIC;EDS;ORIGINAL_DST;ENVIRONMENT_VARIABLE
+	// +kube:validation:default=STRICT_DNS
+	Type string `json:"type"`
 
-// +kubebuilder:object:root=true
-// +kubebuilder:subresource:status
+	// LbPolicy is the load balancing policy for the cluster
+	// +kubebuilder:validation:Required
+	// +kube:validation:Enum=ROUND_ROBIN;LEAST_REQUEST;RANDOM;RING_HASH;MAGLEV;ORIGINAL_DST_LB;CLUSTER_PROVIDED
+	LbPolicy string `json:"lb_policy"`
 
-// EnvoyProxy is the Schema for the envoyproxies API
-type EnvoyProxy struct {
-	metav1.TypeMeta   `json:",inline"`
-	metav1.ObjectMeta `json:"metadata,omitempty"`
+	// TypedExtensionProtocolOptions is a map of typed extension protocol options
+	// +kubebuilder:validation:Optional
+	TypedExtensionProtocolOptions runtime.RawExtension `json:"typed_extension_protocol_options,omitempty"`
 
-	Spec   EnvoyProxySpec   `json:"spec,omitempty"`
-	Status EnvoyProxyStatus `json:"status,omitempty"`
-}
-
-// +kubebuilder:object:root=true
-
-// EnvoyProxyList contains a list of EnvoyProxy
-type EnvoyProxyList struct {
-	metav1.TypeMeta `json:",inline"`
-	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []EnvoyProxy `json:"items"`
-}
-
-func init() {
-	SchemeBuilder.Register(&EnvoyProxy{}, &EnvoyProxyList{})
+	// LoadAssignment is the load assignment for the cluster
+	// +kubebuilder:validation:Required
+	LoadAssignment LoadAssignment `json:"load_assignment"`
+	// LoadAssignment runtime.RawExtension `json:"load_assignment"`
 }

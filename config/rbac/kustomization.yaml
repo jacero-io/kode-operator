@@ -14,8 +14,16 @@ resources:
 # default, aiding admins in cluster management. Those roles are
 # not used by the Project itself. You can comment the following lines
 # if you do not want those helpers be installed with your Project.
-- envoyproxy_editor_role.yaml
-- envoyproxy_viewer_role.yaml
+- kodeclustertemplate_editor_role.yaml
+- kodeclustertemplate_viewer_role.yaml
+- envoyproxyclusterconfig_editor_role.yaml
+- envoyproxyclusterconfig_viewer_role.yaml
+- envoyproxyconfig_editor_role.yaml
+- envoyproxyconfig_viewer_role.yaml
+- kodetemplate_editor_role.yaml
+- kodetemplate_viewer_role.yaml
+- envoyproxytemplate_editor_role.yaml
+- envoyproxytemplate_viewer_role.yaml
 - kode_editor_role.yaml
 - kode_viewer_role.yaml
 

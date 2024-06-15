@@ -41,33 +41,31 @@ rules:
   - update
   - watch
 - apiGroups:
-  - kode.jacero.io
+  - kode.kode.jacero.io
   resources:
-  - envoyproxies
+  - envoyproxyclusterconfig
   verbs:
-  - create
-  - delete
   - get
   - list
-  - patch
-  - update
   - watch
 - apiGroups:
-  - kode.jacero.io
+  - kode.kode.jacero.io
   resources:
-  - envoyproxies/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - kode.jacero.io
-  resources:
-  - envoyproxies/status
+  - envoyproxyconfig
   verbs:
   - get
-  - patch
-  - update
+  - list
+  - watch
 - apiGroups:
-  - kode.jacero.io
+  - kode.kode.jacero.io
+  resources:
+  - kodeclustertemplates
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - kode.kode.jacero.io
   resources:
   - kodes
   verbs:
@@ -79,16 +77,24 @@ rules:
   - update
   - watch
 - apiGroups:
-  - kode.jacero.io
+  - kode.kode.jacero.io
   resources:
   - kodes/finalizers
   verbs:
   - update
 - apiGroups:
-  - kode.jacero.io
+  - kode.kode.jacero.io
   resources:
   - kodes/status
   verbs:
   - get
   - patch
   - update
+- apiGroups:
+  - kode.kode.jacero.io
+  resources:
+  - kodetemplates
+  verbs:
+  - get
+  - list
+  - watch
