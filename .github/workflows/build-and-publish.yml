@@ -39,7 +39,8 @@ jobs:
     - name: Verify Kubebuilder installation
       run: |
         if ! command -v kubebuilder &> /dev/null; then
-          curl -L https://go.kubebuilder.io/dl/latest/linux/amd64 | tar -xz -C /usr/local/
+          curl -L -o kubebuilder "https://go.kubebuilder.io/dl/latest/$(go env GOOS)/$(go env GOARCH)"
+          chmod +x kubebuilder && mv kubebuilder /usr/local/bin/
           export PATH=$PATH:/usr/local/kubebuilder/bin
         fi
 
