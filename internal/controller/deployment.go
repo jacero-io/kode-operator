@@ -107,6 +107,7 @@ func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode,
 	}
 
 	var containers []corev1.Container
+	var initContainers []corev1.Container
 
 	if sharedKodeTemplateSpec.Type == "code-server" {
 		containers = constructCodeServerContainers(kode, sharedKodeTemplateSpec, workspace)
@@ -117,15 +118,15 @@ func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode,
 	volumes, volumeMounts := constructVolumesAndMounts(mountPath, kode)
 	containers[0].VolumeMounts = volumeMounts
 
-	initContainers := []corev1.Container{}
 	if sharedKodeTemplateSpec.EnvoyProxyTemplateRef.Name != "" {
 		log.Info("EnvoyProxyTemplateRef is defined", "Name", sharedKodeTemplateSpec.EnvoyProxyTemplateRef.Name)
-		envoySidecarContainer, err := constructEnvoyProxyContainer(&log, sharedKodeTemplateSpec, sharedEnvoyProxyTemplateSpec)
+		envoySidecarContainer, envoyInitContainer, err := constructEnvoyProxyContainer(&log, sharedKodeTemplateSpec, sharedEnvoyProxyTemplateSpec)
 		if err != nil {
-			log.Error(err, "Failed to construct EnvoyProxy sidecar", "Kode", kode.Name, "Container", sharedKodeTemplateSpec.EnvoyProxyTemplateRef.Name)
+			log.Error(err, "Failed to construct EnvoyProxy sidecar", "Kode", kode.Name, "Container", sharedKodeTemplateSpec.EnvoyProxyTemplateRef.Name, "Error", err)
 		} else {
 			containers = append(containers, envoySidecarContainer)
-			log.Info("Added EnvoyProxy sidecar container", "Kode", kode.Name, "Container", envoySidecarContainer.Name)
+			initContainers = append(initContainers, envoyInitContainer)
+			log.Info("Added EnvoyProxy sidecar container and init container", "Kode", kode.Name, "Container", envoySidecarContainer.Name)
 		}
 	}
 

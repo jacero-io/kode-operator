@@ -19,6 +19,7 @@ package controller
 import (
 	_ "embed"
 	"fmt"
+	"strconv"
 
 	kodev1alpha1 "github.com/emil-jacero/kode-operator/api/v1alpha1"
 	"github.com/go-logr/logr"
@@ -36,6 +37,9 @@ import (
 const (
 	// RestartPolicyAlways ContainerRestartPolicy = "Always"
 	EnvoyProxyContainerName = "envoy-proxy"
+	EnvoyProxyRunAsUser     = 1111
+	ProxyInitContainerName  = "proxy-init"
+	ProxyInitContainerImage = "openpolicyagent/proxy_init:v8"
 )
 
 //go:embed bootstrap_schema.cue
@@ -57,31 +61,39 @@ var RouterFilter = kodev1alpha1.HTTPFilter{
 	},
 }
 
-// EnsureRouterFilter ensures that the Router filter is added last in the list of filters.
 func EnsureRouterFilter(filters []kodev1alpha1.HTTPFilter) []kodev1alpha1.HTTPFilter {
-	// Check if the Router filter is already present
-	for _, filter := range filters {
+	for i, filter := range filters {
 		if string(filter.TypedConfig.Raw) == `{"@type": "type.googleapis.com/envoy.extensions.filters.http.router.v3.Router"}` {
-			// Remove the Router filter if it's not the last one
-			filters = append(filters[:len(filters)-1], filters[len(filters):]...)
+			filters = append(filters[:i], filters[i+1:]...)
 			break
 		}
 	}
-	// Append the Router filter as the last filter
 	return append(filters, RouterFilter)
+}
+
+func unifyAndValidate(ctx *cue.Context, schema, value cue.Value) (cue.Value, error) {
+	unifiedValue := schema.Unify(value)
+	if err := unifiedValue.Validate(); err != nil {
+		return cue.Value{}, fmt.Errorf("failed to unify value with schema: %w", err)
+	}
+	return unifiedValue, nil
+}
+
+func encodeToYAML(value cue.Value) (string, error) {
+	yamlBytes, err := yaml.Encode(value)
+	if err != nil {
+		return "", fmt.Errorf("failed to encode YAML: %w", err)
+	}
+	return string(yamlBytes), nil
 }
 
 // GetRenderedBootstrapConfig renders the bootstrap config using the provided options.
 func GetRenderedBootstrapConfig(log *logr.Logger, options GetRenderedBootstrapConfigOptions) (string, error) {
-	// Ensure the Router filter is included
 	options.HTTPFilters = EnsureRouterFilter(options.HTTPFilters)
 
-	// Create a new CUE context
 	ctx := cuecontext.New()
 	httpFiltersSchema := ctx.CompileString(schemaFile).LookupPath(cue.ParsePath("#HTTPFilters"))
-	log.V(1).Info("HttpFilters schema", "schema", httpFiltersSchema)
 	clustersSchema := ctx.CompileString(schemaFile).LookupPath(cue.ParsePath("#Clusters"))
-	log.V(1).Info("Clusters schema", "schema", clustersSchema)
 
 	// Load the CUE instance from the provided files
 	inst := load.Instances(options.CueFiles, nil)[0]
@@ -89,56 +101,44 @@ func GetRenderedBootstrapConfig(log *logr.Logger, options GetRenderedBootstrapCo
 		return "", fmt.Errorf("failed to load CUE instance: %w", inst.Err)
 	}
 
-	// Build the CUE value from the instance
 	value := ctx.BuildInstance(inst)
 	if value.Err() != nil {
 		return "", fmt.Errorf("failed to build CUE instance: %w", value.Err())
 	}
 
-	// Add HTTPFilters to the CUE context
 	httpFiltersValue := ctx.Encode(options.HTTPFilters)
 	if httpFiltersValue.Err() != nil {
 		return "", fmt.Errorf("failed to encode HTTPFilters: %w", httpFiltersValue.Err())
 	}
-	log.V(1).Info("HTTPFilters", "filtersValue", httpFiltersValue)
-
-	unifiedHTTPFilterValues := httpFiltersSchema.Unify(httpFiltersValue)
-	if err := unifiedHTTPFilterValues.Validate(); err != nil {
-		return "", fmt.Errorf("failed to unify HTTPFilters with Schema: %w", httpFiltersValue.Err())
+	unifiedHTTPFilterValues, err := unifyAndValidate(ctx, httpFiltersSchema, httpFiltersValue)
+	if err != nil {
+		return "", err
 	}
-	log.V(1).Info("Unified http filter values", "unified", unifiedHTTPFilterValues)
+	value = value.FillPath(cue.ParsePath("#GoHttpFilters"), unifiedHTTPFilterValues)
 
-	value = value.FillPath(cue.ParsePath("#GoHttpFilters"), httpFiltersValue)
-
-	// Add Clusters to the CUE context
 	clustersValue := ctx.Encode(options.Clusters)
 	if clustersValue.Err() != nil {
 		return "", fmt.Errorf("failed to encode Clusters: %w", clustersValue.Err())
 	}
-	log.V(1).Info("Clusters", "filtersValue", clustersValue)
-
-	unifiedClusterValues := clustersSchema.Unify(clustersValue)
-	if err := unifiedClusterValues.Validate(); err != nil {
-		return "", fmt.Errorf("failed to unify Clusters with Schema: %w", clustersValue.Err())
-	}
-	log.V(1).Info("Unified cluster values", "unified", unifiedClusterValues)
-
-	value = value.FillPath(cue.ParsePath("#GoClusters"), clustersValue)
-
-	// Convert the CUE value to YAML
-	yamlBytes, err := yaml.Encode(value)
+	unifiedClusterValues, err := unifyAndValidate(ctx, clustersSchema, clustersValue)
 	if err != nil {
-		return "", fmt.Errorf("failed to encode YAML: %w", err)
+		return "", err
 	}
+	value = value.FillPath(cue.ParsePath("#GoClusters"), unifiedClusterValues)
 
-	// Return the resulting YAML as a string
-	return string(yamlBytes), nil
+	servicePortValue := ctx.Encode(options.ServicePort)
+	if servicePortValue.Err() != nil {
+		return "", fmt.Errorf("failed to encode Clusters: %w", servicePortValue.Err())
+	}
+	value = value.FillPath(cue.ParsePath("#GoLocalServicePort"), servicePortValue)
+
+	return encodeToYAML(value)
 }
 
 // constructEnvoyProxyContainer constructs the Envoy Proxy container
 func constructEnvoyProxyContainer(log *logr.Logger,
 	sharedKodeTemplateSpec *kodev1alpha1.SharedKodeTemplateSpec,
-	sharedEnvoyProxyTemplateSpec *kodev1alpha1.EnvoyProxyConfigSpec) (corev1.Container, error) {
+	sharedEnvoyProxyTemplateSpec *kodev1alpha1.EnvoyProxyConfigSpec) (corev1.Container, corev1.Container, error) {
 
 	ServicePort := sharedKodeTemplateSpec.Port
 	config, err := GetRenderedBootstrapConfig(log, GetRenderedBootstrapConfigOptions{
@@ -148,10 +148,10 @@ func constructEnvoyProxyContainer(log *logr.Logger,
 		ServicePort: ServicePort,
 	})
 	if err != nil {
-		return corev1.Container{}, fmt.Errorf("error rendering bootstrap config: %w", err)
+		return corev1.Container{}, corev1.Container{}, err
 	}
 
-	return corev1.Container{
+	envoyContainer := corev1.Container{
 		Name:  EnvoyProxyContainerName,
 		Image: sharedEnvoyProxyTemplateSpec.Image,
 		Args: []string{
@@ -160,5 +160,32 @@ func constructEnvoyProxyContainer(log *logr.Logger,
 		Ports: []corev1.ContainerPort{
 			{Name: "http", ContainerPort: ServicePort},
 		},
-	}, nil
+		SecurityContext: &corev1.SecurityContext{
+			RunAsUser: int64Ptr(EnvoyProxyRunAsUser),
+		},
+	}
+
+	initContainer := corev1.Container{
+		Name:  ProxyInitContainerName,
+		Image: ProxyInitContainerImage,
+		// Documentation: https://github.com/open-policy-agent/opa-envoy-plugin/blob/main/proxy_init/proxy_init.sh
+		Args: []string{"-p", "8000", "-u", strconv.FormatInt(*int64Ptr(EnvoyProxyRunAsUser), 16)},
+		SecurityContext: &corev1.SecurityContext{
+			Capabilities: &corev1.Capabilities{
+				Add: []corev1.Capability{"NET_ADMIN"},
+			},
+			RunAsNonRoot: boolPtr(false),
+			RunAsUser:    int64Ptr(0),
+		},
+	}
+
+	return envoyContainer, initContainer, nil
+}
+
+func boolPtr(b bool) *bool {
+	return &b
+}
+
+func int64Ptr(i int64) *int64 {
+	return &i
 }
