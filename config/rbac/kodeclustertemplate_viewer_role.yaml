@@ -1,16 +1,16 @@
-# permissions for end users to view clusterkodetemplates.
+# permissions for end users to view kodeclustertemplates.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
     app.kubernetes.io/name: kode-operator
     app.kubernetes.io/managed-by: kustomize
-  name: clusterkodetemplate-viewer-role
+  name: kodeclustertemplate-viewer-role
 rules:
 - apiGroups:
   - kode.jacero.io
   resources:
-  - clusterkodetemplates
+  - kodeclustertemplates
   verbs:
   - get
   - list
@@ -18,6 +18,6 @@ rules:
 - apiGroups:
   - kode.jacero.io
   resources:
-  - clusterkodetemplates/status
+  - kodeclustertemplates/status
   verbs:
   - get

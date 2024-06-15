@@ -22,14 +22,6 @@ resources:
     namespaced: true
   domain: jacero.io
   group: kode
-  kind: EnvoyProxyTemplate
-  path: github.com/emil-jacero/kode-operator/api/v1alpha1
-  version: v1alpha1
-- api:
-    crdVersion: v1
-    namespaced: true
-  domain: jacero.io
-  group: kode
   kind: KodeTemplate
   path: github.com/emil-jacero/kode-operator/api/v1alpha1
   version: v1alpha1
@@ -38,7 +30,7 @@ resources:
     namespaced: true
   domain: jacero.io
   group: kode
-  kind: ClusterKodeTemplate
+  kind: KodeClusterTemplate
   path: github.com/emil-jacero/kode-operator/api/v1alpha1
   version: v1alpha1
 - api:
@@ -46,7 +38,15 @@ resources:
     namespaced: true
   domain: jacero.io
   group: kode
-  kind: ClusterEnvoyProxyTemplate
+  kind: EnvoyProxyConfig
+  path: github.com/emil-jacero/kode-operator/api/v1alpha1
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: jacero.io
+  group: kode
+  kind: EnvoyProxyClusterConfig
   path: github.com/emil-jacero/kode-operator/api/v1alpha1
   version: v1alpha1
 version: "3"

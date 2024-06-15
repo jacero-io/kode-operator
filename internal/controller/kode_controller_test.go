@@ -21,6 +21,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+// TODO: If the KodeTemplate is updated, force a reconcile of the Kode instance
+// TODO: If the KodeClusterTemplate is updated, force a reconcile of the Kode instance
+// TODO: If the EnvoyProxyConfig is updated, force a reconcile of the Kode instance
+// TODO: If the EnvoyProxyClusterConfig is updated, force a reconcile of the Kode instance
+// TODO: If the KodeTemplate is deleted, DO NOT delete the Kode instance
+// TODO: If the KodeClusterTemplate is deleted, DO NOT delete the Kode instance
+// TODO: If the EnvoyProxyConfig is deleted, DO NOT delete the Kode instance
+// TODO: If the EnvoyProxyClusterConfig is deleted, DO NOT delete the Kode instance
+
+// TODO: Make sure that the port number that is specified in the KodeTemplate or KodeClusterTemplate is applied everywhere it is needed
+
 var _ = Describe("Kode Controller", func() {
 	var (
 		ctx        context.Context
@@ -128,9 +139,9 @@ var _ = Describe("Kode Controller", func() {
 				Spec: kodev1alpha1.KodeTemplateSpec{
 					SharedKodeTemplateSpec: kodev1alpha1.SharedKodeTemplateSpec{
 						Image: "lscr.io/linuxserver/code-server:latest",
-						Port:  8443,
-						EnvoyProxyTemplateRef: kodev1alpha1.EnvoyProxyReference{
-							Kind: "EnvoyProxyTemplate",
+						Port:  3000,
+						EnvoyProxyRef: kodev1alpha1.EnvoyProxyReference{
+							Kind: "EnvoyProxyConfig",
 							Name: "test-envoyproxytemplate",
 						},
 					},
@@ -139,28 +150,28 @@ var _ = Describe("Kode Controller", func() {
 			err = k8sClient.Create(ctx, kodeTemplate)
 			Expect(err).NotTo(HaveOccurred())
 
-			By("creating the custom resource for the Kind EnvoyProxyTemplate")
-			envoyProxyTemplate := &kodev1alpha1.EnvoyProxyTemplate{
+			By("creating the custom resource for the Kind EnvoyProxyConfig")
+			envoyProxyConfig := &kodev1alpha1.EnvoyProxyConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-envoyproxytemplate",
 				},
-				Spec: kodev1alpha1.EnvoyProxyTemplateSpec{
-					EnvoyProxyConfigSpec: kodev1alpha1.EnvoyProxyConfigSpec{
+				Spec: kodev1alpha1.EnvoyProxyConfigSpec{
+					SharedEnvoyProxyConfigSpec: kodev1alpha1.SharedEnvoyProxyConfigSpec{
 						Image:       "envoyproxy/envoy:v1.30-latest",
 						HTTPFilters: []kodev1alpha1.HTTPFilter{RouterFilter},
 					},
 				},
 			}
-			err = k8sClient.Create(ctx, envoyProxyTemplate)
+			err = k8sClient.Create(ctx, envoyProxyConfig)
 			Expect(err).NotTo(HaveOccurred())
 
-			By("creating the custom resource for the Kind ClusterEnvoyProxyTemplate")
-			clusterEnvoyProxyTemplate := &kodev1alpha1.ClusterEnvoyProxyTemplate{
+			By("creating the custom resource for the Kind EnvoyProxyClusterConfig")
+			clusterEnvoyProxyTemplate := &kodev1alpha1.EnvoyProxyClusterConfig{
 				ObjectMeta: metav1.ObjectMeta{
 					Name: "test-clusterenvoyproxytemplate",
 				},
-				Spec: kodev1alpha1.ClusterEnvoyProxyTemplateSpec{
-					EnvoyProxyConfigSpec: kodev1alpha1.EnvoyProxyConfigSpec{
+				Spec: kodev1alpha1.EnvoyProxyClusterConfigSpec{
+					SharedEnvoyProxyConfigSpec: kodev1alpha1.SharedEnvoyProxyConfigSpec{
 						Image:       "envoyproxy/envoy:v1.30-latest",
 						HTTPFilters: []kodev1alpha1.HTTPFilter{RouterFilter},
 					},
@@ -185,12 +196,12 @@ var _ = Describe("Kode Controller", func() {
 
 			Expect(k8sClient.Delete(ctx, kodeTemplate)).To(Succeed())
 
-			By("deleting the custom resource for the Kind EnvoyProxyTemplate")
-			envoyProxyTemplate := &kodev1alpha1.EnvoyProxyTemplate{}
-			err = k8sClient.Get(ctx, types.NamespacedName{Name: "test-envoyproxytemplate"}, envoyProxyTemplate)
+			By("deleting the custom resource for the Kind EnvoyProxyConfig")
+			envoyProxyConfig := &kodev1alpha1.EnvoyProxyConfig{}
+			err = k8sClient.Get(ctx, types.NamespacedName{Name: "test-envoyproxytemplate"}, envoyProxyConfig)
 			Expect(err).NotTo(HaveOccurred())
 
-			Expect(k8sClient.Delete(ctx, envoyProxyTemplate)).To(Succeed())
+			Expect(k8sClient.Delete(ctx, envoyProxyConfig)).To(Succeed())
 		})
 
 		It("should create a Deployment for the Kode resource", func() {
@@ -218,7 +229,7 @@ var _ = Describe("Kode Controller", func() {
 				return true
 			}, time.Second*10, time.Millisecond*250).Should(BeTrue())
 
-			Expect(service.Spec.Ports[0].Port).To(Equal(int32(8443)))
+			Expect(service.Spec.Ports[0].Port).To(Equal(int32(3000)))
 		})
 
 		It("should create a PersistentVolumeClaim for the Kode resource if storage is defined", func() {
@@ -308,7 +319,7 @@ var _ = Describe("Kode Controller", func() {
 				Spec: kodev1alpha1.KodeTemplateSpec{
 					SharedKodeTemplateSpec: kodev1alpha1.SharedKodeTemplateSpec{
 						Image: "invalid-image-name",
-						Port:  8443,
+						Port:  3000,
 					},
 				},
 			}

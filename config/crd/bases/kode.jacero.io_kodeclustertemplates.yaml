@@ -4,20 +4,21 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.14.0
-  name: clusterkodetemplates.kode.jacero.io
+  name: kodeclustertemplates.kode.jacero.io
 spec:
   group: kode.jacero.io
   names:
-    kind: ClusterKodeTemplate
-    listKind: ClusterKodeTemplateList
-    plural: clusterkodetemplates
-    singular: clusterkodetemplate
+    kind: KodeClusterTemplate
+    listKind: KodeClusterTemplateList
+    plural: kodeclustertemplates
+    singular: kodeclustertemplate
   scope: Cluster
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: ClusterKodeTemplate is the Schema for the kodetemplates API
+        description: KodeClusterTemplate is the Schema for the kodeclustertemplates
+          API
         properties:
           apiVersion:
             description: |-
@@ -37,7 +38,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: KodeTemplateSpec defines the desired state of KodeTemplate
+            description: KodeClusterTemplateSpec defines the desired state of KodeClusterTemplate
             properties:
               allowPrivileged:
                 default: false
@@ -61,23 +62,22 @@ spec:
                 minLength: 3
                 pattern: ^[^/].*$
                 type: string
-              envoyProxyTemplateRef:
-                description: EnvoyProxyTemplateRef is the reference to the EnvoyProxy
-                  configuration
+              envoyProxyRef:
+                description: EnvoyProxyRef is the reference to the EnvoyProxy configuration
                 properties:
                   kind:
                     description: Kind is the resource kind
                     enum:
-                    - EnvoyProxyTemplate
-                    - ClusterEnvoyProxyTemplate
+                    - EnvoyProxyConfig
+                    - EnvoyProxyClusterConfig
                     type: string
                   name:
-                    description: Name is the name of the EnvoyProxyTemplate or ClusterEnvoyProxyTemplate
+                    description: Name is the name of the EnvoyProxyConfig or EnvoyProxyClusterConfig
                     minLength: 1
                     type: string
                   namespace:
-                    description: Namespace is the namespace of the EnvoyProxyTemplate
-                      or ClusterEnvoyProxyTemplate
+                    description: Namespace is the namespace of the EnvoyProxyConfig
+                      or EnvoyProxyClusterConfig
                     minLength: 1
                     type: string
                 required:
@@ -235,8 +235,6 @@ spec:
                 enum:
                 - code-server
                 - webtop
-                - devcontainers
-                - jupyter
                 type: string
               tz:
                 default: UTC
@@ -247,7 +245,7 @@ spec:
             - type
             type: object
           status:
-            description: KodeTemplateStatus defines the observed state of KodeTemplate
+            description: KodeClusterTemplateStatus defines the observed state of KodeClusterTemplate
             properties:
               conditions:
                 description: Conditions reflect the current state of the template

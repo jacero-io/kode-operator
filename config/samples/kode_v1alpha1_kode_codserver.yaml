@@ -8,8 +8,8 @@ metadata:
   name: kode-codeserver-sample
 spec:
   templateRef:
-    kind: ClusterKodeTemplate
-    name: clusterkodetemplate-codeserver-sample
+    kind: KodeClusterTemplate
+    name: kodeclustertemplate-codeserver-sample
   user: user1
   password: password1
   # storage:

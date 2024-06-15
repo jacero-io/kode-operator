@@ -21,16 +21,16 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// SharedKodeTemplateSpec defines the desired state of ClusterKodeTemplate
+// SharedKodeTemplateSpec defines the desired state of KodeClusterTemplate
 type SharedKodeTemplateSpec struct {
-	// EnvoyProxyTemplateRef is the reference to the EnvoyProxy configuration
+	// EnvoyProxyRef is the reference to the EnvoyProxy configuration
 	// +kubebuilder:validation:Description="Reference to the EnvoyProxy configuration."
-	EnvoyProxyTemplateRef EnvoyProxyReference `json:"envoyProxyTemplateRef,omitempty"`
+	EnvoyProxyRef EnvoyProxyReference `json:"envoyProxyRef,omitempty"`
 
 	// Type is the type of container to use. Can be one of 'code-server', 'webtop', 'devcontainers', 'jupyter', 'alnoda'.
 	// +kubebuilder:validation:Description="Type of container to use. Can be one of 'code-server', 'webtop', 'devcontainers', 'jupyter', 'alnoda'."
 	// +kubebuilder:validation:Required
-	// +kubebuilder:validation:Enum=code-server;webtop;devcontainers;jupyter
+	// +kubebuilder:validation:Enum=code-server;webtop
 	Type string `json:"type"`
 
 	// Image is the container image for the service
@@ -97,26 +97,8 @@ type SharedKodeTemplateSpec struct {
 	RecycleAfterSeconds *int64 `json:"recycleAfterSeconds,omitempty"`
 }
 
-// SharedKodeTemplateStatus defines the observed state of ClusterKodeTemplate
+// SharedKodeTemplateStatus defines the observed state
 type SharedKodeTemplateStatus struct {
 	// Conditions reflect the current state of the template
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
-}
-
-type KodeTemplateReference struct {
-	// Kind is the resource kind
-	// +kubebuilder:validation:Description="Resource kind"
-	// +kubebuilder:validation:Enum=KodeTemplate;ClusterKodeTemplate
-	Kind string `json:"kind"`
-
-	// Name is the name of the KodeTemplate
-	// +kubebuilder:validation:Description="Name of the KodeTemplate"
-	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:Required
-	Name string `json:"name"`
-
-	// Namespace is the namespace of the KodeTemplate
-	// +kubebuilder:validation:Description="Namespace of the KodeTemplate"
-	// +kubebuilder:validation:MinLength=1
-	Namespace string `json:"namespace,omitempty"`
 }

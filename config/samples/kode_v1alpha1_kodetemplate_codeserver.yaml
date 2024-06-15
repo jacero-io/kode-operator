@@ -1,4 +1,3 @@
----
 apiVersion: kode.jacero.io/v1alpha1
 kind: KodeTemplate
 metadata:
@@ -7,9 +6,9 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: kodetemplate-codeserver-sample
 spec:
-  # envoyProxyTemplateRef:
-  #   kind: EnvoyProxyTemplate
-  #   name: envoyproxytemplate-sample
+  envoyProxyRef:
+    kind: EnvoyProxyConfig
+    name: envoyproxyconfig-sample
   type: code-server
   image: lscr.io/linuxserver/code-server:latest
   tz: "Europe/Stockholm"

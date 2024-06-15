@@ -17,7 +17,7 @@ limitations under the License.
 package v1alpha1
 
 // Spec for the EnvoyProxyConfig.
-type EnvoyProxyConfigSpec struct {
+type SharedEnvoyProxyConfigSpec struct {
 	// Image is the Docker image for the Envoy proxy
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:Required
@@ -34,27 +34,27 @@ type EnvoyProxyConfigSpec struct {
 }
 
 // EnvoyProxyStatus defines the observed state of EnvoyProxy
-type EnvoyProxyStatus struct {
+type SharedEnvoyProxyStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 }
 
-// EnvoyProxyReference is a reference to an EnvoyProxyTemplate or ClusterEnvoyProxyTemplate
+// EnvoyProxyReference is a reference to an EnvoyProxyConfig or EnvoyProxyClusterConfig
 type EnvoyProxyReference struct {
 	// Kind is the resource kind
 	// +kubebuilder:validation:Description="Resource kind"
-	// +kubebuilder:validation:Enum=EnvoyProxyTemplate;ClusterEnvoyProxyTemplate
+	// +kubebuilder:validation:Enum=EnvoyProxyConfig;EnvoyProxyClusterConfig
 	// +kubebuilder:validation:Required
 	Kind string `json:"kind"`
 
-	// Name is the name of the EnvoyProxyTemplate or ClusterEnvoyProxyTemplate
-	// +kubebuilder:validation:Description="Name of the template"
+	// Name is the name of the EnvoyProxyConfig or EnvoyProxyClusterConfig
+	// +kubebuilder:validation:Description="Name of the config"
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
-	// Namespace is the namespace of the EnvoyProxyTemplate or ClusterEnvoyProxyTemplate
-	// +kubebuilder:validation:Description="Namespace of the Envoy Proxy template"
+	// Namespace is the namespace of the EnvoyProxyConfig or EnvoyProxyClusterConfig
+	// +kubebuilder:validation:Description="Namespace of the Envoy Proxy config"
 	// +kubebuilder:validation:MinLength=1
 	Namespace string `json:"namespace,omitempty"`
 }

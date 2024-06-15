@@ -4,20 +4,20 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.14.0
-  name: clusterenvoyproxytemplates.kode.jacero.io
+  name: envoyproxyclusterconfigs.kode.jacero.io
 spec:
   group: kode.jacero.io
   names:
-    kind: ClusterEnvoyProxyTemplate
-    listKind: ClusterEnvoyProxyTemplateList
-    plural: clusterenvoyproxytemplates
-    singular: clusterenvoyproxytemplate
+    kind: EnvoyProxyClusterConfig
+    listKind: EnvoyProxyClusterConfigList
+    plural: envoyproxyclusterconfigs
+    singular: envoyproxyclusterconfig
   scope: Cluster
   versions:
   - name: v1alpha1
     schema:
       openAPIV3Schema:
-        description: ClusterEnvoyProxyTemplate is the Schema for the clusterenvoyproxytemplates
+        description: EnvoyProxyClusterConfig is the Schema for the envoyproxyclusterconfigs
           API
         properties:
           apiVersion:
@@ -38,8 +38,8 @@ spec:
           metadata:
             type: object
           spec:
-            description: ClusterEnvoyProxyTemplateSpec defines the desired state of
-              ClusterEnvoyProxyTemplate
+            description: EnvoyProxyClusterConfigSpec defines the desired state of
+              EnvoyProxyClusterConfig
             properties:
               clusters:
                 description: Clusters is a list of Envoy clusters
@@ -158,8 +158,8 @@ spec:
             - image
             type: object
           status:
-            description: ClusterEnvoyProxyTemplateStatus defines the observed state
-              of ClusterEnvoyProxyTemplate
+            description: EnvoyProxyClusterConfigStatus defines the observed state
+              of EnvoyProxyClusterConfig
             type: object
         type: object
     served: true

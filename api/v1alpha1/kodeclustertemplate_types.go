@@ -20,37 +20,38 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EnvoyProxyTemplateSpec defines the desired state of EnvoyProxyTemplate
-type EnvoyProxyTemplateSpec struct {
-	EnvoyProxyConfigSpec `json:",inline"`
+// KodeClusterTemplateSpec defines the desired state of KodeClusterTemplate
+type KodeClusterTemplateSpec struct {
+	SharedKodeTemplateSpec `json:",inline"`
 }
 
-// EnvoyProxyTemplateStatus defines the observed state of EnvoyProxyTemplate
-type EnvoyProxyTemplateStatus struct {
-	EnvoyProxyStatus `json:",inline"`
+// KodeClusterTemplateStatus defines the observed state of KodeClusterTemplate
+type KodeClusterTemplateStatus struct {
+	SharedKodeTemplateStatus `json:",inline"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:resource:scope=Cluster
 
-// EnvoyProxyTemplate is the Schema for the envoyproxytemplates API
-type EnvoyProxyTemplate struct {
+// KodeClusterTemplate is the Schema for the kodeclustertemplates API
+type KodeClusterTemplate struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   EnvoyProxyTemplateSpec   `json:"spec,omitempty"`
-	Status EnvoyProxyTemplateStatus `json:"status,omitempty"`
+	Spec   KodeClusterTemplateSpec   `json:"spec,omitempty"`
+	Status KodeClusterTemplateStatus `json:"status,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 
-// EnvoyProxyTemplateList contains a list of EnvoyProxyTemplate
-type EnvoyProxyTemplateList struct {
+// KodeClusterTemplateList contains a list of KodeClusterTemplate
+type KodeClusterTemplateList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []EnvoyProxyTemplate `json:"items"`
+	Items           []KodeClusterTemplate `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&EnvoyProxyTemplate{}, &EnvoyProxyTemplateList{})
+	SchemeBuilder.Register(&KodeClusterTemplate{}, &KodeClusterTemplateList{})
 }

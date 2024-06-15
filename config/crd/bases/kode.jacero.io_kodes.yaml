@@ -115,7 +115,7 @@ spec:
                     description: Kind is the resource kind
                     enum:
                     - KodeTemplate
-                    - ClusterKodeTemplate
+                    - KodeClusterTemplate
                     type: string
                   name:
                     description: Name is the name of the KodeTemplate

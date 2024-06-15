@@ -39,7 +39,7 @@ spec:
         storage: 1Gi
 ```
 
-### KodeTemplate & ClusterKodeTemplate
+### KodeTemplate & KodeClusterTemplate
 
 These are cluster scoped and namespace scoped templates. A template contains an image and some default configuration for that image. You can also include an Envoy Proxy configuration that is then applied to the sidecar of the resulting Kode instance.
 
@@ -54,7 +54,7 @@ metadata:
 spec:
   type: code-server
   image: linuxserver/code-server:latest
-  port: 8443
+  port: 3000
   tz: UTC
   puid: 1000
   pgid: 1000
@@ -64,11 +64,11 @@ spec:
     name: my-envoy-proxy-template
 ```
 
-**Example for ClusterKodeTemplate:**
+**Example for KodeClusterTemplate:**
 
 ```yaml
 apiVersion: kode.jacero.io/v1alpha1
-kind: ClusterKodeTemplate
+kind: KodeClusterTemplate
 metadata:
   name: my-cluster-kode-template
 spec:
@@ -93,15 +93,18 @@ These are cluster scoped and namespace scoped template for the Envoy Proxy sidec
 
 ### Features
 
-- [ ] *Provisioning and update of [Code-server](https://docs.linuxserver.io/images/docker-code-server/).
+- [x] *Provisioning and update of [Code-server](https://docs.linuxserver.io/images/docker-code-server/).
 - [ ] *Provisioning and update of [Webtop](https://docs.linuxserver.io/images/docker-webtop/).
 - [ ] Authentication & Authorization support using Envoy Proxy sidecar.
-  - [ ] [OAuth2](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/oauth2_filter)
-  - [ ] [Basic Auth](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/basic_auth_filter.html#basic-auth)
-  - [ ] [Ext_Authz](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/ext_authz_filter) HTTP and GRPC (Used by for example OPA)
-- [ ] [Code-server] User defined settings and data (e.g. extensions, settings.json, etc).
-- [ ] [Webtop] User defined settings and data (e.g. .profile, .bashrc, preinstalled software, etc).
-- [ ] Backup & Restore of user data adn state to S3.
+  - [ ] [OAuth2](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/oauth2_filter) With external Oauth2 provider.
+  - [ ] [Basic Auth](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/basic_auth_filter.html#basic-auth) Use password from Kode.password or Kode.existingSecret.
+  - [ ] [Ext_Authz](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/ext_authz_filter) HTTP and GRPC (Used by for example OPA).
+- [ ] Ability to add VSCode Extensions to the KodeTemplate and as a user.
+- [ ] Ability to add "preinstalled" software to the KodeTemplate.
+- [ ] Include dotfiles and other user settings in the Kode instance.
+- [ ] Pause/Prune container on inactivity, keeping the persistent storage.
+  - [ ] Backup & Restore of user stage. Maybe not feasible.
+- [ ] Backup & Restore of user data to S3.
 
 ## Usage Scenarios
 
@@ -119,7 +122,7 @@ metadata:
 spec:
   type: code-server
   image: linuxserver/code-server:latest
-  port: 8443
+  port: 3000
   defaultHome: /config
   defaultWorkspace: workspace
 ```
@@ -215,7 +218,7 @@ metadata:
 spec:
   type: code-server
   image: linuxserver/code-server:latest
-  port: 8443
+  port: 3000
   envoyProxyTemplateRef:
     name: basic-auth-proxy
   defaultHome: /config

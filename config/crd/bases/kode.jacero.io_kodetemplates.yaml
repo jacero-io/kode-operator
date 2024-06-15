@@ -61,23 +61,22 @@ spec:
                 minLength: 3
                 pattern: ^[^/].*$
                 type: string
-              envoyProxyTemplateRef:
-                description: EnvoyProxyTemplateRef is the reference to the EnvoyProxy
-                  configuration
+              envoyProxyRef:
+                description: EnvoyProxyRef is the reference to the EnvoyProxy configuration
                 properties:
                   kind:
                     description: Kind is the resource kind
                     enum:
-                    - EnvoyProxyTemplate
-                    - ClusterEnvoyProxyTemplate
+                    - EnvoyProxyConfig
+                    - EnvoyProxyClusterConfig
                     type: string
                   name:
-                    description: Name is the name of the EnvoyProxyTemplate or ClusterEnvoyProxyTemplate
+                    description: Name is the name of the EnvoyProxyConfig or EnvoyProxyClusterConfig
                     minLength: 1
                     type: string
                   namespace:
-                    description: Namespace is the namespace of the EnvoyProxyTemplate
-                      or ClusterEnvoyProxyTemplate
+                    description: Namespace is the namespace of the EnvoyProxyConfig
+                      or EnvoyProxyClusterConfig
                     minLength: 1
                     type: string
                 required:
@@ -235,8 +234,6 @@ spec:
                 enum:
                 - code-server
                 - webtop
-                - devcontainers
-                - jupyter
                 type: string
               tz:
                 default: UTC

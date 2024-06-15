@@ -138,7 +138,7 @@ func GetRenderedBootstrapConfig(log *logr.Logger, options GetRenderedBootstrapCo
 // constructEnvoyProxyContainer constructs the Envoy Proxy container
 func constructEnvoyProxyContainer(log *logr.Logger,
 	sharedKodeTemplateSpec *kodev1alpha1.SharedKodeTemplateSpec,
-	sharedEnvoyProxyTemplateSpec *kodev1alpha1.EnvoyProxyConfigSpec) (corev1.Container, corev1.Container, error) {
+	sharedEnvoyProxyTemplateSpec *kodev1alpha1.SharedEnvoyProxyConfigSpec) (corev1.Container, corev1.Container, error) {
 
 	ServicePort := sharedKodeTemplateSpec.Port
 	config, err := GetRenderedBootstrapConfig(log, GetRenderedBootstrapConfigOptions{
