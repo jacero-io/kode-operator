@@ -20,6 +20,17 @@ spec:
             cluster_name: ext_authz-opa-service
           timeout: 0.250s
         transport_api_version: V3
-    - name: envoy.filters.http.router
-      typed_config:
-        '@type': type.googleapis.com/envoy.extensions.filters.http.router.v3.Router
+  clusters:
+    - name: ext_authz-opa-service
+      connect_timeout: 0.250s
+      lb_policy: round_robin
+      type: strict_dns
+      load_assignment:
+        cluster_name: ext_authz-opa-service
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: opa-service
+                      port_value: 8181

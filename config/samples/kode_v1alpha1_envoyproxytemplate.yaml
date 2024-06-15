@@ -28,3 +28,12 @@ spec:
       connect_timeout: 0.250s
       lb_policy: round_robin
       type: strict_dns
+      load_assignment:
+        cluster_name: ext_authz-opa-service
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: opa-service
+                      port_value: 8181
