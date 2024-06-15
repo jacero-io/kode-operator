@@ -11,16 +11,15 @@ spec:
     - name: envoy.filters.http.ext_authz
       typed_config:
         '@type': type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz
-        config:
-          with_request_body:
-            max_request_bytes: 8192
-            allow_partial_message: true
-          failure_mode_allow: false
-          grpc_service:
-            envoy_grpc:
-              cluster_name: ext_authz-opa-service
-            timeout: 0.250s
-          transport_api_version: V3
+        with_request_body:
+          max_request_bytes: 8192
+          allow_partial_message: true
+        failure_mode_allow: false
+        grpc_service:
+          envoy_grpc:
+            cluster_name: ext_authz-opa-service
+          timeout: 0.250s
+        transport_api_version: V3
     - name: envoy.filters.http.router
       typed_config:
         '@type': type.googleapis.com/envoy.extensions.filters.http.router.v3.Router

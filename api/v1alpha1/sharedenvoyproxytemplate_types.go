@@ -18,50 +18,50 @@ package v1alpha1
 
 import runtime "k8s.io/apimachinery/pkg/runtime"
 
-type SocketAddress struct {
-	// Address is the address of the socket
-	// +kubebuilder:validation:Required
-	Address string `json:"address"`
+// type SocketAddress struct {
+// 	// Address is the address of the socket
+// 	// +kubebuilder:validation:Required
+// 	Address string `json:"address"`
 
-	// PortValue is the port of the socket
-	// +kubebuilder:validation:Required
-	PortValue int `json:"port_value"`
-}
+// 	// PortValue is the port of the socket
+// 	// +kubebuilder:validation:Required
+// 	PortValue int `json:"port_value"`
+// }
 
-type Address struct {
-	// SocketAddress is the socket address
-	// +kubebuilder:validation:Required
-	SocketAddress SocketAddress `json:"socket_address"`
-}
+// type Address struct {
+// 	// SocketAddress is the socket address
+// 	// +kubebuilder:validation:Required
+// 	SocketAddress SocketAddress `json:"socket_address"`
+// }
 
-type Endpoint struct {
-	// Address is the address of the load balancer endpoint
-	// +kubebuilder:validation:Required
-	Address Address `json:"address"`
-}
+// type Endpoint struct {
+// 	// Address is the address of the load balancer endpoint
+// 	// +kubebuilder:validation:Required
+// 	Address Address `json:"address"`
+// }
 
-type LbEndpoints struct {
-	// Endpoints is a list of endpoints
-	// +kubebuilder:validation:Required
-	Endpoint []Endpoint `json:"endpoint"`
-}
+// type LbEndpoints struct {
+// 	// Endpoints is a list of endpoints
+// 	// +kubebuilder:validation:Required
+// 	Endpoint Endpoint `json:"endpoint"`
+// }
 
-type Endpoints struct {
-	// LbEndpoints is a list of load balancer endpoints
-	// +kubebuilder:validation:Required
-	LbEndpoints []LbEndpoints `json:"lb_endpoints"`
-}
+// type Endpoints struct {
+// 	// LbEndpoints is the load balancer endpoints
+// 	// +kubebuilder:validation:Required
+// 	LbEndpoints LbEndpoints `json:"lb_endpoints"`
+// }
 
-type LoadAssignment struct {
-	// ClusterName is the name of the cluster
-	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:Required
-	ClusterName string `json:"cluster_name"`
+// type LoadAssignment struct {
+// 	// ClusterName is the name of the cluster
+// 	// +kubebuilder:validation:MinLength=1
+// 	// +kubebuilder:validation:Required
+// 	ClusterName string `json:"cluster_name"`
 
-	// Endpoints is a list of endpoints
-	// +kubebuilder:validation:Required
-	Endpoints []Endpoints `json:"endpoints"`
-}
+// 	// Endpoints is a list of endpoints
+// 	// +kubebuilder:validation:Required
+// 	Endpoints []Endpoints `json:"endpoints"`
+// }
 
 type Cluster struct {
 	// Name is the name of the cluster
@@ -90,7 +90,7 @@ type Cluster struct {
 
 	// LoadAssignment is the load assignment for the cluster
 	// +kubebuilder:validation:Required
-	//LoadAssignment LoadAssignment `json:"load_assignment"`
+	// LoadAssignment LoadAssignment `json:"load_assignment"`
 }
 
 // Spec for the EnvoyProxyConfig.
@@ -103,7 +103,7 @@ type EnvoyProxyConfigSpec struct {
 
 	// HTTPFilters is a list of Envoy HTTP filters to be applied
 	// +kubebuilder:validation:Description="HTTP filters to be applied"
-	HTTPFilters []HTTPFilter `json:"filters"`
+	HTTPFilters []HTTPFilter `json:"httpFilters"`
 
 	// Clusters is a list of Envoy clusters
 	// +kubebuilder:validation:Description="Envoy clusters"
