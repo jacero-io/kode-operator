@@ -18,7 +18,6 @@ package controller
 
 import (
 	_ "embed"
-	"encoding/json"
 	"fmt"
 
 	kodev1alpha1 "github.com/emil-jacero/kode-operator/api/v1alpha1"
@@ -46,6 +45,8 @@ var schemaFile string
 type GetRenderedBootstrapConfigOptions struct {
 	CueFiles    []string
 	HTTPFilters []kodev1alpha1.HTTPFilter
+	Clusters    []kodev1alpha1.Cluster
+	ServicePort int32
 }
 
 // Define the Router filter
@@ -54,15 +55,6 @@ var RouterFilter = kodev1alpha1.HTTPFilter{
 	TypedConfig: runtime.RawExtension{
 		Raw: []byte(`{"@type": "type.googleapis.com/envoy.extensions.filters.http.router.v3.Router"}`),
 	},
-}
-
-// Utility function to convert a filter configuration to runtime.RawExtension
-func toRawExtension(filterConfig interface{}) (*runtime.RawExtension, error) {
-	data, err := json.Marshal(filterConfig)
-	if err != nil {
-		return nil, err
-	}
-	return &runtime.RawExtension{Raw: data}, nil
 }
 
 // EnsureRouterFilter ensures that the Router filter is added last in the list of filters.
@@ -86,8 +78,10 @@ func GetRenderedBootstrapConfig(log *logr.Logger, options GetRenderedBootstrapCo
 
 	// Create a new CUE context
 	ctx := cuecontext.New()
-	schema := ctx.CompileString(schemaFile).LookupPath(cue.ParsePath("#HTTPFilters"))
-	log.V(1).Info("Schema", "schema", schema)
+	httpFiltersSchema := ctx.CompileString(schemaFile).LookupPath(cue.ParsePath("#HTTPFilters"))
+	log.V(1).Info("HttpFilters schema", "schema", httpFiltersSchema)
+	clustersSchema := ctx.CompileString(schemaFile).LookupPath(cue.ParsePath("#Clusters"))
+	log.V(1).Info("Clusters schema", "schema", clustersSchema)
 
 	// Load the CUE instance from the provided files
 	inst := load.Instances(options.CueFiles, nil)[0]
@@ -102,18 +96,34 @@ func GetRenderedBootstrapConfig(log *logr.Logger, options GetRenderedBootstrapCo
 	}
 
 	// Add HTTPFilters to the CUE context
-	filtersValue := ctx.Encode(options.HTTPFilters)
-	if filtersValue.Err() != nil {
-		return "", fmt.Errorf("failed to encode HTTPFilters: %w", filtersValue.Err())
+	httpFiltersValue := ctx.Encode(options.HTTPFilters)
+	if httpFiltersValue.Err() != nil {
+		return "", fmt.Errorf("failed to encode HTTPFilters: %w", httpFiltersValue.Err())
 	}
-	log.V(1).Info("HTTPFilters", "filtersValue", filtersValue)
-	unified := schema.Unify(filtersValue)
-	if err := unified.Validate(); err != nil {
-		return "", fmt.Errorf("failed to unify HTTPFilters with Schema: %w", filtersValue.Err())
-	}
-	log.V(1).Info("Unified", "unified", unified)
+	log.V(1).Info("HTTPFilters", "filtersValue", httpFiltersValue)
 
-	value = value.FillPath(cue.ParsePath("#GoHttpFilters"), filtersValue)
+	unifiedHTTPFilterValues := httpFiltersSchema.Unify(httpFiltersValue)
+	if err := unifiedHTTPFilterValues.Validate(); err != nil {
+		return "", fmt.Errorf("failed to unify HTTPFilters with Schema: %w", httpFiltersValue.Err())
+	}
+	log.V(1).Info("Unified http filter values", "unified", unifiedHTTPFilterValues)
+
+	value = value.FillPath(cue.ParsePath("#GoHttpFilters"), httpFiltersValue)
+
+	// Add Clusters to the CUE context
+	clustersValue := ctx.Encode(options.Clusters)
+	if clustersValue.Err() != nil {
+		return "", fmt.Errorf("failed to encode Clusters: %w", clustersValue.Err())
+	}
+	log.V(1).Info("Clusters", "filtersValue", clustersValue)
+
+	unifiedClusterValues := clustersSchema.Unify(clustersValue)
+	if err := unifiedClusterValues.Validate(); err != nil {
+		return "", fmt.Errorf("failed to unify Clusters with Schema: %w", clustersValue.Err())
+	}
+	log.V(1).Info("Unified cluster values", "unified", unifiedClusterValues)
+
+	value = value.FillPath(cue.ParsePath("#GoClusters"), clustersValue)
 
 	// Convert the CUE value to YAML
 	yamlBytes, err := yaml.Encode(value)
@@ -130,10 +140,12 @@ func constructEnvoyProxyContainer(log *logr.Logger,
 	sharedKodeTemplateSpec *kodev1alpha1.SharedKodeTemplateSpec,
 	sharedEnvoyProxyTemplateSpec *kodev1alpha1.EnvoyProxyConfigSpec) (corev1.Container, error) {
 
-	// ContainerPort := templateSpec.Spec.Port
+	ServicePort := sharedKodeTemplateSpec.Port
 	config, err := GetRenderedBootstrapConfig(log, GetRenderedBootstrapConfigOptions{
 		CueFiles:    []string{"internal/controller/bootstrap.cue", "internal/controller/bootstrap_schema.cue"},
 		HTTPFilters: sharedEnvoyProxyTemplateSpec.HTTPFilters,
+		Clusters:    sharedEnvoyProxyTemplateSpec.Clusters,
+		ServicePort: ServicePort,
 	})
 	if err != nil {
 		return corev1.Container{}, fmt.Errorf("error rendering bootstrap config: %w", err)
@@ -146,7 +158,7 @@ func constructEnvoyProxyContainer(log *logr.Logger,
 			"--config-yaml", config,
 		},
 		Ports: []corev1.ContainerPort{
-			{Name: "http", ContainerPort: 8000},
+			{Name: "http", ContainerPort: ServicePort},
 		},
 	}, nil
 }

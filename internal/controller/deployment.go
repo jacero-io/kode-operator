@@ -122,10 +122,10 @@ func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode,
 		log.Info("EnvoyProxyTemplateRef is defined", "Name", sharedKodeTemplateSpec.EnvoyProxyTemplateRef.Name)
 		envoySidecarContainer, err := constructEnvoyProxyContainer(&log, sharedKodeTemplateSpec, sharedEnvoyProxyTemplateSpec)
 		if err != nil {
-			log.Error(err, "Failed to construct EnvoyProxy sidecar")
+			log.Error(err, "Failed to construct EnvoyProxy sidecar", "Kode", kode.Name, "Container", sharedKodeTemplateSpec.EnvoyProxyTemplateRef.Name)
 		} else {
 			containers = append(containers, envoySidecarContainer)
-			log.Info("Added EnvoyProxy sidecar container")
+			log.Info("Added EnvoyProxy sidecar container", "Kode", kode.Name, "Container", envoySidecarContainer.Name)
 		}
 	}
 

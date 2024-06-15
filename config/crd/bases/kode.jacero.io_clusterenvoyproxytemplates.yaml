@@ -65,39 +65,41 @@ spec:
                             properties:
                               lb_endpoints:
                                 description: LbEndpoints is the load balancer endpoints
-                                properties:
-                                  endpoint:
-                                    description: Endpoints is a list of endpoints
-                                    properties:
-                                      address:
-                                        description: Address is the address of the
-                                          load balancer endpoint
-                                        properties:
-                                          socket_address:
-                                            description: SocketAddress is the socket
-                                              address
-                                            properties:
-                                              address:
-                                                description: Address is the address
-                                                  of the socket
-                                                type: string
-                                              port_value:
-                                                description: PortValue is the port
-                                                  of the socket
-                                                type: integer
-                                            required:
-                                            - address
-                                            - port_value
-                                            type: object
-                                        required:
-                                        - socket_address
-                                        type: object
-                                    required:
-                                    - address
-                                    type: object
-                                required:
-                                - endpoint
-                                type: object
+                                items:
+                                  properties:
+                                    endpoint:
+                                      description: Endpoints is a list of endpoints
+                                      properties:
+                                        address:
+                                          description: Address is the address of the
+                                            load balancer endpoint
+                                          properties:
+                                            socket_address:
+                                              description: SocketAddress is the socket
+                                                address
+                                              properties:
+                                                address:
+                                                  description: Address is the address
+                                                    of the socket
+                                                  type: string
+                                                port_value:
+                                                  description: PortValue is the port
+                                                    of the socket
+                                                  type: integer
+                                              required:
+                                              - address
+                                              - port_value
+                                              type: object
+                                          required:
+                                          - socket_address
+                                          type: object
+                                      required:
+                                      - address
+                                      type: object
+                                  required:
+                                  - endpoint
+                                  type: object
+                                type: array
                             required:
                             - lb_endpoints
                             type: object

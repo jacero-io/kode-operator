@@ -1,9 +1,15 @@
 package bootstrap
 
-#Address: socket_address: {
-            address:    string
-            port_value: int
-        }
+#SocketAddress: {
+    address:    string
+    port_value: int
+}
+
+#Address: {
+    socket_address: #SocketAddress
+    pipe?: {...}
+    envoy_internal_address?: {...}
+}
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////
 // Definitions for the bootstrap configuration
@@ -88,18 +94,31 @@ package bootstrap
 // Endpoint Definitions
 #Endpoint: {
     address: #Address
+    health_check_config?: {...}
+    hostname?: string
+    additional_addresses?: [...]
 }
 
-#LBEndpoints: [...#Endpoint] | *[]
+#LbEndpoint: {
+    endpoint: #Endpoint
+    health_status?: string
+    metadata?: {...}
+    load_balancing_weight?: {...}
+}
 
-#Endpoints: [{
-    lb_endpoints: #LBEndpoints
-}]
+#LocalityLbEndpoints: {
+    locality?: {...}
+    lb_endpoints: [...#LbEndpoint]
+    load_balancer_endpoints?: {...}
+    leds_cluster_locality_config?: {...}
+    load_balancing_weight?: {...}
+    priority?: uint32
+}
 
-// Load Assignment Definitions
 #LoadAssignment: {
     cluster_name: string
-    endpoints: #Endpoints
+    endpoints: [#LocalityLbEndpoints]
+    policy?: {...}
 }
 
 // Cluster Definitions
@@ -108,7 +127,7 @@ package bootstrap
     connect_timeout: string | *"0.25s"
     type: string | *"STRICT_DNS"
     lb_policy: string | *"ROUND_ROBIN"
-    typed_extension_protocol_options?: "envoy.extensions.upstreams.http.v3.HttpProtocolOptions": {} | *{}
+    typed_extension_protocol_options?: {...}
     load_assignment: #LoadAssignment
 }
 

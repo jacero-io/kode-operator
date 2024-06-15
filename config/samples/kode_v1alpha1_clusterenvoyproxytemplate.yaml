@@ -17,16 +17,16 @@ spec:
         failure_mode_allow: false
         grpc_service:
           envoy_grpc:
-            cluster_name: ext_authz-opa-service
+            cluster_name: ext_authz-opa-service1
           timeout: 0.250s
         transport_api_version: V3
   clusters:
-    - name: ext_authz-opa-service
+    - name: ext_authz-opa-service1
       connect_timeout: 0.250s
       lb_policy: round_robin
       type: strict_dns
       load_assignment:
-        cluster_name: ext_authz-opa-service
+        cluster_name: ext_authz-opa-service1
         endpoints:
           - lb_endpoints:
               - endpoint:

@@ -26,8 +26,52 @@ package bootstrap
     typed_config: "@type": "type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog"
 }]
 
-// Define go httpFilter
-#GoHttpFilters: [...#HTTPFilter]
+#ExtAuthzOPAServiceFilter: #HTTPFilter & {
+    name: "envoy.filters.http.ext_authz"
+    typed_config: {
+        "@type": "type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz"
+        with_request_body: {
+            max_request_bytes:     8192
+            allow_partial_message: true
+        }
+        failure_mode_allow: false
+        grpc_service: {
+            envoy_grpc: cluster_name: #ExtAuthzOPAService.load_assignment.cluster_name
+            timeout: "0.250s"
+        }
+        transport_api_version: "V3"
+    }
+}
+
+#ExtAuthzOPAService: #Cluster & {
+    name:      "ext_authz-opa-service"
+    load_assignment: {
+        cluster_name: "ext_authz-opa-service"
+        endpoints: [{
+            lb_endpoints: [{endpoint: {
+                address: { socket_address: {
+                    address: "ext_authz-http-service"
+                    port_value: 8181
+                }}}
+            }]
+        }]
+    }
+}
+
+#LocalServiceCluster: #Cluster & {
+    name:      "local_service_cluster"
+    load_assignment: {
+        cluster_name: "local_service_cluster"
+        endpoints: [{
+            lb_endpoints: [{endpoint: {
+                address: { socket_address: {
+                    address: "local_service"
+                    port_value: 8080
+                }}}
+            }]
+        }]
+    }
+}
 
 #Listener0: #Listener & {
     name: "listener_0"
@@ -54,7 +98,7 @@ package bootstrap
                         domains: ["*"]
                         routes: [{
                             match: {prefix: "/"}
-                            route: {cluster: "webtop1"}
+                            route: {cluster: #LocalServiceCluster.load_assignment.cluster_name}
                         }]
                     }]
                 }
@@ -63,42 +107,14 @@ package bootstrap
     }]
 }
 
-#ExtAuthzOPAServiceFilter: #HTTPFilter & {
-    name: "envoy.filters.http.ext_authz"
-    typed_config: {
-        "@type": "type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz"
-        with_request_body: {
-            max_request_bytes:     8192
-            allow_partial_message: true
-        }
-        failure_mode_allow: false
-        grpc_service: {
-            envoy_grpc: cluster_name: #ExtAuthzOPAService.load_assignment.cluster_name
-            timeout: "0.250s"
-        }
-        transport_api_version: "V3"
-    }
-}
-
-#ExtAuthzOPAService: #Cluster & {
-    name:      "ext_authz-opa-service"
-    typed_extension_protocol_options: "envoy.extensions.upstreams.http.v3.HttpProtocolOptions": {}
-    load_assignment: {
-        cluster_name: "ext_authz-opa-service"
-        endpoints: [{
-            lb_endpoints: [{
-                address: { socket_address: {
-                    address: "ext_authz-http-service"
-                    port_value: 8181
-                }}
-            }]
-        }]
-    }
-}
+// Define go types
+#GoLocalServicePort: uint32 & 8080
+#GoHttpFilters: [...#HTTPFilter]
+#GoClusters: [...#Cluster]
 
 #BootstrapConfig: {
     listeners: #Listeners & [#Listener0]
-    clusters: #Clusters & [#ExtAuthzOPAService]
+    clusters: [#LocalServiceCluster] + #GoClusters
 }
 
 admin: #AdminServer
