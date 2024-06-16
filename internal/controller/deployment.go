@@ -85,7 +85,7 @@ func (r *KodeReconciler) ensureDeployment(ctx context.Context,
 // constructDeployment constructs a Deployment for the Kode instance
 func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode,
 	labels map[string]string,
-	sharedKodeTemplateSpec *kodev1alpha1.SharedKodeTemplateSpec,
+	templateSpec *kodev1alpha1.SharedKodeTemplateSpec,
 	sharedEnvoyProxyConfigSpec *kodev1alpha1.SharedEnvoyProxyConfigSpec) *appsv1.Deployment {
 
 	log := r.Log.WithName("constructDeployment")
@@ -95,34 +95,34 @@ func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode,
 	var workspace string
 	var mountPath string
 
-	workspace = path.Join(sharedKodeTemplateSpec.DefaultHome, sharedKodeTemplateSpec.DefaultWorkspace)
-	mountPath = sharedKodeTemplateSpec.DefaultHome
+	workspace = path.Join(templateSpec.DefaultHome, templateSpec.DefaultWorkspace)
+	mountPath = templateSpec.DefaultHome
 	if kode.Spec.Workspace != "" {
 		if kode.Spec.Home != "" {
 			workspace = path.Join(kode.Spec.Home, kode.Spec.Workspace)
 			mountPath = kode.Spec.Home
 		} else {
-			workspace = path.Join(sharedKodeTemplateSpec.DefaultHome, kode.Spec.Workspace)
+			workspace = path.Join(templateSpec.DefaultHome, kode.Spec.Workspace)
 		}
 	}
 
 	var containers []corev1.Container
 	var initContainers []corev1.Container
 
-	if sharedKodeTemplateSpec.Type == "code-server" {
-		containers = constructCodeServerContainers(kode, sharedKodeTemplateSpec, workspace)
-	} else if sharedKodeTemplateSpec.Type == "webtop" {
-		containers = constructWebtopContainers(kode, sharedKodeTemplateSpec)
+	if templateSpec.Type == "code-server" {
+		containers = constructCodeServerContainers(kode, templateSpec, workspace)
+	} else if templateSpec.Type == "webtop" {
+		containers = constructWebtopContainers(kode, templateSpec)
 	}
 
 	volumes, volumeMounts := constructVolumesAndMounts(mountPath, kode)
 	containers[0].VolumeMounts = volumeMounts
 
-	if sharedKodeTemplateSpec.EnvoyProxyRef.Name != "" {
-		log.Info("EnvoyProxyRef is defined", "Name", sharedKodeTemplateSpec.EnvoyProxyRef.Name)
-		envoySidecarContainer, envoyInitContainer, err := constructEnvoyProxyContainer(&log, sharedKodeTemplateSpec, sharedEnvoyProxyConfigSpec)
+	if templateSpec.EnvoyProxyRef.Name != "" {
+		log.Info("EnvoyProxyRef is defined", "Namespace", kode.Namespace, "Kode", kode.Name, "Name", templateSpec.EnvoyProxyRef.Name)
+		envoySidecarContainer, envoyInitContainer, err := constructEnvoyProxyContainer(log, templateSpec, sharedEnvoyProxyConfigSpec)
 		if err != nil {
-			log.Error(err, "Failed to construct EnvoyProxy sidecar", "Kode", kode.Name, "Container", sharedKodeTemplateSpec.EnvoyProxyRef.Name, "Error", err)
+			log.Error(err, "Failed to construct EnvoyProxy sidecar", "Kode", kode.Name, "Container", templateSpec.EnvoyProxyRef.Name, "Error", err)
 		} else {
 			containers = append(containers, envoySidecarContainer)
 			initContainers = append(initContainers, envoyInitContainer)
@@ -175,7 +175,7 @@ func constructCodeServerContainers(kode *kodev1alpha1.Kode,
 			{Name: "DEFAULT_WORKSPACE", Value: workspace},
 		},
 		Ports: []corev1.ContainerPort{{
-			Name:          "kode-port",
+			Name:          "http",
 			ContainerPort: templateSpec.Port,
 		}},
 	}}
@@ -196,7 +196,7 @@ func constructWebtopContainers(kode *kodev1alpha1.Kode,
 			{Name: "PASSWORD", Value: kode.Spec.Password},
 		},
 		Ports: []corev1.ContainerPort{{
-			Name:          "kode-port",
+			Name:          "http",
 			ContainerPort: templateSpec.Port,
 		}},
 	}}

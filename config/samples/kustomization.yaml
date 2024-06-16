@@ -1,15 +1,15 @@
 ## Append samples of your project ##
 resources:
-- kode_v1alpha1_kode_codserver.yaml
+- kode_v1alpha1_kode_codeserver.yaml
 # - kode_v1alpha1_kode_webtop.yaml
 
 - kode_v1alpha1_kodetemplate_codeserver.yaml
 # - kode_v1alpha1_kodetemplate_webtop.yaml
 
-- kode_v1alpha1_kodeclustertemplate_codeserver.yaml
+# - kode_v1alpha1_kodeclustertemplate_codeserver.yaml
 # - kode_v1alpha1_kodeclustertemplate_webtop.yaml
 
 - kode_v1alpha1_envoyproxyconfig.yaml
-- kode_v1alpha1_envoyproxyclusterconfig.yaml
+# - kode_v1alpha1_envoyproxyclusterconfig.yaml
 
 #+kubebuilder:scaffold:manifestskustomizesamples

@@ -1,0 +1,41 @@
+name: Test Operator
+
+on: [push, pull_request]
+
+env:
+  K8S_VERSION: 1.29.5 # Make sure this is the same as the version in the Makefile
+  GO_VERSION: 1.22
+  KIND_VERSION: 0.23.0
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: ${{ env.GO_VERSION }}
+
+    - name: Install kubectl
+      run: |
+        curl -LO "https://dl.k8s.io/release/v${{ env.K8S_VERSION }}/bin/linux/amd64/kubectl"
+        chmod +x kubectl
+        sudo mv kubectl /usr/local/bin/
+
+    - name: Install kind
+      run: |
+        curl -Lo ./kind https://kind.sigs.k8s.io/dl/v${{ env.KIND_VERSION }}/kind-linux-amd64
+        chmod +x kind
+        sudo mv kind /usr/local/bin/
+
+    - name: Create kind cluster
+      run: kind create cluster --image kindest/node:v${{ env.K8S_VERSION }}
+
+    - name: Run tests
+      run: make test
+
+    - name: Delete kind cluster
+      run: kind delete cluster

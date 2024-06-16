@@ -1,3 +1,4 @@
+---
 apiVersion: kode.jacero.io/v1alpha1
 kind: KodeClusterTemplate
 metadata:

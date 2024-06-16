@@ -29,13 +29,11 @@ type KodeTemplateReference struct {
 
 	// Name is the name of the KodeTemplate
 	// +kubebuilder:validation:Description="Name of the KodeTemplate"
-	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
 	// Namespace is the namespace of the KodeTemplate
 	// +kubebuilder:validation:Description="Namespace of the KodeTemplate"
-	// +kubebuilder:validation:MinLength=1
 	Namespace string `json:"namespace,omitempty"`
 }
 
@@ -99,6 +97,11 @@ type KodeStorageSpec struct {
 
 	// Resources specifies the resource requirements for the persistent volume
 	Resources corev1.VolumeResourceRequirements `json:"resources,omitempty"`
+
+	// KeepVolume specifies if the volume should be kept when the kode is deleted
+	// +kubebuilder:validation:Description="Specifies if the volume should be kept when the kode is deleted."
+	// +kubebuilder:default=false
+	KeepVolume *bool `json:"keepVolume,omitempty"`
 }
 
 type ConditionType string

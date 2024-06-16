@@ -1,3 +1,4 @@
+---
 apiVersion: kode.jacero.io/v1alpha1
 kind: KodeTemplate
 metadata:
@@ -5,10 +6,12 @@ metadata:
     app.kubernetes.io/name: kode-operator
     app.kubernetes.io/managed-by: kustomize
   name: kodetemplate-webtop-sample
+  namespace: default
 spec:
   envoyProxyRef:
     kind: EnvoyProxyConfig
     name: envoyproxyconfig-sample
+    namespace: default
   type: code-server
   image: lscr.io/linuxserver/code-server:latest
   tz: "Europe/Stockholm"

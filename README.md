@@ -99,6 +99,7 @@ These are cluster scoped and namespace scoped template for the Envoy Proxy sidec
 - [ ] Pause/Prune container on inactivity, keeping the persistent storage.
   - [ ] Backup & Restore of user stage. Maybe not feasible.
 - [ ] Backup & Restore of user data to S3.
+- [ ] A Kode CLI to manage Kode resources
 
 ## Usage Scenarios
 

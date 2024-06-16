@@ -1,3 +1,4 @@
+---
 apiVersion: kode.jacero.io/v1alpha1
 kind: EnvoyProxyConfig
 metadata:
@@ -5,6 +6,7 @@ metadata:
     app.kubernetes.io/name: kode-operator
     app.kubernetes.io/managed-by: kustomize
   name: envoyproxyconfig-sample
+  namespace: default
 spec:
   image: envoyproxy/envoy:v1.30-latest
   httpFilters:

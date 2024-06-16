@@ -74,6 +74,11 @@ spec:
                     items:
                       type: string
                     type: array
+                  keepVolume:
+                    default: false
+                    description: KeepVolume specifies if the volume should be kept
+                      when the kode is deleted
+                    type: boolean
                   resources:
                     description: Resources specifies the resource requirements for
                       the persistent volume
@@ -119,11 +124,9 @@ spec:
                     type: string
                   name:
                     description: Name is the name of the KodeTemplate
-                    minLength: 1
                     type: string
                   namespace:
                     description: Namespace is the namespace of the KodeTemplate
-                    minLength: 1
                     type: string
                 required:
                 - kind

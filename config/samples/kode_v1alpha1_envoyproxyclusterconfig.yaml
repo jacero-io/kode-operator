@@ -1,3 +1,4 @@
+---
 apiVersion: kode.jacero.io/v1alpha1
 kind: EnvoyProxyClusterConfig
 metadata:
@@ -34,4 +35,3 @@ spec:
                     socket_address:
                       address: opa-service
                       port_value: 8181
-

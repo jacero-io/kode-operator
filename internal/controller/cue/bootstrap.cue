@@ -108,7 +108,7 @@ package bootstrap
 }
 
 // Define go types
-#GoLocalServicePort: uint32
+#GoLocalServicePort: #Port | *3000
 #GoHttpFilters: [...#HTTPFilter]
 #GoClusters: [...#Cluster]
 

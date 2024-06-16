@@ -71,7 +71,7 @@ func (r *KodeReconciler) ensureService(ctx context.Context, kode *kodev1alpha1.K
 // constructService constructs a Service for the Kode instance
 func (r *KodeReconciler) constructService(kode *kodev1alpha1.Kode,
 	labels map[string]string,
-	sharedKodeTemplateSpec *kodev1alpha1.SharedKodeTemplateSpec) *corev1.Service {
+	templateSpec *kodev1alpha1.SharedKodeTemplateSpec) *corev1.Service {
 
 	log := r.Log.WithName("constructService")
 	service := &corev1.Service{
@@ -83,8 +83,8 @@ func (r *KodeReconciler) constructService(kode *kodev1alpha1.Kode,
 			Selector: labels,
 			Ports: []corev1.ServicePort{{
 				Protocol:   corev1.ProtocolTCP,
-				Port:       sharedKodeTemplateSpec.Port,
-				TargetPort: intstr.FromInt(int(sharedKodeTemplateSpec.Port)),
+				Port:       templateSpec.Port,
+				TargetPort: intstr.FromInt(int(templateSpec.Port)),
 			}},
 		},
 	}

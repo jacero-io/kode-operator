@@ -30,14 +30,16 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	client "sigs.k8s.io/controller-runtime/pkg/client"
-	handler "sigs.k8s.io/controller-runtime/pkg/handler"
+	controller "sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 )
 
 // Configuration constants
 const (
 	ContainerRestartPolicyAlways corev1.ContainerRestartPolicy = "Always"
 	PersistentVolumeClaimName                                  = "kode-pvc"
-	LoopRetryTime                                              = 10 * time.Second
+	LoopRetryTime                                              = 3 * time.Second
+	OperatorName                                               = "kode-operator"
 )
 
 type KodeReconciler struct {
@@ -57,22 +59,22 @@ type KodeReconciler struct {
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
 
-// TODO: When requeued (EnvoyProxyConfig, EnvoyProxyClusterConfig) or (KodeTemplate, KodeClusterTemplate), force reconcile of Kode instance
+// TODO: When requeued (EnvoyProxyConfig, EnvoyProxyClusterConfig) or (KodeTemplate, KodeClusterTemplate), force reconcile of Kode resource
 
 func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithName("Reconcile")
 
 	labels := map[string]string{}
 
-	// Fetch the Kode instance
+	// Fetch the Kode resource
 	kode := &kodev1alpha1.Kode{}
 	if err := r.Get(ctx, req.NamespacedName, kode); err != nil {
 		if client.IgnoreNotFound(err) != nil {
-			log.Error(err, "Failed to fetch Kode instance", "Namespace", req.Namespace, "Name", req.Name)
+			log.Error(err, "Failed to fetch Kode resource", "Namespace", req.Namespace, "Name", req.Name)
 		}
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-	log.Info("Fetching Kode instance", "Namespace", req.Namespace, "Name", req.Name, "TemplateRef", kode.Spec.TemplateRef.Name, "TemplateRefKind", kode.Spec.TemplateRef.Kind)
+	log.Info("Fetching Kode resource", "Namespace", req.Namespace, "Name", req.Name, "TemplateRefKind", kode.Spec.TemplateRef.Kind, "TemplateRef", kode.Spec.TemplateRef.Name)
 	logKodeManifest(log, kode)
 
 	// Validate references
@@ -84,10 +86,10 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	var sharedKodeTemplateSpec kodev1alpha1.SharedKodeTemplateSpec
 	var sharedEnvoyProxyConfigSpec kodev1alpha1.SharedEnvoyProxyConfigSpec
 
-	// Fetch the KodeTemplate or KodeClusterTemplate instance and EnvoyProxyConfig instance
+	// Fetch the KodeTemplate or KodeClusterTemplate resource and EnvoyProxyConfig resource
 	if kode.Spec.TemplateRef.Name != "" {
 		labels["app.kubernetes.io/name"] = "kode-" + kode.Name
-		labels["app.kubernetes.io/managed-by"] = "kode-operator"
+		labels["app.kubernetes.io/managed-by"] = OperatorName
 		labels["kode.jacero.io/name"] = kode.Name
 
 		if kode.Spec.TemplateRef.Kind == "KodeTemplate" {
@@ -95,43 +97,46 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 			kodeTemplateName := kode.Spec.TemplateRef.Name
 			templateNamespace := kode.Spec.TemplateRef.Namespace
 
+			// If no namespace is provided, use the namespace of the Kode resource
 			if templateNamespace == "" {
 				templateNamespace = kode.Namespace
 			}
 			kodeTemplateNameObject := client.ObjectKey{Name: kodeTemplateName, Namespace: templateNamespace}
-			log.Info("Fetching KodeTemplate instance", "Name", kode.Spec.TemplateRef.Name, "Namespace", templateNamespace)
+			log.Info("Fetching KodeTemplate resource", "Namespace", templateNamespace, "Name", kodeTemplateName)
 
+			// Attempt to fetch the KodeTemplate resource
 			if err := r.Get(ctx, kodeTemplateNameObject, kodeTemplate); err != nil {
 				if errors.IsNotFound(err) {
-					log.Info("KodeTemplate instance not found in namespace, requeuing", "Namespace", templateNamespace, "Name", kodeTemplateName)
+					log.Info("KodeTemplate resource not found in namespace, requeuing", "Namespace", templateNamespace, "Name", kodeTemplateName)
 					return ctrl.Result{RequeueAfter: LoopRetryTime}, nil
 				}
-				log.Error(err, "Failed to fetch KodeTemplate instance", "Namespace", templateNamespace, "Name", kode.Spec.TemplateRef.Name)
+				log.Error(err, "Failed to fetch KodeTemplate resource", "Namespace", templateNamespace, "Name", kode.Spec.TemplateRef.Name)
 				return ctrl.Result{Requeue: true}, err
 			}
-			log.Info("KodeTemplate instance found", "Name", kodeTemplateName)
-			labels["template.kode.jacero.io/name"] = kodeTemplate.Name
+			log.Info("KodeTemplate resource found", "Namespace", kodeTemplate.Namespace, "Name", kodeTemplate.Name)
+			labels["kode-template.kode.jacero.io/name"] = kodeTemplate.Name
 			sharedKodeTemplateSpec = kodeTemplate.Spec.SharedKodeTemplateSpec
 
+			// Attempt to fetch the EnvoyProxyConfig resource
 			if kodeTemplate.Spec.EnvoyProxyRef.Name != "" {
 				envoyProxyConfig := &kodev1alpha1.EnvoyProxyConfig{}
 				envoyProxyConfigName := kodeTemplate.Spec.EnvoyProxyRef.Name
-				envoyTemplateNamespace := kodeTemplate.Spec.EnvoyProxyRef.Namespace
-				if envoyTemplateNamespace == "" {
-					envoyTemplateNamespace = kode.Namespace
+				envoyProxyConfigNamespace := kodeTemplate.Spec.EnvoyProxyRef.Namespace
+				if envoyProxyConfigNamespace == "" {
+					envoyProxyConfigNamespace = kode.Namespace
 				}
 
-				envoyProxyConfigNameObject := client.ObjectKey{Name: envoyProxyConfigName, Namespace: envoyTemplateNamespace}
-				log.Info("Fetching EnvoyProxyConfig instance", "Name", envoyProxyConfigName, "Namespace", envoyTemplateNamespace)
+				envoyProxyConfigNameObject := client.ObjectKey{Name: envoyProxyConfigName, Namespace: envoyProxyConfigNamespace}
+				log.Info("Fetching EnvoyProxyConfig resource", "Name", envoyProxyConfigName, "Namespace", envoyProxyConfigNamespace)
 				if err := r.Get(ctx, envoyProxyConfigNameObject, envoyProxyConfig); err != nil {
 					if errors.IsNotFound(err) {
-						log.Info("EnvoyProxyConfig instance not found in namespace, requeuing", "Namespace", templateNamespace, "Name", envoyProxyConfigName)
+						log.Info("EnvoyProxyConfig resource not found in namespace, requeuing", kodeTemplate.Namespace, "Name", kodeTemplate.Name)
 						return ctrl.Result{RequeueAfter: LoopRetryTime}, nil
 					}
-					log.Error(err, "Failed to fetch EnvoyProxyConfig instance", "Namespace", envoyTemplateNamespace, "Name", kodeTemplate.Spec.EnvoyProxyRef.Name)
+					log.Error(err, "Failed to fetch EnvoyProxyConfig resource", "Namespace", envoyProxyConfigNamespace, "Name", kodeTemplate.Spec.EnvoyProxyRef.Name, "Namespace", kodeTemplate.Namespace, "Name", kodeTemplate.Name)
 					return ctrl.Result{Requeue: true}, err
 				}
-				log.Info("EnvoyProxyConfig instance found", "Name", envoyProxyConfig.Name)
+				log.Info("EnvoyProxyConfig resource found", "Namespace", envoyProxyConfigNamespace, "Name", envoyProxyConfig.Name, "Namespace", kodeTemplate.Namespace, "Name", kodeTemplate.Name)
 				labels["envoyproxy-config.kode.jacero.io/name"] = envoyProxyConfig.Name
 				sharedEnvoyProxyConfigSpec = envoyProxyConfig.Spec.SharedEnvoyProxyConfigSpec
 			}
@@ -140,33 +145,35 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 			kodeClusterTemplateName := kode.Spec.TemplateRef.Name
 			kodeClusterTemplateNameObject := client.ObjectKey{Name: kodeClusterTemplateName}
 
-			log.Info("Fetching KodeClusterTemplate instance", "Name", kodeClusterTemplateName)
+			// Attempt to fetch the KodeClusterTemplate resource
+			log.Info("Fetching KodeClusterTemplate resource", "Name", kodeClusterTemplateName)
 			if err := r.Get(ctx, kodeClusterTemplateNameObject, kodeClusterTemplate); err != nil {
 				if errors.IsNotFound(err) {
-					log.Info("KodeClusterTemplate instance not found, requeuing", "Name", kodeClusterTemplateName)
+					log.Info("KodeClusterTemplate resource not found, requeuing", "Name", kodeClusterTemplateName)
 					return ctrl.Result{RequeueAfter: LoopRetryTime}, nil
 				}
-				log.Error(err, "Failed to fetch KodeClusterTemplate instance", "Name", kodeClusterTemplateName)
+				log.Error(err, "Failed to fetch KodeClusterTemplate resource", "Name", kodeClusterTemplateName)
 				return ctrl.Result{Requeue: true}, err
 			}
-			log.Info("KodeClusterTemplate instance found", "Name", kodeClusterTemplateName)
-			labels["cluster-template.kode.jacero.io/name"] = kodeClusterTemplate.Name
+			log.Info("KodeClusterTemplate resource found", "Name", kodeClusterTemplateName)
+			labels["kode-cluster-template.kode.jacero.io/name"] = kodeClusterTemplate.Name
 			sharedKodeTemplateSpec = kodeClusterTemplate.Spec.SharedKodeTemplateSpec
 
+			// Attempt to fetch the EnvoyProxyClusterConfig resource
 			if kodeClusterTemplate.Spec.EnvoyProxyRef.Name != "" {
 				envoyProxyClusterConfig := &kodev1alpha1.EnvoyProxyClusterConfig{}
 				envoyProxyClusterConfigName := kodeClusterTemplate.Spec.EnvoyProxyRef.Name
 				envoyProxyClusterConfigNameObject := client.ObjectKey{Name: envoyProxyClusterConfigName}
-				log.Info("Fetching EnvoyProxyConfig instance", "Name", envoyProxyClusterConfigName)
+				log.Info("Fetching EnvoyProxyClusterConfig resource", "Name", envoyProxyClusterConfigName)
 				if err := r.Get(ctx, envoyProxyClusterConfigNameObject, envoyProxyClusterConfig); err != nil {
 					if errors.IsNotFound(err) {
-						log.Info("EnvoyProxyConfig instance not found, requeuing", "Name", envoyProxyClusterConfigName)
+						log.Info("EnvoyProxyClusterConfig resource not found, requeuing", "Name", envoyProxyClusterConfigName)
 						return ctrl.Result{RequeueAfter: LoopRetryTime}, nil
 					}
-					log.Error(err, "Failed to fetch EnvoyProxyConfig instance", "Name", envoyProxyClusterConfigName)
+					log.Error(err, "Failed to fetch EnvoyProxyClusterConfig resource", "Name", envoyProxyClusterConfigName)
 					return ctrl.Result{Requeue: true}, err
 				}
-				log.Info("EnvoyProxyConfig instance found", "Name", envoyProxyClusterConfig.Name)
+				log.Info("EnvoyProxyClusterConfig resource found", "Name", envoyProxyClusterConfig.Name)
 				labels["cluster-envoyproxy-config.kode.jacero.io/name"] = envoyProxyClusterConfig.Name
 				sharedEnvoyProxyConfigSpec = envoyProxyClusterConfig.Spec.SharedEnvoyProxyConfigSpec
 			}
@@ -200,9 +207,9 @@ func (r *KodeReconciler) validateReferences(kode *kodev1alpha1.Kode) error {
 
 func (r *KodeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	r.Log = ctrl.Log.WithName("Kode")
-	// cache := mgr.GetCache()
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&kodev1alpha1.Kode{}).
+		WithOptions(controller.Options{MaxConcurrentReconciles: 1}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).
 		Watches(&kodev1alpha1.KodeTemplate{}, &handler.EnqueueRequestForObject{}).

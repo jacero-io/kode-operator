@@ -6,10 +6,12 @@ metadata:
     app.kubernetes.io/name: kode-operator
     app.kubernetes.io/managed-by: kustomize
   name: kode-codeserver-sample
+  namespace: default
 spec:
   templateRef:
-    kind: KodeClusterTemplate
-    name: kodeclustertemplate-codeserver-sample
+    kind: KodeTemplate
+    name: kodetemplate-codeserver-sample
+    namespace: default
   user: user1
   password: password1
   # storage:

@@ -1,8 +1,10 @@
 package bootstrap
 
+#Port: uint32
+
 #SocketAddress: {
     address:    string
-    port_value: int
+    port_value: #Port
 }
 
 #Address: {
