@@ -3,7 +3,7 @@ name: Test Operator
 on: [push, pull_request]
 
 env:
-  K8S_VERSION: 1.29.5 # Make sure this is the same as the version in the Makefile
+  K8S_VERSION: 1.29.0 # Make sure this is the same as the version in the Makefile
   GO_VERSION: 1.22
   KIND_VERSION: 0.23.0
 
