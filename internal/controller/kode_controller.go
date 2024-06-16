@@ -31,14 +31,13 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	client "sigs.k8s.io/controller-runtime/pkg/client"
 	controller "sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 )
 
 // Configuration constants
 const (
 	ContainerRestartPolicyAlways corev1.ContainerRestartPolicy = "Always"
 	PersistentVolumeClaimName                                  = "kode-pvc"
-	LoopRetryTime                                              = 3 * time.Second
+	LoopRetryTime                                              = 5 * time.Second
 	OperatorName                                               = "kode-operator"
 )
 
@@ -74,7 +73,7 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		}
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
-	log.Info("Fetching Kode resource", "Namespace", req.Namespace, "Name", req.Name, "TemplateRefKind", kode.Spec.TemplateRef.Kind, "TemplateRef", kode.Spec.TemplateRef.Name)
+	log.Info("Fetching Kode resource", "Namespace", req.Namespace, "Name", req.Name)
 	logKodeManifest(log, kode)
 
 	// Validate references
@@ -95,25 +94,25 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		if kode.Spec.TemplateRef.Kind == "KodeTemplate" {
 			kodeTemplate := &kodev1alpha1.KodeTemplate{}
 			kodeTemplateName := kode.Spec.TemplateRef.Name
-			templateNamespace := kode.Spec.TemplateRef.Namespace
+			kodeTemplateNamespace := kode.Spec.TemplateRef.Namespace
 
 			// If no namespace is provided, use the namespace of the Kode resource
-			if templateNamespace == "" {
-				templateNamespace = kode.Namespace
+			if kodeTemplateNamespace == "" {
+				kodeTemplateNamespace = kode.Namespace
 			}
-			kodeTemplateNameObject := client.ObjectKey{Name: kodeTemplateName, Namespace: templateNamespace}
-			log.Info("Fetching KodeTemplate resource", "Namespace", templateNamespace, "Name", kodeTemplateName)
+			kodeTemplateNameObject := client.ObjectKey{Name: kodeTemplateName, Namespace: kodeTemplateNamespace}
+			log.Info("Fetching KodeTemplate resource", "Namespace", kodeTemplateNamespace, "Name", kodeTemplateName)
 
 			// Attempt to fetch the KodeTemplate resource
 			if err := r.Get(ctx, kodeTemplateNameObject, kodeTemplate); err != nil {
 				if errors.IsNotFound(err) {
-					log.Info("KodeTemplate resource not found in namespace, requeuing", "Namespace", templateNamespace, "Name", kodeTemplateName)
+					log.Info("KodeTemplate resource not found in namespace, requeuing", "Namespace", kodeTemplateNamespace, "Name", kodeTemplateName)
 					return ctrl.Result{RequeueAfter: LoopRetryTime}, nil
 				}
-				log.Error(err, "Failed to fetch KodeTemplate resource", "Namespace", templateNamespace, "Name", kode.Spec.TemplateRef.Name)
+				log.Error(err, "Failed to fetch KodeTemplate resource", "Namespace", kodeTemplateNamespace, "Name", kode.Spec.TemplateRef.Name)
 				return ctrl.Result{Requeue: true}, err
 			}
-			log.Info("KodeTemplate resource found", "Namespace", kodeTemplate.Namespace, "Name", kodeTemplate.Name)
+			log.Info("KodeTemplate resource found", "Namespace", kodeTemplateNamespace, "Name", kodeTemplate.Name)
 			labels["kode-template.kode.jacero.io/name"] = kodeTemplate.Name
 			sharedKodeTemplateSpec = kodeTemplate.Spec.SharedKodeTemplateSpec
 
@@ -130,13 +129,21 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 				log.Info("Fetching EnvoyProxyConfig resource", "Name", envoyProxyConfigName, "Namespace", envoyProxyConfigNamespace)
 				if err := r.Get(ctx, envoyProxyConfigNameObject, envoyProxyConfig); err != nil {
 					if errors.IsNotFound(err) {
-						log.Info("EnvoyProxyConfig resource not found in namespace, requeuing", kodeTemplate.Namespace, "Name", kodeTemplate.Name)
+						log.Info("EnvoyProxyConfig resource not found in namespace, requeuing", "Namespace", envoyProxyConfigNamespace, "Name", envoyProxyConfigName)
 						return ctrl.Result{RequeueAfter: LoopRetryTime}, nil
 					}
-					log.Error(err, "Failed to fetch EnvoyProxyConfig resource", "Namespace", envoyProxyConfigNamespace, "Name", kodeTemplate.Spec.EnvoyProxyRef.Name, "Namespace", kodeTemplate.Namespace, "Name", kodeTemplate.Name)
+					log.Error(err, "Failed to fetch EnvoyProxyConfig resource",
+						"EnvoyProxy_Namespace", envoyProxyConfig.Namespace,
+						"EnvoyProxy_Name", envoyProxyConfig.Name,
+						"KodeTemplate_Namespace", kodeTemplate.Namespace,
+						"KodeTemplate_Name", kodeTemplate.Name)
 					return ctrl.Result{Requeue: true}, err
 				}
-				log.Info("EnvoyProxyConfig resource found", "Namespace", envoyProxyConfigNamespace, "Name", envoyProxyConfig.Name, "Namespace", kodeTemplate.Namespace, "Name", kodeTemplate.Name)
+				log.Info("EnvoyProxyConfig resource found",
+					"EnvoyProxy_Namespace", envoyProxyConfig.Namespace,
+					"EnvoyProxy_Name", envoyProxyConfig.Name,
+					"KodeTemplate_Namespace", kodeTemplate.Namespace,
+					"KodeTemplate_Name", kodeTemplate.Name)
 				labels["envoyproxy-config.kode.jacero.io/name"] = envoyProxyConfig.Name
 				sharedEnvoyProxyConfigSpec = envoyProxyConfig.Spec.SharedEnvoyProxyConfigSpec
 			}
@@ -174,7 +181,10 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 					return ctrl.Result{Requeue: true}, err
 				}
 				log.Info("EnvoyProxyClusterConfig resource found", "Name", envoyProxyClusterConfig.Name)
-				labels["cluster-envoyproxy-config.kode.jacero.io/name"] = envoyProxyClusterConfig.Name
+				log.Info("EnvoyProxyClusterConfig resource found",
+					"EnvoyProxy_Name", envoyProxyClusterConfig.Name,
+					"KodeTemplate_Name", kodeClusterTemplate.Name)
+				labels["envoyproxy-cluster-config.kode.jacero.io/name"] = envoyProxyClusterConfig.Name
 				sharedEnvoyProxyConfigSpec = envoyProxyClusterConfig.Spec.SharedEnvoyProxyConfigSpec
 			}
 		}
@@ -212,10 +222,10 @@ func (r *KodeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		WithOptions(controller.Options{MaxConcurrentReconciles: 1}).
 		Owns(&appsv1.Deployment{}).
 		Owns(&corev1.Service{}).
-		Watches(&kodev1alpha1.KodeTemplate{}, &handler.EnqueueRequestForObject{}).
-		Watches(&kodev1alpha1.KodeClusterTemplate{}, &handler.EnqueueRequestForObject{}).
-		Watches(&kodev1alpha1.EnvoyProxyConfig{}, &handler.EnqueueRequestForObject{}).
-		Watches(&kodev1alpha1.EnvoyProxyClusterConfig{}, &handler.EnqueueRequestForObject{}).
+		// Watches(&kodev1alpha1.KodeTemplate{}, &handler.EnqueueRequestForObject{}).
+		// Watches(&kodev1alpha1.KodeClusterTemplate{}, &handler.EnqueueRequestForObject{}).
+		// Watches(&kodev1alpha1.EnvoyProxyConfig{}, &handler.EnqueueRequestForObject{}).
+		// Watches(&kodev1alpha1.EnvoyProxyClusterConfig{}, &handler.EnqueueRequestForObject{}).
 		Owns(&corev1.PersistentVolumeClaim{}).
 		Complete(r)
 }

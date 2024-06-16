@@ -237,7 +237,7 @@ func constructEnvoyProxyContainer(log logr.Logger,
 			"--config-yaml", config,
 		},
 		Ports: []corev1.ContainerPort{
-			{Name: "http", ContainerPort: servicePort},
+			{Name: "envoy-http", ContainerPort: servicePort},
 		},
 		SecurityContext: &corev1.SecurityContext{
 			RunAsUser: int64Ptr(EnvoyProxyRunAsUser),

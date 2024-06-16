@@ -196,6 +196,31 @@ var _ = Describe("Kode Controller", func() {
 			err := k8sClient.Create(ctx, namespace)
 			Expect(err).NotTo(HaveOccurred())
 
+			By("creating the custom resource for the Kind Kode")
+			kode := &kodev1alpha1.Kode{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      kodeResourceName,
+					Namespace: resourceNamespace,
+				},
+				Spec: kodev1alpha1.KodeSpec{
+					TemplateRef: kodev1alpha1.KodeTemplateReference{
+						Kind:      kodeTemplateKind,
+						Name:      kodeTemplateName,
+						Namespace: resourceNamespace,
+					},
+					Storage: kodev1alpha1.KodeStorageSpec{
+						AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+						Resources: corev1.VolumeResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceStorage: resource.MustParse("1Gi"),
+							},
+						},
+					},
+				},
+			}
+			err = k8sClient.Create(ctx, kode)
+			Expect(err).NotTo(HaveOccurred())
+
 			By("creating the custom resource for the Kind KodeTemplate")
 			kodeTemplate := &kodev1alpha1.KodeTemplate{
 				ObjectMeta: metav1.ObjectMeta{
@@ -234,51 +259,38 @@ var _ = Describe("Kode Controller", func() {
 			}
 			err = k8sClient.Create(ctx, envoyProxyConfig)
 			Expect(err).NotTo(HaveOccurred())
-
-			By("creating the custom resource for the Kind Kode")
-			kode := &kodev1alpha1.Kode{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      kodeResourceName,
-					Namespace: resourceNamespace,
-				},
-				Spec: kodev1alpha1.KodeSpec{
-					TemplateRef: kodev1alpha1.KodeTemplateReference{
-						Kind:      kodeTemplateKind,
-						Name:      kodeTemplateName,
-						Namespace: resourceNamespace,
-					},
-					Storage: kodev1alpha1.KodeStorageSpec{
-						AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-						Resources: corev1.VolumeResourceRequirements{
-							Requests: corev1.ResourceList{
-								corev1.ResourceStorage: resource.MustParse("1Gi"),
-							},
-						},
-					},
-				},
-			}
-			err = k8sClient.Create(ctx, kode)
-			Expect(err).NotTo(HaveOccurred())
 		})
 
 		AfterEach(func() {
 			By("deleting the custom resource for the Kind Kode")
 			kode := &kodev1alpha1.Kode{}
 			err := k8sClient.Get(ctx, typeNamespacedName, kode)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(k8sClient.Delete(ctx, kode)).To(Succeed())
+			if err == nil {
+				Expect(k8sClient.Delete(ctx, kode)).To(Succeed())
+			}
 
 			By("deleting the custom resource for the Kind KodeTemplate")
 			kodeTemplate := &kodev1alpha1.KodeTemplate{}
-			err = k8sClient.Get(ctx, types.NamespacedName{Name: kodeTemplateName, Namespace: resourceNamespace}, kodeTemplate)
-			Expect(err).NotTo(HaveOccurred())
-			Expect(k8sClient.Delete(ctx, kodeTemplate)).To(Succeed())
+			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: resourceNamespace, Name: kodeTemplateName}, kodeTemplate)
+			if err == nil {
+				Expect(k8sClient.Delete(ctx, kodeTemplate)).To(Succeed())
+			}
 
 			By("deleting the custom resource for the Kind EnvoyProxyConfig")
 			envoyProxyConfig := &kodev1alpha1.EnvoyProxyConfig{}
-			err = k8sClient.Get(ctx, types.NamespacedName{Name: envoyProxyConfigName, Namespace: resourceNamespace}, envoyProxyConfig)
+			err = k8sClient.Get(ctx, types.NamespacedName{Namespace: resourceNamespace, Name: envoyProxyConfigName}, envoyProxyConfig)
+			if err == nil {
+				Expect(k8sClient.Delete(ctx, envoyProxyConfig)).To(Succeed())
+			}
+
+			By("deleting the namespace for the test")
+			namespace := &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: resourceNamespace,
+				},
+			}
+			err = k8sClient.Delete(ctx, namespace)
 			Expect(err).NotTo(HaveOccurred())
-			Expect(k8sClient.Delete(ctx, envoyProxyConfig)).To(Succeed())
 		})
 
 		It("should create a Deployment for the Kode resource", func() {
@@ -292,15 +304,332 @@ var _ = Describe("Kode Controller", func() {
 			Expect(deployment.Spec.Template.Spec.Containers[0].Image).To(Equal(kodeTemplateImage))
 		})
 
-		// It("should create a Service for the Kode resource", func() {
-		// 	By("checking if the Service has been created")
-		// 	service := &corev1.Service{}
+		It("should create a Service for the Kode resource", func() {
+			By("checking if the Service has been created")
+			service := &corev1.Service{}
+			Eventually(func() error {
+				return k8sClient.Get(ctx, typeNamespacedName, service)
+			}, timeout, interval).Should(Succeed())
+
+			Expect(service.Spec.Ports).To(HaveLen(1))
+			Expect(service.Spec.Ports[0].Port).To(Equal(int32(3000)))
+		})
+
+		// // TODO: Fix validation. It should find the created PVC
+		// It("should create a PersistentVolumeClaim for the Kode resource if storage is defined", func() {
+		// 	By("checking if the PersistentVolumeClaim has been created")
+		// 	pvcNamespacedName := types.NamespacedName{
+		// 		Name:      "kode-pvc",
+		// 		Namespace: resourceNamespace,
+		// 	}
+		// 	pvc := &corev1.PersistentVolumeClaim{}
 		// 	Eventually(func() error {
-		// 		return k8sClient.Get(ctx, typeNamespacedName, service)
+		// 		return k8sClient.Get(ctx, pvcNamespacedName, pvc)
 		// 	}, timeout, interval).Should(Succeed())
 
-		// 	Expect(service.Spec.Ports).To(HaveLen(1))
-		// 	Expect(service.Spec.Ports[0].Port).To(Equal(int32(3000)))
+		// 	Expect(pvc.Name).To(Equal("kode-pvc"))
+		// 	Expect(pvc.Spec.Resources.Requests[corev1.ResourceStorage]).To(Equal(resource.MustParse("1Gi")))
+		// })
+
+		// // TODO: Fix validation. It should fail when KodeTemplate has an invalid image name
+		// It("should handle an invalid image name", func() {
+		// 	By("creating a KodeTemplate resource with an invalid image name")
+		// 	kodeTemplate := &kodev1alpha1.KodeTemplate{
+		// 		ObjectMeta: metav1.ObjectMeta{
+		// 			Name:      "test-kodetemplate-invalid",
+		// 			Namespace: resourceNamespace,
+		// 		},
+		// 		Spec: kodev1alpha1.KodeTemplateSpec{
+		// 			SharedKodeTemplateSpec: kodev1alpha1.SharedKodeTemplateSpec{
+		// 				EnvoyProxyRef: kodev1alpha1.EnvoyProxyReference{
+		// 					Kind: envoyProxyConfigKind,
+		// 					Name: envoyProxyConfigName,
+		// 				},
+		// 				Image: "invalid-image-name",
+		// 				Type:  "code-server",
+		// 			},
+		// 		},
+		// 	}
+		// 	err := k8sClient.Create(ctx, kodeTemplate)
+		// 	Expect(err).ToNot(HaveOccurred())
+
+		// 	By("creating a Kode resource that references the invalid KodeTemplate")
+		// 	kode := &kodev1alpha1.Kode{
+		// 		ObjectMeta: metav1.ObjectMeta{
+		// 			Name:      "test-kode-invalid-image",
+		// 			Namespace: resourceNamespace,
+		// 		},
+		// 		Spec: kodev1alpha1.KodeSpec{
+		// 			TemplateRef: kodev1alpha1.KodeTemplateReference{
+		// 				Kind:      kodeTemplateKind,
+		// 				Name:      "test-kodetemplate-invalid",
+		// 				Namespace: resourceNamespace,
+		// 			},
+		// 		},
+		// 	}
+		// 	err = k8sClient.Create(ctx, kode)
+		// 	Expect(err).To(HaveOccurred())
+		// })
+
+		// It("should create a Kode resource if the TemplateRef is set and the KodeTemplate exists", func() {
+		// 	By("creating the custom resource for the Kind KodeTemplate")
+		// 	kodeTemplate := &kodev1alpha1.KodeTemplate{
+		// 		ObjectMeta: metav1.ObjectMeta{
+		// 			Name:      kodeTemplateName,
+		// 			Namespace: resourceNamespace,
+		// 		},
+		// 		Spec: kodev1alpha1.KodeTemplateSpec{
+		// 			SharedKodeTemplateSpec: kodev1alpha1.SharedKodeTemplateSpec{
+		// 				EnvoyProxyRef: kodev1alpha1.EnvoyProxyReference{
+		// 					Kind: envoyProxyConfigKind,
+		// 					Name: envoyProxyConfigName,
+		// 				},
+		// 				Image: kodeTemplateImage,
+		// 				Type:  "code-server",
+		// 			},
+		// 		},
+		// 	}
+		// 	err := k8sClient.Create(ctx, kodeTemplate)
+		// 	Expect(err).NotTo(HaveOccurred())
+
+		// 	By("creating the custom resource for the Kind EnvoyProxyConfig")
+		// 	envoyProxyConfig := &kodev1alpha1.EnvoyProxyConfig{
+		// 		ObjectMeta: metav1.ObjectMeta{
+		// 			Name:      envoyProxyConfigName,
+		// 			Namespace: resourceNamespace,
+		// 		},
+		// 		Spec: kodev1alpha1.EnvoyProxyConfigSpec{
+		// 			SharedEnvoyProxyConfigSpec: kodev1alpha1.SharedEnvoyProxyConfigSpec{
+		// 				Image: envoyProxyConfigImage,
+		// 				HTTPFilters: []kodev1alpha1.HTTPFilter{{
+		// 					Name:        "filter1",
+		// 					TypedConfig: runtime.RawExtension{Raw: []byte(envoyProxyConfigFilter)},
+		// 				}},
+		// 			},
+		// 		},
+		// 	}
+		// 	err = k8sClient.Create(ctx, envoyProxyConfig)
+		// 	Expect(err).NotTo(HaveOccurred())
+
+		// 	By("creating the custom resource for the Kind Kode")
+		// 	kode := &kodev1alpha1.Kode{
+		// 		ObjectMeta: metav1.ObjectMeta{
+		// 			Name:      kodeResourceName,
+		// 			Namespace: resourceNamespace,
+		// 		},
+		// 		Spec: kodev1alpha1.KodeSpec{
+		// 			TemplateRef: kodev1alpha1.KodeTemplateReference{
+		// 				Kind:      kodeTemplateKind,
+		// 				Name:      kodeTemplateName,
+		// 				Namespace: resourceNamespace,
+		// 			},
+		// 			Storage: kodev1alpha1.KodeStorageSpec{
+		// 				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+		// 				Resources: corev1.VolumeResourceRequirements{
+		// 					Requests: corev1.ResourceList{
+		// 						corev1.ResourceStorage: resource.MustParse("1Gi"),
+		// 					},
+		// 				},
+		// 			},
+		// 		},
+		// 	}
+		// 	err = k8sClient.Create(ctx, kode)
+		// 	Expect(err).NotTo(HaveOccurred())
+		// })
+
+		// It("should NOT create a Kode resource if the TemplateRef is set and the KodeTemplate does not exist", func() {
+		// 	By("creating the custom resource for the Kind Kode")
+		// 	kode := &kodev1alpha1.Kode{
+		// 		ObjectMeta: metav1.ObjectMeta{
+		// 			Name:      kodeResourceName,
+		// 			Namespace: resourceNamespace,
+		// 		},
+		// 		Spec: kodev1alpha1.KodeSpec{
+		// 			TemplateRef: kodev1alpha1.KodeTemplateReference{
+		// 				Kind:      kodeTemplateKind,
+		// 				Name:      kodeTemplateName,
+		// 				Namespace: resourceNamespace,
+		// 			},
+		// 			Storage: kodev1alpha1.KodeStorageSpec{
+		// 				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+		// 				Resources: corev1.VolumeResourceRequirements{
+		// 					Requests: corev1.ResourceList{
+		// 						corev1.ResourceStorage: resource.MustParse("1Gi"),
+		// 					},
+		// 				},
+		// 			},
+		// 		},
+		// 	}
+		// 	err := k8sClient.Create(ctx, kode)
+		// 	Expect(err).To(HaveOccurred())
+		// })
+
+		// It("should reconcile the Kode resource when the KodeTemplate is updated", func() {
+		// 	By("creating the custom resource for the Kind KodeTemplate")
+		// 	kodeTemplate := &kodev1alpha1.KodeTemplate{
+		// 		ObjectMeta: metav1.ObjectMeta{
+		// 			Name:      kodeTemplateName,
+		// 			Namespace: resourceNamespace,
+		// 		},
+		// 		Spec: kodev1alpha1.KodeTemplateSpec{
+		// 			SharedKodeTemplateSpec: kodev1alpha1.SharedKodeTemplateSpec{
+		// 				EnvoyProxyRef: kodev1alpha1.EnvoyProxyReference{
+		// 					Kind: envoyProxyConfigKind,
+		// 					Name: envoyProxyConfigName,
+		// 				},
+		// 				Image: kodeTemplateImage,
+		// 				Type:  "code-server",
+		// 			},
+		// 		},
+		// 	}
+		// 	err := k8sClient.Create(ctx, kodeTemplate)
+		// 	Expect(err).NotTo(HaveOccurred())
+
+		// 	By("creating the custom resource for the Kind EnvoyProxyConfig")
+		// 	envoyProxyConfig := &kodev1alpha1.EnvoyProxyConfig{
+		// 		ObjectMeta: metav1.ObjectMeta{
+		// 			Name:      envoyProxyConfigName,
+		// 			Namespace: resourceNamespace,
+		// 		},
+		// 		Spec: kodev1alpha1.EnvoyProxyConfigSpec{
+		// 			SharedEnvoyProxyConfigSpec: kodev1alpha1.SharedEnvoyProxyConfigSpec{
+		// 				Image: envoyProxyConfigImage,
+		// 				HTTPFilters: []kodev1alpha1.HTTPFilter{{
+		// 					Name:        "filter1",
+		// 					TypedConfig: runtime.RawExtension{Raw: []byte(envoyProxyConfigFilter)},
+		// 				}},
+		// 			},
+		// 		},
+		// 	}
+		// 	err = k8sClient.Create(ctx, envoyProxyConfig)
+		// 	Expect(err).NotTo(HaveOccurred())
+
+		// 	By("creating the custom resource for the Kind Kode")
+		// 	kode := &kodev1alpha1.Kode{
+		// 		ObjectMeta: metav1.ObjectMeta{
+		// 			Name:      kodeResourceName,
+		// 			Namespace: resourceNamespace,
+		// 		},
+		// 		Spec: kodev1alpha1.KodeSpec{
+		// 			TemplateRef: kodev1alpha1.KodeTemplateReference{
+		// 				Kind:      kodeTemplateKind,
+		// 				Name:      kodeTemplateName,
+		// 				Namespace: resourceNamespace,
+		// 			},
+		// 			Storage: kodev1alpha1.KodeStorageSpec{
+		// 				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+		// 				Resources: corev1.VolumeResourceRequirements{
+		// 					Requests: corev1.ResourceList{
+		// 						corev1.ResourceStorage: resource.MustParse("1Gi"),
+		// 					},
+		// 				},
+		// 			},
+		// 		},
+		// 	}
+		// 	err = k8sClient.Create(ctx, kode)
+		// 	Expect(err).NotTo(HaveOccurred())
+
+		// 	By("updating the KodeTemplate resource")
+		// 	updatedImage := "lscr.io/linuxserver/code-server:latest-updated"
+		// 	kodeTemplate.Spec.SharedKodeTemplateSpec.Image = updatedImage
+		// 	err = k8sClient.Update(ctx, kodeTemplate)
+		// 	Expect(err).NotTo(HaveOccurred())
+
+		// 	By("checking if the Deployment has been updated")
+		// 	deployment := &appsv1.Deployment{}
+		// 	Eventually(func() error {
+		// 		return k8sClient.Get(ctx, typeNamespacedName, deployment)
+		// 	}, timeout, interval).Should(Succeed())
+
+		// 	Expect(deployment.Spec.Template.Spec.Containers[0].Image).To(Equal(updatedImage))
+		// })
+
+		// It("should reconcile the Kode resource when the EnvoyProxyConfig is updated", func() {
+		// 	By("creating the custom resource for the Kind KodeTemplate")
+		// 	kodeTemplate := &kodev1alpha1.KodeTemplate{
+		// 		ObjectMeta: metav1.ObjectMeta{
+		// 			Name:      kodeTemplateName,
+		// 			Namespace: resourceNamespace,
+		// 		},
+		// 		Spec: kodev1alpha1.KodeTemplateSpec{
+		// 			SharedKodeTemplateSpec: kodev1alpha1.SharedKodeTemplateSpec{
+		// 				EnvoyProxyRef: kodev1alpha1.EnvoyProxyReference{
+		// 					Kind: envoyProxyConfigKind,
+		// 					Name: envoyProxyConfigName,
+		// 				},
+		// 				Image: kodeTemplateImage,
+		// 				Type:  "code-server",
+		// 			},
+		// 		},
+		// 	}
+		// 	err := k8sClient.Create(ctx, kodeTemplate)
+		// 	Expect(err).NotTo(HaveOccurred())
+
+		// 	By("creating the custom resource for the Kind EnvoyProxyConfig")
+		// 	envoyProxyConfig := &kodev1alpha1.EnvoyProxyConfig{
+		// 		ObjectMeta: metav1.ObjectMeta{
+		// 			Name:      envoyProxyConfigName,
+		// 			Namespace: resourceNamespace,
+		// 		},
+		// 		Spec: kodev1alpha1.EnvoyProxyConfigSpec{
+		// 			SharedEnvoyProxyConfigSpec: kodev1alpha1.SharedEnvoyProxyConfigSpec{
+		// 				Image: envoyProxyConfigImage,
+		// 				HTTPFilters: []kodev1alpha1.HTTPFilter{{
+		// 					Name:        "filter1",
+		// 					TypedConfig: runtime.RawExtension{Raw: []byte(envoyProxyConfigFilter)},
+		// 				}},
+		// 			},
+		// 		},
+		// 	}
+		// 	err = k8sClient.Create(ctx, envoyProxyConfig)
+		// 	Expect(err).NotTo(HaveOccurred())
+
+		// 	By("creating the custom resource for the Kind Kode")
+		// 	kode := &kodev1alpha1.Kode{
+		// 		ObjectMeta: metav1.ObjectMeta{
+		// 			Name:      kodeResourceName,
+		// 			Namespace: resourceNamespace,
+		// 		},
+		// 		Spec: kodev1alpha1.KodeSpec{
+		// 			TemplateRef: kodev1alpha1.KodeTemplateReference{
+		// 				Kind:      kodeTemplateKind,
+		// 				Name:      kodeTemplateName,
+		// 				Namespace: resourceNamespace,
+		// 			},
+		// 			Storage: kodev1alpha1.KodeStorageSpec{
+		// 				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+		// 				Resources: corev1.VolumeResourceRequirements{
+		// 					Requests: corev1.ResourceList{
+		// 						corev1.ResourceStorage: resource.MustParse("1Gi"),
+		// 					},
+		// 				},
+		// 			},
+		// 		},
+		// 	}
+		// 	err = k8sClient.Create(ctx, kode)
+		// 	Expect(err).NotTo(HaveOccurred())
+
+		// 	By("updating the EnvoyProxyConfig resource")
+		// 	updatedImage := "envoyproxy/envoy:v1.31-latest"
+		// 	envoyProxyConfig.Spec.SharedEnvoyProxyConfigSpec.Image = updatedImage
+		// 	err = k8sClient.Update(ctx, envoyProxyConfig)
+		// 	Expect(err).NotTo(HaveOccurred())
+
+		// 	By("checking if the Deployment has been updated")
+		// 	deployment := &appsv1.Deployment{}
+		// 	Eventually(func() error {
+		// 		return k8sClient.Get(ctx, typeNamespacedName, deployment)
+		// 	}, timeout, interval).Should(Succeed())
+
+		// 	// Check if the Envoy sidecar container image is updated
+		// 	found := false
+		// 	for _, container := range deployment.Spec.Template.Spec.Containers {
+		// 		if container.Image == updatedImage {
+		// 			found = true
+		// 			break
+		// 		}
+		// 	}
+		// 	Expect(found).To(BeTrue())
 		// })
 	})
 })
