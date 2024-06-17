@@ -9,7 +9,6 @@ package controller
 
 // ADVANCED TESTS (using KodeTemplate and EnvoyProxyConfig)
 // TEST: It should create a Kode resource if the TemplateRef is set and the KodeTemplate exists
-// TEST: It should NOT create a Kode resource if the TemplateRef is set and the KodeTemplate does not exist
 // TEST: It should reconcile the Kode resource when the KodeTemplate is updated
 // TEST: It should reconcile the Kode resource when the EnvoyProxyConfig is updated
 // TEST: It should reconcile the Kode resource when the KodeTemplate is deleted
@@ -43,7 +42,6 @@ package controller
 
 // ADVANCED TESTS (using KodeClusterTemplate and EnvoyProxyClusterConfig)
 // TEST: It should create a Kode resource if the TemplateRef is set and the KodeClusterTemplate exists
-// TEST: It should NOT create a Kode resource if the TemplateRef is set and the KodeClusterTemplate does not exist
 // TEST: It should reconcile the Kode resource when the KodeClusterTemplate is updated
 // TEST: It should reconcile the Kode resource when the EnvoyProxyClusterConfig is updated
 // TEST: It should reconcile the Kode resource when the KodeClusterTemplate is deleted
@@ -371,105 +369,103 @@ var _ = Describe("Kode Controller", func() {
 		// 	Expect(err).To(HaveOccurred())
 		// })
 
-		// It("should create a Kode resource if the TemplateRef is set and the KodeTemplate exists", func() {
-		// 	By("creating the custom resource for the Kind KodeTemplate")
-		// 	kodeTemplate := &kodev1alpha1.KodeTemplate{
-		// 		ObjectMeta: metav1.ObjectMeta{
-		// 			Name:      kodeTemplateName,
-		// 			Namespace: resourceNamespace,
-		// 		},
-		// 		Spec: kodev1alpha1.KodeTemplateSpec{
-		// 			SharedKodeTemplateSpec: kodev1alpha1.SharedKodeTemplateSpec{
-		// 				EnvoyProxyRef: kodev1alpha1.EnvoyProxyReference{
-		// 					Kind: envoyProxyConfigKind,
-		// 					Name: envoyProxyConfigName,
-		// 				},
-		// 				Image: kodeTemplateImage,
-		// 				Type:  "code-server",
-		// 			},
-		// 		},
-		// 	}
-		// 	err := k8sClient.Create(ctx, kodeTemplate)
-		// 	Expect(err).NotTo(HaveOccurred())
+		It("should create a Kode resource if the TemplateRef is set and the KodeTemplate exists", func() {
+			testNamespace := "test-create-if-template-exists"
 
-		// 	By("creating the custom resource for the Kind EnvoyProxyConfig")
-		// 	envoyProxyConfig := &kodev1alpha1.EnvoyProxyConfig{
-		// 		ObjectMeta: metav1.ObjectMeta{
-		// 			Name:      envoyProxyConfigName,
-		// 			Namespace: resourceNamespace,
-		// 		},
-		// 		Spec: kodev1alpha1.EnvoyProxyConfigSpec{
-		// 			SharedEnvoyProxyConfigSpec: kodev1alpha1.SharedEnvoyProxyConfigSpec{
-		// 				Image: envoyProxyConfigImage,
-		// 				HTTPFilters: []kodev1alpha1.HTTPFilter{{
-		// 					Name:        "filter1",
-		// 					TypedConfig: runtime.RawExtension{Raw: []byte(envoyProxyConfigFilter)},
-		// 				}},
-		// 			},
-		// 		},
-		// 	}
-		// 	err = k8sClient.Create(ctx, envoyProxyConfig)
-		// 	Expect(err).NotTo(HaveOccurred())
+			By("creating the namespace for the test")
+			namespace := &corev1.Namespace{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: testNamespace,
+				},
+			}
+			err := k8sClient.Create(ctx, namespace)
+			Expect(err).NotTo(HaveOccurred())
 
-		// 	By("creating the custom resource for the Kind Kode")
-		// 	kode := &kodev1alpha1.Kode{
-		// 		ObjectMeta: metav1.ObjectMeta{
-		// 			Name:      kodeResourceName,
-		// 			Namespace: resourceNamespace,
-		// 		},
-		// 		Spec: kodev1alpha1.KodeSpec{
-		// 			TemplateRef: kodev1alpha1.KodeTemplateReference{
-		// 				Kind:      kodeTemplateKind,
-		// 				Name:      kodeTemplateName,
-		// 				Namespace: resourceNamespace,
-		// 			},
-		// 			Storage: kodev1alpha1.KodeStorageSpec{
-		// 				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-		// 				Resources: corev1.VolumeResourceRequirements{
-		// 					Requests: corev1.ResourceList{
-		// 						corev1.ResourceStorage: resource.MustParse("1Gi"),
-		// 					},
-		// 				},
-		// 			},
-		// 		},
-		// 	}
-		// 	err = k8sClient.Create(ctx, kode)
-		// 	Expect(err).NotTo(HaveOccurred())
-		// })
+			By("creating the custom resource for the Kind KodeTemplate")
+			kodeTemplate := &kodev1alpha1.KodeTemplate{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      kodeTemplateName,
+					Namespace: namespace.Name,
+				},
+				Spec: kodev1alpha1.KodeTemplateSpec{
+					SharedKodeTemplateSpec: kodev1alpha1.SharedKodeTemplateSpec{
+						EnvoyProxyRef: kodev1alpha1.EnvoyProxyReference{
+							Kind: envoyProxyConfigKind,
+							Name: envoyProxyConfigName,
+						},
+						Image: kodeTemplateImage,
+						Type:  "code-server",
+					},
+				},
+			}
+			err = k8sClient.Create(ctx, kodeTemplate)
+			Expect(err).NotTo(HaveOccurred())
+			// Eventually(func() error {
+			// 	return k8sClient.Get(ctx, typeNamespacedName, kodeTemplate)
+			// }, timeout, interval).Should(Succeed())
 
-		// It("should NOT create a Kode resource if the TemplateRef is set and the KodeTemplate does not exist", func() {
-		// 	By("creating the custom resource for the Kind Kode")
-		// 	kode := &kodev1alpha1.Kode{
-		// 		ObjectMeta: metav1.ObjectMeta{
-		// 			Name:      kodeResourceName,
-		// 			Namespace: resourceNamespace,
-		// 		},
-		// 		Spec: kodev1alpha1.KodeSpec{
-		// 			TemplateRef: kodev1alpha1.KodeTemplateReference{
-		// 				Kind:      kodeTemplateKind,
-		// 				Name:      kodeTemplateName,
-		// 				Namespace: resourceNamespace,
-		// 			},
-		// 			Storage: kodev1alpha1.KodeStorageSpec{
-		// 				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-		// 				Resources: corev1.VolumeResourceRequirements{
-		// 					Requests: corev1.ResourceList{
-		// 						corev1.ResourceStorage: resource.MustParse("1Gi"),
-		// 					},
-		// 				},
-		// 			},
-		// 		},
-		// 	}
-		// 	err := k8sClient.Create(ctx, kode)
-		// 	Expect(err).To(HaveOccurred())
-		// })
+			By("creating the custom resource for the Kind EnvoyProxyConfig")
+			envoyProxyConfig := &kodev1alpha1.EnvoyProxyConfig{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      envoyProxyConfigName,
+					Namespace: namespace.Name,
+				},
+				Spec: kodev1alpha1.EnvoyProxyConfigSpec{
+					SharedEnvoyProxyConfigSpec: kodev1alpha1.SharedEnvoyProxyConfigSpec{
+						Image: envoyProxyConfigImage,
+						HTTPFilters: []kodev1alpha1.HTTPFilter{{
+							Name:        "filter1",
+							TypedConfig: runtime.RawExtension{Raw: []byte(envoyProxyConfigFilter)},
+						}},
+					},
+				},
+			}
+			err = k8sClient.Create(ctx, envoyProxyConfig)
+			Expect(err).NotTo(HaveOccurred())
+
+			By("creating the custom resource for the Kind Kode")
+			kode := &kodev1alpha1.Kode{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      kodeResourceName,
+					Namespace: namespace.Name,
+				},
+				Spec: kodev1alpha1.KodeSpec{
+					TemplateRef: kodev1alpha1.KodeTemplateReference{
+						Kind:      kodeTemplateKind,
+						Name:      kodeTemplateName,
+						Namespace: namespace.Name,
+					},
+					Storage: kodev1alpha1.KodeStorageSpec{
+						AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+						Resources: corev1.VolumeResourceRequirements{
+							Requests: corev1.ResourceList{
+								corev1.ResourceStorage: resource.MustParse("1Gi"),
+							},
+						},
+					},
+				},
+			}
+			err = k8sClient.Create(ctx, kode)
+			Expect(err).NotTo(HaveOccurred())
+		})
 
 		// It("should reconcile the Kode resource when the KodeTemplate is updated", func() {
+		// 	testNamespace := "test-reconcile-if-template-updated"
+
+		// 	By("creating the namespace for the test")
+		// 	namespace := &corev1.Namespace{
+		// 		ObjectMeta: metav1.ObjectMeta{
+		// 			Name: testNamespace,
+		// 		},
+		// 	}
+		// 	err := k8sClient.Create(ctx, namespace)
+		// 	Expect(err).NotTo(HaveOccurred())
+
 		// 	By("creating the custom resource for the Kind KodeTemplate")
 		// 	kodeTemplate := &kodev1alpha1.KodeTemplate{
 		// 		ObjectMeta: metav1.ObjectMeta{
 		// 			Name:      kodeTemplateName,
-		// 			Namespace: resourceNamespace,
+		// 			Namespace: namespace.Name,
 		// 		},
 		// 		Spec: kodev1alpha1.KodeTemplateSpec{
 		// 			SharedKodeTemplateSpec: kodev1alpha1.SharedKodeTemplateSpec{
@@ -482,14 +478,14 @@ var _ = Describe("Kode Controller", func() {
 		// 			},
 		// 		},
 		// 	}
-		// 	err := k8sClient.Create(ctx, kodeTemplate)
+		// 	err = k8sClient.Create(ctx, kodeTemplate)
 		// 	Expect(err).NotTo(HaveOccurred())
 
 		// 	By("creating the custom resource for the Kind EnvoyProxyConfig")
 		// 	envoyProxyConfig := &kodev1alpha1.EnvoyProxyConfig{
 		// 		ObjectMeta: metav1.ObjectMeta{
 		// 			Name:      envoyProxyConfigName,
-		// 			Namespace: resourceNamespace,
+		// 			Namespace: namespace.Name,
 		// 		},
 		// 		Spec: kodev1alpha1.EnvoyProxyConfigSpec{
 		// 			SharedEnvoyProxyConfigSpec: kodev1alpha1.SharedEnvoyProxyConfigSpec{
@@ -508,13 +504,13 @@ var _ = Describe("Kode Controller", func() {
 		// 	kode := &kodev1alpha1.Kode{
 		// 		ObjectMeta: metav1.ObjectMeta{
 		// 			Name:      kodeResourceName,
-		// 			Namespace: resourceNamespace,
+		// 			Namespace: namespace.Name,
 		// 		},
 		// 		Spec: kodev1alpha1.KodeSpec{
 		// 			TemplateRef: kodev1alpha1.KodeTemplateReference{
 		// 				Kind:      kodeTemplateKind,
 		// 				Name:      kodeTemplateName,
-		// 				Namespace: resourceNamespace,
+		// 				Namespace: namespace.Name,
 		// 			},
 		// 			Storage: kodev1alpha1.KodeStorageSpec{
 		// 				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},

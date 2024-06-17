@@ -37,7 +37,7 @@ import (
 const (
 	ContainerRestartPolicyAlways corev1.ContainerRestartPolicy = "Always"
 	PersistentVolumeClaimName                                  = "kode-pvc"
-	LoopRetryTime                                              = 5 * time.Second
+	LoopRetryTime                                              = 1 * time.Second
 	OperatorName                                               = "kode-operator"
 )
 
