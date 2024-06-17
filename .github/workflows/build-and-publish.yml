@@ -45,7 +45,7 @@ jobs:
         fi
 
     - name: Run tests
-      run: go test ./... -v
+      run: make test
 
   publish:
     needs: build
