@@ -149,11 +149,11 @@ kubectl apply -f my-code-server.yaml
 
 You want to secure your Code-server environment using Envoy Proxy with Basic Auth.
 
-**1. Create an EnvoyProxyTemplate:**
+**1. Create an EnvoyProxyConfig:**
 
 ```yaml
 apiVersion: v1alpha1
-kind: EnvoyProxyTemplate
+kind: EnvoyProxyClusterConfig
 metadata:
   name: basic-auth-proxy
 spec:
@@ -171,7 +171,8 @@ metadata:
 spec:
   type: code-server
   image: linuxserver/code-server:latest
-  envoyProxyTemplateRef:
+  envoyProxyRef:
+    kind: EnvoyProxyClusterConfig
     name: basic-auth-proxy
   defaultHome: /config
   defaultWorkspace: workspace
