@@ -86,6 +86,10 @@ type SharedKodeTemplateSpec struct {
 	// +kubebuilder:default=false
 	AllowPrivileged *bool `json:"allowPrivileged,omitempty"`
 
+	// InitPlugins specifies the OCI containers to be run before the main container. It is an ordered list.
+	// +kubebuilder:validation:Description="OCI containers to be run before the main container. It is an ordered list."
+	InitPlugins []InitPluginSpec `json:"initPlugins,omitempty"`
+
 	// Specifies the period before controller inactive the resource (delete all resources except volume).
 	// +kubebuilder:validation:Description="Period before controller inactive the resource (delete all resources except volume)."
 	// +kubebuilder:default=600
@@ -93,8 +97,12 @@ type SharedKodeTemplateSpec struct {
 
 	// Specifies the period before controller recycle the resource (delete all resources).
 	// +kubebuilder:validation:Description="Period before controller recycle the resource (delete all resources)."
-	// +kubebuilder:default=1200
+	// +kubebuilder:default=28800
 	RecycleAfterSeconds *int64 `json:"recycleAfterSeconds,omitempty"`
+
+	// EntryPointSpec defines the desired state of the entrypoint.
+	// +kubebuilder:validation:Description="Desired state of the entrypoint."
+	EntryPointSpec EntryPointSpec `json:"entryPointSpec,omitempty"`
 }
 
 // SharedKodeTemplateStatus defines the observed state

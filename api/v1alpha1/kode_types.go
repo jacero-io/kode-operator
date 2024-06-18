@@ -21,22 +21,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type KodeTemplateReference struct {
-	// Kind is the resource kind
-	// +kubebuilder:validation:Description="Resource kind"
-	// +kubebuilder:validation:Enum=KodeTemplate;KodeClusterTemplate
-	Kind string `json:"kind"`
-
-	// Name is the name of the KodeTemplate
-	// +kubebuilder:validation:Description="Name of the KodeTemplate"
-	// +kubebuilder:validation:Required
-	Name string `json:"name"`
-
-	// Namespace is the namespace of the KodeTemplate
-	// +kubebuilder:validation:Description="Namespace of the KodeTemplate"
-	Namespace string `json:"namespace,omitempty"`
-}
-
 // KodeSpec defines the desired state of Kode
 type KodeSpec struct {
 	// TemplateRef is the reference to the KodeTemplate configuration
@@ -77,14 +61,22 @@ type KodeSpec struct {
 	// +kubebuilder:validation:Description="Git repository URL to get user configuration from."
 	UserConfig string `json:"userConfig,omitempty"`
 
-	// Privileged specifies if the container should run in privileged mode. Only set to true if you know what you are doing.
-	// +kubebuilder:validation:Description="Specifies if the container should run in privileged mode. Only set to true if you know what you are doing."
+	// Privileged specifies if the container should run in privileged mode. Will only work if the KodeTemplate allows it. Only set to true if you know what you are doing.
+	// +kubebuilder:validation:Description="Specifies if the container should run in privileged mode. Will only work if the KodeTemplate allows it. Only set to true if you know what you are doing."
 	// +kubebuilder:default=false
 	Privileged *bool `json:"privileged,omitempty"`
 
-	// InitPlugins specifies the plugins to be installed on the first start
-	// +kubebuilder:validation:Description="Plugins to be installed on the first start."
-	InitPlugins map[string][]string `json:"initPlugins,omitempty"`
+	// InitPlugins specifies the OCI containers to be run as InitContainers. These containers can be used to prepare the workspace or run some setup scripts. It is an ordered list.
+	// +kubebuilder:validation:Description="OCI containers to be run as InitContainers. These containers can be used to prepare the workspace or run some setup scripts. It is an ordered list."
+	InitPlugins []InitPluginSpec `json:"initPlugins,omitempty"`
+
+	// Ingress contains the Ingress configuration for the Kode resource
+	// +kubebuilder:validation:Description="Contains the Ingress configuration for the Kode resource."
+	Ingress *IngressSpec `json:"ingress,omitempty"`
+
+	// Gateway contains the Gateway configuration for the Kode resource
+	// +kubebuilder:validation:Description="Contains the Gateway configuration for the Kode resource."
+	Gateway *GatewaySpec `json:"gateway,omitempty"`
 }
 
 // KodeStorageSpec defines the storage configuration
@@ -98,8 +90,8 @@ type KodeStorageSpec struct {
 	// Resources specifies the resource requirements for the persistent volume
 	Resources corev1.VolumeResourceRequirements `json:"resources,omitempty"`
 
-	// KeepVolume specifies if the volume should be kept when the kode is deleted
-	// +kubebuilder:validation:Description="Specifies if the volume should be kept when the kode is deleted."
+	// KeepVolume specifies if the volume should be kept when the kode is recycled. Defaults to false.
+	// +kubebuilder:validation:Description="Specifies if the volume should be kept when the kode is recycled. Defaults to false."
 	// +kubebuilder:default=false
 	KeepVolume *bool `json:"keepVolume,omitempty"`
 }
@@ -156,6 +148,45 @@ type KodeList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []Kode `json:"items"`
+}
+
+type KodeTemplateReference struct {
+	// Kind is the resource kind
+	// +kubebuilder:validation:Description="Resource kind"
+	// +kubebuilder:validation:Enum=KodeTemplate;KodeClusterTemplate
+	Kind string `json:"kind"`
+
+	// Name is the name of the KodeTemplate
+	// +kubebuilder:validation:Description="Name of the KodeTemplate"
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
+	// Namespace is the namespace of the KodeTemplate
+	// +kubebuilder:validation:Description="Namespace of the KodeTemplate"
+	Namespace string `json:"namespace,omitempty"`
+}
+
+type InitPluginSpec struct {
+	// Image is the OCI image for the container
+	// +kubebuilder:validation:Description="OCI image for the container."
+	// +kubebuilder:validation:Required
+	Image string `json:"image"`
+
+	// Tag is the tag of the OCI image
+	// +kubebuilder:validation:Description="Tag of the OCI image."
+	Tag string `json:"tag,omitempty"`
+
+	// Args are the arguments to the container
+	// +kubebuilder:validation:Description="Arguments to the container."
+	Args []string `json:"args,omitempty"`
+
+	// EnvVars are the environment variables to the container
+	// +kubebuilder:validation:Description="Environment variables to the container."
+	EnvVars []corev1.EnvVar `json:"envVars,omitempty"`
+
+	// Command is the command to run in the container
+	// +kubebuilder:validation:Description="Command to run in the container."
+	Command []string `json:"command,omitempty"`
 }
 
 func init() {
