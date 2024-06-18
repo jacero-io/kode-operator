@@ -77,7 +77,7 @@ test-e2e:
 
 .PHONY: kind-create-cluster
 kind-create-cluster:
-	kind create cluster --image kindest/node:v$(K8S_VERSION)
+	kind create cluster --image kindest/node:v$(ENVTEST_K8S_VERSION)
 
 .PHONY: kind-delete-cluster
 kind-delete-cluster:

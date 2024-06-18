@@ -70,13 +70,13 @@ type KodeSpec struct {
 	// +kubebuilder:validation:Description="OCI containers to be run as InitContainers. These containers can be used to prepare the workspace or run some setup scripts. It is an ordered list."
 	InitPlugins []InitPluginSpec `json:"initPlugins,omitempty"`
 
-	// Ingress contains the Ingress configuration for the Kode resource
-	// +kubebuilder:validation:Description="Contains the Ingress configuration for the Kode resource."
-	Ingress *IngressSpec `json:"ingress,omitempty"`
+	// // Ingress contains the Ingress configuration for the Kode resource. It will override the KodeTemplate Ingress configuration.
+	// // +kubebuilder:validation:Description="Contains the Ingress configuration for the Kode resource. It will override the KodeTemplate Ingress configuration."
+	// Ingress *IngressSpec `json:"ingress,omitempty"`
 
-	// Gateway contains the Gateway configuration for the Kode resource
-	// +kubebuilder:validation:Description="Contains the Gateway configuration for the Kode resource."
-	Gateway *GatewaySpec `json:"gateway,omitempty"`
+	// // Gateway contains the Gateway configuration for the Kode resource. It will override the KodeTemplate Gateway configuration.
+	// // +kubebuilder:validation:Description="Contains the Gateway configuration for the Kode resource. It will override the KodeTemplate Gateway configuration."
+	// Gateway *GatewaySpec `json:"gateway,omitempty"`
 }
 
 // KodeStorageSpec defines the storage configuration
