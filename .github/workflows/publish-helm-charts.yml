@@ -28,29 +28,13 @@ jobs:
         run: |
           curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 
-      - name: Install Go and dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y golang-go
-          go get sigs.k8s.io/kustomize/kustomize/v5
-          go get github.com/arttor/helmify/cmd/helmify
-
       - name: Extract version from tag
         id: get_version
         run: echo "::set-output name=version::${GITHUB_REF/refs\/tags\//}"
 
-      - name: Generate Helm charts using kustomize and helmify
+      - name: Update Chart.yaml for kode-operator-crd
         run: |
           version=${{ steps.get_version.outputs.version }}
-          go run sigs.k8s.io/kustomize/kustomize/v5 build config/default | go run github.com/arttor/helmify/cmd/helmify \
-            -cert-manager-as-subchart \
-            -cert-manager-version 1.15.0 \
-            -generate-defaults \
-            -image-pull-secrets \
-            helm-charts/kode-operator
-          go run sigs.k8s.io/kustomize/kustomize/v5 build config/crd | go run github.com/arttor/helmify/cmd/helmify helm-charts/kode-operator-crd
-          
-          sed -i "s/PLACEHOLDER_VERSION/$version/" helm-charts/kode-operator/Chart.yaml
           sed -i "s/PLACEHOLDER_VERSION/$version/" helm-charts/kode-operator-crd/Chart.yaml
 
       - name: Package kode-operator-crd chart
@@ -59,6 +43,11 @@ jobs:
           helm package helm-charts/kode-operator-crd --version $version
           helm chart save kode-operator-crd-$version.tgz ghcr.io/${{ github.repository_owner }}/kode-operator-crd:$version
           helm chart push ghcr.io/${{ github.repository_owner }}/kode-operator-crd:$version
+
+      - name: Update Chart.yaml for kode-operator
+        run: |
+          version=${{ steps.get_version.outputs.version }}
+          sed -i "s/PLACEHOLDER_VERSION/$version/" helm-charts/kode-operator/Chart.yaml
 
       - name: Package kode-operator chart
         run: |
