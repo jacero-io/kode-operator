@@ -1,5 +1,7 @@
 # kode-operator
 
+WARNING! THIS PROJECT IS UNDER HEAVY DEVELOPMENT AND NOT MEANT FOR PRODUCTION USE JUST YET.
+
 Kode-Operator is a Kubernetes operator designed to manage the full lifecycle of various ephemeral and semi ephemeral development environments and tools. It automates the deployment, configuration, and management of Code-server, Webtop, DevContainers, Alnoda, and Jupyter environments within a Kubernetes cluster.
 
 Additionally, it supports authentication and authorization using Envoy Proxy and a standard way for the user to add custom configuration and data.
