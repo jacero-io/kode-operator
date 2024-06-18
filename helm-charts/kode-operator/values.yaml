@@ -1,16 +1,17 @@
+certmanager:
+  enabled: true
+  installCRDs: true
 controllerManager:
   manager:
     args:
-    - --leader-elect
-    - --health-probe-bind-address=:8081
-    - --metrics-bind-address=0
+    - --metrics-bind-address=0.0.0.0:8080
     containerSecurityContext:
       allowPrivilegeEscalation: false
       capabilities:
         drop:
         - ALL
     image:
-      repository: emiljacero/kode-operator
+      repository: ghcr.io/emil-jacero/kode-operator
       tag: latest
     resources:
       limits:
@@ -22,6 +23,7 @@ controllerManager:
   replicas: 1
   serviceAccount:
     annotations: {}
+imagePullSecrets: []
 kubernetesClusterDomain: cluster.local
 metricsService:
   ports:
