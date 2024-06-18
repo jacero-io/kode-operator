@@ -91,5 +91,4 @@ type Cluster struct {
 	// LoadAssignment is the load assignment for the cluster
 	// +kubebuilder:validation:Required
 	LoadAssignment LoadAssignment `json:"load_assignment"`
-	// LoadAssignment runtime.RawExtension `json:"load_assignment"`
 }
