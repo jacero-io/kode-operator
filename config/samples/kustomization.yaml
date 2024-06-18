@@ -12,4 +12,5 @@ resources:
 - kode_v1alpha1_envoyproxyconfig.yaml
 # - kode_v1alpha1_envoyproxyclusterconfig.yaml
 
+- kode_v1alpha1_entrypoint.yaml
 #+kubebuilder:scaffold:manifestskustomizesamples

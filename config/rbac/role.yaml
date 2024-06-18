@@ -41,6 +41,32 @@ rules:
   - update
   - watch
 - apiGroups:
+  - kode.jacero.io
+  resources:
+  - entrypoints
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - kode.jacero.io
+  resources:
+  - entrypoints/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - kode.jacero.io
+  resources:
+  - entrypoints/status
+  verbs:
+  - get
+  - patch
+  - update
+- apiGroups:
   - kode.kode.jacero.io
   resources:
   - envoyproxyclusterconfig

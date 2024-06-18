@@ -18,10 +18,11 @@ package v1alpha1
 
 import (
 	networkingv1 "k8s.io/api/networking/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
-// GatewaySpec defines the desired state of the ingress or gateway. It will inform the kode-operator how to publish the Kode resource.
+// EntryPointSpec defines the desired state of EntryPoint
 type EntryPointSpec struct {
 	// Type is the type of the gateway. It could be ingress-api or gateway-api.
 	// +kubebuilder:validation:description=Type is the type of the gateway. It could be ingress-api or gateway-api.
@@ -41,6 +42,31 @@ type EntryPointSpec struct {
 	// +kubebuilder:validation:description=URL is the domain name to use either as a suffix in the case of Type=domain or as a prefix/domain in the case of Type=path. When the type is domain, the controller will try to publish the Kode resource as a subdomain of the given domain (e.g <kode-resource>.kode.example.com). When the type is path, the controller will try to publish the Kode resource as a path of the given URL (e.g kode.example.com/<kode-resource>).
 	// +kubebuilder:validation:Required
 	URL string `json:"url"`
+}
+
+// EntryPointStatus defines the observed state of EntryPoint
+type EntryPointStatus struct {
+}
+
+// +kubebuilder:object:root=true
+// +kubebuilder:subresource:status
+
+// EntryPoint is the Schema for the entrypoints API
+type EntryPoint struct {
+	metav1.TypeMeta   `json:",inline"`
+	metav1.ObjectMeta `json:"metadata,omitempty"`
+
+	Spec   EntryPointSpec   `json:"spec,omitempty"`
+	Status EntryPointStatus `json:"status,omitempty"`
+}
+
+// +kubebuilder:object:root=true
+
+// EntryPointList contains a list of EntryPoint
+type EntryPointList struct {
+	metav1.TypeMeta `json:",inline"`
+	metav1.ListMeta `json:"metadata,omitempty"`
+	Items           []EntryPoint `json:"items"`
 }
 
 type IngressSpec struct {
@@ -69,4 +95,8 @@ type GatewaySpec struct {
 	// Routes contains the route configuration for the Gateway.
 	// +kubebuilder:validation:Description="Contains the route configuration for the Gateway."
 	Routes []gatewayv1.HTTPRoute `json:"routes,omitempty"`
+}
+
+func init() {
+	SchemeBuilder.Register(&EntryPoint{}, &EntryPointList{})
 }
