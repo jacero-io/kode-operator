@@ -130,6 +130,11 @@ func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode,
 		}
 	}
 
+	// Add InitPlugins as InitContainers
+	for _, initPlugin := range kode.Spec.InitPlugins {
+		initContainers = append(initContainers, constructInitPluginContainer(initPlugin))
+	}
+
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kode.Name,
@@ -227,4 +232,14 @@ func constructVolumesAndMounts(mountPath string, kode *kodev1alpha1.Kode) ([]cor
 	}
 
 	return volumes, volumeMounts
+}
+
+func constructInitPluginContainer(plugin kodev1alpha1.InitPluginSpec) corev1.Container {
+	return corev1.Container{
+		Name:    "init-" + plugin.Image,
+		Image:   plugin.Image,
+		Command: plugin.Command,
+		Args:    plugin.Args,
+		Env:     plugin.EnvVars,
+	}
 }
