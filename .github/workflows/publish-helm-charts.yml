@@ -41,7 +41,7 @@ jobs:
         run: |
           version=${{ steps.get_version.outputs.version }}
           helm package helm-charts/kode-operator-crd --version $version
-          helm push kode-operator-crd-$version.tgz ghcr.io/${{ github.repository_owner }}/kode-operator-crd:$version
+          helm push kode-operator-crd-$version.tgz oic://ghcr.io/${{ github.repository_owner }}/kode-operator-crd:$version
 
       - name: Update Chart.yaml for kode-operator
         run: |
@@ -52,4 +52,4 @@ jobs:
         run: |
           version=${{ steps.get_version.outputs.version }}
           helm package helm-charts/kode-operator --version $version
-          helm push kode-operator-$version.tgz ghcr.io/${{ github.repository_owner }}/kode-operator:$version
+          helm push kode-operator-$version.tgz oic://ghcr.io/${{ github.repository_owner }}/kode-operator:$version
