@@ -9,7 +9,7 @@ on:
 jobs:
   build-and-publish:
     permissions:
-      contents: write
+      packages: write
     runs-on: ubuntu-latest
 
     steps:
@@ -22,7 +22,6 @@ jobs:
 
       - name: Extract version from tag
         id: get_version
-        # run: echo "::save-state name=version::${GITHUB_REF/refs\/tags\//}"¨
         run: echo "VERSION=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_OUTPUT
 
       - name: Update Chart.yaml for kode-operator-crd
@@ -33,8 +32,8 @@ jobs:
       - name: Package kode-operator-crd chart
         run: |
           export VERSION=${{ steps.get_version.outputs.version }}
+          echo ${{ secrets.GITHUB_TOKEN }} | helm registry login -u ${{ github.actor }} ghcr.io --password-stdin
           helm package helm-charts/kode-operator-crd --version $VERSION
-          helm registry login -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }} ghcr.io
           helm push kode-operator-crd-$VERSION.tgz oci://ghcr.io/${{ github.repository_owner }}
 
       - name: Update Chart.yaml for kode-operator
@@ -45,6 +44,6 @@ jobs:
       - name: Package kode-operator chart
         run: |
           export VERSION=${{ steps.get_version.outputs.version }}
+          echo ${{ secrets.GITHUB_TOKEN }} | helm registry login -u ${{ github.actor }} ghcr.io --password-stdin
           helm package helm-charts/kode-operator --version $VERSION
-          helm registry login -u ${{ github.actor }} -p ${{ secrets.GITHUB_TOKEN }} ghcr.io
           helm push kode-operator-$VERSION.tgz oci://ghcr.io/${{ github.repository_owner }}
