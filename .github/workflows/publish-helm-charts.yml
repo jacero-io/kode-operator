@@ -35,21 +35,22 @@ jobs:
       - name: Update Chart.yaml for kode-operator-crd
         run: |
           version=${{ steps.get_version.outputs.version }}
-          sed -i "s/PLACEHOLDER_VERSION/${VERSION}/" helm-charts/kode-operator-crd/Chart.yaml
+          sed -i "s/PLACEHOLDER_VERSION/$VERSION/" helm-charts/kode-operator-crd/Chart.yaml
 
       - name: Package kode-operator-crd chart
         run: |
           export VERSION=${{ steps.get_version.outputs.version }}
-          helm package helm-charts/kode-operator-crd --version ${VERSION}
-          helm push kode-operator-crd-${VERSION}.tgz oci://ghcr.io/${{ github.repository_owner }}
+          helm package helm-charts/kode-operator-crd --version $VERSION
+          cat 
+          helm push kode-operator-crd-$VERSION.tgz oci://ghcr.io/${{ github.repository_owner }}
 
       - name: Update Chart.yaml for kode-operator
         run: |
           export VERSION=${{ steps.get_version.outputs.version }}
-          sed -i "s/PLACEHOLDER_VERSION/${VERSION}/" helm-charts/kode-operator/Chart.yaml
+          sed -i "s/PLACEHOLDER_VERSION/$VERSION/" helm-charts/kode-operator/Chart.yaml
 
       - name: Package kode-operator chart
         run: |
           export VERSION=${{ steps.get_version.outputs.version }}
-          helm package helm-charts/kode-operator --version ${VERSION}
-          helm push kode-operator-${VERSION}.tgz oci://ghcr.io/${{ github.repository_owner }}
+          helm package helm-charts/kode-operator --version $VERSION
+          helm push kode-operator-$VERSION.tgz oci://ghcr.io/${{ github.repository_owner }}
