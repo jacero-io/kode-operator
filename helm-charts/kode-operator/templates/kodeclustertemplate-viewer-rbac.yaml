@@ -1,0 +1,21 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "kode-operator.fullname" . }}-kodeclustertemplate-viewer-role
+  labels:
+  {{- include "kode-operator.labels" . | nindent 4 }}
+rules:
+- apiGroups:
+  - kode.jacero.io
+  resources:
+  - kodeclustertemplates
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - kode.jacero.io
+  resources:
+  - kodeclustertemplates/status
+  verbs:
+  - get

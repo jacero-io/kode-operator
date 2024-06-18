@@ -1,21 +1,21 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "chart.fullname" . }}-controller-manager
+  name: {{ include "kode-operator.fullname" . }}-controller-manager
   labels:
     control-plane: controller-manager
-  {{- include "chart.labels" . | nindent 4 }}
+  {{- include "kode-operator.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.controllerManager.replicas }}
   selector:
     matchLabels:
       control-plane: controller-manager
-    {{- include "chart.selectorLabels" . | nindent 6 }}
+    {{- include "kode-operator.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
         control-plane: controller-manager
-      {{- include "chart.selectorLabels" . | nindent 8 }}
+      {{- include "kode-operator.selectorLabels" . | nindent 8 }}
       annotations:
         kubectl.kubernetes.io/default-container: manager
     spec:
@@ -47,5 +47,5 @@ spec:
           | nindent 10 }}
       securityContext:
         runAsNonRoot: true
-      serviceAccountName: {{ include "chart.fullname" . }}-controller-manager
+      serviceAccountName: {{ include "kode-operator.fullname" . }}-controller-manager
       terminationGracePeriodSeconds: 10

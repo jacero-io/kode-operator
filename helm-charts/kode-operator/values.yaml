@@ -10,7 +10,7 @@ controllerManager:
         drop:
         - ALL
     image:
-      repository: controller
+      repository: emiljacero/kode-operator
       tag: latest
     resources:
       limits:
