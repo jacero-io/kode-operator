@@ -30,11 +30,12 @@ jobs:
 
       - name: Extract version from tag
         id: get_version
-        run: echo "::set-output name=version::${GITHUB_REF/refs\/tags\//}"
+        # run: echo "::save-state name=version::${GITHUB_REF/refs\/tags\//}"¨
+        run: echo "VERSION=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_OUTPUT
 
       - name: Update Chart.yaml for kode-operator-crd
         run: |
-          version=${{ steps.get_version.outputs.version }}
+          VERSION=${{ steps.get_version.outputs.version }}
           sed -i "s/PLACEHOLDER_VERSION/$VERSION/" helm-charts/kode-operator-crd/Chart.yaml
 
       - name: Package kode-operator-crd chart
