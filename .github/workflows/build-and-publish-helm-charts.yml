@@ -26,6 +26,13 @@ jobs:
         id: get_version
         run: echo "VERSION=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_ENV
 
+      - name: Check Chart.yaml for kode-crd
+        run: |
+          if [ ! -f helm-charts/kode-crd/Chart.yaml ]; then
+            echo "Chart.yaml file for kode-crd is missing"
+            exit 1
+          fi
+
       - name: Update Chart.yaml for kode-crd
         run: |
           sed -i "s/PLACEHOLDER_VERSION/${{ env.VERSION }}/g" helm-charts/kode-crd/Chart.yaml
@@ -35,6 +42,13 @@ jobs:
         run: |
           echo ${{ secrets.GITHUB_TOKEN }} | helm registry login -u ${{ github.actor }} ghcr.io --password-stdin
           helm push kode-crd-${{ env.VERSION }}.tgz oci://ghcr.io/${{ github.repository_owner }}
+
+      - name: Check Chart.yaml for kode
+        run: |
+          if [ ! -f helm-charts/kode/Chart.yaml ]; then
+            echo "Chart.yaml file for kode is missing"
+            exit 1
+          fi
 
       - name: Update Chart.yaml for kode
         run: |
