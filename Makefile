@@ -150,15 +150,15 @@ helm-package-kode-crd: ## Package kode-crd Helm chart
 	mv /tmp/kode-crd-$(VERSION).tgz ./kode-crd-$(VERSION).tgz
 	rm -rf /tmp/helm-charts/kode-crd
 
-.PHONY: helm-package-kode-operator
-helm-package-kode-operator: ## Package kode-operator Helm chart
-	@echo "Packaging kode-operator chart..."
-	mkdir -p /tmp/helm-charts/kode-operator
-	cp -r helm-charts/kode-operator/* /tmp/helm-charts/kode-operator/
-	sed -i "s/PLACEHOLDER_VERSION/${VERSION}/g" /tmp/helm-charts/kode-operator/Chart.yaml
-	helm package /tmp/helm-charts/kode-operator --version $(VERSION) --destination /tmp
+.PHONY: helm-package-kode
+helm-package-kode: ## Package kode Helm chart
+	@echo "Packaging kode chart..."
+	mkdir -p /tmp/helm-charts/kode
+	cp -r helm-charts/kode/* /tmp/helm-charts/kode/
+	sed -i "s/PLACEHOLDER_VERSION/${VERSION}/g" /tmp/helm-charts/kode/Chart.yaml
+	helm package /tmp/helm-charts/kode --version $(VERSION) --destination /tmp
 	mv /tmp/kode-$(VERSION).tgz ./kode-$(VERSION).tgz
-	rm -rf /tmp/helm-charts/kode-operator
+	rm -rf /tmp/helm-charts/kode
 
 # Utility target to set version from environment variable
 .PHONY: set-version
@@ -168,7 +168,7 @@ set-version: ## Set the version for Helm charts
 
 # Package all Helm charts
 .PHONY: helm-package-all
-helm-package-all: set-version helm-package-kode-crd helm-package-kode-operator
+helm-package-all: set-version helm-package-kode-crd helm-package-kode
 
 ##@ Deployment
 
