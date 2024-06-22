@@ -1,10 +1,15 @@
 apiVersion: v2
-name: kode-operator
+name: kode
 description: A Helm chart for the Kode Operator. It installs the Kode Operator and its dependencies.
 type: application
 version: "PLACEHOLDER_VERSION" # This will be replaced by the GitHub workflow
 appVersion: "PLACEHOLDER_VERSION" # This will be replaced by the GitHub workflow
 dependencies:
-  - name: kode-operator-crd
+  - name: kode-crd
     version: "PLACEHOLDER_VERSION" # This will be replaced by the GitHub workflow
     repository: "oci://ghcr.io/emil-jacero"
+  - name: cert-manager
+    repository: https://charts.jetstack.io
+    condition: certmanager.enabled
+    alias: certmanager
+    version: "1.15.0"

@@ -1,21 +1,25 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "kode-operator.fullname" . }}-envoyproxyclusterconfig-viewer-role
+  name: {{ include "kode.fullname" . }}-kode-editor-role
   labels:
-  {{- include "kode-operator.labels" . | nindent 4 }}
+  {{- include "kode.labels" . | nindent 4 }}
 rules:
 - apiGroups:
   - kode.jacero.io
   resources:
-  - envoyproxyclusterconfigs
+  - kodes
   verbs:
+  - create
+  - delete
   - get
   - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - kode.jacero.io
   resources:
-  - envoyproxyclusterconfigs/status
+  - kodes/status
   verbs:
   - get

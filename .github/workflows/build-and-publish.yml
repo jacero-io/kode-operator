@@ -1,4 +1,4 @@
-name: Build and Publish
+name: Build & Publish container images to GHCR
 
 on:
   push:
@@ -12,8 +12,10 @@ on:
 
 jobs:
   build-and-publish:
+    permissions:
+      packages: write
     runs-on: ubuntu-latest
-    if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
+    # if: github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/')
     
     steps:
     - name: Checkout code
@@ -29,14 +31,16 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Build and push Docker image
-      uses: docker/build-push-action@v2
+    - name: Set up Go
+      uses: actions/setup-go@v3
       with:
-        context: .
-        push: true
-        tags: |
-          ghcr.io/${{ github.repository }}/kode-operator:latest
-          ghcr.io/${{ github.repository }}/kode-operator:${{ github.ref_name }}
+        go-version: '1.22'
+    
+    - name: Install dependencies
+      run: make $(LOCALBIN)
+
+    - name: Build and push Docker image using Make
+      run: make docker-buildx IMG=ghcr.io/${{ github.repository }}/kode-operator:${{ github.ref_name }}
 
     - name: Log out from GitHub Container Registry
       run: docker logout ghcr.io

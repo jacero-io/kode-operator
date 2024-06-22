@@ -1,0 +1,66 @@
+name: Build & Publish Helm Charts to GHCR
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+jobs:
+  build-and-publish-helm-charts:
+    permissions:
+      packages: write
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Install dependencies
+        run: |
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+          go install sigs.k8s.io/kustomize/kustomize/v5@latest
+          go install github.com/arttor/helmify/cmd/helmify@latest
+
+      - name: Extract version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_ENV
+
+      - name: Create temporary directory
+        run: mkdir -p /tmp/helm-charts
+
+      - name: Create output directory
+        run: mkdir -p /tmp/helm-packages
+
+      - name: Copy kode-crd to temporary directory
+        run: cp -r helm-charts/kode-crd /tmp/helm-charts/kode-crd
+
+      - name: Update Chart.yaml for kode-crd
+        run: |
+          sed -i "s/PLACEHOLDER_VERSION/${{ env.VERSION }}/g" /tmp/helm-charts/kode-crd/Chart.yaml
+          helm package /tmp/helm-charts/kode-crd --version ${{ env.VERSION }} --destination /tmp/helm-packages
+
+      - name: Push kode-crd chart
+        run: |
+          echo ${{ secrets.GITHUB_TOKEN }} | helm registry login -u ${{ github.actor }} ghcr.io --password-stdin
+          helm push /tmp/helm-packages/kode-crd-${{ env.VERSION }}.tgz oci://ghcr.io/${{ github.repository_owner }}
+
+      - name: Copy kode to temporary directory
+        run: cp -r helm-charts/kode /tmp/helm-charts/kode
+
+      - name: Update Chart.yaml for kode
+        run: |
+          sed -i "s/PLACEHOLDER_VERSION/${{ env.VERSION }}/g" /tmp/helm-charts/kode/Chart.yaml
+          helm dependency update /tmp/helm-charts/kode
+          helm package /tmp/helm-charts/kode --version ${{ env.VERSION }} --destination /tmp/helm-packages
+
+      - name: Push kode chart
+        run: |
+          echo ${{ secrets.GITHUB_TOKEN }} | helm registry login -u ${{ github.actor }} ghcr.io --password-stdin
+          helm push /tmp/helm-packages/kode-${{ env.VERSION }}.tgz oci://ghcr.io/${{ github.repository_owner }}
+
+      - name: Clean up temporary directory
+        run: rm -rf /tmp/helm-charts /tmp/helm-packages
+
+      - name: Log out from GitHub Container Registry
+        run: helm registry logout ghcr.io

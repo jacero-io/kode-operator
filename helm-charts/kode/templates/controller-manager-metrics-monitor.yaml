@@ -1,10 +1,10 @@
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: {{ include "kode-operator.fullname" . }}-controller-manager-metrics-monitor
+  name: {{ include "kode.fullname" . }}-controller-manager-metrics-monitor
   labels:
     control-plane: controller-manager
-  {{- include "kode-operator.labels" . | nindent 4 }}
+  {{- include "kode.labels" . | nindent 4 }}
 spec:
   endpoints:
   - path: /metrics

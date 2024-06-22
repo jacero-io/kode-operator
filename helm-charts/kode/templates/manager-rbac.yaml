@@ -1,9 +1,9 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "kode-operator.fullname" . }}-manager-role
+  name: {{ include "kode.fullname" . }}-manager-role
   labels:
-  {{- include "kode-operator.labels" . | nindent 4 }}
+  {{- include "kode.labels" . | nindent 4 }}
 rules:
 - apiGroups:
   - apps
@@ -41,6 +41,32 @@ rules:
   - patch
   - update
   - watch
+- apiGroups:
+  - kode.jacero.io
+  resources:
+  - entrypoints
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - kode.jacero.io
+  resources:
+  - entrypoints/finalizers
+  verbs:
+  - update
+- apiGroups:
+  - kode.jacero.io
+  resources:
+  - entrypoints/status
+  verbs:
+  - get
+  - patch
+  - update
 - apiGroups:
   - kode.kode.jacero.io
   resources:
@@ -103,14 +129,14 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: {{ include "kode-operator.fullname" . }}-manager-rolebinding
+  name: {{ include "kode.fullname" . }}-manager-rolebinding
   labels:
-  {{- include "kode-operator.labels" . | nindent 4 }}
+  {{- include "kode.labels" . | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: '{{ include "kode-operator.fullname" . }}-manager-role'
+  name: '{{ include "kode.fullname" . }}-manager-role'
 subjects:
 - kind: ServiceAccount
-  name: '{{ include "kode-operator.fullname" . }}-controller-manager'
+  name: '{{ include "kode.fullname" . }}-controller-manager'
   namespace: '{{ .Release.Namespace }}'
