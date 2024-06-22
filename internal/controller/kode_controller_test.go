@@ -17,6 +17,7 @@ package controller
 // TEST: It should NOT create a Kode resource if the KodeTemplate.Spec.EnvoyProxyRef is set and the EnvoyProxyConfig does not exist
 // TEST: It should create a Kode resource without an envoy proxy sidecar when the KodeTemplate.Spec.EnvoyProxyRef is not set
 // TEST: It should create a Kode resource with an envoy proxy sidecar when the KodeTemplate.Spec.EnvoyProxyRef is set
+// TEST: It should add InitPlugins to the Deployment when the KodeTemplate has InitPlugins and the Kode resource has InitPlugins. The order of the InitPlugins should be preserved. KodeTemplate comes first, then Kode resource.
 
 // STORAGE TESTS (using KodeTemplate and EnvoyProxyConfig)
 // TEST: It should create a PersistentVolumeClaim for the Kode resource with storage configured
