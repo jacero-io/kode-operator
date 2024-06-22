@@ -1,4 +1,4 @@
-name: Publish Helm Charts to GHCR
+name: Build & Publish Helm Charts to GHCR
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-and-publish:
+  build-and-publish-helm-charts:
     permissions:
       packages: write
     runs-on: ubuntu-latest
