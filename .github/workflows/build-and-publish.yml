@@ -38,8 +38,8 @@ jobs:
     - name: Install dependencies
       run: make $(LOCALBIN)
 
-    # - name: Run Tests
-    #   run: make test
+    - name: Run Tests
+      run: make test
 
     - name: Build and push Docker image using Make
       run: make docker-buildx IMG=ghcr.io/${{ github.repository }}/kode-operator:${{ github.ref_name }}
