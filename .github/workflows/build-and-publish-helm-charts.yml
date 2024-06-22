@@ -29,18 +29,21 @@ jobs:
       - name: Create temporary directory
         run: mkdir -p /tmp/helm-charts
 
+      - name: Create output directory
+        run: mkdir -p /tmp/helm-packages
+
       - name: Copy kode-crd to temporary directory
         run: cp -r helm-charts/kode-crd /tmp/helm-charts/kode-crd
 
       - name: Update Chart.yaml for kode-crd
         run: |
           sed -i "s/PLACEHOLDER_VERSION/${{ env.VERSION }}/g" /tmp/helm-charts/kode-crd/Chart.yaml
-          helm package /tmp/helm-charts/kode-crd --version ${{ env.VERSION }}
+          helm package /tmp/helm-charts/kode-crd --version ${{ env.VERSION }} --destination /tmp/helm-packages
 
       - name: Push kode-crd chart
         run: |
           echo ${{ secrets.GITHUB_TOKEN }} | helm registry login -u ${{ github.actor }} ghcr.io --password-stdin
-          helm push /tmp/helm-charts/kode-crd-${{ env.VERSION }}.tgz oci://ghcr.io/${{ github.repository_owner }}
+          helm push /tmp/helm-packages/kode-crd-${{ env.VERSION }}.tgz oci://ghcr.io/${{ github.repository_owner }}
 
       - name: Copy kode to temporary directory
         run: cp -r helm-charts/kode /tmp/helm-charts/kode
@@ -49,15 +52,15 @@ jobs:
         run: |
           sed -i "s/PLACEHOLDER_VERSION/${{ env.VERSION }}/g" /tmp/helm-charts/kode/Chart.yaml
           helm dependency update /tmp/helm-charts/kode
-          helm package /tmp/helm-charts/kode --version ${{ env.VERSION }}
+          helm package /tmp/helm-charts/kode --version ${{ env.VERSION }} --destination /tmp/helm-packages
 
       - name: Push kode chart
         run: |
           echo ${{ secrets.GITHUB_TOKEN }} | helm registry login -u ${{ github.actor }} ghcr.io --password-stdin
-          helm push /tmp/helm-charts/kode-${{ env.VERSION }}.tgz oci://ghcr.io/${{ github.repository_owner }}
+          helm push /tmp/helm-packages/kode-${{ env.VERSION }}.tgz oci://ghcr.io/${{ github.repository_owner }}
 
       - name: Clean up temporary directory
-        run: rm -rf /tmp/helm-charts
+        run: rm -rf /tmp/helm-charts /tmp/helm-packages
 
       - name: Log out from GitHub Container Registry
         run: helm registry logout ghcr.io
