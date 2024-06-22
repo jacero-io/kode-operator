@@ -1,14 +1,14 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "kode-operator.fullname" . }}-controller-manager-metrics-service
+  name: {{ include "kode.fullname" . }}-controller-manager-metrics-service
   labels:
     control-plane: controller-manager
-  {{- include "kode-operator.labels" . | nindent 4 }}
+  {{- include "kode.labels" . | nindent 4 }}
 spec:
   type: {{ .Values.metricsService.type }}
   selector:
     control-plane: controller-manager
-  {{- include "kode-operator.selectorLabels" . | nindent 4 }}
+  {{- include "kode.selectorLabels" . | nindent 4 }}
   ports:
 	{{- .Values.metricsService.ports | toYaml | nindent 2 }}

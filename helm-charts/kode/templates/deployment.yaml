@@ -1,21 +1,21 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "kode-operator.fullname" . }}-controller-manager
+  name: {{ include "kode.fullname" . }}-controller-manager
   labels:
     control-plane: controller-manager
-  {{- include "kode-operator.labels" . | nindent 4 }}
+  {{- include "kode.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.controllerManager.replicas }}
   selector:
     matchLabels:
       control-plane: controller-manager
-    {{- include "kode-operator.selectorLabels" . | nindent 6 }}
+    {{- include "kode.selectorLabels" . | nindent 6 }}
   template:
     metadata:
       labels:
         control-plane: controller-manager
-      {{- include "kode-operator.selectorLabels" . | nindent 8 }}
+      {{- include "kode.selectorLabels" . | nindent 8 }}
       annotations:
         kubectl.kubernetes.io/default-container: manager
     spec:
@@ -64,5 +64,5 @@ spec:
       imagePullSecrets: {{ .Values.imagePullSecrets | default list | toJson }}
       securityContext:
         runAsNonRoot: true
-      serviceAccountName: {{ include "kode-operator.fullname" . }}-controller-manager
+      serviceAccountName: {{ include "kode.fullname" . }}-controller-manager
       terminationGracePeriodSeconds: 10

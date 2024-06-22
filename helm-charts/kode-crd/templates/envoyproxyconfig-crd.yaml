@@ -5,7 +5,7 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.14.0
   labels:
-  {{- include "kode-operator-crd.labels" . | nindent 4 }}
+  {{- include "kode-crd.labels" . | nindent 4 }}
 spec:
   group: kode.jacero.io
   names:

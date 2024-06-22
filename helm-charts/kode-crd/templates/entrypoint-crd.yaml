@@ -1,0 +1,81 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: entrypoints.kode.jacero.io
+  annotations:
+    controller-gen.kubebuilder.io/version: v0.14.0
+  labels:
+  {{- include "kode-crd.labels" . | nindent 4 }}
+spec:
+  group: kode.jacero.io
+  names:
+    kind: EntryPoint
+    listKind: EntryPointList
+    plural: entrypoints
+    singular: entrypoint
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    schema:
+      openAPIV3Schema:
+        description: EntryPoint is the Schema for the entrypoints API
+        properties:
+          apiVersion:
+            description: |-
+              APIVersion defines the versioned schema of this representation of an object.
+              Servers should convert recognized schemas to the latest internal value, and
+              may reject unrecognized values.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources
+            type: string
+          kind:
+            description: |-
+              Kind is a string value representing the REST resource this object represents.
+              Servers may infer this from the endpoint the client submits requests to.
+              Cannot be updated.
+              In CamelCase.
+              More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: EntryPointSpec defines the desired state of EntryPoint
+            properties:
+              apiType:
+                description: Type is the type of the gateway. It could be ingress-api
+                  or gateway-api.
+                enum:
+                - ingress-api
+                - gateway-api
+                type: string
+              type:
+                description: Type is the way the Kode resource is accessed. It could
+                  be subdomain or path.
+                enum:
+                - domain
+                - path
+                type: string
+              url:
+                description: |-
+                  URL is the domain name to use either as a suffix in the case of Type=domain or as a prefix/domain in the case of Type=path.
+                  When the type is domain, the controller will try to publish the Kode resource as a subdomain of the given domain (e.g <kode-resource>.kode.example.com).
+                  When the type is path, the controller will try to publish the Kode resource as a path of the given URL (e.g kode.example.com/<kode-resource>).
+                type: string
+            required:
+            - apiType
+            - type
+            - url
+            type: object
+          status:
+            description: EntryPointStatus defines the observed state of EntryPoint
+            type: object
+        type: object
+    served: true
+    storage: true
+    subresources:
+      status: {}
+status:
+  acceptedNames:
+    kind: ""
+    plural: ""
+  conditions: []
+  storedVersions: []
