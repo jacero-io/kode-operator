@@ -1,0 +1,45 @@
+name: Build & Publish Helm Charts to GHCR
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+jobs:
+  build-and-publish-helm-charts:
+    permissions:
+      packages: write
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Install Helm
+        run: |
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+      - name: Extract version from tag
+        id: get_version
+        run: echo "version=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_ENV
+
+      - name: Update Chart.yaml for kode-operator-crd
+        run: |
+          sed -i "s/PLACEHOLDER_VERSION/${{ env.version }}/" helm-charts/kode-operator-crd/Chart.yaml
+
+      - name: Package and push kode-operator-crd chart
+        run: |
+          echo ${{ secrets.GITHUB_TOKEN }} | helm registry login -u ${{ github.actor }} ghcr.io --password-stdin
+          helm package helm-charts/kode-operator-crd --version ${{ env.version }}
+          helm push kode-operator-crd-${{ env.version }}.tgz oci://ghcr.io/${{ github.repository_owner }}
+
+      - name: Update Chart.yaml for kode-operator
+        run: |
+          sed -i "s/PLACEHOLDER_VERSION/${{ env.version }}/" helm-charts/kode-operator/Chart.yaml
+
+      - name: Package and push kode-operator chart
+        run: |
+          echo ${{ secrets.GITHUB_TOKEN }} | helm registry login -u ${{ github.actor }} ghcr.io --password-stdin
+          helm package helm-charts/kode-operator --version ${{ env.version }}
+          helm push kode-operator-${{ env.version }}.tgz oci://ghcr.io/${{ github.repository_owner }}
