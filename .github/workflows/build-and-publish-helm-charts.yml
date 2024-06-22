@@ -26,40 +26,38 @@ jobs:
         id: get_version
         run: echo "VERSION=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_ENV
 
-      - name: Check Chart.yaml for kode-crd
-        run: |
-          if [ ! -f helm-charts/kode-crd/Chart.yaml ]; then
-            echo "Chart.yaml file for kode-crd is missing"
-            exit 1
-          fi
+      - name: Create temporary directory
+        run: mkdir -p /tmp/helm-charts
+
+      - name: Copy kode-crd to temporary directory
+        run: cp -r helm-charts/kode-crd /tmp/helm-charts/kode-crd
 
       - name: Update Chart.yaml for kode-crd
         run: |
-          sed -i "s/PLACEHOLDER_VERSION/${{ env.VERSION }}/g" helm-charts/kode-crd/Chart.yaml
-          helm package helm-charts/kode-crd --version ${{ env.VERSION }}
+          sed -i "s/PLACEHOLDER_VERSION/${{ env.VERSION }}/g" /tmp/helm-charts/kode-crd/Chart.yaml
+          helm package /tmp/helm-charts/kode-crd --version ${{ env.VERSION }}
 
       - name: Push kode-crd chart
         run: |
           echo ${{ secrets.GITHUB_TOKEN }} | helm registry login -u ${{ github.actor }} ghcr.io --password-stdin
-          helm push kode-crd-${{ env.VERSION }}.tgz oci://ghcr.io/${{ github.repository_owner }}
+          helm push /tmp/helm-charts/kode-crd-${{ env.VERSION }}.tgz oci://ghcr.io/${{ github.repository_owner }}
 
-      - name: Check Chart.yaml for kode
-        run: |
-          if [ ! -f helm-charts/kode/Chart.yaml ]; then
-            echo "Chart.yaml file for kode is missing"
-            exit 1
-          fi
+      - name: Copy kode to temporary directory
+        run: cp -r helm-charts/kode /tmp/helm-charts/kode
 
       - name: Update Chart.yaml for kode
         run: |
-          sed -i "s/PLACEHOLDER_VERSION/${{ env.VERSION }}/g" helm-charts/kode/Chart.yaml
-          helm dependency update
-          helm package helm-charts/kode --version ${{ env.VERSION }}
+          sed -i "s/PLACEHOLDER_VERSION/${{ env.VERSION }}/g" /tmp/helm-charts/kode/Chart.yaml
+          helm dependency update /tmp/helm-charts/kode
+          helm package /tmp/helm-charts/kode --version ${{ env.VERSION }}
 
       - name: Push kode chart
         run: |
           echo ${{ secrets.GITHUB_TOKEN }} | helm registry login -u ${{ github.actor }} ghcr.io --password-stdin
-          helm push kode-${{ env.VERSION }}.tgz oci://ghcr.io/${{ github.repository_owner }}
+          helm push /tmp/helm-charts/kode-${{ env.VERSION }}.tgz oci://ghcr.io/${{ github.repository_owner }}
+
+      - name: Clean up temporary directory
+        run: rm -rf /tmp/helm-charts
 
       - name: Log out from GitHub Container Registry
         run: helm registry logout ghcr.io
