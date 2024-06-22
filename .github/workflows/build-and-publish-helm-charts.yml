@@ -20,26 +20,32 @@ jobs:
         run: |
           curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: '1.22'
+    
+      - name: Install dependencies
+        run: make $(LOCALBIN)
+
       - name: Extract version from tag
         id: get_version
-        run: echo "version=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_ENV
+        run: echo "VERSION=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_ENV
 
-      - name: Update Chart.yaml for kode-operator-crd
-        run: |
-          sed -i "s/PLACEHOLDER_VERSION/${{ env.version }}/" helm-charts/kode-operator-crd/Chart.yaml
+      - name: Package Helm charts
+        env:
+          VERSION: ${{ env.VERSION }}
+        run: make helm-package-all
 
-      - name: Package and push kode-operator-crd chart
-        run: |
-          echo ${{ secrets.GITHUB_TOKEN }} | helm registry login -u ${{ github.actor }} ghcr.io --password-stdin
-          helm package helm-charts/kode-operator-crd --version ${{ env.version }}
-          helm push kode-operator-crd-${{ env.version }}.tgz oci://ghcr.io/${{ github.repository_owner }}
-
-      - name: Update Chart.yaml for kode-operator
-        run: |
-          sed -i "s/PLACEHOLDER_VERSION/${{ env.version }}/" helm-charts/kode-operator/Chart.yaml
-
-      - name: Package and push kode-operator chart
+      - name: Push kode-operator-crd chart
         run: |
           echo ${{ secrets.GITHUB_TOKEN }} | helm registry login -u ${{ github.actor }} ghcr.io --password-stdin
-          helm package helm-charts/kode-operator --version ${{ env.version }}
-          helm push kode-operator-${{ env.version }}.tgz oci://ghcr.io/${{ github.repository_owner }}
+          helm push kode-operator-crd-${{ env.VERSION }}.tgz oci://ghcr.io/${{ github.repository_owner }}
+
+      - name: Push kode-operator chart
+        run: |
+          echo ${{ secrets.GITHUB_TOKEN }} | helm registry login -u ${{ github.actor }} ghcr.io --password-stdin
+          helm push kode-operator-${{ env.VERSION }}.tgz oci://ghcr.io/${{ github.repository_owner }}
+
+      - name: Log out from GitHub Container Registry
+        run: helm registry logout ghcr.io

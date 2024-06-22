@@ -140,6 +140,36 @@ build-installer: manifests generate kustomize ## Generate a consolidated YAML wi
 	cd config/manager && $(KUSTOMIZE) edit set image controller=${IMG}
 	$(KUSTOMIZE) build config/default > dist/install.yaml
 
+.PHONY: helm-package-kode-operator-crd
+helm-package-kode-operator-crd: ## Package kode-operator-crd Helm chart
+	@echo "Packaging kode-operator-crd chart..."
+	mkdir -p /tmp/helm-charts/kode-operator-crd
+	cp -r helm-charts/kode-operator-crd/* /tmp/helm-charts/kode-operator-crd/
+	sed -i "s/PLACEHOLDER_VERSION/${VERSION}/g" /tmp/helm-charts/kode-operator-crd/Chart.yaml
+	helm package /tmp/helm-charts/kode-operator-crd --version $(VERSION) --destination /tmp
+	mv /tmp/kode-operator-crd-$(VERSION).tgz ./kode-operator-crd-$(VERSION).tgz
+	rm -rf /tmp/helm-charts/kode-operator-crd
+
+.PHONY: helm-package-kode-operator
+helm-package-kode-operator: ## Package kode-operator Helm chart
+	@echo "Packaging kode-operator chart..."
+	mkdir -p /tmp/helm-charts/kode-operator
+	cp -r helm-charts/kode-operator/* /tmp/helm-charts/kode-operator/
+	sed -i "s/PLACEHOLDER_VERSION/${VERSION}/g" /tmp/helm-charts/kode-operator/Chart.yaml
+	helm package /tmp/helm-charts/kode-operator --version $(VERSION) --destination /tmp
+	mv /tmp/kode-operator-$(VERSION).tgz ./kode-operator-$(VERSION).tgz
+	rm -rf /tmp/helm-charts/kode-operator
+
+# Utility target to set version from environment variable
+.PHONY: set-version
+set-version: ## Set the version for Helm charts
+	$(eval VERSION := $(shell echo $(GITHUB_REF) | sed 's/refs\/tags\///'))
+	@echo "Version set to $(VERSION)"
+
+# Package all Helm charts
+.PHONY: helm-package-all
+helm-package-all: set-version helm-package-kode-operator-crd helm-package-kode-operator
+
 ##@ Deployment
 
 ifndef ignore-not-found
