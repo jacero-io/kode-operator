@@ -34,6 +34,7 @@ jobs:
       - name: Update Chart.yaml for kode
         run: |
           sed -i "s/PLACEHOLDER_VERSION/${{ env.VERSION }}/g" helm-charts/kode/Chart.yaml
+          helm dependency update
           helm package helm-charts/kode --version ${{ env.VERSION }}
 
       - name: Push kode-crd chart
