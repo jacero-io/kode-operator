@@ -16,33 +16,32 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
 
-      - name: Install Helm
+      - name: Install dependencies
         run: |
           curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-
-      - name: Set up Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: '1.22'
-    
-      - name: Install dependencies
-        run: make $(LOCALBIN)
+          go install sigs.k8s.io/kustomize/kustomize/v5@latest
+          go install github.com/arttor/helmify/cmd/helmify@latest
 
       - name: Extract version from tag
         id: get_version
         run: echo "VERSION=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_ENV
 
-      - name: Package Helm charts
-        env:
-          VERSION: ${{ env.VERSION }}
-        run: make helm-package-all
+      - name: Update Chart.yaml for kode-crd
+        run: |
+          sed -i "s/PLACEHOLDER_VERSION/${{ env.VERSION }}/g" helm-charts/kode-crd/Chart.yaml
+          helm package helm-charts/kode-crd --version ${{ env.VERSION }}
+
+      - name: Update Chart.yaml for kode
+        run: |
+          sed -i "s/PLACEHOLDER_VERSION/${{ env.VERSION }}/g" helm-charts/kode/Chart.yaml
+          helm package helm-charts/kode --version ${{ env.VERSION }}
 
       - name: Push kode-crd chart
         run: |
           echo ${{ secrets.GITHUB_TOKEN }} | helm registry login -u ${{ github.actor }} ghcr.io --password-stdin
           helm push kode-crd-${{ env.VERSION }}.tgz oci://ghcr.io/${{ github.repository_owner }}
 
-      - name: Push kode-operator chart
+      - name: Push kode chart
         run: |
           echo ${{ secrets.GITHUB_TOKEN }} | helm registry login -u ${{ github.actor }} ghcr.io --password-stdin
           helm push kode-${{ env.VERSION }}.tgz oci://ghcr.io/${{ github.repository_owner }}
