@@ -1,15 +1,15 @@
 name: Build and Publish
 
-on: [push, pull_request]
-# on:
-#   push:
-#     branches:
-#       - main
-#     tags:
-#       - '*'
-#   pull_request:
-#     branches:
-#       - main
+on:
+  push:
+    branches:
+      - main
+      - add-github-workflow
+    tags:
+      - '*'
+  pull_request:
+    branches:
+      - main
 
 jobs:
   build-and-publish:
