@@ -29,14 +29,16 @@ jobs:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Build and push Docker image
-      uses: docker/build-push-action@v2
+    - name: Set up Go
+      uses: actions/setup-go@v3
       with:
-        context: .
-        push: true
-        tags: |
-          ghcr.io/${{ github.repository }}/kode-operator:latest
-          ghcr.io/${{ github.repository }}/kode-operator:${{ github.ref_name }}
+        go-version: '1.22'
+    
+    - name: Install dependencies
+      run: make $(LOCALBIN)
+
+    - name: Build and push Docker image using Make
+      run: make docker-buildx IMG=ghcr.io/${{ github.repository }}/kode-operator:${{ github.ref_name }}
 
     - name: Log out from GitHub Container Registry
       run: docker logout ghcr.io
