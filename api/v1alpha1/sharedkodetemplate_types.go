@@ -102,7 +102,7 @@ type SharedKodeTemplateSpec struct {
 
 	// EntryPointSpec defines the desired state of the entrypoint.
 	// +kubebuilder:validation:Description="Desired state of the entrypoint."
-	EntryPointSpec EntryPointSpec `json:"entryPointSpec,omitempty"`
+	// EntryPointSpec EntryPointSpec `json:"entryPointSpec,omitempty"`
 }
 
 // SharedKodeTemplateStatus defines the observed state
