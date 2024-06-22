@@ -31,16 +31,16 @@ jobs:
           sed -i "s/PLACEHOLDER_VERSION/${{ env.VERSION }}/g" helm-charts/kode-crd/Chart.yaml
           helm package helm-charts/kode-crd --version ${{ env.VERSION }}
 
+      - name: Push kode-crd chart
+        run: |
+          echo ${{ secrets.GITHUB_TOKEN }} | helm registry login -u ${{ github.actor }} ghcr.io --password-stdin
+          helm push kode-crd-${{ env.VERSION }}.tgz oci://ghcr.io/${{ github.repository_owner }}
+
       - name: Update Chart.yaml for kode
         run: |
           sed -i "s/PLACEHOLDER_VERSION/${{ env.VERSION }}/g" helm-charts/kode/Chart.yaml
           helm dependency update
           helm package helm-charts/kode --version ${{ env.VERSION }}
-
-      - name: Push kode-crd chart
-        run: |
-          echo ${{ secrets.GITHUB_TOKEN }} | helm registry login -u ${{ github.actor }} ghcr.io --password-stdin
-          helm push kode-crd-${{ env.VERSION }}.tgz oci://ghcr.io/${{ github.repository_owner }}
 
       - name: Push kode chart
         run: |
