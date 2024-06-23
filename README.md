@@ -157,7 +157,6 @@ metadata:
 spec:
   type: code-server
   image: linuxserver/code-server:latest
-  port: 3000
   defaultHome: /config
   defaultWorkspace: workspace
 ```

@@ -17,7 +17,9 @@ limitations under the License.
 package controller
 
 import (
+	"crypto/sha1"
 	_ "embed"
+	"encoding/base64"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -50,6 +52,7 @@ const (
 	ProxyInitContainerName  = "proxy-init"
 	ProxyInitContainerImage = "openpolicyagent/proxy_init:v8"
 	RouterFilterType        = "type.googleapis.com/envoy.extensions.filters.http.router.v3.Router"
+	BasicAuthFilterType     = "type.googleapis.com/envoy.extensions.filters.http.basic_auth.v3.BasicAuth"
 )
 
 func writeEmbeddedFilesToTempDir() (string, error) {
@@ -73,7 +76,7 @@ func writeEmbeddedFilesToTempDir() (string, error) {
 type BootstrapConfigOptions struct {
 	HTTPFilters []kodev1alpha1.HTTPFilter
 	Clusters    []kodev1alpha1.Cluster
-	ServicePort int32
+	ExposePort  int32
 }
 
 // Define the Router filter
@@ -111,30 +114,27 @@ func encodeToYAML(value cue.Value) (string, error) {
 }
 
 // encodeAndFillPath encodes the provided data and fills it into the CUE value at the specified path.
-// It takes a CUE context, the CUE value, the CUE parse path, the CUE schema, the CUE schema string, and the data to encode and fill.
-// If a CUE schema is provided, it validates the encoded value against the schema before filling it into the CUE value.
-// Returns an error if encoding, validation, or filling fails.
-func encodeAndFillPath(ctx *cue.Context, value cue.Value, cueParsePath string, cueSchema string, cueSchemaString string, data interface{}) error {
-	var cueSchemaValue cue.Value
-	if cueSchema != "" {
-		cueSchemaValue = ctx.CompileString(cueSchemaString).LookupPath(cue.ParsePath(cueParsePath))
+// It takes a CUE context, a CUE value, the CUE parse path, the CUE value path, the CUE schema file, and the data as input.
+// It returns the updated CUE value and an error if any.
+func encodeAndFillPath(ctx *cue.Context, value cue.Value, cueParsePath string, cueValuePath string, cueSchemaFile string, data interface{}) (cue.Value, error) {
+	schema := ctx.CompileString(cueSchemaFile).LookupPath(cue.ParsePath(cueParsePath))
+	if schema.Err() != nil {
+		return value, errors.Wrap(schema.Err(), "Failed to parse path")
 	}
-	encodedValue := ctx.Encode(data)
-	if encodedValue.Err() != nil {
-		return errors.Wrap(encodedValue.Err(), fmt.Sprintf("failed to encode data for path %s", cueParsePath))
+
+	valueAsCUE := ctx.Encode(data)
+	if valueAsCUE.Err() != nil {
+		return value, errors.Wrap(valueAsCUE.Err(), "Failed to encode data")
 	}
-	if cueSchema != "" {
-		unifiedValue, err := unifyAndValidate(cueSchemaValue, encodedValue)
-		if err != nil {
-			return err
-		}
-		// Fill the unified value into the CUE value at the specified path
-		value = value.FillPath(cue.ParsePath(cueParsePath), unifiedValue)
-	} else {
-		// Fill the encoded value into the CUE value at the specified path
-		value = value.FillPath(cue.ParsePath(cueParsePath), encodedValue)
+
+	unifiedValue, err := unifyAndValidate(schema, valueAsCUE)
+	if err != nil {
+		return value, err
 	}
-	return nil
+
+	// Fill the unified value into the CUE value at the specified path
+	value = value.FillPath(cue.ParsePath(cueValuePath), unifiedValue)
+	return value, nil
 }
 
 // getBootstrapConfig generates the bootstrap configuration based on the provided options.
@@ -144,8 +144,6 @@ func encodeAndFillPath(ctx *cue.Context, value cue.Value, cueParsePath string, c
 // If any error occurs during the process, it is returned along with an empty string.
 func getBootstrapConfig(log logr.Logger, options BootstrapConfigOptions) (string, error) {
 	log.Info("Starting getBootstrapConfig", "options", options)
-
-	cueSchemaString := string(embeddedCueSchemaFile)
 
 	ctx := cuecontext.New()
 
@@ -178,21 +176,24 @@ func getBootstrapConfig(log logr.Logger, options BootstrapConfigOptions) (string
 	}
 
 	type encodeAndFillPathArgs struct {
-		cueParsePath    string
-		cueSchema       string
-		cueSchemaString string
-		data            interface{}
+		cueParsePath  string
+		cueValuePath  string
+		cueSchemaFile string
+		data          interface{}
 	}
 
 	args := []encodeAndFillPathArgs{
-		{"#GoHttpFilters", "#HTTPFilters", cueSchemaString, options.HTTPFilters},
-		{"#GoClusters", "#Clusters", cueSchemaString, options.Clusters},
-		{"#GoLocalServicePort", "#Port", cueSchemaString, uint32(options.ServicePort)},
+		{"#HTTPFilters", "#GoHttpFilters", embeddedCueSchemaFile, options.HTTPFilters},
+		{"#Clusters", "#GoClusters", embeddedCueSchemaFile, options.Clusters},
+		{"#Port", "#GoLocalServicePort", embeddedCueSchemaFile, uint32(InternalServicePort)},
+		{"#Port", "#GoExposePort", embeddedCueSchemaFile, uint32(options.ExposePort)},
 	}
 
 	for _, arg := range args {
 		log.Info("Encoding and filling path", "path", arg.cueParsePath, "data", arg.data)
-		if err := encodeAndFillPath(ctx, value, arg.cueParsePath, arg.cueSchema, arg.cueSchemaString, arg.data); err != nil {
+		var err error
+		value, err = encodeAndFillPath(ctx, value, arg.cueParsePath, arg.cueValuePath, arg.cueSchemaFile, arg.data)
+		if err != nil {
 			log.Error(err, "Failed to encode and fill path", "path", arg.cueParsePath)
 			return "", err
 		}
@@ -211,19 +212,35 @@ func getBootstrapConfig(log logr.Logger, options BootstrapConfigOptions) (string
 // constructEnvoyProxyContainer constructs the Envoy Proxy container and the Init container.
 // It takes a logger, the sharedKodeTemplateSpec, and the sharedEnvoyProxyTemplateSpec as input.
 // It returns the constructed Envoy Proxy container, the Init container, and an error if any.
-func constructEnvoyProxyContainer(log logr.Logger,
-	sharedKodeTemplateSpec *kodev1alpha1.SharedKodeTemplateSpec,
-	sharedEnvoyProxyTemplateSpec *kodev1alpha1.SharedEnvoyProxyConfigSpec) (corev1.Container, corev1.Container, error) {
-	var modifiedLog logr.Logger
-	modifiedLog = log.WithName("constructEnvoyProxyContainer")
+func constructEnvoyProxyContainer(upstreamLog logr.Logger,
+	templateSpec *kodev1alpha1.SharedKodeTemplateSpec,
+	envoyProxyConfigSpec *kodev1alpha1.SharedEnvoyProxyConfigSpec,
+	kode *kodev1alpha1.Kode) (corev1.Container, corev1.Container, error) {
+	var log logr.Logger
+	log = upstreamLog.WithName("constructEnvoyProxyContainer")
 
-	modifiedLog.Info("Constructing Envoy Proxy container", "sharedKodeTemplateSpec", sharedKodeTemplateSpec, "sharedEnvoyProxyTemplateSpec", sharedEnvoyProxyTemplateSpec)
+	log.Info("Constructing Envoy Proxy container", "templateSpec", templateSpec, "envoyProxyConfigSpec", envoyProxyConfigSpec)
 
-	servicePort := sharedKodeTemplateSpec.Port
-	config, err := getBootstrapConfig(modifiedLog, BootstrapConfigOptions{
-		HTTPFilters: sharedEnvoyProxyTemplateSpec.HTTPFilters,
-		Clusters:    sharedEnvoyProxyTemplateSpec.Clusters,
-		ServicePort: servicePort,
+	exposePort := templateSpec.Port
+
+	// Check if AuthType is set to "basic" and kode.Password or kode.existingSecret is provided
+	if envoyProxyConfigSpec.AuthType == "basic" && (kode.Spec.Password != "" || kode.Spec.ExistingSecret != "") {
+		hashedPassword := hashPassword(kode.Spec.Password)
+		basicAuthFilter := kodev1alpha1.HTTPFilter{
+			Name: "envoy.filters.http.basic_auth",
+			TypedConfig: runtime.RawExtension{
+				Raw: []byte(fmt.Sprintf(`{"@type": "%s", "users": {"inline_string": "%s:%s"}}`, BasicAuthFilterType, kode.Spec.User, hashedPassword)),
+			},
+		}
+		// Prepend the Basic Auth filter to the list of HTTP filters
+		envoyProxyConfigSpec.HTTPFilters = prependFilter(envoyProxyConfigSpec.HTTPFilters, basicAuthFilter)
+		log.Info("Added Basic Auth filter with hashed password", "username", kode.Spec.User)
+	}
+
+	config, err := getBootstrapConfig(log, BootstrapConfigOptions{
+		HTTPFilters: envoyProxyConfigSpec.HTTPFilters,
+		Clusters:    envoyProxyConfigSpec.Clusters,
+		ExposePort:  exposePort,
 	})
 	if err != nil {
 		log.Error(err, "Failed to get bootstrap config")
@@ -232,12 +249,12 @@ func constructEnvoyProxyContainer(log logr.Logger,
 
 	envoyContainer := corev1.Container{
 		Name:  EnvoyProxyContainerName,
-		Image: sharedEnvoyProxyTemplateSpec.Image,
+		Image: envoyProxyConfigSpec.Image,
 		Args: []string{
 			"--config-yaml", config,
 		},
 		Ports: []corev1.ContainerPort{
-			{Name: "envoy-http", ContainerPort: servicePort},
+			{Name: "envoy-http", ContainerPort: exposePort},
 		},
 		SecurityContext: &corev1.SecurityContext{
 			RunAsUser: int64Ptr(EnvoyProxyRunAsUser),
@@ -248,7 +265,7 @@ func constructEnvoyProxyContainer(log logr.Logger,
 		Name:  ProxyInitContainerName,
 		Image: ProxyInitContainerImage,
 		// Documentation: https://github.com/open-policy-agent/opa-envoy-plugin/blob/main/proxy_init/proxy_init.sh
-		Args: []string{"-p", "8000", "-u", strconv.FormatInt(*int64Ptr(EnvoyProxyRunAsUser), 16)},
+		Args: []string{"-p", strconv.Itoa(int(exposePort)), "-u", strconv.FormatInt(*int64Ptr(EnvoyProxyRunAsUser), 16)},
 		SecurityContext: &corev1.SecurityContext{
 			Capabilities: &corev1.Capabilities{
 				Add: []corev1.Capability{"NET_ADMIN"},
@@ -260,6 +277,17 @@ func constructEnvoyProxyContainer(log logr.Logger,
 
 	log.Info("Successfully constructed Envoy Proxy and Init containers")
 	return envoyContainer, initContainer, nil
+}
+
+// hashPassword hashes the password using SHA-1 and base64 encoding to be compatible with htpasswd SHA
+func hashPassword(password string) string {
+	passwordHash := sha1.Sum([]byte(password))
+	return "{SHA}" + base64.StdEncoding.EncodeToString(passwordHash[:])
+}
+
+// prependFilter prepends the filter to the list of HTTP filters
+func prependFilter(filters []kodev1alpha1.HTTPFilter, filter kodev1alpha1.HTTPFilter) []kodev1alpha1.HTTPFilter {
+	return append([]kodev1alpha1.HTTPFilter{filter}, filters...)
 }
 
 func boolPtr(b bool) *bool {

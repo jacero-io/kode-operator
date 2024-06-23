@@ -31,7 +31,7 @@ type SharedEnvoyProxyConfigSpec struct {
 
 	// HTTPFilters is a list of Envoy HTTP filters to be applied
 	// +kubebuilder:validation:Description="HTTP filters to be applied"
-	HTTPFilters []HTTPFilter `json:"httpFilters"`
+	HTTPFilters []HTTPFilter `json:"httpFilters,omitempty"`
 
 	// Clusters is a list of Envoy clusters
 	// +kubebuilder:validation:Description="Envoy clusters"

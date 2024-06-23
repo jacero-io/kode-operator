@@ -41,6 +41,7 @@ const (
 	PersistentVolumeClaimName                                  = "kode-pvc"
 	LoopRetryTime                                              = 1 * time.Second
 	OperatorName                                               = "kode-operator"
+	InternalServicePort                                        = 3000
 )
 
 type KodeReconciler struct {
@@ -63,6 +64,7 @@ type KodeReconciler struct {
 // TODO: When requeued (EnvoyProxyConfig, EnvoyProxyClusterConfig) or (KodeTemplate, KodeClusterTemplate), force reconcile of Kode resource
 // TODO: Fix when storage config is added after the Kode instance has deployed the volume-mount is not added. It should recreate the deployment with the PVC
 // TODO: Investigate and fix why is it triggering the reconcile loop four times?
+// TODO: Improve the logging output of the Kode instance and sidecar containers so that it seamlessly integrates with the opentelemetry logging, using labels.
 
 func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithName("Reconcile")

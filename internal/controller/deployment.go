@@ -107,7 +107,7 @@ func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode,
 
 	if templateSpec.EnvoyProxyRef.Name != "" {
 		log.Info("EnvoyProxyRef is defined", "Namespace", kode.Namespace, "Kode", kode.Name, "Name", templateSpec.EnvoyProxyRef.Name)
-		envoySidecarContainer, envoyInitContainer, err := constructEnvoyProxyContainer(log, templateSpec, sharedEnvoyProxyConfigSpec)
+		envoySidecarContainer, envoyInitContainer, err := constructEnvoyProxyContainer(log, templateSpec, sharedEnvoyProxyConfigSpec, kode)
 		if err != nil {
 			log.Error(err, "Failed to construct EnvoyProxy sidecar", "Kode", kode.Name, "Container", templateSpec.EnvoyProxyRef.Name, "Error", err)
 		} else {
@@ -155,11 +155,19 @@ func constructCodeServerContainers(kode *kodev1alpha1.Kode,
 	workspace string,
 	envoyProxyEnabled bool) []corev1.Container {
 
+	// If not envoyProxyEnabled, the servicePort will be the same as the template port
+	// This is because the Envoy Proxy will be listening on the template port
+	var servicePort int32
+	servicePort = InternalServicePort
+	if !envoyProxyEnabled {
+		servicePort = templateSpec.Port
+	}
+
 	container := corev1.Container{
 		Name:  "kode-" + kode.Name,
 		Image: templateSpec.Image,
 		Env: []corev1.EnvVar{
-			{Name: "PORT", Value: fmt.Sprintf("%d", templateSpec.Port)},
+			{Name: "PORT", Value: fmt.Sprintf("%d", servicePort)},
 			{Name: "PUID", Value: fmt.Sprintf("%d", templateSpec.PUID)},
 			{Name: "PGID", Value: fmt.Sprintf("%d", templateSpec.PGID)},
 			{Name: "TZ", Value: templateSpec.TZ},
@@ -173,7 +181,7 @@ func constructCodeServerContainers(kode *kodev1alpha1.Kode,
 	if !envoyProxyEnabled {
 		container.Ports = []corev1.ContainerPort{{
 			Name:          "http",
-			ContainerPort: templateSpec.Port,
+			ContainerPort: servicePort,
 		}}
 	}
 
@@ -184,6 +192,14 @@ func constructWebtopContainers(kode *kodev1alpha1.Kode,
 	templateSpec *kodev1alpha1.SharedKodeTemplateSpec,
 	envoyProxyEnabled bool) []corev1.Container {
 
+	// If not envoyProxyEnabled, the servicePort will be the same as the template port
+	// This is because the Envoy Proxy will be listening on the template port
+	var servicePort int32
+	servicePort = InternalServicePort
+	if !envoyProxyEnabled {
+		servicePort = templateSpec.Port
+	}
+
 	container := corev1.Container{
 		Name:  "kode-" + kode.Name,
 		Image: templateSpec.Image,
@@ -191,7 +207,7 @@ func constructWebtopContainers(kode *kodev1alpha1.Kode,
 			{Name: "PUID", Value: fmt.Sprintf("%d", templateSpec.PUID)},
 			{Name: "PGID", Value: fmt.Sprintf("%d", templateSpec.PGID)},
 			{Name: "TZ", Value: templateSpec.TZ},
-			{Name: "CUSTOM_PORT", Value: fmt.Sprintf("%d", templateSpec.Port)},
+			{Name: "CUSTOM_PORT", Value: fmt.Sprintf("%d", servicePort)},
 			{Name: "CUSTOM_USER", Value: kode.Spec.User},
 			{Name: "PASSWORD", Value: kode.Spec.Password},
 		},
@@ -201,7 +217,7 @@ func constructWebtopContainers(kode *kodev1alpha1.Kode,
 	if !envoyProxyEnabled {
 		container.Ports = []corev1.ContainerPort{{
 			Name:          "http",
-			ContainerPort: templateSpec.Port,
+			ContainerPort: servicePort,
 		}}
 	}
 
