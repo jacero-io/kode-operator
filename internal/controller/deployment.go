@@ -172,7 +172,7 @@ func constructCodeServerContainers(kode *kodev1alpha1.Kode,
 			{Name: "PGID", Value: fmt.Sprintf("%d", templateSpec.PGID)},
 			{Name: "TZ", Value: templateSpec.TZ},
 			{Name: "USERNAME", Value: kode.Spec.User},
-			{Name: "PASSWORD", Value: kode.Spec.Password},
+			// {Name: "PASSWORD", Value: kode.Spec.Password}, // Don't need to set password for code-server
 			{Name: "DEFAULT_WORKSPACE", Value: workspace},
 		},
 	}
