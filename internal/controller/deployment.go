@@ -25,10 +25,7 @@ import (
 	kodev1alpha1 "github.com/emil-jacero/kode-operator/api/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
@@ -37,7 +34,9 @@ func (r *KodeReconciler) ensureDeployment(ctx context.Context,
 	kode *kodev1alpha1.Kode,
 	labels map[string]string,
 	sharedKodeTemplateSpec *kodev1alpha1.SharedKodeTemplateSpec,
-	sharedEnvoyProxyConfigSpec *kodev1alpha1.SharedEnvoyProxyConfigSpec) error {
+	sharedEnvoyProxyConfigSpec *kodev1alpha1.SharedEnvoyProxyConfigSpec,
+	templateVersion string,
+	proxyConfigVersion string) error {
 
 	log := r.Log.WithName("ensureDeployment")
 
@@ -48,37 +47,26 @@ func (r *KodeReconciler) ensureDeployment(ctx context.Context,
 		return err
 	}
 
-	found := &appsv1.Deployment{}
-	err := r.Get(ctx, types.NamespacedName{Name: deployment.Name, Namespace: deployment.Namespace}, found)
+	// Use controllerutil.CreateOrUpdate for idempotency
+	op, err := controllerutil.CreateOrUpdate(ctx, r.Client, deployment, func() error {
+		// Update deployment spec to ensure correct state
+		found := deployment.DeepCopy()
+		found.Spec = deployment.Spec
+
+		// Update annotations with the latest resource versions
+		if found.Annotations == nil {
+			found.Annotations = map[string]string{}
+		}
+		found.Annotations["kode-template.version"] = templateVersion
+		found.Annotations["envoy-proxy-config.version"] = proxyConfigVersion
+
+		return nil
+	})
 	if err != nil {
-		if errors.IsNotFound(err) {
-			log.Info("Creating Deployment", "Namespace", deployment.Namespace, "Name", deployment.Name)
-			if err := r.Create(ctx, deployment); err != nil {
-				log.Error(err, "Failed to create Deployment", "Namespace", deployment.Namespace, "Name", deployment.Name)
-				return err
-			}
-			log.Info("Deployment created", "Namespace", deployment.Namespace, "Name", deployment.Name)
-		} else {
-			log.Error(err, "Failed to get Deployment", "Namespace", deployment.Namespace, "Name", deployment.Name)
-			return err
-		}
-	} else if !reflect.DeepEqual(deployment.Spec, found.Spec) {
-		retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			if err := r.Get(ctx, types.NamespacedName{Name: deployment.Name, Namespace: deployment.Namespace}, found); err != nil {
-				return err
-			}
-			found.Spec = deployment.Spec
-			log.Info("Updating Deployment due to spec change", "Namespace", found.Namespace, "Name", found.Name)
-			return r.Update(ctx, found)
-		})
-
-		if retryErr != nil {
-			log.Error(retryErr, "Failed to update Deployment after retrying", "Namespace", deployment.Namespace, "Name", deployment.Name)
-			return retryErr
-		}
+		log.Error(err, "Failed to create or update Deployment", "Namespace", deployment.Namespace, "Name", deployment.Name)
+		return err
 	}
-
-	log.Info("Successfully ensured Deployment", "Namespace", kode.Namespace, "Name", kode.Name)
+	log.Info("Deployment ensured", "operation", op, "Namespace", deployment.Namespace, "Name", deployment.Name)
 	return nil
 }
 
@@ -87,7 +75,6 @@ func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode,
 	labels map[string]string,
 	templateSpec *kodev1alpha1.SharedKodeTemplateSpec,
 	sharedEnvoyProxyConfigSpec *kodev1alpha1.SharedEnvoyProxyConfigSpec) *appsv1.Deployment {
-
 	log := r.Log.WithName("constructDeployment")
 
 	replicas := int32(1)
@@ -110,9 +97,9 @@ func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode,
 	var initContainers []corev1.Container
 
 	if templateSpec.Type == "code-server" {
-		containers = constructCodeServerContainers(kode, templateSpec, workspace)
+		containers = constructCodeServerContainers(kode, templateSpec, workspace, templateSpec.EnvoyProxyRef.Name != "")
 	} else if templateSpec.Type == "webtop" {
-		containers = constructWebtopContainers(kode, templateSpec)
+		containers = constructWebtopContainers(kode, templateSpec, templateSpec.EnvoyProxyRef.Name != "")
 	}
 
 	volumes, volumeMounts := constructVolumesAndMounts(mountPath, kode)
@@ -165,9 +152,10 @@ func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode,
 
 func constructCodeServerContainers(kode *kodev1alpha1.Kode,
 	templateSpec *kodev1alpha1.SharedKodeTemplateSpec,
-	workspace string) []corev1.Container {
+	workspace string,
+	envoyProxyEnabled bool) []corev1.Container {
 
-	return []corev1.Container{{
+	container := corev1.Container{
 		Name:  "kode-" + kode.Name,
 		Image: templateSpec.Image,
 		Env: []corev1.EnvVar{
@@ -179,17 +167,24 @@ func constructCodeServerContainers(kode *kodev1alpha1.Kode,
 			{Name: "PASSWORD", Value: kode.Spec.Password},
 			{Name: "DEFAULT_WORKSPACE", Value: workspace},
 		},
-		Ports: []corev1.ContainerPort{{
+	}
+
+	// Add port only if Envoy Proxy is not enabled
+	if !envoyProxyEnabled {
+		container.Ports = []corev1.ContainerPort{{
 			Name:          "http",
 			ContainerPort: templateSpec.Port,
-		}},
-	}}
+		}}
+	}
+
+	return []corev1.Container{container}
 }
 
 func constructWebtopContainers(kode *kodev1alpha1.Kode,
-	templateSpec *kodev1alpha1.SharedKodeTemplateSpec) []corev1.Container {
+	templateSpec *kodev1alpha1.SharedKodeTemplateSpec,
+	envoyProxyEnabled bool) []corev1.Container {
 
-	return []corev1.Container{{
+	container := corev1.Container{
 		Name:  "kode-" + kode.Name,
 		Image: templateSpec.Image,
 		Env: []corev1.EnvVar{
@@ -200,11 +195,17 @@ func constructWebtopContainers(kode *kodev1alpha1.Kode,
 			{Name: "CUSTOM_USER", Value: kode.Spec.User},
 			{Name: "PASSWORD", Value: kode.Spec.Password},
 		},
-		Ports: []corev1.ContainerPort{{
+	}
+
+	// Add port only if Envoy Proxy is not enabled
+	if !envoyProxyEnabled {
+		container.Ports = []corev1.ContainerPort{{
 			Name:          "http",
 			ContainerPort: templateSpec.Port,
-		}},
-	}}
+		}}
+	}
+
+	return []corev1.Container{container}
 }
 
 func constructVolumesAndMounts(mountPath string, kode *kodev1alpha1.Kode) ([]corev1.Volume, []corev1.VolumeMount) {
@@ -236,7 +237,7 @@ func constructVolumesAndMounts(mountPath string, kode *kodev1alpha1.Kode) ([]cor
 
 func constructInitPluginContainer(plugin kodev1alpha1.InitPluginSpec) corev1.Container {
 	return corev1.Container{
-		Name:    "init-" + plugin.Image,
+		Name:    "init-plugin-" + plugin.Name,
 		Image:   plugin.Image,
 		Command: plugin.Command,
 		Args:    plugin.Args,

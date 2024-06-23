@@ -65,7 +65,7 @@ package bootstrap
         endpoints: [{
             lb_endpoints: [{endpoint: {
                 address: { socket_address: {
-                    address: "local_service"
+                    address: "127.0.0.1"
                     port_value: #GoLocalServicePort
                 }}}
             }]
@@ -77,7 +77,7 @@ package bootstrap
     name: "listener_0"
     address: #Address & { socket_address: {
         address: "0.0.0.0"
-        port_value: 8000
+        port_value: #GoLocalServicePort
         }
     }
     filter_chains: [{

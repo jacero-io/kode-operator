@@ -24,6 +24,11 @@ type SharedEnvoyProxyConfigSpec struct {
 	// +kubebuilder:default="envoyproxy/envoy:v1.30-latest"
 	Image string `json:"image"`
 
+	// AuthType is the type of authentication to use
+	// +kubebuilder:validation:Description="Type of authentication to use"
+	// +kubebuilder:validation:Enum=basic
+	AuthType string `json:"authType,omitempty"`
+
 	// HTTPFilters is a list of Envoy HTTP filters to be applied
 	// +kubebuilder:validation:Description="HTTP filters to be applied"
 	HTTPFilters []HTTPFilter `json:"httpFilters"`
