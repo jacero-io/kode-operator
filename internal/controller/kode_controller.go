@@ -42,6 +42,7 @@ const (
 	LoopRetryTime                                              = 1 * time.Second
 	OperatorName                                               = "kode-operator"
 	InternalServicePort                                        = 3000
+	ExternalServicePort                                        = 8000
 )
 
 type KodeReconciler struct {
@@ -82,6 +83,26 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	}
 	log.Info("Kode resource found", "Namespace", kode.Namespace, "Name", kode.Name)
 	logKodeManifest(log, kode)
+
+	// Fetch the secret if ExistingSecret is set
+	var username, password string
+	if kode.Spec.ExistingSecret != "" {
+		secret := &corev1.Secret{}
+		secretNamespace := kode.Namespace
+		if err := r.Get(ctx, types.NamespacedName{Name: kode.Spec.ExistingSecret, Namespace: secretNamespace}, secret); err != nil {
+			if errors.IsNotFound(err) {
+				log.Info("Secret not found, requeuing", "Namespace", secretNamespace, "Name", kode.Spec.ExistingSecret)
+				return ctrl.Result{RequeueAfter: LoopRetryTime}, nil
+			}
+			log.Error(err, "Failed to fetch Secret", "Namespace", secretNamespace, "Name", kode.Spec.ExistingSecret)
+			return ctrl.Result{}, err
+		}
+		username = string(secret.Data["username"])
+		password = string(secret.Data["password"])
+	} else {
+		username = kode.Spec.User
+		password = kode.Spec.Password
+	}
 
 	// Validate references
 	if err := r.validateReferences(kode); err != nil {
@@ -187,7 +208,7 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	}
 
 	// Ensure the Deployment and Service exist
-	if err := r.ensureDeployment(ctx, kode, labels, &sharedKodeTemplateSpec, &sharedEnvoyProxyConfigSpec, templateVersion, envoyProxyConfigVersion); err != nil {
+	if err := r.ensureDeployment(ctx, kode, labels, &sharedKodeTemplateSpec, &sharedEnvoyProxyConfigSpec, templateVersion, envoyProxyConfigVersion, username, password); err != nil {
 		return ctrl.Result{}, err
 	}
 	if err := r.ensureService(ctx, kode, labels, &sharedKodeTemplateSpec); err != nil {

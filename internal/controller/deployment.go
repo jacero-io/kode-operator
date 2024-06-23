@@ -36,13 +36,15 @@ func (r *KodeReconciler) ensureDeployment(ctx context.Context,
 	sharedKodeTemplateSpec *kodev1alpha1.SharedKodeTemplateSpec,
 	sharedEnvoyProxyConfigSpec *kodev1alpha1.SharedEnvoyProxyConfigSpec,
 	templateVersion string,
-	proxyConfigVersion string) error {
+	proxyConfigVersion string,
+	username string,
+	password string) error {
 
 	log := r.Log.WithName("ensureDeployment")
 
 	log.Info("Ensuring Deployment exists", "Namespace", kode.Namespace, "Name", kode.Name)
 
-	deployment := r.constructDeployment(kode, labels, sharedKodeTemplateSpec, sharedEnvoyProxyConfigSpec)
+	deployment := r.constructDeployment(kode, labels, sharedKodeTemplateSpec, sharedEnvoyProxyConfigSpec, username, password)
 	if err := controllerutil.SetControllerReference(kode, deployment, r.Scheme); err != nil {
 		return err
 	}
@@ -74,7 +76,9 @@ func (r *KodeReconciler) ensureDeployment(ctx context.Context,
 func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode,
 	labels map[string]string,
 	templateSpec *kodev1alpha1.SharedKodeTemplateSpec,
-	sharedEnvoyProxyConfigSpec *kodev1alpha1.SharedEnvoyProxyConfigSpec) *appsv1.Deployment {
+	sharedEnvoyProxyConfigSpec *kodev1alpha1.SharedEnvoyProxyConfigSpec,
+	username string,
+	password string) *appsv1.Deployment {
 	log := r.Log.WithName("constructDeployment")
 
 	replicas := int32(1)
@@ -102,17 +106,25 @@ func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode,
 		containers = constructWebtopContainers(kode, templateSpec, templateSpec.EnvoyProxyRef.Name != "")
 	}
 
+	// Append additional Envs and Args to the main container
+	if len(containers) > 0 {
+		containers[0].Env = append(containers[0].Env, templateSpec.Envs...)
+		containers[0].Args = append(containers[0].Args, templateSpec.Args...)
+	}
+
 	volumes, volumeMounts := constructVolumesAndMounts(mountPath, kode)
 	containers[0].VolumeMounts = volumeMounts
 
 	if templateSpec.EnvoyProxyRef.Name != "" {
 		log.Info("EnvoyProxyRef is defined", "Namespace", kode.Namespace, "Kode", kode.Name, "Name", templateSpec.EnvoyProxyRef.Name)
-		envoySidecarContainer, envoyInitContainer, err := constructEnvoyProxyContainer(log, templateSpec, sharedEnvoyProxyConfigSpec, kode)
+		envoySidecarContainer, envoyInitContainers, err := constructEnvoyProxyContainer(log, templateSpec, sharedEnvoyProxyConfigSpec, username, password)
 		if err != nil {
 			log.Error(err, "Failed to construct EnvoyProxy sidecar", "Kode", kode.Name, "Container", templateSpec.EnvoyProxyRef.Name, "Error", err)
 		} else {
 			containers = append(containers, envoySidecarContainer)
-			initContainers = append(initContainers, envoyInitContainer)
+			for _, initContainer := range envoyInitContainers {
+				initContainers = append(initContainers, initContainer)
+			}
 			log.Info("Added EnvoyProxy sidecar container and init container", "Kode", kode.Name, "Container", envoySidecarContainer.Name)
 		}
 	}

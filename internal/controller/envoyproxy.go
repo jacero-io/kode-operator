@@ -46,12 +46,16 @@ var embeddedCueSchemaFile string
 var embeddedBootstrapCueFile string
 
 const (
-	// RestartPolicyAlways ContainerRestartPolicy = "Always"
+	RestartPolicyAlways corev1.ContainerRestartPolicy = corev1.ContainerRestartPolicyAlways
 	EnvoyProxyContainerName = "envoy-proxy"
 	EnvoyProxyRunAsUser     = 1111
 	ProxyInitContainerName  = "proxy-init"
 	ProxyInitContainerImage = "openpolicyagent/proxy_init:v8"
+	BasicAuthContainerPort  = 9001
+	BasicAuthContainerImage = "ghcr.io/emil-jacero/grpc-basic-auth:latest"
+	BasicAuthContainerName  = "basic-auth-service"
 	RouterFilterType        = "type.googleapis.com/envoy.extensions.filters.http.router.v3.Router"
+	ExtAuthzFilterType      = "type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz"
 	BasicAuthFilterType     = "type.googleapis.com/envoy.extensions.filters.http.basic_auth.v3.BasicAuth"
 )
 
@@ -80,10 +84,63 @@ type BootstrapConfigOptions struct {
 }
 
 // Define the Router filter
-var RouterFilter = kodev1alpha1.HTTPFilter{
+var RouterHTTPFilter = kodev1alpha1.HTTPFilter{
 	Name: "envoy.filters.http.router",
 	TypedConfig: runtime.RawExtension{
 		Raw: []byte(fmt.Sprintf(`{"@type": "%s"}`, RouterFilterType)),
+	},
+}
+
+// Define the BasicAuth filter
+var BasicAuthHTTPFilter = kodev1alpha1.HTTPFilter{
+	Name: "envoy.filters.http.ext_authz.basic_auth",
+	TypedConfig: runtime.RawExtension{
+		Raw: []byte(fmt.Sprintf(`{"@type": "%s",
+			"with_request_body": {
+				"max_request_bytes": 8192,
+				"allow_partial_message": true
+			},
+			"failure_mode_allow": false,
+			"grpc_service": {
+				"envoy_grpc": {
+					"cluster_name": "basic-auth-service"
+				},
+				"timeout": "0.250s"
+			},
+			"transport_api_version": "V3"
+		}}`, ExtAuthzFilterType)),
+	},
+}
+
+// Define the BasicAuth cluster
+var BasicAuthCluster = kodev1alpha1.Cluster{
+	Name: BasicAuthContainerName,
+	ConnectTimeout: "0.25s",
+	Type:           "STRICT_DNS",
+	LbPolicy:       "ROUND_ROBIN",
+	TypedExtensionProtocolOptions: runtime.RawExtension{
+		Raw: []byte(fmt.Sprintf(`{
+		"envoy.extensions.upstreams.http.v3.HttpProtocolOptions": {
+			"@type": "type.googleapis.com/envoy.extensions.upstreams.http.v3.HttpProtocolOptions",
+			"explicit_http_config": {
+				"http2_protocol_options": {},
+			},
+		}`)),
+	},
+	LoadAssignment: kodev1alpha1.LoadAssignment{
+		ClusterName: BasicAuthContainerName,
+		Endpoints: []kodev1alpha1.Endpoints{{
+			LbEndpoints: []kodev1alpha1.LbEndpoint{{
+				Endpoint: kodev1alpha1.Endpoint{
+					Address: kodev1alpha1.Address{
+						SocketAddress: kodev1alpha1.SocketAddress{
+							Address: BasicAuthContainerName,
+							PortValue: BasicAuthContainerPort,
+						},
+					},
+				},
+			}},
+		}},
 	},
 }
 
@@ -94,7 +151,7 @@ func EnsureRouterFilter(filters []kodev1alpha1.HTTPFilter) []kodev1alpha1.HTTPFi
 			break
 		}
 	}
-	return append(filters, RouterFilter)
+	return append(filters, RouterHTTPFilter)
 }
 
 func unifyAndValidate(schema, value cue.Value) (cue.Value, error) {
@@ -215,26 +272,53 @@ func getBootstrapConfig(log logr.Logger, options BootstrapConfigOptions) (string
 func constructEnvoyProxyContainer(upstreamLog logr.Logger,
 	templateSpec *kodev1alpha1.SharedKodeTemplateSpec,
 	envoyProxyConfigSpec *kodev1alpha1.SharedEnvoyProxyConfigSpec,
-	kode *kodev1alpha1.Kode) (corev1.Container, corev1.Container, error) {
+	username string,
+	password string) (corev1.Container, []corev1.Container, error) {
 	var log logr.Logger
 	log = upstreamLog.WithName("constructEnvoyProxyContainer")
+
+	var initContainers []corev1.Container
 
 	log.Info("Constructing Envoy Proxy container", "templateSpec", templateSpec, "envoyProxyConfigSpec", envoyProxyConfigSpec)
 
 	exposePort := templateSpec.Port
 
-	// Check if AuthType is set to "basic" and kode.Password or kode.existingSecret is provided
-	if envoyProxyConfigSpec.AuthType == "basic" && (kode.Spec.Password != "" || kode.Spec.ExistingSecret != "") {
-		hashedPassword := hashPassword(kode.Spec.Password)
-		basicAuthFilter := kodev1alpha1.HTTPFilter{
-			Name: "envoy.filters.http.basic_auth",
-			TypedConfig: runtime.RawExtension{
-				Raw: []byte(fmt.Sprintf(`{"@type": "%s", "users": {"inline_string": "%s:%s"}}`, BasicAuthFilterType, kode.Spec.User, hashedPassword)),
+	// Construct the Proxy Init container
+	proxySetupContainer := corev1.Container{
+		Name:  ProxyInitContainerName,
+		Image: ProxyInitContainerImage,
+		// Documentation: https://github.com/open-policy-agent/opa-envoy-plugin/blob/main/proxy_init/proxy_init.sh
+		Args: []string{"-p", strconv.Itoa(int(exposePort)), "-u", strconv.FormatInt(*int64Ptr(EnvoyProxyRunAsUser), 16)},
+		SecurityContext: &corev1.SecurityContext{
+			Capabilities: &corev1.Capabilities{
+				Add: []corev1.Capability{"NET_ADMIN"},
 			},
+			RunAsNonRoot: boolPtr(false),
+			RunAsUser:    int64Ptr(0),
+		},
+	}
+	initContainers = append(initContainers, proxySetupContainer)
+
+	// Check if AuthType is set to "basic" and password is provided
+	if envoyProxyConfigSpec.AuthType == "basic" && (password != "") {
+		BasicAuthHTTPFilter := BasicAuthHTTPFilter
+		BasicAuthCluster := BasicAuthCluster
+		basicAuthContainer := corev1.Container{
+			Name:  BasicAuthContainerName,
+			Image: BasicAuthContainerImage,
+			Ports: []corev1.ContainerPort{
+				{Name: "grpc", ContainerPort: BasicAuthContainerPort},
+			},
+			Env: []corev1.EnvVar{
+				{Name: "AUTH_USERNAME", Value: username},
+				{Name: "AUTH_PASSWORD", Value: password},
+			},
+			RestartPolicy: "Always",
 		}
-		// Prepend the Basic Auth filter to the list of HTTP filters
-		envoyProxyConfigSpec.HTTPFilters = prependFilter(envoyProxyConfigSpec.HTTPFilters, basicAuthFilter)
-		log.Info("Added Basic Auth filter with hashed password", "username", kode.Spec.User)
+		initContainers = append(initContainers, basicAuthContainer)
+		envoyProxyConfigSpec.HTTPFilters = prependFilter(envoyProxyConfigSpec.HTTPFilters, BasicAuthHTTPFilter)
+		envoyProxyConfigSpec.Clusters = append(envoyProxyConfigSpec.Clusters, BasicAuthCluster)
+		log.Info("Added Basic Auth service container", "username", username)
 	}
 
 	config, err := getBootstrapConfig(log, BootstrapConfigOptions{
@@ -244,7 +328,7 @@ func constructEnvoyProxyContainer(upstreamLog logr.Logger,
 	})
 	if err != nil {
 		log.Error(err, "Failed to get bootstrap config")
-		return corev1.Container{}, corev1.Container{}, err
+		return corev1.Container{}, []corev1.Container{}, err
 	}
 
 	envoyContainer := corev1.Container{
@@ -261,22 +345,10 @@ func constructEnvoyProxyContainer(upstreamLog logr.Logger,
 		},
 	}
 
-	initContainer := corev1.Container{
-		Name:  ProxyInitContainerName,
-		Image: ProxyInitContainerImage,
-		// Documentation: https://github.com/open-policy-agent/opa-envoy-plugin/blob/main/proxy_init/proxy_init.sh
-		Args: []string{"-p", strconv.Itoa(int(exposePort)), "-u", strconv.FormatInt(*int64Ptr(EnvoyProxyRunAsUser), 16)},
-		SecurityContext: &corev1.SecurityContext{
-			Capabilities: &corev1.Capabilities{
-				Add: []corev1.Capability{"NET_ADMIN"},
-			},
-			RunAsNonRoot: boolPtr(false),
-			RunAsUser:    int64Ptr(0),
-		},
-	}
+
 
 	log.Info("Successfully constructed Envoy Proxy and Init containers")
-	return envoyContainer, initContainer, nil
+	return envoyContainer, initContainers, nil
 }
 
 // hashPassword hashes the password using SHA-1 and base64 encoding to be compatible with htpasswd SHA
