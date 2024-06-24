@@ -101,9 +101,9 @@ func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode,
 	var initContainers []corev1.Container
 
 	if templateSpec.Type == "code-server" {
-		containers = constructCodeServerContainers(kode, templateSpec, workspace, templateSpec.EnvoyProxyRef.Name != "")
+		containers = constructCodeServerContainers(kode, templateSpec, workspace, username, password, templateSpec.EnvoyProxyRef.Name != "")
 	} else if templateSpec.Type == "webtop" {
-		containers = constructWebtopContainers(kode, templateSpec, templateSpec.EnvoyProxyRef.Name != "")
+		containers = constructWebtopContainers(kode, templateSpec, username, password, templateSpec.EnvoyProxyRef.Name != "")
 	}
 
 	// Append additional Envs and Args to the main container
@@ -165,6 +165,8 @@ func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode,
 func constructCodeServerContainers(kode *kodev1alpha1.Kode,
 	templateSpec *kodev1alpha1.SharedKodeTemplateSpec,
 	workspace string,
+	username string,
+	password string,
 	envoyProxyEnabled bool) []corev1.Container {
 
 	// If not envoyProxyEnabled, the servicePort will be the same as the template port
@@ -179,12 +181,12 @@ func constructCodeServerContainers(kode *kodev1alpha1.Kode,
 		Name:  "kode-" + kode.Name,
 		Image: templateSpec.Image,
 		Env: []corev1.EnvVar{
-			{Name: "PORT", Value: fmt.Sprintf("%d", servicePort)},
 			{Name: "PUID", Value: fmt.Sprintf("%d", templateSpec.PUID)},
 			{Name: "PGID", Value: fmt.Sprintf("%d", templateSpec.PGID)},
 			{Name: "TZ", Value: templateSpec.TZ},
+			{Name: "PORT", Value: fmt.Sprintf("%d", servicePort)},
 			{Name: "USERNAME", Value: kode.Spec.User},
-			// {Name: "PASSWORD", Value: kode.Spec.Password}, // Don't need to set password for code-server
+			// {Name: "PASSWORD", Value: kode.Spec.Password}, // Don't need to set password
 			{Name: "DEFAULT_WORKSPACE", Value: workspace},
 		},
 	}
@@ -202,6 +204,8 @@ func constructCodeServerContainers(kode *kodev1alpha1.Kode,
 
 func constructWebtopContainers(kode *kodev1alpha1.Kode,
 	templateSpec *kodev1alpha1.SharedKodeTemplateSpec,
+	username string,
+	password string,
 	envoyProxyEnabled bool) []corev1.Container {
 
 	// If not envoyProxyEnabled, the servicePort will be the same as the template port
@@ -221,7 +225,7 @@ func constructWebtopContainers(kode *kodev1alpha1.Kode,
 			{Name: "TZ", Value: templateSpec.TZ},
 			{Name: "CUSTOM_PORT", Value: fmt.Sprintf("%d", servicePort)},
 			{Name: "CUSTOM_USER", Value: kode.Spec.User},
-			{Name: "PASSWORD", Value: kode.Spec.Password},
+			// {Name: "PASSWORD", Value: kode.Spec.Password}, // Don't need to set password
 		},
 	}
 

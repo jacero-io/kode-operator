@@ -46,17 +46,17 @@ var embeddedCueSchemaFile string
 var embeddedBootstrapCueFile string
 
 const (
-	RestartPolicyAlways corev1.ContainerRestartPolicy = corev1.ContainerRestartPolicyAlways
-	EnvoyProxyContainerName = "envoy-proxy"
-	EnvoyProxyRunAsUser     = 1111
-	ProxyInitContainerName  = "proxy-init"
-	ProxyInitContainerImage = "openpolicyagent/proxy_init:v8"
-	BasicAuthContainerPort  = 9001
-	BasicAuthContainerImage = "ghcr.io/emil-jacero/grpc-basic-auth:latest"
-	BasicAuthContainerName  = "basic-auth-service"
-	RouterFilterType        = "type.googleapis.com/envoy.extensions.filters.http.router.v3.Router"
-	ExtAuthzFilterType      = "type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz"
-	BasicAuthFilterType     = "type.googleapis.com/envoy.extensions.filters.http.basic_auth.v3.BasicAuth"
+	RestartPolicyAlways     corev1.ContainerRestartPolicy = corev1.ContainerRestartPolicyAlways
+	EnvoyProxyContainerName                               = "envoy-proxy"
+	EnvoyProxyRunAsUser                                   = 1111
+	ProxyInitContainerName                                = "proxy-init"
+	ProxyInitContainerImage                               = "openpolicyagent/proxy_init:v8"
+	BasicAuthContainerPort                                = 9001
+	BasicAuthContainerImage                               = "ghcr.io/emil-jacero/grpc-basic-auth:latest"
+	BasicAuthContainerName                                = "basic-auth-service"
+	RouterFilterType                                      = "type.googleapis.com/envoy.extensions.filters.http.router.v3.Router"
+	ExtAuthzFilterType                                    = "type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz"
+	BasicAuthFilterType                                   = "type.googleapis.com/envoy.extensions.filters.http.basic_auth.v3.BasicAuth"
 )
 
 func writeEmbeddedFilesToTempDir() (string, error) {
@@ -114,7 +114,7 @@ var BasicAuthHTTPFilter = kodev1alpha1.HTTPFilter{
 
 // Define the BasicAuth cluster
 var BasicAuthCluster = kodev1alpha1.Cluster{
-	Name: BasicAuthContainerName,
+	Name:           BasicAuthContainerName,
 	ConnectTimeout: "0.25s",
 	Type:           "STRICT_DNS",
 	LbPolicy:       "ROUND_ROBIN",
@@ -134,7 +134,7 @@ var BasicAuthCluster = kodev1alpha1.Cluster{
 				Endpoint: kodev1alpha1.Endpoint{
 					Address: kodev1alpha1.Address{
 						SocketAddress: kodev1alpha1.SocketAddress{
-							Address: BasicAuthContainerName,
+							Address:   BasicAuthContainerName,
 							PortValue: BasicAuthContainerPort,
 						},
 					},
@@ -313,7 +313,7 @@ func constructEnvoyProxyContainer(upstreamLog logr.Logger,
 				{Name: "AUTH_USERNAME", Value: username},
 				{Name: "AUTH_PASSWORD", Value: password},
 			},
-			RestartPolicy: "Always",
+			// RestartPolicy: corev1.ContainerRestartPolicyAlways,
 		}
 		initContainers = append(initContainers, basicAuthContainer)
 		envoyProxyConfigSpec.HTTPFilters = prependFilter(envoyProxyConfigSpec.HTTPFilters, BasicAuthHTTPFilter)
@@ -344,8 +344,6 @@ func constructEnvoyProxyContainer(upstreamLog logr.Logger,
 			RunAsUser: int64Ptr(EnvoyProxyRunAsUser),
 		},
 	}
-
-
 
 	log.Info("Successfully constructed Envoy Proxy and Init containers")
 	return envoyContainer, initContainers, nil
