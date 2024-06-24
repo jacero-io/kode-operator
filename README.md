@@ -128,12 +128,11 @@ spec:
 - [x] *Provisioning and update of [Code-server](https://docs.linuxserver.io/images/docker-code-server/).
 - [ ] *Provisioning and update of [Webtop](https://docs.linuxserver.io/images/docker-webtop/).
 - [ ] Authentication & Authorization support using Envoy Proxy sidecar.
-  - [ ] [OAuth2](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/oauth2_filter) With external Oauth2 provider.
-  - [ ] [Basic Auth](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/basic_auth_filter.html#basic-auth) Use password from Kode.Password or Kode.existingSecret.
-  - [ ] [Ext_Authz](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/ext_authz_filter) HTTP and GRPC (Used by for example OPA to authorize the users).
+  - [OAuth2](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/oauth2_filter) With external Oauth2 provider.
+  - [Ext_Authz](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/ext_authz_filter) HTTP and GRPC (Used by for example OPA to authorize the users).
 - [ ] [Falco](https://falco.org/) sidecar support
 - [ ] Kode instance bound to the user identity and namespaced for isolation, an identity provided by an IAM (e.g Keycloak).
-- [ ] Ability to include InitPlugins which are executed in order. InitPlugins can mutate the instance in any way the administrator or user like.
+- [x] Ability to include InitPlugins which are executed in order. InitPlugins can mutate the instance in any way the administrator or user like.
   - Could for example add VSCode extensions or install software that is not built into the image.
 - [ ] Include dotfiles and other user settings in the Kode instance.
 - [ ] Pause/Prune container on inactivity, keeping the persistent storage.
