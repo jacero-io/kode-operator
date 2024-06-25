@@ -7,7 +7,7 @@ appVersion: "PLACEHOLDER_VERSION" # This will be replaced by the GitHub workflow
 dependencies:
   - name: kode-crd
     version: "PLACEHOLDER_VERSION" # This will be replaced by the GitHub workflow
-    repository: "oci://ghcr.io/emil-jacero"
+    repository: "oci://ghcr.io/kodify-cloud"
   - name: cert-manager
     repository: https://charts.jetstack.io
     condition: certmanager.enabled

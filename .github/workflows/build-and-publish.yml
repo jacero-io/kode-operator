@@ -14,51 +14,59 @@ on:
 jobs:
   build-and-publish:
     permissions:
+      contents: read
       packages: write
     runs-on: ubuntu-latest
-    
+    env:
+      PLATFORMS: linux/arm64,linux/amd64
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v2
+      - name: Checkout code
+        uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4.1.6
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v1
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
 
-    - name: Log in to GitHub Container Registry
-      if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-      uses: docker/login-action@v1
-      with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-    - name: Set up Go
-      uses: actions/setup-go@v3
-      with:
-        go-version: '1.22'
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        env:
+          DESCRIPTION: kode-operator is a Kubernetes operator that manages the lifecycle your development environments.
+        with:
+          images: ghcr.io/kodify-cloud/kode-operator
+          # type=ref,event=branch
+          tags: |
+            type=semver,pattern=v{{version}},event=tag
+            type=semver,pattern=v{{major}}.{{minor}},event=tag
+            type=semver,pattern=v{{major}},event=tag
+            type=ref,event=pr
+            type=sha
+          labels: |
+            org.opencontainers.image.authors=emil@jacero.se
+            org.opencontainers.image.description=${{ env.DESCRIPTION }}
+          annotations: |
+            org.opencontainers.image.authors=emil@jacero.se
+            org.opencontainers.image.description=${{ env.DESCRIPTION }}
 
-    - name: Install dependencies
-      run: make $(LOCALBIN)
+          # type=ref,event=branch
 
-    - name: Run Tests
-      run: make test
+      - name: Log in to GitHub Container Registry
+        if: (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor != 'dependabot[bot]'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Build and push Docker image using Make
-      if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-      run: |
-        if [[ ${{ github.ref }} == refs/tags/v*.*.* ]]; then
-          TAG=${{ github.ref_name }}
-          MAJOR=$(echo $TAG | cut -d. -f1)
-          MAJOR_MINOR=$(echo $TAG | cut -d. -f1-2)
-          make docker-buildx IMG=ghcr.io/${{ github.repository }}/kode-operator:$TAG
-          make docker-buildx IMG=ghcr.io/${{ github.repository }}/kode-operator:latest
-          make docker-buildx IMG=ghcr.io/${{ github.repository }}/kode-operator:$MAJOR
-          make docker-buildx IMG=ghcr.io/${{ github.repository }}/kode-operator:$MAJOR_MINOR
-        else
-          BRANCH=$(echo ${{ github.ref_name }} | sed 's/\//-/g')
-          make docker-buildx IMG=ghcr.io/${{ github.repository }}/kode-operator:$BRANCH
-        fi
-
-    - name: Log out from GitHub Container Registry
-      if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
-      run: docker logout ghcr.io
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.multiplatform
+          platforms: ${{ env.PLATFORMS }}
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          annotations: ${{ steps.meta.outputs.annotations }}
