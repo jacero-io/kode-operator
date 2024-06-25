@@ -12,51 +12,34 @@ on:
       - main
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    outputs:
-      server-tag: ${{ steps.build.outputs.server-tag }}
-    
+  build-and-publish:
+    runs-on: ubuntu-latest    
     steps:
       - name: Checkout code
         uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4.1.6
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
-      -
-        name: Set up Docker Buildx
+
+      - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Build Docker image
-        id: prepare-build
-        run: |
-          export PLATFORMS="linux/arm64,linux/amd64,linux/s390x,linux/ppc64le"
-          sed -e '1 s/\(^FROM\)/FROM --platform=\$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
-          cat Dockerfile.cross
-
-      - name: Multi-stage Docker Build
-        id: build
-        uses: firehed/multistage-docker-build-action@v1.7.0
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
         with:
-          dockerfile: Dockerfile
-          repository: ghcr.io/${{ github.repository }}/kode-operator
-          stages: build,publish
-          server-stage: publish
-          tag-latest-on-default: false
-
-  publish:
-    needs: build
-    permissions:
-      packages: write
-    runs-on: ubuntu-latest
-    env:
-      IMAGE_TAG: ${{ needs.build.outputs.server-tag }}
-
-    steps:
-      - run: echo "${IMAGE_TAG}"
-
-      - name: Checkout code
-        uses: actions/checkout@v2
+          images: kodify-cloud/kode-operator
+          tags: |
+            type=semver,pattern=v{{version}},event=tag
+            type=semver,pattern=v{{major}}.{{minor}},event=tag
+            type=semver,pattern=v{{major}},event=tag
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha
+          labels: |
+            org.opencontainers.image.authors=emil@jacero.se
+            org.opencontainers.image.title=Kode Operator
+            org.opencontainers.image.description=Kode Operator is a Kubernetes operator that manages the lifecycle your development environments.
 
       - name: Log in to GitHub Container Registry
         if: (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor != 'dependabot[bot]'
@@ -66,30 +49,14 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Pull built image from build stage
-        run: docker pull ghcr.io/${{ github.repository }}/kode-operator:${{ env.IMAGE_TAG }}
-
-      - name: Tag and push Docker image
-        if: (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor != 'dependabot[bot]'
-        run: |
-          if [[ ${{ github.ref }} == refs/tags/v*.*.* ]]; then
-            TAG=${{ github.ref_name }}
-            MAJOR=$(echo $TAG | cut -d. -f1)
-            MAJOR_MINOR=$(echo $TAG | cut -d. -f1-2)
-            docker tag ghcr.io/${{ github.repository }}/kode-operator:${{ env.IMAGE_TAG }} ghcr.io/${{ github.repository }}/kode-operator:$TAG
-            docker tag ghcr.io/${{ github.repository }}/kode-operator:${{ env.IMAGE_TAG }} ghcr.io/${{ github.repository }}/kode-operator:latest
-            docker tag ghcr.io/${{ github.repository }}/kode-operator:${{ env.IMAGE_TAG }} ghcr.io/${{ github.repository }}/kode-operator:$MAJOR
-            docker tag ghcr.io/${{ github.repository }}/kode-operator:${{ env.IMAGE_TAG }} ghcr.io/${{ github.repository }}/kode-operator:$MAJOR_MINOR
-            docker push ghcr.io/${{ github.repository }}/kode-operator:$TAG
-            docker push ghcr.io/${{ github.repository }}/kode-operator:latest
-            docker push ghcr.io/${{ github.repository }}/kode-operator:$MAJOR
-            docker push ghcr.io/${{ github.repository }}/kode-operator:$MAJOR_MINOR
-          else
-            BRANCH=$(echo ${{ github.ref_name }} | sed 's/\//-/g')
-            docker tag ghcr.io/${{ github.repository }}/kode-operator:${{ env.IMAGE_TAG }} ghcr.io/${{ github.repository }}/kode-operator:$BRANCH
-            docker push ghcr.io/${{ github.repository }}/kode-operator:$BRANCH
-          fi
-
-      - name: Log out from GitHub Container Registry
-        if: (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor != 'dependabot[bot]'
-        run: docker logout ghcr.io
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          platforms: linux/arm64,linux/amd64,linux/s390x,linux/ppc64le
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            BUILDTIME=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
+            VERSION=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
+            REVISION=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.revision'] }}
