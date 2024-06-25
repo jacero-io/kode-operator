@@ -57,7 +57,7 @@ jobs:
 
       - name: Prepare Dockerfile
         run: |
-          sed -e '1 s/\(^FROM\)/FROM --platform=${{ env.PLATFORMS }}/; t' -e ' 1,// s//FROM --platform=${{ env.PLATFORMS }}/' Dockerfile > Dockerfile.cross
+          sed '1s/^/FROM --platform=${{ env.PLATFORMS }} /' Dockerfile > Dockerfile.cross
           cat Dockerfile.cross
 
       - name: Build and push
@@ -70,7 +70,3 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           annotations: ${{ steps.meta.outputs.annotations }}
-          build-args: |
-            BUILDTIME=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
-            VERSION=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.version'] }}
-            REVISION=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.revision'] }}
