@@ -30,7 +30,7 @@ jobs:
         env:
           DESCRIPTION: kode-operator is a Kubernetes operator that manages the lifecycle your development environments.
         with:
-          images: kodify-cloud/kode-operator
+          images: ghcr.io/kodify-cloud/kode-operator
           tags: |
             type=semver,pattern=v{{version}},event=tag
             type=semver,pattern=v{{major}}.{{minor}},event=tag
