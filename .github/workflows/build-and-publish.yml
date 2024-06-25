@@ -13,6 +13,9 @@ on:
 
 jobs:
   build-and-publish:
+    permissions:
+      contents: read
+      packages: write
     runs-on: ubuntu-latest
     env:
       PLATFORMS: linux/arm64,linux/amd64
