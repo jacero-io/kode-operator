@@ -11,30 +11,38 @@ on:
     branches:
       - main
 
-env:
-  GO_VERSION: 1.22
-
 jobs:
   build:
     runs-on: ubuntu-latest
     outputs:
-      image-tag: ${{ steps.build.outputs.image-tag }}
+      server-tag: ${{ steps.build.outputs.server-tag }}
     
     steps:
       - name: Checkout code
         uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4.1.6
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      -
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Build Docker image
-        id: build
+        id: prepare-build
         run: |
           export PLATFORMS="linux/arm64,linux/amd64,linux/s390x,linux/ppc64le"
           sed -e '1 s/\(^FROM\)/FROM --platform=\$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
           cat Dockerfile.cross
-          docker buildx build --push --tag ghcr.io/${{ github.repository }}/kode-operator:${{ github.sha }} -f Dockerfile.cross .
-          echo "image-tag=${{ github.sha }}" >> $GITHUB_OUTPUT
+
+      - name: Multi-stage Docker Build
+        id: build
+        uses: firehed/multistage-docker-build-action@v1.7.0
+        with:
+          dockerfile: Dockerfile
+          repository: ghcr.io/${{ github.repository }}/kode-operator
+          stages: build,publish
+          server-stage: publish
+          tag-latest-on-default: false
 
   publish:
     needs: build
@@ -42,16 +50,13 @@ jobs:
       packages: write
     runs-on: ubuntu-latest
     env:
-      IMAGE_TAG: ${{ needs.build.outputs.image-tag }}
+      IMAGE_TAG: ${{ needs.build.outputs.server-tag }}
 
     steps:
       - run: echo "${IMAGE_TAG}"
 
       - name: Checkout code
         uses: actions/checkout@v2
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
 
       - name: Log in to GitHub Container Registry
         if: (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor != 'dependabot[bot]'
