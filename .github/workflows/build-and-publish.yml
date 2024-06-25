@@ -36,11 +36,11 @@ jobs:
           DESCRIPTION: kode-operator is a Kubernetes operator that manages the lifecycle your development environments.
         with:
           images: ghcr.io/kodify-cloud/kode-operator
+          # type=ref,event=branch
           tags: |
             type=semver,pattern=v{{version}},event=tag
             type=semver,pattern=v{{major}}.{{minor}},event=tag
             type=semver,pattern=v{{major}},event=tag
-            type=ref,event=branch
             type=ref,event=pr
             type=sha
           labels: |
@@ -49,6 +49,8 @@ jobs:
           annotations: |
             org.opencontainers.image.authors=emil@jacero.se
             org.opencontainers.image.description=${{ env.DESCRIPTION }}
+
+          # type=ref,event=branch
 
       - name: Log in to GitHub Container Registry
         if: (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor != 'dependabot[bot]'
