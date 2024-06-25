@@ -27,6 +27,8 @@ jobs:
       - name: Docker meta
         id: meta
         uses: docker/metadata-action@v5
+        env:
+          DESCRIPTION: kode-operator is a Kubernetes operator that manages the lifecycle your development environments.
         with:
           images: kodify-cloud/kode-operator
           tags: |
@@ -38,8 +40,10 @@ jobs:
             type=sha
           labels: |
             org.opencontainers.image.authors=emil@jacero.se
-            org.opencontainers.image.title=Kode Operator
-            org.opencontainers.image.description=Kode Operator is a Kubernetes operator that manages the lifecycle your development environments.
+            org.opencontainers.image.description=${{ env.DESCRIPTION }}
+          annotations: |
+            org.opencontainers.image.authors=emil@jacero.se
+            org.opencontainers.image.description=${{ env.DESCRIPTION }}
 
       - name: Log in to GitHub Container Registry
         if: (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor != 'dependabot[bot]'
