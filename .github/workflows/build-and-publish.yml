@@ -55,16 +55,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Prepare Dockerfile
-        run: |
-          sed -e '1 s/\(^FROM\)/FROM --platform=${{ env.PLATFORMS }}/; t' -e ' 1,// s//FROM --platform=${{ env.PLATFORMS }}/' Dockerfile > Dockerfile.cross 
-          cat Dockerfile.cross
-
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: Dockerfile.cross
+          file: Dockerfile.multiplatform
           platforms: ${{ env.PLATFORMS }}
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
