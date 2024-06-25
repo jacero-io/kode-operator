@@ -57,7 +57,7 @@ jobs:
 
       - name: Prepare Dockerfile
         run: |
-          sed '1s/^/FROM --platform=${{ env.PLATFORMS }} /' Dockerfile > Dockerfile.cross
+          sed -e '1 s/\(^FROM\)/FROM --platform=${{ env.PLATFORMS }}/; t' -e ' 1,// s//FROM --platform=${{ env.PLATFORMS }}/' Dockerfile > Dockerfile.cross 
           cat Dockerfile.cross
 
       - name: Build and push
