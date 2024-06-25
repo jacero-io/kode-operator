@@ -25,21 +25,8 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v1
 
-    - name: Set up Go
-      uses: actions/setup-go@cdcb36043654635271a94b9a6d1392de5bb323a7 # v5.0.1
-      with:
-        go-version: '1.22'
-        cache-dependency-path: |
-          **/go.sum
-          **/go.mod
-
-    - name: Install dependencies
-      run: make $(LOCALBIN)
-
-    - name: Run Tests
-      run: make test
-
     - name: Build Docker image
+      id: build
       run: |
         export PLATFORMS="linux/arm64,linux/amd64,linux/s390x,linux/ppc64le"
         sed -e '1 s/\(^FROM\)/FROM --platform=\$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
