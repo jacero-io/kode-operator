@@ -4,16 +4,15 @@ on:
   push:
     branches:
       - main
+      - 'feature/*'
     tags:
-      - '*'
+      - 'v*.*.*'
   pull_request:
     branches:
       - main
 
 jobs:
-  build-and-publish:
-    permissions:
-      packages: write
+  build:
     runs-on: ubuntu-latest
     
     steps:
@@ -23,26 +22,76 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v1
 
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.22.x
+        cache-dependency-path: |
+          **/go.sum
+          **/go.mod
+
+    - name: Install dependencies
+      run: make $(LOCALBIN)
+
+    - name: Run Tests
+      run: make test
+
+    - name: Build Docker image
+      run: |
+        export PLATFORMS="linux/arm64,linux/amd64,linux/s390x,linux/ppc64le"
+        sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
+        cat Dockerfile.cross
+        docker buildx build --tag ghcr.io/${{ github.repository }}/kode-operator:${{ github.sha }} -f Dockerfile.cross .
+        echo "image-tag=${{ github.sha }}" >> $GITHUB_OUTPUT
+
+    outputs:
+      image-tag: ${{ steps.build.outputs.image-tag }}
+
+  publish:
+    needs: build
+    permissions:
+      packages: write
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v1
+
     - name: Log in to GitHub Container Registry
+      if: (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor != 'dependabot[bot]'
       uses: docker/login-action@v1
       with:
         registry: ghcr.io
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Set up Go
-      uses: actions/setup-go@v3
-      with:
-        go-version: '1.22'
+    - name: Pull built image from build stage
+      run: docker pull ghcr.io/${{ github.repository }}/kode-operator:${{ needs.build.outputs.image-tag }}
 
-    - name: Install dependencies
-      run: make $(LOCALBIN)
-
-    # - name: Run Tests
-    #   run: make test
-
-    - name: Build and push Docker image using Make
-      run: make docker-buildx IMG=ghcr.io/${{ github.repository }}/kode-operator:${{ github.ref_name }}
+    - name: Tag and push Docker image
+      if: (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor != 'dependabot[bot]'
+      run: |
+        if [[ ${{ github.ref }} == refs/tags/v*.*.* ]]; then
+          TAG=${{ github.ref_name }}
+          MAJOR=$(echo $TAG | cut -d. -f1)
+          MAJOR_MINOR=$(echo $TAG | cut -d. -f1-2)
+          docker tag ghcr.io/${{ github.repository }}/kode-operator:${{ needs.build.outputs.image-tag }} ghcr.io/${{ github.repository }}/kode-operator:$TAG
+          docker tag ghcr.io/${{ github.repository }}/kode-operator:${{ needs.build.outputs.image-tag }} ghcr.io/${{ github.repository }}/kode-operator:latest
+          docker tag ghcr.io/${{ github.repository }}/kode-operator:${{ needs.build.outputs.image-tag }} ghcr.io/${{ github.repository }}/kode-operator:$MAJOR
+          docker tag ghcr.io/${{ github.repository }}/kode-operator:${{ needs.build.outputs.image-tag }} ghcr.io/${{ github.repository }}/kode-operator:$MAJOR_MINOR
+          docker push ghcr.io/${{ github.repository }}/kode-operator:$TAG
+          docker push ghcr.io/${{ github.repository }}/kode-operator:latest
+          docker push ghcr.io/${{ github.repository }}/kode-operator:$MAJOR
+          docker push ghcr.io/${{ github.repository }}/kode-operator:$MAJOR_MINOR
+        else
+          BRANCH=$(echo ${{ github.ref_name }} | sed 's/\//-/g')
+          docker tag ghcr.io/${{ github.repository }}/kode-operator:${{ needs.build.outputs.image-tag }} ghcr.io/${{ github.repository }}/kode-operator:$BRANCH
+          docker push ghcr.io/${{ github.repository }}/kode-operator:$BRANCH
+        fi
 
     - name: Log out from GitHub Container Registry
+      if: (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor != 'dependabot[bot]'
       run: docker logout ghcr.io

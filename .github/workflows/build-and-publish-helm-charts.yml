@@ -41,6 +41,7 @@ jobs:
           helm package /tmp/helm-charts/kode-crd --version ${{ env.VERSION }} --destination /tmp/helm-packages
 
       - name: Push kode-crd chart
+        if: (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor != 'dependabot[bot]'
         run: |
           echo ${{ secrets.GITHUB_TOKEN }} | helm registry login -u ${{ github.actor }} ghcr.io --password-stdin
           helm push /tmp/helm-packages/kode-crd-${{ env.VERSION }}.tgz oci://ghcr.io/${{ github.repository_owner }}
@@ -55,6 +56,7 @@ jobs:
           helm package /tmp/helm-charts/kode --version ${{ env.VERSION }} --destination /tmp/helm-packages
 
       - name: Push kode chart
+        if: (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && github.actor != 'dependabot[bot]'
         run: |
           echo ${{ secrets.GITHUB_TOKEN }} | helm registry login -u ${{ github.actor }} ghcr.io --password-stdin
           helm push /tmp/helm-packages/kode-${{ env.VERSION }}.tgz oci://ghcr.io/${{ github.repository_owner }}
