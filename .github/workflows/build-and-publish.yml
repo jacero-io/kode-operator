@@ -11,21 +11,24 @@ on:
     branches:
       - main
 
+env:
+  GO_VERSION: 1.22
+
 jobs:
   build:
     runs-on: ubuntu-latest
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v2
+      uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4.1.6
 
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v1
 
     - name: Set up Go
-      uses: actions/setup-go@v3
+      uses: actions/setup-go@cdcb36043654635271a94b9a6d1392de5bb323a7 # v5.0.1
       with:
-        go-version: 1.22.x
+        go-version: '1.22'
         cache-dependency-path: |
           **/go.sum
           **/go.mod
@@ -39,7 +42,7 @@ jobs:
     - name: Build Docker image
       run: |
         export PLATFORMS="linux/arm64,linux/amd64,linux/s390x,linux/ppc64le"
-        sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
+        sed -e '1 s/\(^FROM\)/FROM --platform=\$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
         cat Dockerfile.cross
         docker buildx build --tag ghcr.io/${{ github.repository }}/kode-operator:${{ github.sha }} -f Dockerfile.cross .
         echo "image-tag=${{ github.sha }}" >> $GITHUB_OUTPUT
