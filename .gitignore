@@ -27,3 +27,5 @@ go.work
 *~
 coverage/*
 random/*
+concat.sh
+concatenated_output.txt
