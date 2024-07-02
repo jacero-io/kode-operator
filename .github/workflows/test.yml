@@ -27,5 +27,5 @@ jobs:
     - name: Install dependencies
       run: make $(LOCALBIN)
 
-    - name: test-integration Run Tests
-      run: make
+    - name: Run Tests
+      run: make test-integration
