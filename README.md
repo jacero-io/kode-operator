@@ -274,6 +274,15 @@ TBD
 
 We welcome contributions to the Kode-Operator project! Here are some guidelines to help you get started:
 
+### Branch naming scheme
+
+Source: <https://dev.to/varbsan/a-simplified-convention-for-naming-branches-and-commits-in-git-il4>
+
+- `feature` is for adding, refactoring or removing a feature
+- `bugfix` is for fixing a bug
+- `hotfix` is for changing code with a temporary solution and/or without following the usual process (usually because of an emergency)
+- `test` is for experimenting outside of an issue/ticket
+
 ### How to Contribute
 
 1. **Fork the Repository**: Click the "Fork" button at the top of this repository to create a copy of the repository in your own GitHub account.
@@ -288,7 +297,8 @@ We welcome contributions to the Kode-Operator project! Here are some guidelines 
 3. **Create a Branch**: Create a new branch for your feature or bugfix.
 
     ```sh
-    git checkout -b feature-or-bugfix-name
+    git checkout -b feature/name
+    git checkout -b bugfix/name
     ```
 
 4. **Make Changes**: Make your changes to the code. Ensure your code follows the project's coding standards and includes appropriate tests.
@@ -303,7 +313,8 @@ We welcome contributions to the Kode-Operator project! Here are some guidelines 
 6. **Push to Your Fork**: Push your changes to your forked repository.
 
     ```sh
-    git push origin feature-or-bugfix-name
+    git push origin feature/name
+    git push origin bugfix/name
     ```
 
 7. **Create a Pull Request**: Go to the original repository and create a pull request from your fork. Provide a clear and detailed description of your changes and the problem they solve.
@@ -314,26 +325,27 @@ Please note that this project is released with a [Contributor Code of Conduct](C
 
 ### Reporting Issues
 
-If you find a bug or have a feature request, please create an issue in the [issue tracker](https://github.com/emil-jacero/kode-operator/issues) with as much detail as possible. Include steps to reproduce the issue and any relevant logs or screenshots.
+If you find a bug or have a feature request, please create an issue in the [issue tracker](https://github.com/jacero-io/kode-operator/issues) with as much detail as possible. Include steps to reproduce the issue and any relevant logs or screenshots.
 
 ### Development Setup
 
 1. **Install Dependencies**: Ensure you have the required dependencies installed:
-    - Go version v1.21.0+
-    - Docker version 17.03+
+    - Go version v1.22.0+
+    - Docker version 25.0.0+
     - kubectl version v1.29.1+
-    - Access to a Kubernetes v1.29.1+ cluster
+    - Access to a Kubernetes v1.29.1+ cluster or kind
 
-2. **Build the Project**: Use `make` to build the project.
+2. **Run the Project**: Use `make` to run the controller.
 
     ```sh
-    make build
+    make install
     ```
 
 3. **Run Tests**: Ensure all tests pass before submitting your pull request.
 
     ```sh
-    make test
+    make test-unit
+    make test-integration
     ```
 
 ### Documentation
