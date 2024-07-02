@@ -31,12 +31,12 @@ const (
 	// Resource-related constants
 	DefaultNamespace      = "default"
 	KodeVolumeStorageName = "kode-storage"
+	// LocalServicePort      = 3000
+	ExternalServicePort = 8000
 
 	// Container-related constants
 	EnvoyProxyContainerName = "envoy-proxy"
 	EnvoyProxyRunAsUser     = 1111
-	InternalServicePort     = 3000
-	ExternalServicePort     = 8000
 	ProxyInitContainerName  = "proxy-init"
 	ProxyInitContainerImage = "openpolicyagent/proxy_init:v8"
 	BasicAuthContainerPort  = 9001

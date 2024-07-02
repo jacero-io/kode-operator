@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 
-	kodev1alpha1 "github.com/emil-jacero/kode-operator/api/v1alpha1"
 	"github.com/emil-jacero/kode-operator/internal/common"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,18 +29,16 @@ import (
 )
 
 // ensureService ensures that the Service exists for the Kode instance
-func (r *KodeReconciler) ensureService(ctx context.Context, kode *kodev1alpha1.Kode,
-	labels map[string]string,
-	sharedKodeTemplateSpec *kodev1alpha1.SharedKodeTemplateSpec) error {
-	log := r.Log.WithName("ServiceEnsurer").WithValues("kode", client.ObjectKeyFromObject(kode))
+func (r *KodeReconciler) ensureService(ctx context.Context, config *common.KodeResourcesConfig) error {
+	log := r.Log.WithName("ServiceEnsurer").WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
 
 	ctx, cancel := common.ContextWithTimeout(ctx, 30) // 30 seconds timeout
 	defer cancel()
 
 	log.Info("Ensuring Service exists")
 
-	service := r.constructService(kode, labels, sharedKodeTemplateSpec)
-	if err := controllerutil.SetControllerReference(kode, service, r.Scheme); err != nil {
+	service := r.constructService(config)
+	if err := controllerutil.SetControllerReference(&config.Kode, service, r.Scheme); err != nil {
 		return fmt.Errorf("failed to set controller reference: %w", err)
 	}
 
@@ -56,20 +53,18 @@ func (r *KodeReconciler) ensureService(ctx context.Context, kode *kodev1alpha1.K
 }
 
 // constructService constructs a Service for the Kode instance
-func (r *KodeReconciler) constructService(kode *kodev1alpha1.Kode,
-	labels map[string]string,
-	templateSpec *kodev1alpha1.SharedKodeTemplateSpec) *corev1.Service {
+func (r *KodeReconciler) constructService(config *common.KodeResourcesConfig) *corev1.Service {
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      kode.Name,
-			Namespace: kode.Namespace,
+			Name:      config.Kode.Name,
+			Namespace: config.Kode.Namespace,
 		},
 		Spec: corev1.ServiceSpec{
-			Selector: labels,
+			Selector: config.Labels,
 			Ports: []corev1.ServicePort{{
 				Protocol:   corev1.ProtocolTCP,
-				Port:       templateSpec.Port,
-				TargetPort: intstr.FromInt(int(templateSpec.Port)),
+				Port:       config.ExternalServicePort,
+				TargetPort: intstr.FromInt(int(config.ExternalServicePort)),
 			}},
 		},
 	}

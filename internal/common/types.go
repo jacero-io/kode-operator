@@ -20,17 +20,8 @@ import (
 	"fmt"
 
 	kodev1alpha1 "github.com/emil-jacero/kode-operator/api/v1alpha1"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
-
-// BootstrapConfigOptions contains options for generating Envoy bootstrap config
-type BootstrapConfigOptions struct {
-	HTTPFilters []kodev1alpha1.HTTPFilter
-	Clusters    []kodev1alpha1.Cluster
-	ServicePort int32
-	ExposePort  int32
-}
 
 // Templates holds the fetched template configurations
 type Templates struct {
@@ -44,21 +35,21 @@ type Templates struct {
 
 // KodeResourcesConfig holds configuration for Kode resources
 type KodeResourcesConfig struct {
-	Kode                 kodev1alpha1.Kode
-	Templates            Templates
-	InitPluginConfig     kodev1alpha1.InitPluginSpec
-	Labels               map[string]string
-	Volumes              []corev1.Volume
-	VolumeMounts         []corev1.VolumeMount
-	VolumeMountName      string
-	PersistentVolumeName string
+	Kode                kodev1alpha1.Kode
+	Templates           Templates
+	UserInitPlugins     []kodev1alpha1.InitPluginSpec
+	TemplateInitPlugins []kodev1alpha1.InitPluginSpec
+	Labels              map[string]string
+	LocalServicePort    int32
+	ExternalServicePort int32
 }
 
-// ReconcileResult represents the result of a reconciliation
-type ReconcileResult struct {
-	Requeue      bool
-	RequeueAfter int64
-	Error        error
+// BootstrapConfigOptions contains options for generating Envoy bootstrap config
+type BootstrapConfigOptions struct {
+	HTTPFilters  []kodev1alpha1.HTTPFilter
+	Clusters     []kodev1alpha1.Cluster
+	LocalPort    int32
+	ExternalPort int32
 }
 
 type TemplateNotFoundError struct {

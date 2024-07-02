@@ -45,7 +45,7 @@ package bootstrap
     name: "listener_0"
     address: #Address & { socket_address: {
         address: "0.0.0.0"
-        port_value: #GoExposePort
+        port_value: #GoExternalServicePort
         }
     }
     filter_chains: [{
@@ -77,7 +77,7 @@ package bootstrap
 
 // Define go values that should be used in the bootstrap config
 #GoLocalServicePort: #Port | *3000
-#GoExposePort: #Port | *8000
+#GoExternalServicePort: #Port | *8000
 #GoHttpFilters: [...#HTTPFilter]
 #GoClusters: [...#Cluster]
 

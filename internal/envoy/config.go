@@ -63,7 +63,6 @@ func (g *BootstrapConfigGenerator) Generate(options common.BootstrapConfigOption
 	if err != nil {
 		return "", err
 	}
-	fmt.Println(value)
 
 	// Encode and fill paths
 	value, err = g.encodeAndFillPaths(value, options)
@@ -148,8 +147,8 @@ func (g *BootstrapConfigGenerator) encodeAndFillPaths(value cue.Value, options c
 	}{
 		{"#HTTPFilters", "#GoHttpFilters", embeddedCueSchemaFile, options.HTTPFilters},
 		{"#Clusters", "#GoClusters", embeddedCueSchemaFile, options.Clusters},
-		{"#Port", "#GoLocalServicePort", embeddedCueSchemaFile, uint32(common.InternalServicePort)},
-		{"#Port", "#GoExposePort", embeddedCueSchemaFile, uint32(options.ExposePort)},
+		{"#Port", "#GoLocalServicePort", embeddedCueSchemaFile, uint32(options.LocalPort)},
+		{"#Port", "#GoExternalServicePort", embeddedCueSchemaFile, uint32(options.ExternalPort)},
 	}
 
 	for _, p := range paths {

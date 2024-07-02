@@ -30,8 +30,8 @@ import (
 
 // TODO: Investigate if "if pvc == nil" is really required
 // ensurePVC ensures that the PersistentVolumeClaim exists for the Kode instance
-func (r *KodeReconciler) ensurePVC(ctx context.Context, kode *kodev1alpha1.Kode) error {
-	log := r.Log.WithName("PVCEnsurer").WithValues("kode", client.ObjectKeyFromObject(kode))
+func (r *KodeReconciler) ensurePVC(ctx context.Context, config *common.KodeResourcesConfig) error {
+	log := r.Log.WithName("PVCEnsurer").WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
 	ctx, cancel := common.ContextWithTimeout(ctx, 30) // 30 seconds timeout
 	defer cancel()
 	var err error
@@ -39,13 +39,13 @@ func (r *KodeReconciler) ensurePVC(ctx context.Context, kode *kodev1alpha1.Kode)
 	log.Info("Ensuring PVC exists")
 
 	// If ExistingVolumeClaim is specified, log and skip creation
-	if kode.Spec.Storage.ExistingVolumeClaim != "" {
-		log.Info("Using existing PVC", "ExistingVolumeClaim", kode.Spec.Storage.ExistingVolumeClaim)
+	if config.Kode.Spec.Storage.ExistingVolumeClaim != "" {
+		log.Info("Using existing PVC", "ExistingVolumeClaim", config.Kode.Spec.Storage.ExistingVolumeClaim)
 		return nil
 	}
 
 	// Construct PVC only if ExistingVolumeClaim is not specified
-	pvc := r.constructPVC(kode)
+	pvc := r.constructPVC(config)
 	if pvc == nil {
 		return nil
 	}
@@ -64,7 +64,7 @@ func (r *KodeReconciler) ensurePVC(ctx context.Context, kode *kodev1alpha1.Kode)
 	//     return nil
 	// }
 
-	if err := controllerutil.SetControllerReference(kode, pvc, r.Scheme); err != nil {
+	if err := controllerutil.SetControllerReference(&config.Kode, pvc, r.Scheme); err != nil {
 		return fmt.Errorf("failed to set controller reference: %w", err)
 	}
 
@@ -79,29 +79,29 @@ func (r *KodeReconciler) ensurePVC(ctx context.Context, kode *kodev1alpha1.Kode)
 }
 
 // constructPVC constructs a PersistentVolumeClaim for the Kode instance
-func (r *KodeReconciler) constructPVC(kode *kodev1alpha1.Kode) *corev1.PersistentVolumeClaim {
+func (r *KodeReconciler) constructPVC(config *common.KodeResourcesConfig) *corev1.PersistentVolumeClaim {
 	// If ExistingVolumeClaim is specified, return nil
-	if kode.Spec.Storage.ExistingVolumeClaim != "" {
+	if config.Kode.Spec.Storage.ExistingVolumeClaim != "" {
 		return nil
 	}
 
 	pvc := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      common.GetPVCName(kode),
-			Namespace: kode.Namespace,
+			Name:      common.GetPVCName(&config.Kode),
+			Namespace: config.Kode.Namespace,
 			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(kode, kodev1alpha1.GroupVersion.WithKind("Kode")),
+				*metav1.NewControllerRef(&config.Kode, kodev1alpha1.GroupVersion.WithKind("Kode")),
 			},
 			// Finalizers: []string{common.PVCFinalizerName},
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{
-			AccessModes: kode.Spec.Storage.AccessModes,
-			Resources:   kode.Spec.Storage.Resources,
+			AccessModes: config.Kode.Spec.Storage.AccessModes,
+			Resources:   config.Kode.Spec.Storage.Resources,
 		},
 	}
 
-	if kode.Spec.Storage.StorageClassName != nil {
-		pvc.Spec.StorageClassName = kode.Spec.Storage.StorageClassName
+	if config.Kode.Spec.Storage.StorageClassName != nil {
+		pvc.Spec.StorageClassName = config.Kode.Spec.Storage.StorageClassName
 	}
 
 	return pvc

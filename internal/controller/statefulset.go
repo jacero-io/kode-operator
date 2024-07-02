@@ -33,19 +33,16 @@ import (
 )
 
 // ensureStatefulSet ensures that the StatefulSet exists for the Kode instance
-func (r *KodeReconciler) ensureStatefulSet(ctx context.Context,
-	kode *kodev1alpha1.Kode,
-	labels map[string]string,
-	templates *common.Templates) error {
-	log := r.Log.WithName("StatefulSetEnsurer").WithValues("kode", client.ObjectKeyFromObject(kode))
+func (r *KodeReconciler) ensureStatefulSet(ctx context.Context, config *common.KodeResourcesConfig) error {
+	log := r.Log.WithName("StatefulSetEnsurer").WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
 
 	ctx, cancel := common.ContextWithTimeout(ctx, 30) // 30 seconds timeout
 	defer cancel()
 
 	log.Info("Ensuring StatefulSet exists")
 
-	statefulSet := r.constructStatefulSet(kode, labels, templates)
-	if err := controllerutil.SetControllerReference(kode, statefulSet, r.Scheme); err != nil {
+	statefulSet := r.constructStatefulSet(config)
+	if err := controllerutil.SetControllerReference(&config.Kode, statefulSet, r.Scheme); err != nil {
 		return fmt.Errorf("failed to set controller reference: %w", err)
 	}
 
@@ -60,25 +57,23 @@ func (r *KodeReconciler) ensureStatefulSet(ctx context.Context,
 }
 
 // constructStatefulSet constructs a StatefulSet for the Kode instance
-func (r *KodeReconciler) constructStatefulSet(kode *kodev1alpha1.Kode,
-	labels map[string]string,
-	templates *common.Templates) *appsv1.StatefulSet {
-	log := r.Log.WithName("SatefulSetConstructor").WithValues("kode", client.ObjectKeyFromObject(kode))
+func (r *KodeReconciler) constructStatefulSet(config *common.KodeResourcesConfig) *appsv1.StatefulSet {
+	log := r.Log.WithName("SatefulSetConstructor").WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
 
 	replicas := int32(1)
-	templateSpec := templates.KodeTemplate
+	templateSpec := config.Templates.KodeTemplate
 
 	var workspace string
 	var mountPath string
 
 	workspace = path.Join(templateSpec.DefaultHome, templateSpec.DefaultWorkspace)
 	mountPath = templateSpec.DefaultHome
-	if kode.Spec.Workspace != "" {
-		if kode.Spec.Home != "" {
-			workspace = path.Join(kode.Spec.Home, kode.Spec.Workspace)
-			mountPath = kode.Spec.Home
+	if config.Kode.Spec.Workspace != "" {
+		if config.Kode.Spec.Home != "" {
+			workspace = path.Join(config.Kode.Spec.Home, config.Kode.Spec.Workspace)
+			mountPath = config.Kode.Spec.Home
 		} else {
-			workspace = path.Join(templateSpec.DefaultHome, kode.Spec.Workspace)
+			workspace = path.Join(templateSpec.DefaultHome, config.Kode.Spec.Workspace)
 		}
 	}
 
@@ -86,46 +81,53 @@ func (r *KodeReconciler) constructStatefulSet(kode *kodev1alpha1.Kode,
 	var initContainers []corev1.Container
 
 	if templateSpec.Type == "code-server" {
-		containers = constructCodeServerContainers(kode, templateSpec, workspace)
+		containers = constructCodeServerContainers(config, workspace)
 	} else if templateSpec.Type == "webtop" {
-		containers = constructWebtopContainers(kode, templateSpec)
+		containers = constructWebtopContainers(config)
 	}
 
-	volumes, volumeMounts := constructVolumesAndMounts(mountPath, kode)
+	volumes, volumeMounts := constructVolumesAndMounts(mountPath, &config.Kode)
 	containers[0].VolumeMounts = volumeMounts
 
-	if templates.EnvoyProxyConfig != nil {
-		log.Info("EnvoyProxyConfig is defined", "Namespace", kode.Namespace, "Kode", kode.Name)
-		envoySidecarContainer, envoyInitContainer, err := envoy.NewContainerConstructor(r.Log, envoy.NewBootstrapConfigGenerator(r.Log.WithName("EnvoyContainerConstructor"))).ConstructEnvoyProxyContainer(templateSpec, templates.EnvoyProxyConfig)
+	if config.Templates.EnvoyProxyConfig != nil {
+		log.Info("EnvoyProxyConfig is defined", "Namespace", config.Kode.Namespace, "Kode", config.Kode.Name)
+		envoySidecarContainer, envoyInitContainer, err := envoy.NewContainerConstructor(
+			r.Log,
+			envoy.NewBootstrapConfigGenerator(r.Log.WithName("EnvoyContainerConstructor"))).ConstructEnvoyProxyContainer(config)
 		if err != nil {
-			log.Error(err, "Failed to construct EnvoyProxy sidecar", "Kode", kode.Name, "Error", err)
+			log.Error(err, "Failed to construct EnvoyProxy sidecar", "Kode", config.Kode.Name, "Error", err)
 		} else {
 			containers = append(containers, envoySidecarContainer)
 			initContainers = append(initContainers, envoyInitContainer)
-			log.Info("Added EnvoyProxy sidecar container and init container", "Kode", kode.Name, "Container", envoySidecarContainer.Name)
+			log.Info("Added EnvoyProxy sidecar container and init container", "Kode", config.Kode.Name, "Container", envoySidecarContainer.Name)
 		}
 	}
 
-	// Add InitPlugins as InitContainers
-	for _, initPlugin := range kode.Spec.InitPlugins {
+	// Add TemplateInitPlugins as InitContainers
+	for _, initPlugin := range config.TemplateInitPlugins {
+		initContainers = append(initContainers, constructInitPluginContainer(initPlugin))
+	}
+
+	// Add UserInitPlugins as InitContainers
+	for _, initPlugin := range config.UserInitPlugins {
 		initContainers = append(initContainers, constructInitPluginContainer(initPlugin))
 	}
 
 	statefulSet := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      kode.Name,
-			Namespace: kode.Namespace,
-			Labels:    labels,
+			Name:      config.Kode.Name,
+			Namespace: config.Kode.Namespace,
+			Labels:    config.Labels,
 		},
 		Spec: appsv1.StatefulSetSpec{
 			Replicas: &replicas,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: labels,
+				MatchLabels: config.Labels,
 			},
-			ServiceName: kode.Name,
+			ServiceName: config.Kode.Name,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels:            labels,
+					Labels:            config.Labels,
 					CreationTimestamp: metav1.Time{},
 				},
 				Spec: corev1.PodSpec{
@@ -141,46 +143,44 @@ func (r *KodeReconciler) constructStatefulSet(kode *kodev1alpha1.Kode,
 	return statefulSet
 }
 
-func constructCodeServerContainers(kode *kodev1alpha1.Kode,
-	templateSpec *kodev1alpha1.SharedKodeTemplateSpec,
+func constructCodeServerContainers(config *common.KodeResourcesConfig,
 	workspace string) []corev1.Container {
 
 	return []corev1.Container{{
-		Name:  "kode-" + kode.Name,
-		Image: templateSpec.Image,
+		Name:  "kode-" + config.Kode.Name,
+		Image: config.Templates.KodeTemplate.Image,
 		Env: []corev1.EnvVar{
-			{Name: "PORT", Value: fmt.Sprintf("%d", templateSpec.Port)},
-			{Name: "PUID", Value: fmt.Sprintf("%d", templateSpec.PUID)},
-			{Name: "PGID", Value: fmt.Sprintf("%d", templateSpec.PGID)},
-			{Name: "TZ", Value: templateSpec.TZ},
-			{Name: "USERNAME", Value: kode.Spec.User},
-			{Name: "PASSWORD", Value: kode.Spec.Password},
+			{Name: "PUID", Value: fmt.Sprintf("%d", config.Templates.KodeTemplate.PUID)},
+			{Name: "PGID", Value: fmt.Sprintf("%d", config.Templates.KodeTemplate.PGID)},
+			{Name: "TZ", Value: config.Templates.KodeTemplate.TZ},
+			{Name: "PORT", Value: fmt.Sprintf("%d", config.LocalServicePort)},
+			{Name: "USERNAME", Value: config.Kode.Spec.User},
+			{Name: "PASSWORD", Value: config.Kode.Spec.Password},
 			{Name: "DEFAULT_WORKSPACE", Value: workspace},
 		},
 		Ports: []corev1.ContainerPort{{
 			Name:          "http",
-			ContainerPort: templateSpec.Port,
+			ContainerPort: config.LocalServicePort,
 		}},
 	}}
 }
 
-func constructWebtopContainers(kode *kodev1alpha1.Kode,
-	templateSpec *kodev1alpha1.SharedKodeTemplateSpec) []corev1.Container {
+func constructWebtopContainers(config *common.KodeResourcesConfig) []corev1.Container {
 
 	return []corev1.Container{{
-		Name:  "kode-" + kode.Name,
-		Image: templateSpec.Image,
+		Name:  "kode-" + config.Kode.Name,
+		Image: config.Templates.KodeTemplate.Image,
 		Env: []corev1.EnvVar{
-			{Name: "PUID", Value: fmt.Sprintf("%d", templateSpec.PUID)},
-			{Name: "PGID", Value: fmt.Sprintf("%d", templateSpec.PGID)},
-			{Name: "TZ", Value: templateSpec.TZ},
-			{Name: "CUSTOM_PORT", Value: fmt.Sprintf("%d", templateSpec.Port)},
-			{Name: "CUSTOM_USER", Value: kode.Spec.User},
-			{Name: "PASSWORD", Value: kode.Spec.Password},
+			{Name: "PUID", Value: fmt.Sprintf("%d", config.Templates.KodeTemplate.PUID)},
+			{Name: "PGID", Value: fmt.Sprintf("%d", config.Templates.KodeTemplate.PGID)},
+			{Name: "TZ", Value: config.Templates.KodeTemplate.TZ},
+			{Name: "CUSTOM_PORT", Value: fmt.Sprintf("%d", config.LocalServicePort)},
+			{Name: "CUSTOM_USER", Value: config.Kode.Spec.User},
+			{Name: "PASSWORD", Value: config.Kode.Spec.Password},
 		},
 		Ports: []corev1.ContainerPort{{
 			Name:          "http",
-			ContainerPort: templateSpec.Port,
+			ContainerPort: config.LocalServicePort,
 		}},
 	}}
 }

@@ -7,7 +7,8 @@ output_file="concatenated_output.txt"
 > "$output_file"
 
 # Exclude patterns
-exclude_patterns=('*deepcopy.go' '*_test.go' 'entrypoint*' '*validator*')
+exclude_patterns=('*deepcopy.go' 'entrypoint*' '*validator*' '*_test.go')
+# '*_test.go'
 
 # Function to process files
 process_files() {

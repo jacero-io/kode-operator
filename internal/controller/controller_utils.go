@@ -28,8 +28,6 @@ import (
 )
 
 func (r *KodeReconciler) UpdateStatusWithSuccess(ctx context.Context, kode *kodev1alpha1.Kode) error {
-	// log := r.Log.WithValues("kode", client.ObjectKeyFromObject(kode))
-	// log.Info("Reconciliation succeeded")
 
 	now := metav1.NewTime(time.Now())
 	conditions := []metav1.Condition{
@@ -122,4 +120,8 @@ func (r *KodeReconciler) clearErrorStatus(ctx context.Context, kode *kodev1alpha
 		return err
 	}
 	return nil
+}
+
+func (r *KodeReconciler) GetCurrentTime() metav1.Time {
+	return metav1.NewTime(time.Now())
 }

@@ -21,7 +21,6 @@ package controller
 import (
 	"context"
 	"fmt"
-	"time"
 
 	kodev1alpha1 "github.com/emil-jacero/kode-operator/api/v1alpha1"
 	"github.com/emil-jacero/kode-operator/internal/cleanup"
@@ -35,7 +34,6 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -66,10 +64,6 @@ type KodeReconciler struct {
 // +kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
-
-func (r *KodeReconciler) GetCurrentTime() metav1.Time {
-	return metav1.NewTime(time.Now())
-}
 
 func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithName("Reconcile").WithValues("kode", req.NamespacedName)
@@ -118,8 +112,11 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		return ctrl.Result{RequeueAfter: common.RequeueInterval}, r.StatusUpdater.UpdateStatus(ctx, kode, kodev1alpha1.KodePhaseError, nil, err.Error(), &currentTime)
 	}
 
+	// Initialize Kode resources config
+	config := InitKodeResourcesConfig(kode, templates)
+
 	// Ensure resources
-	if err := r.ensureResources(ctx, kode, templates); err != nil {
+	if err := r.ensureResources(ctx, config); err != nil {
 		return ctrl.Result{RequeueAfter: common.RequeueInterval}, r.UpdateStatusWithError(ctx, kode, err)
 	}
 
@@ -144,31 +141,24 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	return ctrl.Result{}, nil
 }
 
-func (r *KodeReconciler) ensureResources(ctx context.Context, kode *kodev1alpha1.Kode, templates *common.Templates) error {
-	log := r.Log.WithName("ResourceEnsurer").WithValues("kode", client.ObjectKeyFromObject(kode))
-
-	// Construct labels
-	labels := map[string]string{
-		"app.kubernetes.io/name":       "kode-" + kode.Name,
-		"app.kubernetes.io/managed-by": "kode-operator",
-		"kode.jacero.io/name":          kode.Name,
-	}
+func (r *KodeReconciler) ensureResources(ctx context.Context, config *common.KodeResourcesConfig) error {
+	log := r.Log.WithName("ResourceEnsurer").WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
 
 	// Ensure StatefulSet
-	if err := r.ensureStatefulSet(ctx, kode, labels, templates); err != nil {
+	if err := r.ensureStatefulSet(ctx, config); err != nil {
 		log.Error(err, "Failed to ensure StatefulSet")
 		return err
 	}
 
 	// Ensure Service
-	if err := r.ensureService(ctx, kode, labels, templates.KodeTemplate); err != nil {
+	if err := r.ensureService(ctx, config); err != nil {
 		log.Error(err, "Failed to ensure Service")
 		return err
 	}
 
 	// Ensure PVC if storage is specified
-	if !kode.Spec.DeepCopy().Storage.IsEmpty() {
-		if err := r.ensurePVC(ctx, kode); err != nil {
+	if !config.Kode.Spec.DeepCopy().Storage.IsEmpty() {
+		if err := r.ensurePVC(ctx, config); err != nil {
 			log.Error(err, "Failed to ensure PVC")
 			return err
 		}

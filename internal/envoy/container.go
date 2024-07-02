@@ -19,7 +19,6 @@ package envoy
 import (
 	"strconv"
 
-	kodev1alpha1 "github.com/emil-jacero/kode-operator/api/v1alpha1"
 	"github.com/emil-jacero/kode-operator/internal/common"
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -37,17 +36,14 @@ func NewContainerConstructor(log logr.Logger, configGenerator *BootstrapConfigGe
 	}
 }
 
-func (c *ContainerConstructor) ConstructEnvoyProxyContainer(
-	sharedKodeTemplateSpec *kodev1alpha1.SharedKodeTemplateSpec,
-	sharedEnvoyProxyTemplateSpec *kodev1alpha1.SharedEnvoyProxyConfigSpec,
-) (corev1.Container, corev1.Container, error) {
+func (c *ContainerConstructor) ConstructEnvoyProxyContainer(config *common.KodeResourcesConfig) (corev1.Container, corev1.Container, error) {
 	c.log.Info("Constructing Envoy Proxy container")
 
-	config, err := c.configGenerator.Generate(common.BootstrapConfigOptions{
-		HTTPFilters: sharedEnvoyProxyTemplateSpec.HTTPFilters,
-		Clusters:    sharedEnvoyProxyTemplateSpec.Clusters,
-		ServicePort: common.InternalServicePort,
-		ExposePort:  common.ExternalServicePort,
+	envoyConfig, err := c.configGenerator.Generate(common.BootstrapConfigOptions{
+		HTTPFilters:  config.Templates.EnvoyProxyConfig.HTTPFilters,
+		Clusters:     config.Templates.EnvoyProxyConfig.Clusters,
+		LocalPort:    config.LocalServicePort,
+		ExternalPort: config.ExternalServicePort,
 	})
 	if err != nil {
 		c.log.Error(err, "Failed to generate bootstrap config")
@@ -56,12 +52,12 @@ func (c *ContainerConstructor) ConstructEnvoyProxyContainer(
 
 	envoyContainer := corev1.Container{
 		Name:  common.EnvoyProxyContainerName,
-		Image: sharedEnvoyProxyTemplateSpec.Image,
+		Image: config.Templates.EnvoyProxyConfig.Image,
 		Args: []string{
-			"--config-yaml", config,
+			"--config-yaml", envoyConfig,
 		},
 		Ports: []corev1.ContainerPort{
-			{Name: "envoy-http", ContainerPort: common.ExternalServicePort},
+			{Name: "envoy-http", ContainerPort: config.ExternalServicePort},
 		},
 		SecurityContext: &corev1.SecurityContext{
 			RunAsUser: common.Int64Ptr(common.EnvoyProxyRunAsUser),
@@ -71,7 +67,7 @@ func (c *ContainerConstructor) ConstructEnvoyProxyContainer(
 	proxySetupContainer := corev1.Container{
 		Name:  common.ProxyInitContainerName,
 		Image: common.ProxyInitContainerImage,
-		Args:  []string{"-p", strconv.Itoa(int(common.ExternalServicePort)), "-u", strconv.FormatInt(common.EnvoyProxyRunAsUser, 16)},
+		Args:  []string{"-p", strconv.Itoa(int(config.ExternalServicePort)), "-u", strconv.FormatInt(common.EnvoyProxyRunAsUser, 16)},
 		SecurityContext: &corev1.SecurityContext{
 			Capabilities: &corev1.Capabilities{
 				Add: []corev1.Capability{"NET_ADMIN"},

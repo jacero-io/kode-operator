@@ -38,6 +38,7 @@ import (
 
 	kodev1alpha1 "github.com/emil-jacero/kode-operator/api/v1alpha1"
 	"github.com/emil-jacero/kode-operator/internal/cleanup"
+	"github.com/emil-jacero/kode-operator/internal/repository"
 	"github.com/emil-jacero/kode-operator/internal/resource"
 	"github.com/emil-jacero/kode-operator/internal/status"
 	"github.com/emil-jacero/kode-operator/internal/template"
@@ -91,11 +92,12 @@ var _ = BeforeSuite(func() {
 	reconciler = &KodeReconciler{
 		Client:          k8sClient,
 		Scheme:          k8sManager.GetScheme(),
-		Log:             ctrl.Log.WithName("controllers").WithName("Kode"),
-		ResourceManager: resource.NewDefaultResourceManager(k8sClient, ctrl.Log.WithName("ResourceManager")),
-		TemplateManager: template.NewDefaultTemplateManager(k8sClient, ctrl.Log.WithName("TemplateManager")),
-		CleanupManager:  cleanup.NewDefaultCleanupManager(k8sClient, ctrl.Log.WithName("CleanupManager")),
-		StatusUpdater:   status.NewDefaultStatusUpdater(k8sClient, ctrl.Log.WithName("StatusUpdater")),
+		Log:             ctrl.Log.WithName("controllers").WithName("Kode").WithName("Reconcile"),
+		Repo:            repository.NewDefaultRepository(k8sClient),
+		ResourceManager: resource.NewDefaultResourceManager(k8sClient, ctrl.Log.WithName("controllers").WithName("Kode").WithName("ResourceManager")),
+		TemplateManager: template.NewDefaultTemplateManager(k8sClient, ctrl.Log.WithName("controllers").WithName("Kode").WithName("TemplateManager")),
+		CleanupManager:  cleanup.NewDefaultCleanupManager(k8sClient, ctrl.Log.WithName("controllers").WithName("Kode").WithName("CleanupManager")),
+		StatusUpdater:   status.NewDefaultStatusUpdater(k8sClient, ctrl.Log.WithName("controllers").WithName("Kode").WithName("StatusUpdater")),
 		Validator:       validation.NewDefaultValidator(),
 	}
 
