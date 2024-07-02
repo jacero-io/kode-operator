@@ -86,10 +86,6 @@ type SharedKodeTemplateSpec struct {
 	// +kubebuilder:default=false
 	AllowPrivileged *bool `json:"allowPrivileged,omitempty"`
 
-	// InitPlugins specifies the OCI containers to be run before the main container. It is an ordered list.
-	// +kubebuilder:validation:Description="OCI containers to be run before the main container. It is an ordered list."
-	InitPlugins []InitPluginSpec `json:"initPlugins,omitempty"`
-
 	// Specifies the period before controller inactive the resource (delete all resources except volume).
 	// +kubebuilder:validation:Description="Period before controller inactive the resource (delete all resources except volume)."
 	// +kubebuilder:default=600
@@ -99,6 +95,18 @@ type SharedKodeTemplateSpec struct {
 	// +kubebuilder:validation:Description="Period before controller recycle the resource (delete all resources)."
 	// +kubebuilder:default=28800
 	RecycleAfterSeconds *int64 `json:"recycleAfterSeconds,omitempty"`
+
+	// InitPlugins specifies the OCI containers to be run before the main container. It is an ordered list.
+	// +kubebuilder:validation:Description="OCI containers to be run before the main container. It is an ordered list."
+	InitPlugins []InitPluginSpec `json:"initPlugins,omitempty"`
+
+	// // Ingress contains the Ingress configuration for the Kode resource. It will override the KodeTemplate Ingress configuration.
+	// // +kubebuilder:validation:Description="Contains the Ingress configuration for the Kode resource. It will override the KodeTemplate Ingress configuration."
+	// Ingress *IngressSpec `json:"ingress,omitempty"`
+
+	// // Gateway contains the Gateway configuration for the Kode resource. It will override the KodeTemplate Gateway configuration.
+	// // +kubebuilder:validation:Description="Contains the Gateway configuration for the Kode resource. It will override the KodeTemplate Gateway configuration."
+	// Gateway *GatewaySpec `json:"gateway,omitempty"`
 
 	// EntryPointSpec defines the desired state of the entrypoint.
 	// +kubebuilder:validation:Description="Desired state of the entrypoint."

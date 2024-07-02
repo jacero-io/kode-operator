@@ -69,14 +69,6 @@ type KodeSpec struct {
 	// InitPlugins specifies the OCI containers to be run as InitContainers. These containers can be used to prepare the workspace or run some setup scripts. It is an ordered list.
 	// +kubebuilder:validation:Description="OCI containers to be run as InitContainers. These containers can be used to prepare the workspace or run some setup scripts. It is an ordered list."
 	InitPlugins []InitPluginSpec `json:"initPlugins,omitempty"`
-
-	// // Ingress contains the Ingress configuration for the Kode resource. It will override the KodeTemplate Ingress configuration.
-	// // +kubebuilder:validation:Description="Contains the Ingress configuration for the Kode resource. It will override the KodeTemplate Ingress configuration."
-	// Ingress *IngressSpec `json:"ingress,omitempty"`
-
-	// // Gateway contains the Gateway configuration for the Kode resource. It will override the KodeTemplate Gateway configuration.
-	// // +kubebuilder:validation:Description="Contains the Gateway configuration for the Kode resource. It will override the KodeTemplate Gateway configuration."
-	// Gateway *GatewaySpec `json:"gateway,omitempty"`
 }
 
 // KodeStorageSpec defines the storage configuration
@@ -94,39 +86,45 @@ type KodeStorageSpec struct {
 	// +kubebuilder:validation:Description="Specifies if the volume should be kept when the kode is recycled. Defaults to false."
 	// +kubebuilder:default=false
 	KeepVolume *bool `json:"keepVolume,omitempty"`
+
+	// ExistingVolumeClaim specifies an existing PersistentVolumeClaim to use
+	// +kubebuilder:validation:Description="Specifies an existing PersistentVolumeClaim to use."
+	ExistingVolumeClaim string `json:"existingVolumeClaim,omitempty"`
 }
 
-type ConditionType string
+// KodePhase represents the current phase of the Kode resource.
+type KodePhase string
 
 const (
-	// Created means the code server has been accepted by the system.
-	Created ConditionType = "Created"
-	// Ready means the code server has been ready for usage.
-	Ready ConditionType = "Ready"
-	// Recycled means the code server has been recycled totally.
-	Recycled ConditionType = "Recycled"
-	// Inactive means the code server will be marked inactive if `InactiveAfterSeconds` elapsed
-	Inactive ConditionType = "Inactive"
-)
+	// KodePhaseCreated indicates that the Kode resource has been created.
+	KodePhaseCreated KodePhase = "Created"
 
-type Condition struct {
-	// Type of code server condition.
-	Type ConditionType `json:"type"`
-	// Status of the condition, one of True, False, Unknown.
-	Status corev1.ConditionStatus `json:"status"`
-	// The reason for the condition's last transition.
-	Reason string `json:"reason,omitempty"`
-	// A human readable message indicating details about the transition.
-	Message string `json:"message,omitempty"`
-	// The last time this condition was updated.
-	LastUpdateTime metav1.Time `json:"lastUpdateTime,omitempty"`
-	// Last time the condition transitioned from one status to another.
-	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`
-}
+	// KodePhaseActive indicates that the Kode resource is active and running.
+	KodePhaseActive KodePhase = "Active"
+
+	// KodePhaseError indicates that the Kode resource encountered an error and is not running.
+	KodePhaseError KodePhase = "Error"
+
+	// KodePhaseInactive indicates that the Kode resource has been marked as inactive and will be deleted.
+	KodePhaseInactive KodePhase = "Inactive"
+
+	// KodePhaseRecycled indicates that the Kode resource has been completely recycled and all resources have been deleted.
+	KodePhaseRecycled KodePhase = "Recycled"
+)
 
 // KodeStatus defines the observed state of Kode
 type KodeStatus struct {
-	Conditions []Condition `json:"conditions,omitempty" protobuf:"bytes,1,opt,name=conditions"`
+	// Phase represents the current phase of the Kode resource.
+	Phase KodePhase `json:"phase"`
+
+	// Conditions represent the latest available observations of a Kode's state.
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
+
+	// LastError contains the last error message encountered during reconciliation.
+	LastError string `json:"lastError,omitempty"`
+
+	// LastErrorTime is the timestamp when the last error occurred.
+	LastErrorTime *metav1.Time `json:"lastErrorTime,omitempty"`
 }
 
 //+kubebuilder:object:root=true
@@ -158,7 +156,6 @@ type KodeTemplateReference struct {
 
 	// Name is the name of the KodeTemplate
 	// +kubebuilder:validation:Description="Name of the KodeTemplate"
-	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
 	// Namespace is the namespace of the KodeTemplate
@@ -167,14 +164,19 @@ type KodeTemplateReference struct {
 }
 
 type InitPluginSpec struct {
+	// Name is the name of the container
+	// +kubebuilder:validation:Description="Name of the container."
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
+
 	// Image is the OCI image for the container
 	// +kubebuilder:validation:Description="OCI image for the container."
 	// +kubebuilder:validation:Required
 	Image string `json:"image"`
 
-	// Tag is the tag of the OCI image
-	// +kubebuilder:validation:Description="Tag of the OCI image."
-	Tag string `json:"tag,omitempty"`
+	// Command is the command to run in the container
+	// +kubebuilder:validation:Description="Command to run in the container."
+	Command []string `json:"command,omitempty"`
 
 	// Args are the arguments to the container
 	// +kubebuilder:validation:Description="Arguments to the container."
@@ -183,10 +185,12 @@ type InitPluginSpec struct {
 	// EnvVars are the environment variables to the container
 	// +kubebuilder:validation:Description="Environment variables to the container."
 	EnvVars []corev1.EnvVar `json:"envVars,omitempty"`
+}
 
-	// Command is the command to run in the container
-	// +kubebuilder:validation:Description="Command to run in the container."
-	Command []string `json:"command,omitempty"`
+func (s KodeStorageSpec) IsEmpty() bool {
+	return len(s.AccessModes) == 0 &&
+		s.StorageClassName == nil &&
+		(s.Resources.Requests == nil || s.Resources.Requests.Storage().IsZero())
 }
 
 func init() {

@@ -1,3 +1,5 @@
+# makefile
+
 # Image URL to use all building/pushing image targets
 IMG ?= controller:latest
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
@@ -60,29 +62,51 @@ fmt: ## Run go fmt against code.
 vet: ## Run go vet against code.
 	go vet ./...
 
-# .PHONY: test
-# test: manifests generate fmt vet envtest ## Run tests.
-# 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $$(go list ./... | grep -v /e2e) -coverprofile cover.out
+##@ Testing
 
-.PHONY: test
-test: manifests generate fmt vet envtest ## Run tests.
+.PHONY: test-unit
+test-unit: manifests generate fmt vet ## Run unit tests with coverage
 	mkdir -p coverage
-	GOCOVERDIR=$(shell pwd)/coverage KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test $$(go list ./... | grep -v /e2e) -coverprofile=coverage/cover.out 2>&1 | grep -v 'pkg/mod/k8s.io/client-go@' || true
-	go tool cover -html=coverage/cover.out -o coverage/coverage.html
-	@echo "Test coverage report generated at coverage/coverage.html"
+	go test -v -tags=unit ./... -coverprofile=coverage/unit.out
+	go tool cover -html=coverage/unit.out -o coverage/unit.html
+	@echo "Unit test coverage report generated at coverage/unit.html"
 
-# Utilize Kind or modify the e2e tests to load the image locally, enabling compatibility with other vendors.
-.PHONY: test-e2e  # Run the e2e tests against a Kind k8s instance that is spun up.
-test-e2e:
-	go test ./test/e2e/ -v -ginkgo.v
+.PHONY: test-integration
+test-integration: manifests generate fmt vet envtest ## Run integration tests with coverage
+	mkdir -p coverage
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test -v -tags=integration ./... -coverprofile=coverage/integration.out
+	go tool cover -html=coverage/integration.out -o coverage/integration.html
+	@echo "Integration test coverage report generated at coverage/integration.html"
+
+.PHONY: test-e2e
+test-e2e: manifests generate fmt vet docker-build kind-create-cluster kind-load-image ## Run end-to-end tests with Kind cluster
+	go test -v -tags=e2e ./test/e2e/...
+	$(MAKE) kind-delete-cluster
+
+.PHONY: test-all
+test-all: test-unit test-integration test-e2e
+	@echo "All tests completed"
+
+.PHONY: coverage-report
+coverage-report: test-unit test-integration ## Generate a combined coverage report
+	mkdir -p coverage
+	echo "mode: set" > coverage/coverage.out
+	tail -q -n +2 coverage/*.out >> coverage/coverage.out
+	go tool cover -html=coverage/coverage.out -o coverage/coverage.html
+	go tool cover -func=coverage/coverage.out
+	@echo "Combined test coverage report generated at coverage/coverage.html"
 
 .PHONY: kind-create-cluster
 kind-create-cluster:
-	kind create cluster --image kindest/node:v$(ENVTEST_K8S_VERSION)
+	kind create cluster --name test --image kindest/node:v$(ENVTEST_K8S_VERSION)
 
 .PHONY: kind-delete-cluster
 kind-delete-cluster:
-	kind delete cluster
+	kind delete cluster --name test
+
+.PHONY: kind-load-image
+kind-load-image: docker-build
+	kind load docker-image ${IMG} --name test
 
 .PHONY: lint
 lint: golangci-lint ## Run golangci-lint linter & yamllint

@@ -1,5 +1,3 @@
-//go:build e2e
-
 /*
 Copyright 2024.
 
@@ -16,19 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package template
 
 import (
-	"fmt"
-	"testing"
+	"context"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	kodev1alpha1 "github.com/emil-jacero/kode-operator/api/v1alpha1"
+	"github.com/emil-jacero/kode-operator/internal/common"
 )
 
-// Run e2e tests using the Ginkgo runner.
-func TestE2E(t *testing.T) {
-	RegisterFailHandler(Fail)
-	fmt.Fprintf(GinkgoWriter, "Starting kode-operator suite\n")
-	RunSpecs(t, "e2e suite")
+// TemplateManager defines the interface for managing Kode templates
+type TemplateManager interface {
+	Fetch(ctx context.Context, ref kodev1alpha1.KodeTemplateReference) (*common.Templates, error)
 }

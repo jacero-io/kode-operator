@@ -1,5 +1,3 @@
-//go:build e2e
-
 /*
 Copyright 2024.
 
@@ -16,19 +14,16 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package e2e
+package status
 
 import (
-	"fmt"
-	"testing"
+	"context"
 
-	. "github.com/onsi/ginkgo/v2"
-	. "github.com/onsi/gomega"
+	kodev1alpha1 "github.com/emil-jacero/kode-operator/api/v1alpha1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// Run e2e tests using the Ginkgo runner.
-func TestE2E(t *testing.T) {
-	RegisterFailHandler(Fail)
-	fmt.Fprintf(GinkgoWriter, "Starting kode-operator suite\n")
-	RunSpecs(t, "e2e suite")
+// StatusUpdater defines the interface for updating Kode status
+type StatusUpdater interface {
+	UpdateStatus(ctx context.Context, kode *kodev1alpha1.Kode, phase kodev1alpha1.KodePhase, conditions []metav1.Condition, lastError string, lastErrorTime *metav1.Time) error
 }

@@ -18,14 +18,14 @@ package controller
 
 import (
 	"context"
-	"reflect"
+	"fmt"
 
 	kodev1alpha1 "github.com/emil-jacero/kode-operator/api/v1alpha1"
+	"github.com/emil-jacero/kode-operator/internal/common"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
+	client "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
@@ -33,38 +33,25 @@ import (
 func (r *KodeReconciler) ensureService(ctx context.Context, kode *kodev1alpha1.Kode,
 	labels map[string]string,
 	sharedKodeTemplateSpec *kodev1alpha1.SharedKodeTemplateSpec) error {
+	log := r.Log.WithName("ServiceEnsurer").WithValues("kode", client.ObjectKeyFromObject(kode))
 
-	log := r.Log.WithName("ensureService")
-	log.Info("Ensuring Service exists", "Namespace", kode.Namespace, "Name", kode.Name)
+	ctx, cancel := common.ContextWithTimeout(ctx, 30) // 30 seconds timeout
+	defer cancel()
+
+	log.Info("Ensuring Service exists")
 
 	service := r.constructService(kode, labels, sharedKodeTemplateSpec)
 	if err := controllerutil.SetControllerReference(kode, service, r.Scheme); err != nil {
-		return err
+		return fmt.Errorf("failed to set controller reference: %w", err)
 	}
 
-	found := &corev1.Service{}
-	err := r.Get(ctx, types.NamespacedName{Name: service.Name, Namespace: service.Namespace}, found)
+	err := r.ResourceManager.Ensure(ctx, service)
 	if err != nil {
-		if errors.IsNotFound(err) {
-			log.Info("Creating Service", "Namespace", service.Namespace, "Name", service.Name)
-			if err := r.Create(ctx, service); err != nil {
-				log.Error(err, "Failed to create Service", "Namespace", service.Namespace, "Name", service.Name)
-				return err
-			}
-			log.Info("Service created", "Namespace", service.Namespace, "Name", service.Name)
-		} else {
-			return err
-		}
-	} else if !reflect.DeepEqual(service.Spec, found.Spec) {
-		found.Spec = service.Spec
-		log.Info("Updating Service", "Namespace", found.Namespace, "Name", found.Name)
-		if err := r.Update(ctx, found); err != nil {
-			log.Error(err, "Failed to update Service", "Namespace", found.Namespace, "Name", found.Name)
-			return err
-		}
+		log.Error(err, "Failed to ensure Service")
+		return fmt.Errorf("failed to ensure Service: %w", err)
 	}
 
-	log.Info("Successfully ensured Service", "Namespace", kode.Namespace, "Name", kode.Name)
+	log.Info("Successfully ensured Service")
 	return nil
 }
 
@@ -72,8 +59,6 @@ func (r *KodeReconciler) ensureService(ctx context.Context, kode *kodev1alpha1.K
 func (r *KodeReconciler) constructService(kode *kodev1alpha1.Kode,
 	labels map[string]string,
 	templateSpec *kodev1alpha1.SharedKodeTemplateSpec) *corev1.Service {
-
-	log := r.Log.WithName("constructService")
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kode.Name,
@@ -88,6 +73,5 @@ func (r *KodeReconciler) constructService(kode *kodev1alpha1.Kode,
 			}},
 		},
 	}
-	logServiceManifest(log, service)
 	return service
 }

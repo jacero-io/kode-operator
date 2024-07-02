@@ -23,74 +23,50 @@ import (
 	"reflect"
 
 	kodev1alpha1 "github.com/emil-jacero/kode-operator/api/v1alpha1"
+	"github.com/emil-jacero/kode-operator/internal/common"
+	"github.com/emil-jacero/kode-operator/internal/envoy"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/util/retry"
+	client "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-// ensureDeployment ensures that the Deployment exists for the Kode instance
-func (r *KodeReconciler) ensureDeployment(ctx context.Context,
+// ensureStatefulSet ensures that the StatefulSet exists for the Kode instance
+func (r *KodeReconciler) ensureStatefulSet(ctx context.Context,
 	kode *kodev1alpha1.Kode,
 	labels map[string]string,
-	sharedKodeTemplateSpec *kodev1alpha1.SharedKodeTemplateSpec,
-	sharedEnvoyProxyConfigSpec *kodev1alpha1.SharedEnvoyProxyConfigSpec) error {
+	templates *common.Templates) error {
+	log := r.Log.WithName("StatefulSetEnsurer").WithValues("kode", client.ObjectKeyFromObject(kode))
 
-	log := r.Log.WithName("ensureDeployment")
+	ctx, cancel := common.ContextWithTimeout(ctx, 30) // 30 seconds timeout
+	defer cancel()
 
-	log.Info("Ensuring Deployment exists", "Namespace", kode.Namespace, "Name", kode.Name)
+	log.Info("Ensuring StatefulSet exists")
 
-	deployment := r.constructDeployment(kode, labels, sharedKodeTemplateSpec, sharedEnvoyProxyConfigSpec)
-	if err := controllerutil.SetControllerReference(kode, deployment, r.Scheme); err != nil {
-		return err
+	statefulSet := r.constructStatefulSet(kode, labels, templates)
+	if err := controllerutil.SetControllerReference(kode, statefulSet, r.Scheme); err != nil {
+		return fmt.Errorf("failed to set controller reference: %w", err)
 	}
 
-	found := &appsv1.Deployment{}
-	err := r.Get(ctx, types.NamespacedName{Name: deployment.Name, Namespace: deployment.Namespace}, found)
+	err := r.ResourceManager.Ensure(ctx, statefulSet)
 	if err != nil {
-		if errors.IsNotFound(err) {
-			log.Info("Creating Deployment", "Namespace", deployment.Namespace, "Name", deployment.Name)
-			if err := r.Create(ctx, deployment); err != nil {
-				log.Error(err, "Failed to create Deployment", "Namespace", deployment.Namespace, "Name", deployment.Name)
-				return err
-			}
-			log.Info("Deployment created", "Namespace", deployment.Namespace, "Name", deployment.Name)
-		} else {
-			log.Error(err, "Failed to get Deployment", "Namespace", deployment.Namespace, "Name", deployment.Name)
-			return err
-		}
-	} else if !reflect.DeepEqual(deployment.Spec, found.Spec) {
-		retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			if err := r.Get(ctx, types.NamespacedName{Name: deployment.Name, Namespace: deployment.Namespace}, found); err != nil {
-				return err
-			}
-			found.Spec = deployment.Spec
-			log.Info("Updating Deployment due to spec change", "Namespace", found.Namespace, "Name", found.Name)
-			return r.Update(ctx, found)
-		})
-
-		if retryErr != nil {
-			log.Error(retryErr, "Failed to update Deployment after retrying", "Namespace", deployment.Namespace, "Name", deployment.Name)
-			return retryErr
-		}
+		log.Error(err, "Failed to ensure StatefulSet")
+		return fmt.Errorf("failed to ensure StatefulSet: %w", err)
 	}
 
-	log.Info("Successfully ensured Deployment", "Namespace", kode.Namespace, "Name", kode.Name)
+	log.Info("Successfully ensured StatefulSet")
 	return nil
 }
 
-// constructDeployment constructs a Deployment for the Kode instance
-func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode,
+// constructStatefulSet constructs a StatefulSet for the Kode instance
+func (r *KodeReconciler) constructStatefulSet(kode *kodev1alpha1.Kode,
 	labels map[string]string,
-	templateSpec *kodev1alpha1.SharedKodeTemplateSpec,
-	sharedEnvoyProxyConfigSpec *kodev1alpha1.SharedEnvoyProxyConfigSpec) *appsv1.Deployment {
-
-	log := r.Log.WithName("constructDeployment")
+	templates *common.Templates) *appsv1.StatefulSet {
+	log := r.Log.WithName("SatefulSetConstructor").WithValues("kode", client.ObjectKeyFromObject(kode))
 
 	replicas := int32(1)
+	templateSpec := templates.KodeTemplate
 
 	var workspace string
 	var mountPath string
@@ -118,11 +94,11 @@ func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode,
 	volumes, volumeMounts := constructVolumesAndMounts(mountPath, kode)
 	containers[0].VolumeMounts = volumeMounts
 
-	if templateSpec.EnvoyProxyRef.Name != "" {
-		log.Info("EnvoyProxyRef is defined", "Namespace", kode.Namespace, "Kode", kode.Name, "Name", templateSpec.EnvoyProxyRef.Name)
-		envoySidecarContainer, envoyInitContainer, err := constructEnvoyProxyContainer(log, templateSpec, sharedEnvoyProxyConfigSpec)
+	if templates.EnvoyProxyConfig != nil {
+		log.Info("EnvoyProxyConfig is defined", "Namespace", kode.Namespace, "Kode", kode.Name)
+		envoySidecarContainer, envoyInitContainer, err := envoy.NewContainerConstructor(r.Log, envoy.NewBootstrapConfigGenerator(r.Log.WithName("EnvoyContainerConstructor"))).ConstructEnvoyProxyContainer(templateSpec, templates.EnvoyProxyConfig)
 		if err != nil {
-			log.Error(err, "Failed to construct EnvoyProxy sidecar", "Kode", kode.Name, "Container", templateSpec.EnvoyProxyRef.Name, "Error", err)
+			log.Error(err, "Failed to construct EnvoyProxy sidecar", "Kode", kode.Name, "Error", err)
 		} else {
 			containers = append(containers, envoySidecarContainer)
 			initContainers = append(initContainers, envoyInitContainer)
@@ -135,20 +111,22 @@ func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode,
 		initContainers = append(initContainers, constructInitPluginContainer(initPlugin))
 	}
 
-	deployment := &appsv1.Deployment{
+	statefulSet := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      kode.Name,
 			Namespace: kode.Namespace,
 			Labels:    labels,
 		},
-		Spec: appsv1.DeploymentSpec{
+		Spec: appsv1.StatefulSetSpec{
 			Replicas: &replicas,
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labels,
 			},
+			ServiceName: kode.Name,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels: labels,
+					Labels:            labels,
+					CreationTimestamp: metav1.Time{},
 				},
 				Spec: corev1.PodSpec{
 					InitContainers: initContainers,
@@ -159,8 +137,8 @@ func (r *KodeReconciler) constructDeployment(kode *kodev1alpha1.Kode,
 		},
 	}
 
-	logDeploymentManifest(log, deployment)
-	return deployment
+	// common.logStatefulSetManifest(log, statefulSet)
+	return statefulSet
 }
 
 func constructCodeServerContainers(kode *kodev1alpha1.Kode,
@@ -213,17 +191,29 @@ func constructVolumesAndMounts(mountPath string, kode *kodev1alpha1.Kode) ([]cor
 
 	// Add volume and volume mount if storage is defined
 	if !reflect.DeepEqual(kode.Spec.Storage, kodev1alpha1.KodeStorageSpec{}) {
-		volume := corev1.Volume{
-			Name: "kode-storage",
-			VolumeSource: corev1.VolumeSource{
+		var volumeSource corev1.VolumeSource
+
+		if kode.Spec.Storage.ExistingVolumeClaim != "" {
+			volumeSource = corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: PersistentVolumeClaimName,
+					ClaimName: kode.Spec.Storage.ExistingVolumeClaim,
 				},
-			},
+			}
+		} else if !kode.Spec.DeepCopy().Storage.IsEmpty() {
+			volumeSource = corev1.VolumeSource{
+				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+					ClaimName: common.GetPVCName(kode),
+				},
+			}
+		}
+
+		volume := corev1.Volume{
+			Name:         common.KodeVolumeStorageName,
+			VolumeSource: volumeSource,
 		}
 
 		volumeMount := corev1.VolumeMount{
-			Name:      "kode-storage",
+			Name:      common.KodeVolumeStorageName,
 			MountPath: mountPath,
 		}
 
@@ -236,7 +226,7 @@ func constructVolumesAndMounts(mountPath string, kode *kodev1alpha1.Kode) ([]cor
 
 func constructInitPluginContainer(plugin kodev1alpha1.InitPluginSpec) corev1.Container {
 	return corev1.Container{
-		Name:    "init-" + plugin.Image,
+		Name:    "plugin-" + plugin.Name,
 		Image:   plugin.Image,
 		Command: plugin.Command,
 		Args:    plugin.Args,

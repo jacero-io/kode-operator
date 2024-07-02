@@ -1,3 +1,7 @@
+//go:build integration
+
+// internal/controller/entrypoint_controller_integration_test.go
+
 /*
 Copyright 2024.
 
@@ -23,6 +27,7 @@ import (
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,6 +36,9 @@ import (
 )
 
 var _ = PDescribe("EntryPoint Controller", func() {
+	var (
+		k8sClient client.Client
+	)
 	Context("When reconciling a resource", func() {
 		const resourceName = "test-resource"
 
