@@ -66,17 +66,31 @@ vet: ## Run go vet against code.
 
 .PHONY: test-unit
 test-unit: manifests generate fmt vet ## Run unit tests with coverage
+	rm -rf coverage
 	mkdir -p coverage
-	go test -v -tags=unit ./... -coverprofile=coverage/unit.out
-	go tool cover -html=coverage/unit.out -o coverage/unit.html
-	@echo "Unit test coverage report generated at coverage/unit.html"
+	go test -v -tags=unit ./...
+# go test -v -tags=unit -covermode=atomic -coverprofile=coverage/integration.out ./...
+# if [ -f coverage/unit.out ]; then \
+# 	go tool cover -html=coverage/unit.out -o coverage/unit.html; \
+# 	echo "Unit test coverage report generated at coverage/unit.html"; \
+# else \
+# 	echo "Warning: unit test coverage file not generated. Tests may have failed or encountered an error."; \
+# fi
 
 .PHONY: test-integration
 test-integration: manifests generate fmt vet envtest ## Run integration tests with coverage
+	rm -rf coverage
 	mkdir -p coverage
-	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" go test -v -tags=integration ./... -coverprofile=coverage/integration.out
-	go tool cover -html=coverage/integration.out -o coverage/integration.html
-	@echo "Integration test coverage report generated at coverage/integration.html"
+	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" \
+	go test -v -tags=integration ./...
+# KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" \
+# go test -tags=integration -covermode=atomic -coverprofile=coverage/integration.out ./...
+# if [ -f coverage/integration.out ]; then \
+# 	go tool cover -html=coverage/integration.out -o coverage/integration.html; \
+# 	echo "Integration test coverage report generated at coverage/integration.html"; \
+# else \
+# 	echo "Warning: integration test coverage file not generated. Tests may have failed or encountered an error."; \
+# fi
 
 .PHONY: test-e2e
 test-e2e: manifests generate fmt vet docker-build kind-create-cluster kind-load-image ## Run end-to-end tests with Kind cluster
