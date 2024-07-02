@@ -44,7 +44,8 @@ func NewBootstrapConfigGenerator(log logr.Logger) *BootstrapConfigGenerator {
 }
 
 func (g *BootstrapConfigGenerator) Generate(options common.BootstrapConfigOptions) (string, error) {
-	g.log.Info("Starting bootstrap config generation", "options", options)
+	g.log.Info("Starting bootstrap config generation")
+	g.log.V(1).Info("Config options", "options", options)
 
 	var err error
 

@@ -89,6 +89,7 @@ func (r *KodeReconciler) constructPVC(config *common.KodeResourcesConfig) *corev
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      common.GetPVCName(&config.Kode),
 			Namespace: config.Kode.Namespace,
+			Labels:    config.Labels,
 			OwnerReferences: []metav1.OwnerReference{
 				*metav1.NewControllerRef(&config.Kode, kodev1alpha1.GroupVersion.WithKind("Kode")),
 			},

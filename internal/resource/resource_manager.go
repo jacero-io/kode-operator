@@ -3,6 +3,7 @@ package resource
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	"github.com/go-logr/logr"
 	appsv1 "k8s.io/api/apps/v1"
@@ -44,17 +45,30 @@ func (m *defaultResourceManager) Ensure(ctx context.Context, obj client.Object) 
 
 		// Update the existing object with new spec
 		updated := existing.DeepCopyObject().(client.Object)
-		err = m.updateSpec(obj, updated)
-		if err != nil {
-			log.Error(err, "Failed to update spec", "Kind", obj.GetObjectKind().GroupVersionKind().Kind, "Name", obj.GetName())
-			return err
+		var updateNeeded bool
+		var updateErr error
+
+		switch v := updated.(type) {
+		case *corev1.PersistentVolumeClaim:
+			updateNeeded = m.updatePVCSpec(obj.(*corev1.PersistentVolumeClaim), v)
+		default:
+			updateNeeded, updateErr = m.updateSpec(obj, v)
 		}
 
-		if err := m.client.Update(ctx, updated); err != nil {
-			log.Error(err, "Failed to update resource", "Kind", obj.GetObjectKind().GroupVersionKind().Kind, "Name", obj.GetName())
-			return err
+		if updateErr != nil {
+			log.Error(updateErr, "Failed to update spec", "Kind", obj.GetObjectKind().GroupVersionKind().Kind, "Name", obj.GetName())
+			return updateErr
 		}
-		log.Info("Resource updated", "Kind", obj.GetObjectKind().GroupVersionKind().Kind, "Name", obj.GetName())
+
+		if updateNeeded {
+			if err := m.client.Update(ctx, updated); err != nil {
+				log.Error(err, "Failed to update resource", "Kind", obj.GetObjectKind().GroupVersionKind().Kind, "Name", obj.GetName())
+				return err
+			}
+			log.Info("Resource updated", "Kind", obj.GetObjectKind().GroupVersionKind().Kind, "Name", obj.GetName())
+		} else {
+			log.Info("No update needed", "Kind", obj.GetObjectKind().GroupVersionKind().Kind, "Name", obj.GetName())
+		}
 	} else {
 		log.Info("Resource created", "Kind", obj.GetObjectKind().GroupVersionKind().Kind, "Name", obj.GetName())
 	}
@@ -74,16 +88,50 @@ func (m *defaultResourceManager) Update(ctx context.Context, obj client.Object) 
 	return m.client.Update(ctx, obj)
 }
 
-func (m *defaultResourceManager) updateSpec(new, existing client.Object) error {
+func (m *defaultResourceManager) updateSpec(new, existing client.Object) (bool, error) {
+	updated := false
 	switch v := existing.(type) {
 	case *appsv1.StatefulSet:
-		v.Spec = new.(*appsv1.StatefulSet).Spec
+		if !reflect.DeepEqual(v.Spec.Template, new.(*appsv1.StatefulSet).Spec.Template) {
+			v.Spec.Template = new.(*appsv1.StatefulSet).Spec.Template
+			updated = true
+		}
+		// Update other mutable fields as needed
 	case *corev1.Service:
-		v.Spec = new.(*corev1.Service).Spec
-	case *corev1.PersistentVolumeClaim:
-		v.Spec = new.(*corev1.PersistentVolumeClaim).Spec
+		if !reflect.DeepEqual(v.Spec.Ports, new.(*corev1.Service).Spec.Ports) {
+			v.Spec.Ports = new.(*corev1.Service).Spec.Ports
+			updated = true
+		}
+		// Update other mutable fields as needed
 	default:
-		return fmt.Errorf("unsupported resource type: %T", existing)
+		return false, fmt.Errorf("unsupported resource type: %T", existing)
 	}
-	return nil
+	return updated, nil
+}
+
+func (m *defaultResourceManager) updatePVCSpec(new, existing *corev1.PersistentVolumeClaim) bool {
+	updated := false
+
+	// Update labels
+	if !reflect.DeepEqual(existing.Labels, new.Labels) {
+		existing.Labels = new.Labels
+		updated = true
+	}
+
+	// Update annotations
+	if !reflect.DeepEqual(existing.Annotations, new.Annotations) {
+		existing.Annotations = new.Annotations
+		updated = true
+	}
+
+	// Update resources.requests.storage (only if increasing)
+	if new.Spec.Resources.Requests != nil && existing.Spec.Resources.Requests != nil {
+		newStorage := new.Spec.Resources.Requests[corev1.ResourceStorage]
+		existingStorage := existing.Spec.Resources.Requests[corev1.ResourceStorage]
+		if newStorage.Cmp(existingStorage) > 0 {
+			existing.Spec.Resources.Requests[corev1.ResourceStorage] = newStorage
+			updated = true
+		}
+	}
+	return updated
 }
