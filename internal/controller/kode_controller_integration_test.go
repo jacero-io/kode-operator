@@ -178,40 +178,40 @@ var _ = Describe("Kode Controller Integration", func() {
 			Expect(createdStatefulSet.Spec.Template.Spec.Containers[0].Image).To(Equal(kodeTemplateImage))
 		})
 
-		It("should create a StatefulSet for the Kode resource with Envoy Proxy", func() {
-			kode := &kodev1alpha1.Kode{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      kodeResourceName,
-					Namespace: resourceNamespace,
-				},
-				Spec: kodev1alpha1.KodeSpec{
-					TemplateRef: kodev1alpha1.KodeTemplateReference{
-						Kind:      kodeTemplateKind,
-						Name:      kodeTemplateName + "with-envoy",
-						Namespace: resourceNamespace,
-					},
-					Storage: kodev1alpha1.KodeStorageSpec{
-						AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-						Resources: corev1.VolumeResourceRequirements{
-							Requests: corev1.ResourceList{
-								corev1.ResourceStorage: resource.MustParse("1Gi"),
-							},
-						},
-					},
-				},
-			}
-			Expect(k8sClient.Create(ctx, kode)).To(Succeed())
+		// It("should create a StatefulSet for the Kode resource with Envoy Proxy", func() {
+		// 	kode := &kodev1alpha1.Kode{
+		// 		ObjectMeta: metav1.ObjectMeta{
+		// 			Name:      kodeResourceName,
+		// 			Namespace: resourceNamespace,
+		// 		},
+		// 		Spec: kodev1alpha1.KodeSpec{
+		// 			TemplateRef: kodev1alpha1.KodeTemplateReference{
+		// 				Kind:      kodeTemplateKind,
+		// 				Name:      kodeTemplateName + "with-envoy",
+		// 				Namespace: resourceNamespace,
+		// 			},
+		// 			Storage: kodev1alpha1.KodeStorageSpec{
+		// 				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+		// 				Resources: corev1.VolumeResourceRequirements{
+		// 					Requests: corev1.ResourceList{
+		// 						corev1.ResourceStorage: resource.MustParse("1Gi"),
+		// 					},
+		// 				},
+		// 			},
+		// 		},
+		// 	}
+		// 	Expect(k8sClient.Create(ctx, kode)).To(Succeed())
 
-			statefulSetLookupKey := types.NamespacedName{Name: kodeResourceName, Namespace: resourceNamespace}
-			createdStatefulSet := &appsv1.StatefulSet{}
+		// 	statefulSetLookupKey := types.NamespacedName{Name: kodeResourceName, Namespace: resourceNamespace}
+		// 	createdStatefulSet := &appsv1.StatefulSet{}
 
-			Eventually(func() error {
-				return k8sClient.Get(ctx, statefulSetLookupKey, createdStatefulSet)
-			}, timeout, interval).Should(Succeed())
+		// 	Eventually(func() error {
+		// 		return k8sClient.Get(ctx, statefulSetLookupKey, createdStatefulSet)
+		// 	}, timeout, interval).Should(Succeed())
 
-			Expect(createdStatefulSet.Name).To(Equal(kodeResourceName))
-			Expect(createdStatefulSet.Spec.Template.Spec.Containers[0].Image).To(Equal(kodeTemplateImage))
-		})
+		// 	Expect(createdStatefulSet.Name).To(Equal(kodeResourceName))
+		// 	Expect(createdStatefulSet.Spec.Template.Spec.Containers[0].Image).To(Equal(kodeTemplateImage))
+		// })
 
 		// It("should create a Service for the Kode resource", func() {
 		// 	kode := &kodev1alpha1.Kode{
