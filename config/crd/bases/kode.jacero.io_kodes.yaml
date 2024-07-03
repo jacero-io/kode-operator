@@ -55,17 +55,17 @@ spec:
                 items:
                   properties:
                     args:
-                      description: Args are the arguments to the container
+                      description: Args are the arguments to the container.
                       items:
                         type: string
                       type: array
                     command:
-                      description: Command is the command to run in the container
+                      description: Command is the command to run in the container.
                       items:
                         type: string
                       type: array
-                    envVars:
-                      description: EnvVars are the environment variables to the container
+                    env:
+                      description: Env are the environment variables to the container.
                       items:
                         description: EnvVar represents an environment variable present
                           in a Container.
@@ -188,12 +188,133 @@ spec:
                         - name
                         type: object
                       type: array
+                    envFrom:
+                      description: EnvFrom are the environment variables taken from
+                        a Secret or ConfigMap.
+                      items:
+                        description: EnvFromSource represents the source of a set
+                          of ConfigMaps
+                        properties:
+                          configMapRef:
+                            description: The ConfigMap to select from
+                            properties:
+                              name:
+                                default: ""
+                                description: |-
+                                  Name of the referent.
+                                  This field is effectively required, but due to backwards compatibility is
+                                  allowed to be empty. Instances of this type with an empty value here are
+                                  almost certainly wrong.
+                                  TODO: Add other useful fields. apiVersion, kind, uid?
+                                  More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                  TODO: Drop `kubebuilder:default` when controller-gen doesn't need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.
+                                type: string
+                              optional:
+                                description: Specify whether the ConfigMap must be
+                                  defined
+                                type: boolean
+                            type: object
+                            x-kubernetes-map-type: atomic
+                          prefix:
+                            description: An optional identifier to prepend to each
+                              key in the ConfigMap. Must be a C_IDENTIFIER.
+                            type: string
+                          secretRef:
+                            description: The Secret to select from
+                            properties:
+                              name:
+                                default: ""
+                                description: |-
+                                  Name of the referent.
+                                  This field is effectively required, but due to backwards compatibility is
+                                  allowed to be empty. Instances of this type with an empty value here are
+                                  almost certainly wrong.
+                                  TODO: Add other useful fields. apiVersion, kind, uid?
+                                  More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                  TODO: Drop `kubebuilder:default` when controller-gen doesn't need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.
+                                type: string
+                              optional:
+                                description: Specify whether the Secret must be defined
+                                type: boolean
+                            type: object
+                            x-kubernetes-map-type: atomic
+                        type: object
+                      type: array
                     image:
-                      description: Image is the OCI image for the container
+                      description: Image is the OCI image for the container.
                       type: string
                     name:
-                      description: Name is the name of the container
+                      description: Name is the name of the container.
                       type: string
+                    volumeMounts:
+                      description: VolumeMounts are the volume mounts for the container.
+                        Can be used to mount a ConfigMap or Secret.
+                      items:
+                        description: VolumeMount describes a mounting of a Volume
+                          within a container.
+                        properties:
+                          mountPath:
+                            description: |-
+                              Path within the container at which the volume should be mounted.  Must
+                              not contain ':'.
+                            type: string
+                          mountPropagation:
+                            description: |-
+                              mountPropagation determines how mounts are propagated from the host
+                              to container and the other way around.
+                              When not set, MountPropagationNone is used.
+                              This field is beta in 1.10.
+                              When RecursiveReadOnly is set to IfPossible or to Enabled, MountPropagation must be None or unspecified
+                              (which defaults to None).
+                            type: string
+                          name:
+                            description: This must match the Name of a Volume.
+                            type: string
+                          readOnly:
+                            description: |-
+                              Mounted read-only if true, read-write otherwise (false or unspecified).
+                              Defaults to false.
+                            type: boolean
+                          recursiveReadOnly:
+                            description: |-
+                              RecursiveReadOnly specifies whether read-only mounts should be handled
+                              recursively.
+
+
+                              If ReadOnly is false, this field has no meaning and must be unspecified.
+
+
+                              If ReadOnly is true, and this field is set to Disabled, the mount is not made
+                              recursively read-only.  If this field is set to IfPossible, the mount is made
+                              recursively read-only, if it is supported by the container runtime.  If this
+                              field is set to Enabled, the mount is made recursively read-only if it is
+                              supported by the container runtime, otherwise the pod will not be started and
+                              an error will be generated to indicate the reason.
+
+
+                              If this field is set to IfPossible or Enabled, MountPropagation must be set to
+                              None (or be unspecified, which defaults to None).
+
+
+                              If this field is not specified, it is treated as an equivalent of Disabled.
+                            type: string
+                          subPath:
+                            description: |-
+                              Path within the volume from which the container's volume should be mounted.
+                              Defaults to "" (volume's root).
+                            type: string
+                          subPathExpr:
+                            description: |-
+                              Expanded path within the volume from which the container's volume should be mounted.
+                              Behaves similarly to SubPath but environment variable references $(VAR_NAME) are expanded using the container's environment.
+                              Defaults to "" (volume's root).
+                              SubPathExpr and SubPath are mutually exclusive.
+                            type: string
+                        required:
+                        - mountPath
+                        - name
+                        type: object
+                      type: array
                   required:
                   - image
                   - name
@@ -201,7 +322,7 @@ spec:
                 type: array
               password:
                 description: Password HTTP Basic auth password. If unset there will
-                  be no auth
+                  be no auth.
                 type: string
               privileged:
                 default: false
@@ -210,17 +331,17 @@ spec:
                   true if you know what you are doing.
                 type: boolean
               storage:
-                description: Storage specifies the storage configuration
+                description: Storage specifies the storage configuration.
                 properties:
                   accessModes:
                     description: AccessModes specifies the access modes for the persistent
-                      volume
+                      volume.
                     items:
                       type: string
                     type: array
                   existingVolumeClaim:
                     description: ExistingVolumeClaim specifies an existing PersistentVolumeClaim
-                      to use
+                      to use.
                     type: string
                   keepVolume:
                     default: false
@@ -229,7 +350,7 @@ spec:
                     type: boolean
                   resources:
                     description: Resources specifies the resource requirements for
-                      the persistent volume
+                      the persistent volume.
                     properties:
                       limits:
                         additionalProperties:
@@ -258,23 +379,23 @@ spec:
                     type: object
                   storageClassName:
                     description: StorageClassName specifies the storage class name
-                      for the persistent volume
+                      for the persistent volume.
                     type: string
                 type: object
               templateRef:
-                description: TemplateRef is the reference to the KodeTemplate configuration
+                description: TemplateRef is the reference to the KodeTemplate configuration.
                 properties:
                   kind:
-                    description: Kind is the resource kind
+                    description: Kind is the resource kind.
                     enum:
                     - KodeTemplate
                     - KodeClusterTemplate
                     type: string
                   name:
-                    description: Name is the name of the KodeTemplate
+                    description: Name is the name of the KodeTemplate.
                     type: string
                   namespace:
-                    description: Namespace is the namespace of the KodeTemplate
+                    description: Namespace is the namespace of the KodeTemplate.
                     type: string
                 required:
                 - kind
@@ -287,11 +408,11 @@ spec:
                 type: string
               userConfig:
                 description: UserConfig specifies a git repository URL to get user
-                  configuration from
+                  configuration from.
                 type: string
               workspace:
                 description: Workspace is the user specified workspace directory (e.g.
-                  my-workspace)
+                  my-workspace).
                 minLength: 3
                 pattern: ^[^/].*$
                 type: string

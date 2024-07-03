@@ -1,4 +1,4 @@
-package bootstrap
+package envoy
 
 // HTTPFilterRouter default filter
 #HTTPFilterRouter: #HTTPFilter & {

@@ -23,7 +23,7 @@ import (
 
 // KodeSpec defines the desired state of Kode
 type KodeSpec struct {
-	// TemplateRef is the reference to the KodeTemplate configuration
+	// TemplateRef is the reference to the KodeTemplate configuration.
 	// +kubebuilder:validation:Description="Reference to the KodeTemplate configuration."
 	// +kubebuilder:validation:Required
 	TemplateRef KodeTemplateReference `json:"templateRef"`
@@ -33,7 +33,7 @@ type KodeSpec struct {
 	// +kubebuilder:default="abc"
 	User string `json:"user,omitempty"`
 
-	// Password HTTP Basic auth password. If unset there will be no auth
+	// Password HTTP Basic auth password. If unset there will be no auth.
 	// +kubebuilder:validation:Description="HTTP Basic auth password. If unset, there will be no authentication."
 	Password string `json:"password,omitempty"`
 
@@ -47,17 +47,17 @@ type KodeSpec struct {
 	// +kubebuilder:default=/config
 	Home string `json:"home,omitempty"`
 
-	// Workspace is the user specified workspace directory (e.g. my-workspace)
+	// Workspace is the user specified workspace directory (e.g. my-workspace).
 	// +kubebuilder:validation:Description="User specified workspace directory (e.g. my-workspace)."
 	// +kubebuilder:validation:MinLength=3
 	// +kubebuilder:validation:Pattern="^[^/].*$"
 	Workspace string `json:"workspace,omitempty"`
 
-	// Storage specifies the storage configuration
+	// Storage specifies the storage configuration.
 	// +kubebuilder:validation:Description="Storage configuration."
 	Storage KodeStorageSpec `json:"storage,omitempty"`
 
-	// UserConfig specifies a git repository URL to get user configuration from
+	// UserConfig specifies a git repository URL to get user configuration from.
 	// +kubebuilder:validation:Description="Git repository URL to get user configuration from."
 	UserConfig string `json:"userConfig,omitempty"`
 
@@ -73,13 +73,16 @@ type KodeSpec struct {
 
 // KodeStorageSpec defines the storage configuration
 type KodeStorageSpec struct {
-	// AccessModes specifies the access modes for the persistent volume
+	// AccessModes specifies the access modes for the persistent volume.
+	// +kubebuilder:validation:Description="Access modes for the persistent volume."
 	AccessModes []corev1.PersistentVolumeAccessMode `json:"accessModes,omitempty"`
 
-	// StorageClassName specifies the storage class name for the persistent volume
+	// StorageClassName specifies the storage class name for the persistent volume.
+	// +kubebuilder:validation:Description="Storage class name for the persistent volume."
 	StorageClassName *string `json:"storageClassName,omitempty"`
 
-	// Resources specifies the resource requirements for the persistent volume
+	// Resources specifies the resource requirements for the persistent volume.
+	// +kubebuilder:validation:Description="Resource requirements for the persistent volume."
 	Resources corev1.VolumeResourceRequirements `json:"resources,omitempty"`
 
 	// KeepVolume specifies if the volume should be kept when the kode is recycled. Defaults to false.
@@ -87,7 +90,7 @@ type KodeStorageSpec struct {
 	// +kubebuilder:default=false
 	KeepVolume *bool `json:"keepVolume,omitempty"`
 
-	// ExistingVolumeClaim specifies an existing PersistentVolumeClaim to use
+	// ExistingVolumeClaim specifies an existing PersistentVolumeClaim to use.
 	// +kubebuilder:validation:Description="Specifies an existing PersistentVolumeClaim to use."
 	ExistingVolumeClaim string `json:"existingVolumeClaim,omitempty"`
 }
@@ -149,42 +152,50 @@ type KodeList struct {
 }
 
 type KodeTemplateReference struct {
-	// Kind is the resource kind
+	// Kind is the resource kind.
 	// +kubebuilder:validation:Description="Resource kind"
 	// +kubebuilder:validation:Enum=KodeTemplate;KodeClusterTemplate
 	Kind string `json:"kind"`
 
-	// Name is the name of the KodeTemplate
+	// Name is the name of the KodeTemplate.
 	// +kubebuilder:validation:Description="Name of the KodeTemplate"
 	Name string `json:"name"`
 
-	// Namespace is the namespace of the KodeTemplate
+	// Namespace is the namespace of the KodeTemplate.
 	// +kubebuilder:validation:Description="Namespace of the KodeTemplate"
 	Namespace string `json:"namespace,omitempty"`
 }
 
 type InitPluginSpec struct {
-	// Name is the name of the container
+	// Name is the name of the container.
 	// +kubebuilder:validation:Description="Name of the container."
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
-	// Image is the OCI image for the container
+	// Image is the OCI image for the container.
 	// +kubebuilder:validation:Description="OCI image for the container."
 	// +kubebuilder:validation:Required
 	Image string `json:"image"`
 
-	// Command is the command to run in the container
+	// Command is the command to run in the container.
 	// +kubebuilder:validation:Description="Command to run in the container."
 	Command []string `json:"command,omitempty"`
 
-	// Args are the arguments to the container
+	// Args are the arguments to the container.
 	// +kubebuilder:validation:Description="Arguments to the container."
 	Args []string `json:"args,omitempty"`
 
-	// EnvVars are the environment variables to the container
+	// Env are the environment variables to the container.
 	// +kubebuilder:validation:Description="Environment variables to the container."
-	EnvVars []corev1.EnvVar `json:"envVars,omitempty"`
+	Env []corev1.EnvVar `json:"env,omitempty"`
+
+	// EnvFrom are the environment variables taken from a Secret or ConfigMap.
+	// +kubebuilder:validation:Description="Environment variables taken from a Secret or ConfigMap."
+	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
+
+	// VolumeMounts are the volume mounts for the container. Can be used to mount a ConfigMap or Secret.
+	// +kubebuilder:validation:Description="Volume mounts for the container. Can be used to mount a ConfigMap or Secret."
+	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
 }
 
 func (s KodeStorageSpec) IsEmpty() bool {

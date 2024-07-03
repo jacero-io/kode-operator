@@ -1,3 +1,5 @@
+// envoy/container.go
+
 /*
 Copyright 2024.
 
@@ -36,6 +38,7 @@ func NewContainerConstructor(log logr.Logger, configGenerator *BootstrapConfigGe
 	}
 }
 
+// ConstructEnvoyProxyContainer constructs the Envoy Proxy init container
 func (c *ContainerConstructor) ConstructEnvoyProxyContainer(config *common.KodeResourcesConfig) (corev1.Container, corev1.Container, error) {
 	c.log.Info("Constructing Envoy Proxy container")
 
@@ -62,6 +65,7 @@ func (c *ContainerConstructor) ConstructEnvoyProxyContainer(config *common.KodeR
 		SecurityContext: &corev1.SecurityContext{
 			RunAsUser: common.Int64Ptr(common.EnvoyProxyRunAsUser),
 		},
+		// RestartPolicy: corev1.ContainerRestartPolicyAlways,
 	}
 
 	proxySetupContainer := corev1.Container{

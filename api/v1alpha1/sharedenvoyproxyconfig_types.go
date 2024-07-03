@@ -41,6 +41,8 @@ type SharedEnvoyProxyStatus struct {
 	// Important: Run "make" to regenerate code after modifying this file
 }
 
+// TODO: Fix the validation for the EnvoyProxyReference
+
 // EnvoyProxyReference is a reference to an EnvoyProxyConfig or EnvoyProxyClusterConfig
 type EnvoyProxyReference struct {
 	// Kind is the resource kind

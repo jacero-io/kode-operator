@@ -480,9 +480,23 @@ func (in *InitPluginSpec) DeepCopyInto(out *InitPluginSpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
-	if in.EnvVars != nil {
-		in, out := &in.EnvVars, &out.EnvVars
+	if in.Env != nil {
+		in, out := &in.Env, &out.Env
 		*out = make([]corev1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.EnvFrom != nil {
+		in, out := &in.EnvFrom, &out.EnvFrom
+		*out = make([]corev1.EnvFromSource, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.VolumeMounts != nil {
+		in, out := &in.VolumeMounts, &out.VolumeMounts
+		*out = make([]corev1.VolumeMount, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}
@@ -927,9 +941,21 @@ func (in *SharedEnvoyProxyStatus) DeepCopy() *SharedEnvoyProxyStatus {
 func (in *SharedKodeTemplateSpec) DeepCopyInto(out *SharedKodeTemplateSpec) {
 	*out = *in
 	out.EnvoyProxyRef = in.EnvoyProxyRef
-	if in.Envs != nil {
-		in, out := &in.Envs, &out.Envs
+	if in.Command != nil {
+		in, out := &in.Command, &out.Command
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
+	if in.Env != nil {
+		in, out := &in.Env, &out.Env
 		*out = make([]corev1.EnvVar, len(*in))
+		for i := range *in {
+			(*in)[i].DeepCopyInto(&(*out)[i])
+		}
+	}
+	if in.EnvFrom != nil {
+		in, out := &in.EnvFrom, &out.EnvFrom
+		*out = make([]corev1.EnvFromSource, len(*in))
 		for i := range *in {
 			(*in)[i].DeepCopyInto(&(*out)[i])
 		}

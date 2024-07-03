@@ -226,10 +226,12 @@ func constructVolumesAndMounts(mountPath string, kode *kodev1alpha1.Kode) ([]cor
 
 func constructInitPluginContainer(plugin kodev1alpha1.InitPluginSpec) corev1.Container {
 	return corev1.Container{
-		Name:    "plugin-" + plugin.Name,
-		Image:   plugin.Image,
-		Command: plugin.Command,
-		Args:    plugin.Args,
-		Env:     plugin.EnvVars,
+		Name:         "plugin-" + plugin.Name,
+		Image:        plugin.Image,
+		Command:      plugin.Command,
+		Args:         plugin.Args,
+		Env:          plugin.Env,
+		EnvFrom:      plugin.EnvFrom,
+		VolumeMounts: plugin.VolumeMounts,
 	}
 }
