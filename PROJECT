@@ -6,7 +6,7 @@ domain: jacero.io
 layout:
 - go.kubebuilder.io/v4
 projectName: kode-operator
-repo: github.com/emil-jacero/kode-operator
+repo: github.com/jacero-io/kode-operator
 resources:
 - api:
     crdVersion: v1
@@ -15,7 +15,7 @@ resources:
   domain: jacero.io
   group: kode
   kind: Kode
-  path: github.com/emil-jacero/kode-operator/api/v1alpha1
+  path: github.com/jacero-io/kode-operator/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
@@ -23,7 +23,7 @@ resources:
   domain: jacero.io
   group: kode
   kind: KodeTemplate
-  path: github.com/emil-jacero/kode-operator/api/v1alpha1
+  path: github.com/jacero-io/kode-operator/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
@@ -31,7 +31,7 @@ resources:
   domain: jacero.io
   group: kode
   kind: KodeClusterTemplate
-  path: github.com/emil-jacero/kode-operator/api/v1alpha1
+  path: github.com/jacero-io/kode-operator/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
@@ -39,7 +39,7 @@ resources:
   domain: jacero.io
   group: kode
   kind: EnvoyProxyConfig
-  path: github.com/emil-jacero/kode-operator/api/v1alpha1
+  path: github.com/jacero-io/kode-operator/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
@@ -47,7 +47,7 @@ resources:
   domain: jacero.io
   group: kode
   kind: EnvoyProxyClusterConfig
-  path: github.com/emil-jacero/kode-operator/api/v1alpha1
+  path: github.com/jacero-io/kode-operator/api/v1alpha1
   version: v1alpha1
 - api:
     crdVersion: v1
@@ -56,6 +56,6 @@ resources:
   domain: jacero.io
   group: kode
   kind: EntryPoint
-  path: github.com/emil-jacero/kode-operator/api/v1alpha1
+  path: github.com/jacero-io/kode-operator/api/v1alpha1
   version: v1alpha1
 version: "3"

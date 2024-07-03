@@ -3,10 +3,13 @@ name: Test
 on:
   push:
     branches:
-      - '**'
+      - main
+      - 'feature/*'
+    tags:
+      - 'v*.*.*'
   pull_request:
     branches:
-      - '**'
+      - main
 
 jobs:
   test:
@@ -27,5 +30,7 @@ jobs:
     - name: Install dependencies
       run: make $(LOCALBIN)
 
-    - name: Run Tests
-      run: make test
+    - name: Run integration tests
+      env:
+        TEST_VERBOSITY: ""
+      run: make test-integration

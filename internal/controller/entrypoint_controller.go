@@ -24,7 +24,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	kodev1alpha1 "github.com/emil-jacero/kode-operator/api/v1alpha1"
+	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
 )
 
 // EntryPointReconciler reconciles a EntryPoint object

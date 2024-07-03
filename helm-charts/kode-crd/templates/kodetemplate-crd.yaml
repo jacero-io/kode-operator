@@ -3,7 +3,7 @@ kind: CustomResourceDefinition
 metadata:
   name: kodetemplates.kode.jacero.io
   annotations:
-    controller-gen.kubebuilder.io/version: v0.14.0
+    controller-gen.kubebuilder.io/version: v0.15.0
   labels:
   {{- include "kode-crd.labels" . | nindent 4 }}
 spec:
@@ -42,16 +42,22 @@ spec:
             properties:
               allowPrivileged:
                 default: false
-                description: AllowPrivileged is a flag to allow privileged containers
+                description: AllowPrivileged is a flag to allow privileged execution
+                  of the container.
                 type: boolean
               args:
-                description: Specifies the args
+                description: Specifies the args.
+                items:
+                  type: string
+                type: array
+              command:
+                description: Command is the command to run in the container.
                 items:
                   type: string
                 type: array
               defaultHome:
                 default: /config
-                description: DefaultHome is the path to the directory for the user data
+                description: DefaultHome is the path to the directory for the user data.
                 minLength: 3
                 type: string
               defaultWorkspace:
@@ -61,36 +67,58 @@ spec:
                 minLength: 3
                 pattern: ^[^/].*$
                 type: string
-              entryPointSpec:
-                description: EntryPointSpec defines the desired state of the entrypoint.
-                properties:
-                  apiType:
-                    description: Type is the type of the gateway. It could be ingress-api
-                      or gateway-api.
-                    enum:
-                    - ingress-api
-                    - gateway-api
-                    type: string
-                  type:
-                    description: Type is the way the Kode resource is accessed. It could
-                      be subdomain or path.
-                    enum:
-                    - domain
-                    - path
-                    type: string
-                  url:
-                    description: |-
-                      URL is the domain name to use either as a suffix in the case of Type=domain or as a prefix/domain in the case of Type=path.
-                      When the type is domain, the controller will try to publish the Kode resource as a subdomain of the given domain (e.g <kode-resource>.kode.example.com).
-                      When the type is path, the controller will try to publish the Kode resource as a path of the given URL (e.g kode.example.com/<kode-resource>).
-                    type: string
-                required:
-                - apiType
-                - type
-                - url
-                type: object
+              envFrom:
+                description: EnvFrom are the environment variables taken from a Secret
+                  or ConfigMap.
+                items:
+                  description: EnvFromSource represents the source of a set of ConfigMaps
+                  properties:
+                    configMapRef:
+                      description: The ConfigMap to select from
+                      properties:
+                        name:
+                          default: ""
+                          description: |-
+                            Name of the referent.
+                            This field is effectively required, but due to backwards compatibility is
+                            allowed to be empty. Instances of this type with an empty value here are
+                            almost certainly wrong.
+                            TODO: Add other useful fields. apiVersion, kind, uid?
+                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            TODO: Drop `kubebuilder:default` when controller-gen doesn't need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.
+                          type: string
+                        optional:
+                          description: Specify whether the ConfigMap must be defined
+                          type: boolean
+                      type: object
+                      x-kubernetes-map-type: atomic
+                    prefix:
+                      description: An optional identifier to prepend to each key in
+                        the ConfigMap. Must be a C_IDENTIFIER.
+                      type: string
+                    secretRef:
+                      description: The Secret to select from
+                      properties:
+                        name:
+                          default: ""
+                          description: |-
+                            Name of the referent.
+                            This field is effectively required, but due to backwards compatibility is
+                            allowed to be empty. Instances of this type with an empty value here are
+                            almost certainly wrong.
+                            TODO: Add other useful fields. apiVersion, kind, uid?
+                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                            TODO: Drop `kubebuilder:default` when controller-gen doesn't need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.
+                          type: string
+                        optional:
+                          description: Specify whether the Secret must be defined
+                          type: boolean
+                      type: object
+                      x-kubernetes-map-type: atomic
+                  type: object
+                type: array
               envoyProxyRef:
-                description: EnvoyProxyRef is the reference to the EnvoyProxy configuration
+                description: EnvoyProxyRef is the reference to the EnvoyProxy configuration.
                 properties:
                   kind:
                     description: Kind is the resource kind
@@ -105,12 +133,9 @@ spec:
                     description: Namespace is the namespace of the EnvoyProxyConfig
                       or EnvoyProxyClusterConfig
                     type: string
-                required:
-                - kind
-                - name
                 type: object
               envs:
-                description: Specifies the envs
+                description: Specifies the environment variables.
                 items:
                   description: EnvVar represents an environment variable present in
                     a Container.
@@ -232,7 +257,7 @@ spec:
                   type: object
                 type: array
               image:
-                description: Image is the container image for the service
+                description: Image is the container image for the service.
                 minLength: 1
                 type: string
               inactiveAfterSeconds:
@@ -247,17 +272,17 @@ spec:
                 items:
                   properties:
                     args:
-                      description: Args are the arguments to the container
+                      description: Args are the arguments to the container.
                       items:
                         type: string
                       type: array
                     command:
-                      description: Command is the command to run in the container
+                      description: Command is the command to run in the container.
                       items:
                         type: string
                       type: array
-                    envVars:
-                      description: EnvVars are the environment variables to the container
+                    env:
+                      description: Env are the environment variables to the container.
                       items:
                         description: EnvVar represents an environment variable present
                           in a Container.
@@ -380,31 +405,152 @@ spec:
                         - name
                         type: object
                       type: array
+                    envFrom:
+                      description: EnvFrom are the environment variables taken from
+                        a Secret or ConfigMap.
+                      items:
+                        description: EnvFromSource represents the source of a set of
+                          ConfigMaps
+                        properties:
+                          configMapRef:
+                            description: The ConfigMap to select from
+                            properties:
+                              name:
+                                default: ""
+                                description: |-
+                                  Name of the referent.
+                                  This field is effectively required, but due to backwards compatibility is
+                                  allowed to be empty. Instances of this type with an empty value here are
+                                  almost certainly wrong.
+                                  TODO: Add other useful fields. apiVersion, kind, uid?
+                                  More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                  TODO: Drop `kubebuilder:default` when controller-gen doesn't need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.
+                                type: string
+                              optional:
+                                description: Specify whether the ConfigMap must be defined
+                                type: boolean
+                            type: object
+                            x-kubernetes-map-type: atomic
+                          prefix:
+                            description: An optional identifier to prepend to each key
+                              in the ConfigMap. Must be a C_IDENTIFIER.
+                            type: string
+                          secretRef:
+                            description: The Secret to select from
+                            properties:
+                              name:
+                                default: ""
+                                description: |-
+                                  Name of the referent.
+                                  This field is effectively required, but due to backwards compatibility is
+                                  allowed to be empty. Instances of this type with an empty value here are
+                                  almost certainly wrong.
+                                  TODO: Add other useful fields. apiVersion, kind, uid?
+                                  More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                                  TODO: Drop `kubebuilder:default` when controller-gen doesn't need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.
+                                type: string
+                              optional:
+                                description: Specify whether the Secret must be defined
+                                type: boolean
+                            type: object
+                            x-kubernetes-map-type: atomic
+                        type: object
+                      type: array
                     image:
-                      description: Image is the OCI image for the container
+                      description: Image is the OCI image for the container.
                       type: string
-                    tag:
-                      description: Tag is the tag of the OCI image
+                    name:
+                      description: Name is the name of the container.
                       type: string
+                    volumeMounts:
+                      description: VolumeMounts are the volume mounts for the container.
+                        Can be used to mount a ConfigMap or Secret.
+                      items:
+                        description: VolumeMount describes a mounting of a Volume within
+                          a container.
+                        properties:
+                          mountPath:
+                            description: |-
+                              Path within the container at which the volume should be mounted.  Must
+                              not contain ':'.
+                            type: string
+                          mountPropagation:
+                            description: |-
+                              mountPropagation determines how mounts are propagated from the host
+                              to container and the other way around.
+                              When not set, MountPropagationNone is used.
+                              This field is beta in 1.10.
+                              When RecursiveReadOnly is set to IfPossible or to Enabled, MountPropagation must be None or unspecified
+                              (which defaults to None).
+                            type: string
+                          name:
+                            description: This must match the Name of a Volume.
+                            type: string
+                          readOnly:
+                            description: |-
+                              Mounted read-only if true, read-write otherwise (false or unspecified).
+                              Defaults to false.
+                            type: boolean
+                          recursiveReadOnly:
+                            description: |-
+                              RecursiveReadOnly specifies whether read-only mounts should be handled
+                              recursively.
+  
+  
+                              If ReadOnly is false, this field has no meaning and must be unspecified.
+  
+  
+                              If ReadOnly is true, and this field is set to Disabled, the mount is not made
+                              recursively read-only.  If this field is set to IfPossible, the mount is made
+                              recursively read-only, if it is supported by the container runtime.  If this
+                              field is set to Enabled, the mount is made recursively read-only if it is
+                              supported by the container runtime, otherwise the pod will not be started and
+                              an error will be generated to indicate the reason.
+  
+  
+                              If this field is set to IfPossible or Enabled, MountPropagation must be set to
+                              None (or be unspecified, which defaults to None).
+  
+  
+                              If this field is not specified, it is treated as an equivalent of Disabled.
+                            type: string
+                          subPath:
+                            description: |-
+                              Path within the volume from which the container's volume should be mounted.
+                              Defaults to "" (volume's root).
+                            type: string
+                          subPathExpr:
+                            description: |-
+                              Expanded path within the volume from which the container's volume should be mounted.
+                              Behaves similarly to SubPath but environment variable references $(VAR_NAME) are expanded using the container's environment.
+                              Defaults to "" (volume's root).
+                              SubPathExpr and SubPath are mutually exclusive.
+                            type: string
+                        required:
+                        - mountPath
+                        - name
+                        type: object
+                      type: array
                   required:
                   - image
+                  - name
                   type: object
                 type: array
               pgid:
                 default: 1000
-                description: PGID is the group ID for the service process
+                description: PGID is the group ID for the service process.
                 format: int64
                 type: integer
               port:
-                default: 3000
+                default: 8000
                 description: Port is the port for the service process. Used by EnvoyProxy
-                  to expose the service.
+                  to expose the container.
                 format: int32
                 minimum: 1
                 type: integer
               puid:
                 default: 1000
-                description: PUID is the user ID for the service process
+                description: PUID is the user ID for the service process.
                 format: int64
                 type: integer
               recycleAfterSeconds:
@@ -422,7 +568,7 @@ spec:
                 type: string
               tz:
                 default: UTC
-                description: TZ is the timezone for the service process
+                description: TZ is the timezone for the service process.
                 type: string
             required:
             - image

@@ -59,8 +59,9 @@ spec:
   tz: UTC
   defaultHome: /config
   defaultWorkspace: workspace
-  envoyProxyTemplateRef:
-    name: my-envoy-proxy-template
+  envoyProxyRef:
+    name: my-envoy-proxy-config
+    namespace: default
 ```
 
 **Example for KodeClusterTemplate:**
@@ -76,15 +77,52 @@ spec:
   tz: UTC
   defaultHome: /config
   defaultWorkspace: workspace
-  envoyProxyTemplateRef:
-    name: my-envoy-proxy-template
+  envoyProxyRef:
+    name: my-cluster-envoy-proxy-config
 ```
 
-### EnvoyProxyTemplate & ClusterEnvoyProxyTemplate
+### EnvoyProxyConfig & EnvoyProxyClusterConfig
 
 These are cluster scoped and namespace scoped template for the Envoy Proxy sidecar. A way to define a standard Envoy Proxy configuration that a Kode template should use. This could be a HTTP filter to an Open Policy Agent (OPA) deployment within the cluster.
 
 ```yaml
+apiVersion: kode.jacero.io/v1alpha1
+kind: EnvoyProxyConfig
+metadata:
+  labels:
+    app.kubernetes.io/name: kode-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: my-envoy-proxy-config
+  namespace: default
+spec:
+  image: envoyproxy/envoy:v1.30-latest
+  httpFilters:
+    - name: envoy.filters.http.ext_authz
+      typed_config:
+        '@type': type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz
+        with_request_body:
+          max_request_bytes: 8192
+          allow_partial_message: true
+        failure_mode_allow: false
+        grpc_service:
+          envoy_grpc:
+            cluster_name: ext_authz-opa-service1
+          timeout: 0.250s
+        transport_api_version: V3
+  clusters:
+    - name: ext_authz-opa-service1
+      connect_timeout: 0.250s
+      lb_policy: round_robin
+      type: strict_dns
+      load_assignment:
+        cluster_name: ext_authz-opa-service1
+        endpoints:
+          - lb_endpoints:
+              - endpoint:
+                  address:
+                    socket_address:
+                      address: opa.default.svc.cluster.local
+                      port_value: 8181
 ```
 
 ### Features
@@ -92,14 +130,15 @@ These are cluster scoped and namespace scoped template for the Envoy Proxy sidec
 - [x] *Provisioning and update of [Code-server](https://docs.linuxserver.io/images/docker-code-server/).
 - [ ] *Provisioning and update of [Webtop](https://docs.linuxserver.io/images/docker-webtop/).
 - [ ] Authentication & Authorization support using Envoy Proxy sidecar.
-  - [ ] [OAuth2](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/oauth2_filter) With external Oauth2 provider.
-  - [ ] [Basic Auth](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/basic_auth_filter.html#basic-auth) Use password from Kode.password or Kode.existingSecret.
-  - [ ] [Ext_Authz](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/ext_authz_filter) HTTP and GRPC (Used by for example OPA).
-- [ ] Ability to add VSCode Extensions to the KodeTemplate and as a user.
-- [ ] Ability to add "preinstalled" software to the KodeTemplate.
+  - [OAuth2](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/oauth2_filter) With external Oauth2 provider.
+  - [Ext_Authz](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/ext_authz_filter) HTTP and GRPC (Used by for example OPA to authorize the users).
+- [ ] [Falco](https://falco.org/) sidecar support
+- [ ] Kode instance bound to the user identity and namespaced for isolation, an identity provided by an IAM (e.g Keycloak).
+- [x] Ability to include InitPlugins which are executed in order. InitPlugins can mutate the instance in any way the administrator or user like.
+  - Could for example add VSCode extensions or install software that is not built into the image.
 - [ ] Include dotfiles and other user settings in the Kode instance.
 - [ ] Pause/Prune container on inactivity, keeping the persistent storage.
-  - [ ] Backup & Restore of user stage. Maybe not feasible.
+  - [ ] Backup & restore of the Kode instance state. Maybe not feasible.
 - [ ] Backup & Restore of user data to S3.
 - [ ] A Kode CLI to manage Kode resources
 
@@ -119,7 +158,6 @@ metadata:
 spec:
   type: code-server
   image: linuxserver/code-server:latest
-  port: 3000
   defaultHome: /config
   defaultWorkspace: workspace
 ```
@@ -159,8 +197,7 @@ kind: EnvoyProxyClusterConfig
 metadata:
   name: basic-auth-proxy
 spec:
-  auth:
-    type: basic-auth
+  authType: basic
 ```
 
 **2. Create a KodeTemplate with Envoy Proxy Configuration:**
@@ -237,6 +274,15 @@ TBD
 
 We welcome contributions to the Kode-Operator project! Here are some guidelines to help you get started:
 
+### Branch naming scheme
+
+Source: <https://dev.to/varbsan/a-simplified-convention-for-naming-branches-and-commits-in-git-il4>
+
+- `feature` is for adding, refactoring or removing a feature
+- `bugfix` is for fixing a bug
+- `hotfix` is for changing code with a temporary solution and/or without following the usual process (usually because of an emergency)
+- `test` is for experimenting outside of an issue/ticket
+
 ### How to Contribute
 
 1. **Fork the Repository**: Click the "Fork" button at the top of this repository to create a copy of the repository in your own GitHub account.
@@ -251,7 +297,8 @@ We welcome contributions to the Kode-Operator project! Here are some guidelines 
 3. **Create a Branch**: Create a new branch for your feature or bugfix.
 
     ```sh
-    git checkout -b feature-or-bugfix-name
+    git checkout -b feature/name
+    git checkout -b bugfix/name
     ```
 
 4. **Make Changes**: Make your changes to the code. Ensure your code follows the project's coding standards and includes appropriate tests.
@@ -266,7 +313,8 @@ We welcome contributions to the Kode-Operator project! Here are some guidelines 
 6. **Push to Your Fork**: Push your changes to your forked repository.
 
     ```sh
-    git push origin feature-or-bugfix-name
+    git push origin feature/name
+    git push origin bugfix/name
     ```
 
 7. **Create a Pull Request**: Go to the original repository and create a pull request from your fork. Provide a clear and detailed description of your changes and the problem they solve.
@@ -277,26 +325,27 @@ Please note that this project is released with a [Contributor Code of Conduct](C
 
 ### Reporting Issues
 
-If you find a bug or have a feature request, please create an issue in the [issue tracker](https://github.com/emil-jacero/kode-operator/issues) with as much detail as possible. Include steps to reproduce the issue and any relevant logs or screenshots.
+If you find a bug or have a feature request, please create an issue in the [issue tracker](https://github.com/jacero-io/kode-operator/issues) with as much detail as possible. Include steps to reproduce the issue and any relevant logs or screenshots.
 
 ### Development Setup
 
 1. **Install Dependencies**: Ensure you have the required dependencies installed:
-    - Go version v1.21.0+
-    - Docker version 17.03+
+    - Go version v1.22.0+
+    - Docker version 25.0.0+
     - kubectl version v1.29.1+
-    - Access to a Kubernetes v1.29.1+ cluster
+    - Access to a Kubernetes v1.29.1+ cluster or kind
 
-2. **Build the Project**: Use `make` to build the project.
+2. **Run the Project**: Use `make` to run the controller.
 
     ```sh
-    make build
+    make install
     ```
 
 3. **Run Tests**: Ensure all tests pass before submitting your pull request.
 
     ```sh
-    make test
+    make test-unit
+    make test-integration
     ```
 
 ### Documentation

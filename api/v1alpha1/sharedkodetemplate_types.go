@@ -23,52 +23,61 @@ import (
 
 // SharedKodeTemplateSpec defines the desired state of KodeClusterTemplate
 type SharedKodeTemplateSpec struct {
-	// EnvoyProxyRef is the reference to the EnvoyProxy configuration
+	// EnvoyProxyRef is the reference to the EnvoyProxy configuration.
 	// +kubebuilder:validation:Description="Reference to the EnvoyProxy configuration."
+	// +kubebuilder:validation:Optional
 	EnvoyProxyRef EnvoyProxyReference `json:"envoyProxyRef,omitempty"`
 
 	// Type is the type of container to use. Can be one of 'code-server', 'webtop', 'devcontainers', 'jupyter', 'alnoda'.
-	// +kubebuilder:validation:Description="Type of container to use. Can be one of 'code-server', 'webtop', 'devcontainers', 'jupyter', 'alnoda'."
+	// +kubebuilder:validation:Description="Type of container to use. Can be one of 'code-server', 'webtop', 'jupyter', 'alnoda'."
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Enum=code-server;webtop
 	Type string `json:"type"`
 
-	// Image is the container image for the service
+	// Image is the container image for the service.
 	// +kubebuilder:validation:Description="Container image for the service."
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:Required
 	Image string `json:"image"`
 
-	// Port is the port for the service process. Used by EnvoyProxy to expose the service.
-	// +kubebuilder:validation:Description="Port for the service process. Used by EnvoyProxy to expose the service. Defaults to '3000'."
+	// Port is the port for the service process. Used by EnvoyProxy to expose the container.
+	// +kubebuilder:validation:Description="Port for the service. Used by EnvoyProxy to expose the container. Defaults to '8000'."
 	// +kubebuilder:validation:Minimum=1
-	// +kubebuilder:default=3000
+	// +kubebuilder:default=8000
 	Port int32 `json:"port,omitempty"`
 
-	// Specifies the envs
-	// +kubebuilder:validation:Description="Environment variables for the service."
-	Envs []corev1.EnvVar `json:"envs,omitempty"`
+	// Command is the command to run in the container.
+	// +kubebuilder:validation:Description="Command to run in the container."
+	Command []string `json:"command,omitempty"`
 
-	// Specifies the args
-	// +kubebuilder:validation:Description="Arguments for the service."
+	// Specifies the environment variables.
+	// +kubebuilder:validation:Description="Environment variables for the container"
+	Env []corev1.EnvVar `json:"envs,omitempty"`
+
+	// EnvFrom are the environment variables taken from a Secret or ConfigMap.
+	// +kubebuilder:validation:Description="Environment variables taken from a Secret or ConfigMap."
+	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
+
+	// Specifies the args.
+	// +kubebuilder:validation:Description="Arguments for the container."
 	Args []string `json:"args,omitempty"`
 
-	// TZ is the timezone for the service process
+	// TZ is the timezone for the service process.
 	// +kubebuilder:validation:Description="Timezone for the service process. Defaults to 'UTC'."
 	// +kubebuilder:default="UTC"
 	TZ string `json:"tz,omitempty"`
 
-	// PUID is the user ID for the service process
+	// PUID is the user ID for the service process.
 	// +kubebuilder:validation:Description="User ID for the service process. Defaults to '1000'."
 	// +kubebuilder:default=1000
 	PUID int64 `json:"puid,omitempty"`
 
-	// PGID is the group ID for the service process
+	// PGID is the group ID for the service process.
 	// +kubebuilder:validation:Description="Group ID for the service process. Defaults to '1000'."
 	// +kubebuilder:default=1000
 	PGID int64 `json:"pgid,omitempty"`
 
-	// DefaultHome is the path to the directory for the user data
+	// DefaultHome is the path to the directory for the user data.
 	// +kubebuilder:validation:Description="Default home is the path to the directory for the user data. Defaults to '/config'."
 	// +kubebuilder:validation:MinLength=3
 	// +kubebuilder:default=/config
@@ -81,14 +90,10 @@ type SharedKodeTemplateSpec struct {
 	// +kubebuilder:default=workspace
 	DefaultWorkspace string `json:"defaultWorkspace,omitempty"`
 
-	// AllowPrivileged is a flag to allow privileged containers
-	// +kubebuilder:validation:Description="Flag to allow privileged containers."
+	// AllowPrivileged is a flag to allow privileged execution of the container.
+	// +kubebuilder:validation:Description="Flag to allow privileged execution of the container."
 	// +kubebuilder:default=false
 	AllowPrivileged *bool `json:"allowPrivileged,omitempty"`
-
-	// InitPlugins specifies the OCI containers to be run before the main container. It is an ordered list.
-	// +kubebuilder:validation:Description="OCI containers to be run before the main container. It is an ordered list."
-	InitPlugins []InitPluginSpec `json:"initPlugins,omitempty"`
 
 	// Specifies the period before controller inactive the resource (delete all resources except volume).
 	// +kubebuilder:validation:Description="Period before controller inactive the resource (delete all resources except volume)."
@@ -99,6 +104,18 @@ type SharedKodeTemplateSpec struct {
 	// +kubebuilder:validation:Description="Period before controller recycle the resource (delete all resources)."
 	// +kubebuilder:default=28800
 	RecycleAfterSeconds *int64 `json:"recycleAfterSeconds,omitempty"`
+
+	// InitPlugins specifies the OCI containers to be run before the main container. It is an ordered list.
+	// +kubebuilder:validation:Description="OCI containers to be run before the main container. It is an ordered list."
+	InitPlugins []InitPluginSpec `json:"initPlugins,omitempty"`
+
+	// // Ingress contains the Ingress configuration for the Kode resource. It will override the KodeTemplate Ingress configuration.
+	// // +kubebuilder:validation:Description="Contains the Ingress configuration for the Kode resource. It will override the KodeTemplate Ingress configuration."
+	// Ingress *IngressSpec `json:"ingress,omitempty"`
+
+	// // Gateway contains the Gateway configuration for the Kode resource. It will override the KodeTemplate Gateway configuration.
+	// // +kubebuilder:validation:Description="Contains the Gateway configuration for the Kode resource. It will override the KodeTemplate Gateway configuration."
+	// Gateway *GatewaySpec `json:"gateway,omitempty"`
 
 	// EntryPointSpec defines the desired state of the entrypoint.
 	// +kubebuilder:validation:Description="Desired state of the entrypoint."
