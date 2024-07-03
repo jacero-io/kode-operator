@@ -29,10 +29,9 @@ const (
 	PVCFinalizerName = "kode.jacero.io/pvc-finalizer"
 
 	// Resource-related constants
-	DefaultNamespace      = "default"
-	KodeVolumeStorageName = "kode-storage"
-	// LocalServicePort      = 3000
-	ExternalServicePort = 8000
+	DefaultNamespace        = "default"
+	KodeVolumeStorageName   = "kode-storage"
+	DefaultLocalServicePort = 3000
 
 	// Container-related constants
 	EnvoyProxyContainerName = "envoy-proxy"

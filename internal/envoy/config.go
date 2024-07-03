@@ -156,7 +156,6 @@ func (g *BootstrapConfigGenerator) loadAndBuildCueInstance(cueFiles map[string]s
 	var filepaths []string
 	for name := range cueFiles {
 		filepaths = append(filepaths, filepath.Join(tempDir, name))
-		fmt.Println(filepath.Join(tempDir, name))
 	}
 
 	g.log.V(1).Info("Loading CUE instance")
