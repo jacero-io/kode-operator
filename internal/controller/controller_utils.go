@@ -20,8 +20,8 @@ import (
 	"context"
 	"time"
 
-	kodev1alpha1 "github.com/emil-jacero/kode-operator/api/v1alpha1"
-	"github.com/emil-jacero/kode-operator/internal/common"
+	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
+	"github.com/jacero-io/kode-operator/internal/common"
 	"k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"

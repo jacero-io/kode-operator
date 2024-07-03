@@ -20,9 +20,9 @@ import (
 	"context"
 	"fmt"
 
-	kodev1alpha1 "github.com/emil-jacero/kode-operator/api/v1alpha1"
-	"github.com/emil-jacero/kode-operator/internal/common"
 	"github.com/go-logr/logr"
+	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
+	"github.com/jacero-io/kode-operator/internal/common"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"

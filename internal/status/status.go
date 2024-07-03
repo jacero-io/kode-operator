@@ -19,7 +19,7 @@ package status
 import (
 	"context"
 
-	kodev1alpha1 "github.com/emil-jacero/kode-operator/api/v1alpha1"
+	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 

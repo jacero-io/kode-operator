@@ -25,6 +25,9 @@ go.work
 *.swp
 *.swo
 *~
+
+# Other
+__debug*
 coverage/*
 random/*
 concatenated_output.txt

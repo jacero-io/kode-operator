@@ -36,15 +36,15 @@ import (
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	kodev1alpha1 "github.com/emil-jacero/kode-operator/api/v1alpha1"
-	"github.com/emil-jacero/kode-operator/internal/cleanup"
-	entrypointcontroller "github.com/emil-jacero/kode-operator/internal/controller"
-	kodecontroller "github.com/emil-jacero/kode-operator/internal/controller"
-	"github.com/emil-jacero/kode-operator/internal/repository"
-	"github.com/emil-jacero/kode-operator/internal/resource"
-	"github.com/emil-jacero/kode-operator/internal/status"
-	"github.com/emil-jacero/kode-operator/internal/template"
-	"github.com/emil-jacero/kode-operator/internal/validation"
+	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
+	"github.com/jacero-io/kode-operator/internal/cleanup"
+	entrypointcontroller "github.com/jacero-io/kode-operator/internal/controller"
+	kodecontroller "github.com/jacero-io/kode-operator/internal/controller"
+	"github.com/jacero-io/kode-operator/internal/repository"
+	"github.com/jacero-io/kode-operator/internal/resource"
+	"github.com/jacero-io/kode-operator/internal/status"
+	"github.com/jacero-io/kode-operator/internal/template"
+	"github.com/jacero-io/kode-operator/internal/validation"
 	//+kubebuilder:scaffold:imports
 )
 

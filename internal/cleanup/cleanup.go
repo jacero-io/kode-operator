@@ -19,7 +19,7 @@ package cleanup
 import (
 	"context"
 
-	kodev1alpha1 "github.com/emil-jacero/kode-operator/api/v1alpha1"
+	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
 )
 
 // CleanupManager defines the interface for cleaning up Kode resources

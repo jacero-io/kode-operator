@@ -1,4 +1,4 @@
-module github.com/emil-jacero/kode-operator
+module github.com/jacero-io/kode-operator
 
 go 1.22.0
 

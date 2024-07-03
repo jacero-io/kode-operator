@@ -1,6 +1,4 @@
-//go:build integration
-
-// internal/controller/suite_test.go
+// test/integration/controller/suite_test.go
 
 /*
 Copyright 2024.
@@ -18,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package integration
 
 import (
 	"context"
@@ -36,13 +34,14 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	kodev1alpha1 "github.com/emil-jacero/kode-operator/api/v1alpha1"
-	"github.com/emil-jacero/kode-operator/internal/cleanup"
-	"github.com/emil-jacero/kode-operator/internal/repository"
-	"github.com/emil-jacero/kode-operator/internal/resource"
-	"github.com/emil-jacero/kode-operator/internal/status"
-	"github.com/emil-jacero/kode-operator/internal/template"
-	"github.com/emil-jacero/kode-operator/internal/validation"
+	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
+	"github.com/jacero-io/kode-operator/internal/cleanup"
+	"github.com/jacero-io/kode-operator/internal/controller"
+	"github.com/jacero-io/kode-operator/internal/repository"
+	"github.com/jacero-io/kode-operator/internal/resource"
+	"github.com/jacero-io/kode-operator/internal/status"
+	"github.com/jacero-io/kode-operator/internal/template"
+	"github.com/jacero-io/kode-operator/internal/validation"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -56,12 +55,12 @@ var (
 	testEnv    *envtest.Environment
 	k8sClient  client.Client
 	k8sManager ctrl.Manager
-	reconciler *KodeReconciler
+	reconciler *controller.KodeReconciler
 )
 
 func TestControllers(t *testing.T) {
 	RegisterFailHandler(Fail)
-	RunSpecs(t, "Kode Controller Suite")
+	RunSpecs(t, "Controllers Suite")
 }
 
 var _ = BeforeSuite(func() {
@@ -70,7 +69,7 @@ var _ = BeforeSuite(func() {
 	By("bootstrapping test environment")
 	ctx, cancel = context.WithCancel(context.Background())
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths: []string{filepath.Join("..", "..", "config", "crd", "bases")},
+		CRDDirectoryPaths: []string{filepath.Join("..", "..", "..", "config", "crd", "bases")},
 	}
 
 	var err error
@@ -89,7 +88,7 @@ var _ = BeforeSuite(func() {
 	k8sClient = k8sManager.GetClient()
 	Expect(k8sClient).ToNot(BeNil())
 
-	reconciler = &KodeReconciler{
+	reconciler = &controller.KodeReconciler{
 		Client:          k8sClient,
 		Scheme:          k8sManager.GetScheme(),
 		Log:             ctrl.Log.WithName("controllers").WithName("Kode").WithName("Reconcile"),

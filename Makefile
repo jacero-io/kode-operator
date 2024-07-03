@@ -64,11 +64,14 @@ vet: ## Run go vet against code.
 
 ##@ Testing
 
+# Default to verbose output for local runs
+TEST_VERBOSITY ?= -v
+
 .PHONY: test-unit
 test-unit: manifests generate fmt vet ## Run unit tests with coverage
 	rm -rf coverage
 	mkdir -p coverage
-	go test -v -tags=unit ./...
+	go test $(TEST_VERBOSITY) -tags=unit ./...
 # go test -v -tags=unit -covermode=atomic -coverprofile=coverage/integration.out ./...
 # if [ -f coverage/unit.out ]; then \
 # 	go tool cover -html=coverage/unit.out -o coverage/unit.html; \
@@ -82,9 +85,9 @@ test-integration: manifests generate fmt vet envtest ## Run integration tests wi
 	rm -rf coverage
 	mkdir -p coverage
 	KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" \
-	go test -v -tags=integration ./...
+	go test $(TEST_VERBOSITY) ./test/integration/...
 # KUBEBUILDER_ASSETS="$(shell $(ENVTEST) use $(ENVTEST_K8S_VERSION) --bin-dir $(LOCALBIN) -p path)" \
-# go test -tags=integration -covermode=atomic -coverprofile=coverage/integration.out ./...
+# go test -covermode=atomic -coverprofile=coverage/integration.out ./test/integration/...
 # if [ -f coverage/integration.out ]; then \
 # 	go tool cover -html=coverage/integration.out -o coverage/integration.html; \
 # 	echo "Integration test coverage report generated at coverage/integration.html"; \
@@ -94,7 +97,7 @@ test-integration: manifests generate fmt vet envtest ## Run integration tests wi
 
 .PHONY: test-e2e
 test-e2e: manifests generate fmt vet docker-build kind-create-cluster kind-load-image ## Run end-to-end tests with Kind cluster
-	go test -v -tags=e2e ./test/e2e/...
+	go test $(TEST_VERBOSITY) -tags=e2e ./test/e2e/...
 	$(MAKE) kind-delete-cluster
 
 .PHONY: test-all

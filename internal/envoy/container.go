@@ -21,8 +21,8 @@ package envoy
 import (
 	"strconv"
 
-	"github.com/emil-jacero/kode-operator/internal/common"
 	"github.com/go-logr/logr"
+	"github.com/jacero-io/kode-operator/internal/common"
 	corev1 "k8s.io/api/core/v1"
 )
 

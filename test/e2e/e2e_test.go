@@ -26,7 +26,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/emil-jacero/kode-operator/test/utils"
+	"github.com/jacero-io/kode-operator/test/utils"
 )
 
 const namespace = "kode-operator-system"

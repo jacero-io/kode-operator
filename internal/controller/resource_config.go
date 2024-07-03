@@ -1,8 +1,8 @@
 package controller
 
 import (
-	kodev1alpha1 "github.com/emil-jacero/kode-operator/api/v1alpha1"
-	"github.com/emil-jacero/kode-operator/internal/common"
+	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
+	"github.com/jacero-io/kode-operator/internal/common"
 )
 
 func InitKodeResourcesConfig(

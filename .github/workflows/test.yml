@@ -30,5 +30,7 @@ jobs:
     - name: Install dependencies
       run: make $(LOCALBIN)
 
-    - name: Run Tests
+    - name: Run integration tests
+      env:
+        TEST_VERBOSITY: ""
       run: make test-integration
