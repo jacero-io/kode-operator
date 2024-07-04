@@ -41,7 +41,7 @@ const (
 var _ = Describe("Kode Controller Integration", Ordered, func() {
 	const (
 		resourceNamespace            = "test-namespace"
-		kodeResourceName             = "test-kode"
+		kodeResourceName             = "kode"
 		kodeTemplateKind             = "KodeClusterTemplate"
 		kodeTemplateNameWithoutEnvoy = "test-kodetemplate-without-envoy"
 		kodeTemplateNameWithEnvoy    = "test-kodetemplate-with-envoy"
@@ -166,12 +166,13 @@ var _ = Describe("Kode Controller Integration", Ordered, func() {
 			Expect(createdStatefulSet.Spec.Template.Spec.Containers).To(HaveLen(expectedContainerCount))                // Except the container count to be 1 or 2 based on the template
 			Expect(createdStatefulSet.Spec.Template.Spec.Containers[0].Ports[0].ContainerPort).To(Equal(containerPort)) // Expect the container port to be set to 3000 with envoy and 8000 without envoy
 
-			serviceLookupKey := types.NamespacedName{Name: kodeName, Namespace: namespace.Name}
+			serviceName := fmt.Sprintf("%s-svc", kodeName)
+			serviceLookupKey := types.NamespacedName{Name: serviceName, Namespace: namespace.Name}
 			createdService := &corev1.Service{}
 			Eventually(func() error {
 				return k8sClient.Get(ctx, serviceLookupKey, createdService)
 			}, timeout, interval).Should(Succeed())
-			Expect(createdService.Name).To(Equal(kodeName))                 // Expect the name to be set to the kode name
+			Expect(createdService.Name).To(Equal(serviceName))              // Expect the name to be set to the kode name + "svc"
 			Expect(createdService.Spec.Ports).To(HaveLen(1))                // Expect the service to have 1 port
 			Expect(createdService.Spec.Ports[0].Port).To(Equal(exposePort)) // Expect the service port to be set to the template port. Defaults to 8000
 
