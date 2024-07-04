@@ -1,3 +1,5 @@
+// internal/status/status_updater.go
+
 /*
 Copyright 2024.
 
@@ -21,7 +23,10 @@ import (
 
 	"github.com/go-logr/logr"
 	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
+	"github.com/jacero-io/kode-operator/internal/common"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -37,18 +42,32 @@ func NewDefaultStatusUpdater(client client.Client, log logr.Logger) StatusUpdate
 	}
 }
 
-func (u *defaultStatusUpdater) UpdateStatus(ctx context.Context, kode *kodev1alpha1.Kode, phase kodev1alpha1.KodePhase, conditions []metav1.Condition, lastError string, lastErrorTime *metav1.Time) error {
-	log := u.log.WithValues("kode", client.ObjectKeyFromObject(kode))
+func (u *defaultStatusUpdater) UpdateStatus(ctx context.Context, config *common.KodeResourcesConfig, phase kodev1alpha1.KodePhase, conditions []metav1.Condition, lastError string, lastErrorTime *metav1.Time) error {
+	log := u.log.WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
 
-	kode.Status.Phase = phase
-	kode.Status.Conditions = conditions
-	kode.Status.LastError = lastError
-	kode.Status.LastErrorTime = lastErrorTime
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		// Fetch the latest version of Kode
+		var latestKode kodev1alpha1.Kode
+		if err := u.client.Get(ctx, types.NamespacedName{Name: config.Kode.Name, Namespace: config.Kode.Namespace}, &latestKode); err != nil {
+			log.Error(err, "Failed to get latest version of Kode")
+			return err
+		}
 
-	if err := u.client.Status().Update(ctx, kode); err != nil {
-		log.Error(err, "Failed to update Kode status")
-		return err
-	}
+		// Update the status
+		latestKode.Status.Phase = phase
+		latestKode.Status.Conditions = conditions
+		latestKode.Status.LastError = lastError
+		latestKode.Status.LastErrorTime = lastErrorTime
 
-	return nil
+		// Try to update
+		if err := u.client.Status().Update(ctx, &latestKode); err != nil {
+			log.Error(err, "Failed to update Kode status")
+			return err
+		}
+
+		// Update was successful, update the config's Kode with the latest version
+		config.Kode = latestKode
+
+		return nil
+	})
 }

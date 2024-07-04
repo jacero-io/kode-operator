@@ -40,7 +40,6 @@ import (
 	"github.com/jacero-io/kode-operator/internal/cleanup"
 	entrypointcontroller "github.com/jacero-io/kode-operator/internal/controller"
 	kodecontroller "github.com/jacero-io/kode-operator/internal/controller"
-	"github.com/jacero-io/kode-operator/internal/repository"
 	"github.com/jacero-io/kode-operator/internal/resource"
 	"github.com/jacero-io/kode-operator/internal/status"
 	"github.com/jacero-io/kode-operator/internal/template"
@@ -135,7 +134,6 @@ func main() {
 		Client:          mgr.GetClient(),
 		Scheme:          mgr.GetScheme(),
 		Log:             ctrl.Log.WithName("controllers").WithName("Kode").WithName("Reconcile"),
-		Repo:            repository.NewDefaultRepository(mgr.GetClient()),
 		ResourceManager: resource.NewDefaultResourceManager(mgr.GetClient(), ctrl.Log.WithName("controllers").WithName("Kode").WithName("ResourceManager")),
 		TemplateManager: template.NewDefaultTemplateManager(mgr.GetClient(), ctrl.Log.WithName("controllers").WithName("Kode").WithName("TemplateManager")),
 		CleanupManager:  cleanup.NewDefaultCleanupManager(mgr.GetClient(), ctrl.Log.WithName("controllers").WithName("Kode").WithName("CleanupManager")),

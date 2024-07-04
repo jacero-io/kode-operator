@@ -37,7 +37,6 @@ import (
 	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
 	"github.com/jacero-io/kode-operator/internal/cleanup"
 	"github.com/jacero-io/kode-operator/internal/controller"
-	"github.com/jacero-io/kode-operator/internal/repository"
 	"github.com/jacero-io/kode-operator/internal/resource"
 	"github.com/jacero-io/kode-operator/internal/status"
 	"github.com/jacero-io/kode-operator/internal/template"
@@ -92,7 +91,6 @@ var _ = BeforeSuite(func() {
 		Client:          k8sClient,
 		Scheme:          k8sManager.GetScheme(),
 		Log:             ctrl.Log.WithName("controllers").WithName("Kode").WithName("Reconcile"),
-		Repo:            repository.NewDefaultRepository(k8sClient),
 		ResourceManager: resource.NewDefaultResourceManager(k8sClient, ctrl.Log.WithName("controllers").WithName("Kode").WithName("ResourceManager")),
 		TemplateManager: template.NewDefaultTemplateManager(k8sClient, ctrl.Log.WithName("controllers").WithName("Kode").WithName("TemplateManager")),
 		CleanupManager:  cleanup.NewDefaultCleanupManager(k8sClient, ctrl.Log.WithName("controllers").WithName("Kode").WithName("CleanupManager")),

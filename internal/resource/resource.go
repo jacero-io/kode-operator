@@ -1,3 +1,5 @@
+// internal/resource/resource.go
+
 /*
 Copyright 2024.
 
@@ -19,14 +21,14 @@ package resource
 import (
 	"context"
 
-	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 // ResourceManager defines the interface for managing Kubernetes resources
 type ResourceManager interface {
-	Ensure(ctx context.Context, obj client.Object) error
+	CreateOrPatch(ctx context.Context, obj client.Object, f controllerutil.MutateFn) error
 	Delete(ctx context.Context, obj client.Object) error
-	Get(ctx context.Context, key types.NamespacedName, obj client.Object) error
-	Update(ctx context.Context, obj client.Object) error
+	Get(ctx context.Context, key client.ObjectKey, obj client.Object) error
+	List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error
 }

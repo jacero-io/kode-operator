@@ -1,16 +1,31 @@
+// internal/resource/resource_manager.go
+
+/*
+Copyright 2024.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package resource
 
 import (
 	"context"
 	"fmt"
-	"reflect"
 
 	"github.com/go-logr/logr"
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/types"
+	"github.com/jacero-io/kode-operator/internal/common"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 type defaultResourceManager struct {
@@ -25,54 +40,22 @@ func NewDefaultResourceManager(client client.Client, log logr.Logger) ResourceMa
 	}
 }
 
-func (m *defaultResourceManager) Ensure(ctx context.Context, obj client.Object) error {
-	log := m.log.WithValues("resource", client.ObjectKeyFromObject(obj))
+func (m *defaultResourceManager) CreateOrPatch(ctx context.Context, obj client.Object, f controllerutil.MutateFn) error {
+	// Add type information to the object
+	if err := common.AddTypeInformationToObject(obj); err != nil {
+		return fmt.Errorf("failed to add type information to object: %w", err)
+	}
+	log := m.log.WithValues("kind", obj.GetObjectKind().GroupVersionKind().Kind, "name", obj.GetName(), "namespace", obj.GetNamespace())
 
-	err := m.client.Create(ctx, obj)
+	log.V(1).Info("Starting CreateOrPatch", "Object", obj)
+
+	result, err := controllerutil.CreateOrPatch(ctx, m.client, obj, f)
 	if err != nil {
-		if !errors.IsAlreadyExists(err) {
-			log.Error(err, "Failed to create resource", "Kind", obj.GetObjectKind().GroupVersionKind().Kind, "Name", obj.GetName())
-			return err
-		}
-
-		// Resource already exists, try to update
-		existing := obj.DeepCopyObject().(client.Object)
-		key := client.ObjectKeyFromObject(obj)
-		if err := m.client.Get(ctx, key, existing); err != nil {
-			log.Error(err, "Failed to get existing resource", "Kind", obj.GetObjectKind().GroupVersionKind().Kind, "Name", obj.GetName())
-			return err
-		}
-
-		// Update the existing object with new spec
-		updated := existing.DeepCopyObject().(client.Object)
-		var updateNeeded bool
-		var updateErr error
-
-		switch v := updated.(type) {
-		case *corev1.PersistentVolumeClaim:
-			updateNeeded = m.updatePVCSpec(obj.(*corev1.PersistentVolumeClaim), v)
-		default:
-			updateNeeded, updateErr = m.updateSpec(obj, v)
-		}
-
-		if updateErr != nil {
-			log.Error(updateErr, "Failed to update spec", "Kind", obj.GetObjectKind().GroupVersionKind().Kind, "Name", obj.GetName())
-			return updateErr
-		}
-
-		if updateNeeded {
-			if err := m.client.Update(ctx, updated); err != nil {
-				log.Error(err, "Failed to update resource", "Kind", obj.GetObjectKind().GroupVersionKind().Kind, "Name", obj.GetName())
-				return err
-			}
-			log.Info("Resource updated", "Kind", obj.GetObjectKind().GroupVersionKind().Kind, "Name", obj.GetName())
-		} else {
-			log.Info("No update needed", "Kind", obj.GetObjectKind().GroupVersionKind().Kind, "Name", obj.GetName())
-		}
-	} else {
-		log.Info("Resource created", "Kind", obj.GetObjectKind().GroupVersionKind().Kind, "Name", obj.GetName())
+		log.Error(err, "Failed to create or patch resource")
+		return err
 	}
 
+	log.Info("Resource operation completed", "Result", result)
 	return nil
 }
 
@@ -80,58 +63,10 @@ func (m *defaultResourceManager) Delete(ctx context.Context, obj client.Object) 
 	return m.client.Delete(ctx, obj)
 }
 
-func (m *defaultResourceManager) Get(ctx context.Context, key types.NamespacedName, obj client.Object) error {
+func (m *defaultResourceManager) Get(ctx context.Context, key client.ObjectKey, obj client.Object) error {
 	return m.client.Get(ctx, key, obj)
 }
 
-func (m *defaultResourceManager) Update(ctx context.Context, obj client.Object) error {
-	return m.client.Update(ctx, obj)
-}
-
-func (m *defaultResourceManager) updateSpec(new, existing client.Object) (bool, error) {
-	updated := false
-	switch v := existing.(type) {
-	case *appsv1.StatefulSet:
-		if !reflect.DeepEqual(v.Spec.Template, new.(*appsv1.StatefulSet).Spec.Template) {
-			v.Spec.Template = new.(*appsv1.StatefulSet).Spec.Template
-			updated = true
-		}
-		// Update other mutable fields as needed
-	case *corev1.Service:
-		if !reflect.DeepEqual(v.Spec.Ports, new.(*corev1.Service).Spec.Ports) {
-			v.Spec.Ports = new.(*corev1.Service).Spec.Ports
-			updated = true
-		}
-		// Update other mutable fields as needed
-	default:
-		return false, fmt.Errorf("unsupported resource type: %T", existing)
-	}
-	return updated, nil
-}
-
-func (m *defaultResourceManager) updatePVCSpec(new, existing *corev1.PersistentVolumeClaim) bool {
-	updated := false
-
-	// Update labels
-	if !reflect.DeepEqual(existing.Labels, new.Labels) {
-		existing.Labels = new.Labels
-		updated = true
-	}
-
-	// Update annotations
-	if !reflect.DeepEqual(existing.Annotations, new.Annotations) {
-		existing.Annotations = new.Annotations
-		updated = true
-	}
-
-	// Update resources.requests.storage (only if increasing)
-	if new.Spec.Resources.Requests != nil && existing.Spec.Resources.Requests != nil {
-		newStorage := new.Spec.Resources.Requests[corev1.ResourceStorage]
-		existingStorage := existing.Spec.Resources.Requests[corev1.ResourceStorage]
-		if newStorage.Cmp(existingStorage) > 0 {
-			existing.Spec.Resources.Requests[corev1.ResourceStorage] = newStorage
-			updated = true
-		}
-	}
-	return updated
+func (m *defaultResourceManager) List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error {
+	return m.client.List(ctx, list, opts...)
 }

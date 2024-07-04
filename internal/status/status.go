@@ -1,3 +1,5 @@
+// internal/status/status.go
+
 /*
 Copyright 2024.
 
@@ -20,10 +22,11 @@ import (
 	"context"
 
 	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
+	"github.com/jacero-io/kode-operator/internal/common"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // StatusUpdater defines the interface for updating Kode status
 type StatusUpdater interface {
-	UpdateStatus(ctx context.Context, kode *kodev1alpha1.Kode, phase kodev1alpha1.KodePhase, conditions []metav1.Condition, lastError string, lastErrorTime *metav1.Time) error
+	UpdateStatus(ctx context.Context, config *common.KodeResourcesConfig, phase kodev1alpha1.KodePhase, conditions []metav1.Condition, lastError string, lastErrorTime *metav1.Time) error
 }
