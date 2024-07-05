@@ -12,7 +12,7 @@ controllerManager:
         - ALL
     image:
       repository: ghcr.io/emil-jacero/kode-operator
-      tag: latest
+      tag: "PLACEHOLDER_VERSION" # This will be replaced by the GitHub workflow
     resources:
       limits:
         cpu: 500m
