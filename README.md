@@ -228,9 +228,9 @@ spec:
   templateRef:
     kind: KodeTemplate
     name: secure-code-server-template
-  user: devuser # Sent to the Envoy Proxy Basic Auth
-  password: devpassword # Sent to the Envoy Proxy Basic Auth
-  workspace: my-secure-project
+  user: devuser # Sent to the Envoy proxy Basic Auth
+  password: devpassword # Sent to the Envoy proxy Basic Auth
+  workspace: my-secure-project # Overrides the template workspace
 ```
 
 **3. Apply the Configuration:**
