@@ -1,7 +1,7 @@
 // internal/resource/resource_manager.go
 
 /*
-Copyright 2024.
+Copyright emil@jacero.se 2024.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
