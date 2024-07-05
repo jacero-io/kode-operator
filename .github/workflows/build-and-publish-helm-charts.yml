@@ -49,9 +49,10 @@ jobs:
       - name: Copy kode to temporary directory
         run: cp -r helm-charts/kode /tmp/helm-charts/kode
 
-      - name: Update Chart.yaml for kode
+      - name: Update Chart.yaml and values.yaml for kode
         run: |
           sed -i "s/PLACEHOLDER_VERSION/${{ env.VERSION }}/g" /tmp/helm-charts/kode/Chart.yaml
+          sed -i "s/PLACEHOLDER_VERSION/${{ env.VERSION }}/g" /tmp/helm-charts/kode/values.yaml
           helm dependency update /tmp/helm-charts/kode
           helm package /tmp/helm-charts/kode --version ${{ env.VERSION }} --destination /tmp/helm-packages
 
