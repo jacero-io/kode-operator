@@ -18,27 +18,43 @@ package v1alpha1
 
 import runtime "k8s.io/apimachinery/pkg/runtime"
 
-// Spec for the EnvoyProxyConfig.
+// SharedEnvoyProxyStatus defines the observed state of EnvoyProxy
+type SharedEnvoyProxyStatus struct {
+	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
+	// Important: Run "make" to regenerate code after modifying this file
+}
+
+// SharedEnvoyProxyConfigSpec defines the desired state of EnvoyProxy
 type SharedEnvoyProxyConfigSpec struct {
 	// Image is the Docker image for the Envoy proxy
+	// +kubebuilder:validation:Description="Docker image for the Envoy proxy"
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default="envoyproxy/envoy:v1.30-latest"
 	Image string `json:"image"`
+	
+	// AuthConfig is custom authentication configuration. Can be used to configure basic auth, JWT, etc.
+	// +kubebuilder:validation:Description="Custom authentication configuration. Can be used to configure basic auth, JWT, etc."
+	// +kubebuilder:validation:Optional
+	AuthConfig AuthConfig `json:"authConfig"`
 
 	// HTTPFilters is a list of Envoy HTTP filters to be applied
 	// +kubebuilder:validation:Description="HTTP filters to be applied"
+	// +kubebuilder:validation:Optional
 	HTTPFilters []HTTPFilter `json:"httpFilters"`
 
 	// Clusters is a list of Envoy clusters
 	// +kubebuilder:validation:Description="Envoy clusters"
+	// +kubebuilder:validation:Optional
 	Clusters []Cluster `json:"clusters,omitempty"`
 }
 
-// EnvoyProxyStatus defines the observed state of EnvoyProxy
-type SharedEnvoyProxyStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+type AuthConfig struct {
+	// AuthType is the type of authentication. Can be set to "basic" or "jwt"
+	// +kubebuilder:validation:Description="Type of authentication. Can be set to 'basic' or 'jwt'"
+	// +kubebuilder:validation:enum="basic";"jwt"
+	// +kubebuilder:validation:Required
+	AuthType string `json:"authType"`
 }
 
 // TODO: Fix the validation for the EnvoyProxyReference
@@ -48,15 +64,18 @@ type EnvoyProxyReference struct {
 	// Kind is the resource kind
 	// +kubebuilder:validation:Description="Resource kind"
 	// +kubebuilder:validation:Enum=EnvoyProxyConfig;EnvoyProxyClusterConfig
-	Kind string `json:"kind,omitempty"`
+	// +kubebuilder:validation:Required
+	Kind string `json:"kind"`
 
 	// Name is the name of the EnvoyProxyConfig or EnvoyProxyClusterConfig
 	// +kubebuilder:validation:Description="Name of the config"
-	Name string `json:"name,omitempty"`
+	// +kubebuilder:validation:Required
+	Name string `json:"name"`
 
 	// Namespace is the namespace of the EnvoyProxyConfig or EnvoyProxyClusterConfig
 	// +kubebuilder:validation:Description="Namespace of the Envoy Proxy config"
-	Namespace string `json:"namespace,omitempty"`
+	// +kubebuilder:validation:Required
+	Namespace string `json:"namespace"`
 }
 
 type SocketAddress struct {
