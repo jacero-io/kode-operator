@@ -1,3 +1,5 @@
+// internal/controller/kode_statefulset.go
+
 /*
 Copyright 2024.
 
@@ -39,25 +41,36 @@ func (r *KodeReconciler) ensureStatefulSet(ctx context.Context, config *common.K
 	ctx, cancel := common.ContextWithTimeout(ctx, 30) // 30 seconds timeout
 	defer cancel()
 
-	log.Info("Ensuring StatefulSet exists")
+	log.Info("Ensuring StatefulSet")
 
-	statefulSet := r.constructStatefulSet(config)
-	if err := controllerutil.SetControllerReference(&config.Kode, statefulSet, r.Scheme); err != nil {
-		return fmt.Errorf("failed to set controller reference: %w", err)
+	statefulSet := &appsv1.StatefulSet{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      config.KodeName,
+			Namespace: config.KodeNamespace,
+		},
 	}
 
-	err := r.ResourceManager.Ensure(ctx, statefulSet)
+	err := r.ResourceManager.CreateOrPatch(ctx, statefulSet, func() error {
+		constructedstatefulSet, err := r.constructStatefulSetSpec(config)
+		if err != nil {
+			return fmt.Errorf("failed to construct StatefulSet spec: %v", err)
+		}
+
+		statefulSet.Spec = constructedstatefulSet.Spec
+		statefulSet.ObjectMeta.Labels = constructedstatefulSet.ObjectMeta.Labels
+
+		return controllerutil.SetControllerReference(&config.Kode, statefulSet, r.Scheme)
+	})
+
 	if err != nil {
-		log.Error(err, "Failed to ensure StatefulSet")
-		return fmt.Errorf("failed to ensure StatefulSet: %w", err)
+		return fmt.Errorf("failed to create or patch StatefulSet: %v", err)
 	}
 
-	log.Info("Successfully ensured StatefulSet")
 	return nil
 }
 
-// constructStatefulSet constructs a StatefulSet for the Kode instance
-func (r *KodeReconciler) constructStatefulSet(config *common.KodeResourcesConfig) *appsv1.StatefulSet {
+// constructStatefulSetSpec constructs a StatefulSet for the Kode instance
+func (r *KodeReconciler) constructStatefulSetSpec(config *common.KodeResourcesConfig) (*appsv1.StatefulSet, error) {
 	log := r.Log.WithName("SatefulSetConstructor").WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
 
 	replicas := int32(1)
@@ -84,23 +97,24 @@ func (r *KodeReconciler) constructStatefulSet(config *common.KodeResourcesConfig
 		containers = constructCodeServerContainers(config, workspace)
 	} else if templateSpec.Type == "webtop" {
 		containers = constructWebtopContainers(config)
+	} else {
+		return nil, fmt.Errorf("unknown template type: %s", templateSpec.Type)
 	}
 
-	volumes, volumeMounts := constructVolumesAndMounts(mountPath, &config.Kode)
+	volumes, volumeMounts := constructVolumesAndMounts(mountPath, config)
 	containers[0].VolumeMounts = volumeMounts
 
 	if config.Templates.EnvoyProxyConfig != nil {
-		log.Info("EnvoyProxyConfig is defined", "Namespace", config.Kode.Namespace, "Kode", config.Kode.Name)
+		log.Info("Constructing EnvoyProxy sidecar container and init containers")
 		envoySidecarContainer, envoyInitContainer, err := envoy.NewContainerConstructor(
 			r.Log,
 			envoy.NewBootstrapConfigGenerator(r.Log.WithName("EnvoyContainerConstructor"))).ConstructEnvoyProxyContainer(config)
 		if err != nil {
-			log.Error(err, "Failed to construct EnvoyProxy sidecar", "Kode", config.Kode.Name, "Error", err)
-		} else {
-			containers = append(containers, envoySidecarContainer)
-			initContainers = append(initContainers, envoyInitContainer)
-			log.Info("Added EnvoyProxy sidecar container and init container", "Kode", config.Kode.Name, "Container", envoySidecarContainer.Name)
+			return nil, fmt.Errorf("failed to construct EnvoyProxy sidecar: %v", err)
 		}
+		containers = append(containers, envoySidecarContainer)
+		initContainers = append(initContainers, envoyInitContainer)
+		log.Info("Successfully added EnvoyProxy sidecar container and init containers")
 	}
 
 	// Add TemplateInitPlugins as InitContainers
@@ -115,8 +129,8 @@ func (r *KodeReconciler) constructStatefulSet(config *common.KodeResourcesConfig
 
 	statefulSet := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      config.Kode.Name,
-			Namespace: config.Kode.Namespace,
+			Name:      config.KodeName,
+			Namespace: config.KodeNamespace,
 			Labels:    config.Labels,
 		},
 		Spec: appsv1.StatefulSetSpec{
@@ -124,7 +138,7 @@ func (r *KodeReconciler) constructStatefulSet(config *common.KodeResourcesConfig
 			Selector: &metav1.LabelSelector{
 				MatchLabels: config.Labels,
 			},
-			ServiceName: config.Kode.Name,
+			ServiceName: config.KodeName,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels:            config.Labels,
@@ -139,15 +153,22 @@ func (r *KodeReconciler) constructStatefulSet(config *common.KodeResourcesConfig
 		},
 	}
 
-	// common.logStatefulSetManifest(log, statefulSet)
-	return statefulSet
+	// Add type information to the object
+	if err := common.AddTypeInformationToObject(statefulSet); err != nil {
+		return nil, fmt.Errorf("failed to add type information to StatefulSet: %v", err)
+	}
+
+	maskedSpec := common.MaskSpec(statefulSet.Spec.Template.Spec.Containers[0]) // Mask sensitive values
+	log.V(1).Info("StatefulSet object created", "StatefulSet", statefulSet, "Spec", maskedSpec)
+
+	return statefulSet, nil
 }
 
 func constructCodeServerContainers(config *common.KodeResourcesConfig,
 	workspace string) []corev1.Container {
 
 	return []corev1.Container{{
-		Name:  "kode-" + config.Kode.Name,
+		Name:  config.KodeName,
 		Image: config.Templates.KodeTemplate.Image,
 		Env: []corev1.EnvVar{
 			{Name: "PUID", Value: fmt.Sprintf("%d", config.Templates.KodeTemplate.PUID)},
@@ -168,7 +189,7 @@ func constructCodeServerContainers(config *common.KodeResourcesConfig,
 func constructWebtopContainers(config *common.KodeResourcesConfig) []corev1.Container {
 
 	return []corev1.Container{{
-		Name:  "kode-" + config.Kode.Name,
+		Name:  config.KodeName,
 		Image: config.Templates.KodeTemplate.Image,
 		Env: []corev1.EnvVar{
 			{Name: "PUID", Value: fmt.Sprintf("%d", config.Templates.KodeTemplate.PUID)},
@@ -185,24 +206,24 @@ func constructWebtopContainers(config *common.KodeResourcesConfig) []corev1.Cont
 	}}
 }
 
-func constructVolumesAndMounts(mountPath string, kode *kodev1alpha1.Kode) ([]corev1.Volume, []corev1.VolumeMount) {
+func constructVolumesAndMounts(mountPath string, config *common.KodeResourcesConfig) ([]corev1.Volume, []corev1.VolumeMount) {
 	volumes := []corev1.Volume{}
 	volumeMounts := []corev1.VolumeMount{}
 
 	// Add volume and volume mount if storage is defined
-	if !reflect.DeepEqual(kode.Spec.Storage, kodev1alpha1.KodeStorageSpec{}) {
+	if !reflect.DeepEqual(config.Kode.Spec.Storage, kodev1alpha1.KodeStorageSpec{}) {
 		var volumeSource corev1.VolumeSource
 
-		if kode.Spec.Storage.ExistingVolumeClaim != "" {
+		if config.Kode.Spec.Storage.ExistingVolumeClaim != "" {
 			volumeSource = corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: kode.Spec.Storage.ExistingVolumeClaim,
+					ClaimName: config.Kode.Spec.Storage.ExistingVolumeClaim,
 				},
 			}
-		} else if !kode.Spec.DeepCopy().Storage.IsEmpty() {
+		} else if !config.Kode.Spec.DeepCopy().Storage.IsEmpty() {
 			volumeSource = corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: common.GetPVCName(kode),
+					ClaimName: config.PVCName,
 				},
 			}
 		}

@@ -26,7 +26,6 @@ import (
 	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
 	"github.com/jacero-io/kode-operator/internal/cleanup"
 	"github.com/jacero-io/kode-operator/internal/common"
-	"github.com/jacero-io/kode-operator/internal/repository"
 	"github.com/jacero-io/kode-operator/internal/resource"
 	"github.com/jacero-io/kode-operator/internal/status"
 	"github.com/jacero-io/kode-operator/internal/template"
@@ -36,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	client "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -46,7 +46,6 @@ type KodeReconciler struct {
 	client.Client
 	Scheme          *runtime.Scheme
 	Log             logr.Logger
-	Repo            repository.Repository
 	ResourceManager resource.ResourceManager
 	TemplateManager template.TemplateManager
 	CleanupManager  cleanup.CleanupManager
@@ -67,49 +66,30 @@ type KodeReconciler struct {
 
 func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithName("Reconcile").WithValues("kode", req.NamespacedName)
-	ctx, cancel := common.ContextWithTimeout(ctx, 60) // 60 seconds timeout
-	defer cancel()
 
 	// Fetch the Kode instance
 	kode := &kodev1alpha1.Kode{}
 	if err := r.Get(ctx, req.NamespacedName, kode); err != nil {
-		if errors.IsNotFound(err) {
-			log.Info("Kode resource not found.")
-			return ctrl.Result{}, nil
-		}
-		log.Error(err, "Failed to get Kode")
-		return ctrl.Result{}, err
+		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	// Check if the Kode instance is being deleted
-	if !kode.ObjectMeta.DeletionTimestamp.IsZero() {
-		return r.handleCleanup(ctx, kode)
+	// Handle finalizer
+	if result, err := r.handleFinalizer(ctx, kode); err != nil {
+		return result, err
+	} else if !result.IsZero() {
+		return result, nil
 	}
 
-	// Add finalizer if it doesn't exist
-	if !controllerutil.ContainsFinalizer(kode, common.FinalizerName) {
-		controllerutil.AddFinalizer(kode, common.FinalizerName)
-		if err := r.Update(ctx, kode); err != nil {
-			currentTime := r.GetCurrentTime()
-			return ctrl.Result{RequeueAfter: common.RequeueInterval}, r.StatusUpdater.UpdateStatus(ctx, kode, kodev1alpha1.KodePhaseActive, nil, err.Error(), &currentTime)
-		}
+	// If the object is being deleted, stop here
+	if !kode.DeletionTimestamp.IsZero() {
+		return ctrl.Result{}, nil
 	}
 
-	// // Validate Kode spec
-	// if err := r.Validator.Validate(kode); err != nil {
-	// 	return ctrl.Result{RequeueAfter: common.RequeueInterval}, r.StatusUpdater.UpdateStatusWithError(ctx, kode, err)
-	// }
-
-	// Fetch templates
-	templates := &common.Templates{}
-	templates, err := r.TemplateManager.Fetch(ctx, kode.Spec.TemplateRef)
+	// Fetch templates for normal reconciliation
+	templates, err := r.fetchTemplatesWithRetry(ctx, kode)
 	if err != nil {
-		currentTime := r.GetCurrentTime()
-		if _, ok := err.(*common.TemplateNotFoundError); ok {
-			log.Info("Template not found, requeuing", "error", err)
-			return ctrl.Result{RequeueAfter: common.RequeueInterval}, r.StatusUpdater.UpdateStatus(ctx, kode, kodev1alpha1.KodePhaseActive, nil, err.Error(), &currentTime)
-		}
-		return ctrl.Result{RequeueAfter: common.RequeueInterval}, r.StatusUpdater.UpdateStatus(ctx, kode, kodev1alpha1.KodePhaseError, nil, err.Error(), &currentTime)
+		log.Error(err, "Failed to fetch templates after retries")
+		return ctrl.Result{RequeueAfter: common.RequeueInterval}, err
 	}
 
 	// Initialize Kode resources config
@@ -117,22 +97,22 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 
 	// Ensure resources
 	if err := r.ensureResources(ctx, config); err != nil {
-		return ctrl.Result{RequeueAfter: common.RequeueInterval}, r.UpdateStatusWithError(ctx, kode, err)
+		return ctrl.Result{RequeueAfter: common.RequeueInterval}, r.UpdateStatusWithError(ctx, config, err)
 	}
 
 	// Check if all resources are ready
-	ready, err := r.checkResourcesReady(ctx, kode, templates)
+	ready, err := r.checkResourcesReady(ctx, config)
 	if err != nil {
-		return ctrl.Result{RequeueAfter: common.RequeueInterval}, r.UpdateStatusWithError(ctx, kode, fmt.Errorf("failed to check resource readiness: %w", err))
+		return ctrl.Result{RequeueAfter: common.RequeueInterval}, r.UpdateStatusWithError(ctx, config, fmt.Errorf("failed to check resource readiness: %w", err))
 	}
 	if !ready {
 		log.Info("Resources not ready, requeuing")
 		currentTime := r.GetCurrentTime()
-		return ctrl.Result{RequeueAfter: common.RequeueInterval}, r.StatusUpdater.UpdateStatus(ctx, kode, kodev1alpha1.KodePhaseActive, nil, "resources not ready", &currentTime)
+		return ctrl.Result{RequeueAfter: common.RequeueInterval}, r.StatusUpdater.UpdateStatus(ctx, config, kodev1alpha1.KodePhaseActive, nil, "resources not ready", &currentTime)
 	}
 
 	// Update status to success
-	if err := r.UpdateStatusWithSuccess(ctx, kode); err != nil {
+	if err := r.UpdateStatusWithSuccess(ctx, config); err != nil {
 		log.Error(err, "Failed to update status")
 		return ctrl.Result{Requeue: true}, nil
 	}
@@ -168,14 +148,68 @@ func (r *KodeReconciler) ensureResources(ctx context.Context, config *common.Kod
 	return nil
 }
 
-func (r *KodeReconciler) checkResourcesReady(ctx context.Context, kode *kodev1alpha1.Kode, templates *common.Templates) (bool, error) {
+func (r *KodeReconciler) handleFinalizer(ctx context.Context, kode *kodev1alpha1.Kode) (ctrl.Result, error) {
+	log := r.Log.WithValues("kode", client.ObjectKeyFromObject(kode))
+
+	if kode.ObjectMeta.DeletionTimestamp.IsZero() {
+		// Object is not being deleted, so ensure the finalizer is present
+		if !controllerutil.ContainsFinalizer(kode, common.FinalizerName) {
+			controllerutil.AddFinalizer(kode, common.FinalizerName)
+			log.Info("Adding finalizer", "finalizer", common.FinalizerName)
+			if err := r.Update(ctx, kode); err != nil {
+				log.Error(err, "Failed to add finalizer")
+				return ctrl.Result{}, err
+			}
+		}
+	} else {
+		// Object is being deleted
+		if controllerutil.ContainsFinalizer(kode, common.FinalizerName) {
+			// Run finalization logic
+			if err := r.finalize(ctx, kode); err != nil {
+				log.Error(err, "Failed to run finalizer")
+				// Don't return here, continue to remove the finalizer
+			}
+
+			// Remove finalizer
+			controllerutil.RemoveFinalizer(kode, common.FinalizerName)
+			log.Info("Removing finalizer", "finalizer", common.FinalizerName)
+			if err := r.Update(ctx, kode); err != nil {
+				log.Error(err, "Failed to remove finalizer")
+				return ctrl.Result{}, err
+			}
+		}
+		// Stop reconciliation as the item is being deleted
+		return ctrl.Result{}, nil
+	}
+
+	return ctrl.Result{}, nil
+}
+
+func (r *KodeReconciler) finalize(ctx context.Context, kode *kodev1alpha1.Kode) error {
+	log := r.Log.WithValues("kode", client.ObjectKeyFromObject(kode))
+	log.V(1).Info("Running finalizer")
+
+	// Initialize Kode resources config without templates
+	config := &common.KodeResourcesConfig{
+		Kode:          *kode,
+		KodeName:      kode.Name,
+		KodeNamespace: kode.Namespace,
+		PVCName:       kode.Name + "-pvc",
+		ServiceName:   kode.Name + "-svc",
+	}
+
+	// Perform cleanup
+	return r.CleanupManager.Cleanup(ctx, config)
+}
+
+func (r *KodeReconciler) checkResourcesReady(ctx context.Context, config *common.KodeResourcesConfig) (bool, error) {
+	log := r.Log.WithName("ResourceReadyChecker").WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
 	ctx, cancel := common.ContextWithTimeout(ctx, 20) // 20 seconds timeout
 	defer cancel()
-	log := r.Log.WithName("ResourceReadyChecker").WithValues("kode", client.ObjectKeyFromObject(kode))
 
 	// Check StatefulSet
 	statefulSet := &appsv1.StatefulSet{}
-	err := r.Get(ctx, types.NamespacedName{Name: kode.Name, Namespace: kode.Namespace}, statefulSet)
+	err := r.Get(ctx, types.NamespacedName{Name: config.KodeName, Namespace: config.KodeNamespace}, statefulSet)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			log.Info("StatefulSet not found")
@@ -191,7 +225,7 @@ func (r *KodeReconciler) checkResourcesReady(ctx context.Context, kode *kodev1al
 
 	// Check Service
 	service := &corev1.Service{}
-	err = r.Get(ctx, types.NamespacedName{Name: kode.Name, Namespace: kode.Namespace}, service)
+	err = r.Get(ctx, types.NamespacedName{Name: config.ServiceName, Namespace: config.KodeNamespace}, service)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			log.Info("Service not found")
@@ -201,9 +235,9 @@ func (r *KodeReconciler) checkResourcesReady(ctx context.Context, kode *kodev1al
 	}
 
 	// Check PersistentVolumeClaim if storage is specified
-	if !kode.Spec.Storage.IsEmpty() {
+	if !config.Kode.Spec.Storage.IsEmpty() {
 		pvc := &corev1.PersistentVolumeClaim{}
-		err = r.Get(ctx, types.NamespacedName{Name: common.GetPVCName(kode), Namespace: kode.Namespace}, pvc)
+		err = r.Get(ctx, types.NamespacedName{Name: config.PVCName, Namespace: config.KodeNamespace}, pvc)
 		if err != nil {
 			if errors.IsNotFound(err) {
 				log.Info("PersistentVolumeClaim not found")
@@ -219,8 +253,8 @@ func (r *KodeReconciler) checkResourcesReady(ctx context.Context, kode *kodev1al
 	}
 
 	// Check if Envoy sidecar is ready (if applicable)
-	if templates.KodeTemplate != nil && templates.KodeTemplate.EnvoyProxyRef.Name != "" {
-		ready, err := r.checkEnvoySidecarReady(ctx, kode)
+	if config.Templates.KodeTemplate != nil && config.Templates.KodeTemplate.EnvoyProxyRef.Name != "" {
+		ready, err := r.checkEnvoySidecarReady(ctx, config)
 		if err != nil {
 			return false, fmt.Errorf("failed to check Envoy sidecar readiness: %w", err)
 		}
@@ -234,11 +268,11 @@ func (r *KodeReconciler) checkResourcesReady(ctx context.Context, kode *kodev1al
 	return true, nil
 }
 
-func (r *KodeReconciler) checkEnvoySidecarReady(ctx context.Context, kode *kodev1alpha1.Kode) (bool, error) {
-	log := r.Log.WithName("EnvoySidecarReadyChecker").WithValues("kode", client.ObjectKeyFromObject(kode))
+func (r *KodeReconciler) checkEnvoySidecarReady(ctx context.Context, config *common.KodeResourcesConfig) (bool, error) {
+	log := r.Log.WithName("EnvoySidecarReadyChecker").WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
 
 	pod := &corev1.Pod{}
-	err := r.Get(ctx, types.NamespacedName{Name: kode.Name + "-0", Namespace: kode.Namespace}, pod)
+	err := r.Get(ctx, types.NamespacedName{Name: config.KodeName + "-0", Namespace: config.KodeNamespace}, pod)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			log.Info("Pod not found")
@@ -261,30 +295,14 @@ func (r *KodeReconciler) checkEnvoySidecarReady(ctx context.Context, kode *kodev
 	return false, nil
 }
 
-func (r *KodeReconciler) handleCleanup(ctx context.Context, kode *kodev1alpha1.Kode) (ctrl.Result, error) {
-	log := r.Log.WithName("CleanupHandler").WithValues("kode", client.ObjectKeyFromObject(kode))
-	log.Info("Handling Kode resource deletion")
-
-	if controllerutil.ContainsFinalizer(kode, common.FinalizerName) {
-		// Perform cleanup
-		if err := r.CleanupManager.Cleanup(ctx, kode); err != nil {
-			return ctrl.Result{Requeue: true}, r.UpdateStatusWithError(ctx, kode, err)
-		}
-	}
-
-	// // Update status to recycled
-	// if err := r.UpdateStatusRecycled(ctx, kode); err != nil {
-	// 	log.Error(err, "Failed to update status to recycled")
-	// 	return ctrl.Result{Requeue: true}, nil
-	// }
-
-	// // Clear error status
-	// if err := r.clearErrorStatus(ctx, kode); err != nil {
-	// 	return ctrl.Result{Requeue: true}, nil
-	// }
-
-	log.Info("Kode resource deletion handled successfully")
-	return ctrl.Result{}, nil
+func (r *KodeReconciler) fetchTemplatesWithRetry(ctx context.Context, kode *kodev1alpha1.Kode) (*common.Templates, error) {
+	var templates *common.Templates
+	err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		var err error
+		templates, err = r.TemplateManager.Fetch(ctx, kode.Spec.TemplateRef)
+		return err
+	})
+	return templates, err
 }
 
 func (r *KodeReconciler) SetupWithManager(mgr ctrl.Manager) error {

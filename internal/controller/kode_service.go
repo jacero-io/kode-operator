@@ -1,3 +1,5 @@
+// internal/controller/kode_service.go
+
 /*
 Copyright 2024.
 
@@ -35,29 +37,42 @@ func (r *KodeReconciler) ensureService(ctx context.Context, config *common.KodeR
 	ctx, cancel := common.ContextWithTimeout(ctx, 30) // 30 seconds timeout
 	defer cancel()
 
-	log.Info("Ensuring Service exists")
+	log.Info("Ensuring Service")
 
-	service := r.constructService(config)
-	if err := controllerutil.SetControllerReference(&config.Kode, service, r.Scheme); err != nil {
-		return fmt.Errorf("failed to set controller reference: %w", err)
+	service := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      config.ServiceName,
+			Namespace: config.KodeNamespace,
+		},
 	}
 
-	err := r.ResourceManager.Ensure(ctx, service)
+	err := r.ResourceManager.CreateOrPatch(ctx, service, func() error {
+		constructedService, err := r.constructServiceSpec(config)
+		if err != nil {
+			return fmt.Errorf("failed to construct Service spec: %v", err)
+		}
+
+		service.Spec = constructedService.Spec
+		service.ObjectMeta.Labels = constructedService.ObjectMeta.Labels
+
+		return controllerutil.SetControllerReference(&config.Kode, service, r.Scheme)
+	})
+
 	if err != nil {
-		log.Error(err, "Failed to ensure Service")
-		return fmt.Errorf("failed to ensure Service: %w", err)
+		return fmt.Errorf("failed to create or patch Service: %v", err)
 	}
 
-	log.Info("Successfully ensured Service")
 	return nil
 }
 
 // constructService constructs a Service for the Kode instance
-func (r *KodeReconciler) constructService(config *common.KodeResourcesConfig) *corev1.Service {
+func (r *KodeReconciler) constructServiceSpec(config *common.KodeResourcesConfig) (*corev1.Service, error) {
+	log := r.Log.WithName("ServiceConstructor").WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
+
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      config.Kode.Name,
-			Namespace: config.Kode.Namespace,
+			Name:      config.ServiceName,
+			Namespace: config.KodeNamespace,
 		},
 		Spec: corev1.ServiceSpec{
 			Selector: config.Labels,
@@ -68,5 +83,14 @@ func (r *KodeReconciler) constructService(config *common.KodeResourcesConfig) *c
 			}},
 		},
 	}
-	return service
+
+	// Add type information to the object
+	if err := common.AddTypeInformationToObject(service); err != nil {
+		log.Error(err, "Failed to add type information to Service")
+		return nil, err
+	}
+
+	log.V(1).Info("Service object constructed", "Service", service, "Spec", service.Spec)
+
+	return service, nil
 }

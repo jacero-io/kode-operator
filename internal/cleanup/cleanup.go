@@ -19,11 +19,11 @@ package cleanup
 import (
 	"context"
 
-	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
+	"github.com/jacero-io/kode-operator/internal/common"
 )
 
 // CleanupManager defines the interface for cleaning up Kode resources
 type CleanupManager interface {
-	Cleanup(ctx context.Context, kode *kodev1alpha1.Kode) error
-	Recycle(ctx context.Context, kode *kodev1alpha1.Kode) error
+	Cleanup(ctx context.Context, config *common.KodeResourcesConfig) error
+	Recycle(ctx context.Context, config *common.KodeResourcesConfig) error
 }

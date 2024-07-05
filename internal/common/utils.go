@@ -25,19 +25,54 @@ import (
 
 	"cuelang.org/go/cue"
 	"github.com/go-logr/logr"
-	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
+// returns the name of the PersistentVolumeClaim for the Kode instance
+func GetPVCName(config *KodeResourcesConfig) string {
+	return config.KodeName + "-pvc"
+}
+
+// returns the name of the Kode container
+func GetContainerName(config *KodeResourcesConfig) string {
+	return "kode-" + config.KodeName
+}
+
+// returns the name of the Kode service
+func GetServiceName(config *KodeResourcesConfig) string {
+	return "kode-" + config.KodeName
+}
+
 // masks sensitive string values
 func MaskSensitiveValue(s string) string {
-	if len(s) > 6 {
-		return s[:2] + "******" + s[len(s)-2:]
+	return "********"
+}
+
+// addTypeInformationToObject adds TypeMeta information to a runtime.Object based upon the loaded scheme.Scheme
+// taken from: https://github.com/kubernetes/kubernetes/issues/3030#issuecomment-700099699
+func AddTypeInformationToObject(obj runtime.Object) error {
+	gvks, _, err := scheme.Scheme.ObjectKinds(obj)
+	if err != nil {
+		return fmt.Errorf("missing apiVersion or kind and cannot assign it; %w", err)
 	}
-	return "****"
+
+	for _, gvk := range gvks {
+		if len(gvk.Kind) == 0 {
+			continue
+		}
+		if len(gvk.Version) == 0 || gvk.Version == runtime.APIVersionInternal {
+			continue
+		}
+		obj.GetObjectKind().SetGroupVersionKind(gvk)
+		break
+	}
+
+	return nil
 }
 
 // masks sensitive environment variables
@@ -50,6 +85,12 @@ func MaskEnvVars(envs []corev1.EnvVar) []corev1.EnvVar {
 		maskedEnvs[i] = env
 	}
 	return maskedEnvs
+}
+
+// masks sensitive values in a container spec
+func MaskSpec(spec corev1.Container) corev1.Container {
+	spec.Env = MaskEnvVars(spec.Env)
+	return spec
 }
 
 // logs an object's key details
@@ -148,11 +189,6 @@ func MergeLabels(labelsSlice ...map[string]string) map[string]string {
 		}
 	}
 	return result
-}
-
-// returns the name of the PersistentVolumeClaim for the Kode instance
-func GetPVCName(kode *kodev1alpha1.Kode) string {
-	return kode.Name + "-pvc"
 }
 
 // EncodeAndFillPath encodes a data structure, fills it into a CUE value at a specified path, and validates the result

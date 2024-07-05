@@ -36,6 +36,10 @@ type Templates struct {
 // KodeResourcesConfig holds configuration for Kode resources
 type KodeResourcesConfig struct {
 	Kode                kodev1alpha1.Kode
+	KodeName            string
+	KodeNamespace       string
+	PVCName             string
+	ServiceName         string
 	Templates           Templates
 	UserInitPlugins     []kodev1alpha1.InitPluginSpec
 	TemplateInitPlugins []kodev1alpha1.InitPluginSpec

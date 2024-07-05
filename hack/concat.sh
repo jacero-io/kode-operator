@@ -19,7 +19,7 @@ process_files() {
   done
 
   eval "$find_command" | while read -r file; do
-    echo "#################################################################################" >> "$output_file"
+    echo "##########################" >> "$output_file"
     txtFile="${file#../}"
     echo "// $txtFile" >> "$output_file"
     echo "" >> "$output_file"  # Add a newline for separation

@@ -1,3 +1,5 @@
+// internal/controller/kode_pvc.go
+
 /*
 Copyright 2024.
 
@@ -23,6 +25,7 @@ import (
 	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
 	"github.com/jacero-io/kode-operator/internal/common"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	client "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -32,63 +35,89 @@ import (
 // ensurePVC ensures that the PersistentVolumeClaim exists for the Kode instance
 func (r *KodeReconciler) ensurePVC(ctx context.Context, config *common.KodeResourcesConfig) error {
 	log := r.Log.WithName("PVCEnsurer").WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
+
 	ctx, cancel := common.ContextWithTimeout(ctx, 30) // 30 seconds timeout
 	defer cancel()
-	var err error
 
-	log.Info("Ensuring PVC exists")
+	log.Info("Ensuring PVC")
 
-	// If ExistingVolumeClaim is specified, log and skip creation
-	if config.Kode.Spec.Storage.ExistingVolumeClaim != "" {
-		log.Info("Using existing PVC", "ExistingVolumeClaim", config.Kode.Spec.Storage.ExistingVolumeClaim)
-		return nil
-	}
-
-	// Construct PVC only if ExistingVolumeClaim is not specified
-	pvc := r.constructPVC(config)
-	if pvc == nil {
-		return nil
-	}
-
-	// // Check if PVC already exists
-	// existingPVC := &corev1.PersistentVolumeClaim{}
-	// err = r.Get(ctx, client.ObjectKeyFromObject(pvc), existingPVC)
-	// if err == nil {
-	//     // PVC exists, ensure finalizer is present
-	// 	if !controllerutil.ContainsFinalizer(existingPVC, common.FinalizerName) {
-	// 		controllerutil.AddFinalizer(existingPVC, common.PVCFinalizerName)
-	//         if err := r.Update(ctx, existingPVC); err != nil {
-	//             return fmt.Errorf("failed to update PVC finalizers: %w", err)
-	//         }
-	//     }
-	//     return nil
-	// }
-
-	if err := controllerutil.SetControllerReference(&config.Kode, pvc, r.Scheme); err != nil {
-		return fmt.Errorf("failed to set controller reference: %w", err)
-	}
-
-	err = r.ResourceManager.Ensure(ctx, pvc)
-	if err != nil {
-		log.Error(err, "Failed to ensure PVC")
-		return fmt.Errorf("failed to ensure PVC: %w", err)
-	}
-
-	log.Info("Successfully ensured PVC")
-	return nil
-}
-
-// constructPVC constructs a PersistentVolumeClaim for the Kode instance
-func (r *KodeReconciler) constructPVC(config *common.KodeResourcesConfig) *corev1.PersistentVolumeClaim {
 	// If ExistingVolumeClaim is specified, return nil
 	if config.Kode.Spec.Storage.ExistingVolumeClaim != "" {
+		log.Info("ExistingVolumeClaim specified, skipping PVC creation", "ExistingVolumeClaim", config.Kode.Spec.Storage.ExistingVolumeClaim)
 		return nil
 	}
 
 	pvc := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      common.GetPVCName(&config.Kode),
-			Namespace: config.Kode.Namespace,
+			Name:      config.PVCName,
+			Namespace: config.KodeNamespace,
+		},
+	}
+
+	err := r.ResourceManager.CreateOrPatch(ctx, pvc, func() error {
+		// Construct the desired PVC spec
+		constructedPVC, err := r.constructPVCSpec(config)
+		if err != nil {
+			return fmt.Errorf("failed to construct PVC spec: %v", err)
+		}
+
+		// Get the existing PVC
+		existing := &corev1.PersistentVolumeClaim{}
+		err = r.Client.Get(ctx, client.ObjectKeyFromObject(pvc), existing)
+		if err == nil {
+			// PVC exists, update only mutable fields
+			pvc.Spec.Resources = constructedPVC.Spec.Resources
+			pvc.ObjectMeta.Labels = constructedPVC.ObjectMeta.Labels
+			pvc.ObjectMeta.Annotations = constructedPVC.ObjectMeta.Annotations
+			// Preserve immutable fields
+			pvc.Spec.AccessModes = existing.Spec.AccessModes
+			pvc.Spec.VolumeName = existing.Spec.VolumeName
+			pvc.Spec.VolumeMode = existing.Spec.VolumeMode
+			pvc.Spec.StorageClassName = existing.Spec.StorageClassName
+			pvc.Spec.Selector = existing.Spec.Selector
+		} else if errors.IsNotFound(err) {
+			// PVC doesn't exist, use the entire constructed spec
+			pvc.Spec = constructedPVC.Spec
+		} else {
+			return fmt.Errorf("failed to get existing PVC: %v", err)
+		}
+
+		// Update metadata for both new and existing PVCs
+		pvc.ObjectMeta.Labels = constructedPVC.ObjectMeta.Labels
+		pvc.ObjectMeta.Annotations = constructedPVC.ObjectMeta.Annotations
+
+		return controllerutil.SetControllerReference(&config.Kode, pvc, r.Scheme)
+	})
+
+	if err != nil {
+		return fmt.Errorf("failed to create or patch PVC: %v", err)
+	}
+
+	return nil
+}
+
+// // Check if PVC already exists
+// existingPVC := &corev1.PersistentVolumeClaim{}
+// err = r.Get(ctx, client.ObjectKeyFromObject(pvc), existingPVC)
+// if err == nil {
+//     // PVC exists, ensure finalizer is present
+// 	if !controllerutil.ContainsFinalizer(existingPVC, common.FinalizerName) {
+// 		controllerutil.AddFinalizer(existingPVC, common.PVCFinalizerName)
+//         if err := r.Update(ctx, existingPVC); err != nil {
+//             return fmt.Errorf("failed to update PVC finalizers: %w", err)
+//         }
+//     }
+//     return nil
+// }
+
+// constructPVCSpec constructs a PersistentVolumeClaim for the Kode instance
+func (r *KodeReconciler) constructPVCSpec(config *common.KodeResourcesConfig) (*corev1.PersistentVolumeClaim, error) {
+	log := r.Log.WithName("PvcConstructor").WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
+
+	pvc := &corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      config.PVCName,
+			Namespace: config.KodeNamespace,
 			Labels:    config.Labels,
 			OwnerReferences: []metav1.OwnerReference{
 				*metav1.NewControllerRef(&config.Kode, kodev1alpha1.GroupVersion.WithKind("Kode")),
@@ -105,5 +134,13 @@ func (r *KodeReconciler) constructPVC(config *common.KodeResourcesConfig) *corev
 		pvc.Spec.StorageClassName = config.Kode.Spec.Storage.StorageClassName
 	}
 
-	return pvc
+	// Add type information to the object
+	if err := common.AddTypeInformationToObject(pvc); err != nil {
+		log.Error(err, "Failed to add type information to PVC")
+		return nil, err
+	}
+
+	log.V(1).Info("PVC object constructed", "PVC", pvc, "Spec", pvc.Spec)
+
+	return pvc, nil
 }
