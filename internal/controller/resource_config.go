@@ -33,7 +33,7 @@ func InitKodeResourcesConfig(
 	// If EnvoyProxyConfig is not specified, use KodeTemplate.Port
 	localServicePort = templates.KodeTemplate.Port
 	externalServicePort = templates.KodeTemplate.Port
-	// If EnvoyProxyConfig is specified, use ExternalServicePort
+	// If EnvoyProxyConfig is specified, use the default local service port
 	if templates.EnvoyProxyConfigName != "" {
 		localServicePort = common.DefaultLocalServicePort
 		externalServicePort = templates.KodeTemplate.Port

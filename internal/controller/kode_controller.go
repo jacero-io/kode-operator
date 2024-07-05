@@ -148,6 +148,60 @@ func (r *KodeReconciler) ensureResources(ctx context.Context, config *common.Kod
 	return nil
 }
 
+func (r *KodeReconciler) handleFinalizer(ctx context.Context, kode *kodev1alpha1.Kode) (ctrl.Result, error) {
+	log := r.Log.WithValues("kode", client.ObjectKeyFromObject(kode))
+
+	if kode.ObjectMeta.DeletionTimestamp.IsZero() {
+		// Object is not being deleted, so ensure the finalizer is present
+		if !controllerutil.ContainsFinalizer(kode, common.FinalizerName) {
+			controllerutil.AddFinalizer(kode, common.FinalizerName)
+			log.Info("Adding finalizer", "finalizer", common.FinalizerName)
+			if err := r.Update(ctx, kode); err != nil {
+				log.Error(err, "Failed to add finalizer")
+				return ctrl.Result{}, err
+			}
+		}
+	} else {
+		// Object is being deleted
+		if controllerutil.ContainsFinalizer(kode, common.FinalizerName) {
+			// Run finalization logic
+			if err := r.finalize(ctx, kode); err != nil {
+				log.Error(err, "Failed to run finalizer")
+				// Don't return here, continue to remove the finalizer
+			}
+
+			// Remove finalizer
+			controllerutil.RemoveFinalizer(kode, common.FinalizerName)
+			log.Info("Removing finalizer", "finalizer", common.FinalizerName)
+			if err := r.Update(ctx, kode); err != nil {
+				log.Error(err, "Failed to remove finalizer")
+				return ctrl.Result{}, err
+			}
+		}
+		// Stop reconciliation as the item is being deleted
+		return ctrl.Result{}, nil
+	}
+
+	return ctrl.Result{}, nil
+}
+
+func (r *KodeReconciler) finalize(ctx context.Context, kode *kodev1alpha1.Kode) error {
+	log := r.Log.WithValues("kode", client.ObjectKeyFromObject(kode))
+	log.V(1).Info("Running finalizer")
+
+	// Initialize Kode resources config without templates
+	config := &common.KodeResourcesConfig{
+		Kode:          *kode,
+		KodeName:      kode.Name,
+		KodeNamespace: kode.Namespace,
+		PVCName:       kode.Name + "-pvc",
+		ServiceName:   kode.Name + "-svc",
+	}
+
+	// Perform cleanup
+	return r.CleanupManager.Cleanup(ctx, config)
+}
+
 func (r *KodeReconciler) checkResourcesReady(ctx context.Context, config *common.KodeResourcesConfig) (bool, error) {
 	log := r.Log.WithName("ResourceReadyChecker").WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
 	ctx, cancel := common.ContextWithTimeout(ctx, 20) // 20 seconds timeout
@@ -249,60 +303,6 @@ func (r *KodeReconciler) fetchTemplatesWithRetry(ctx context.Context, kode *kode
 		return err
 	})
 	return templates, err
-}
-
-func (r *KodeReconciler) handleFinalizer(ctx context.Context, kode *kodev1alpha1.Kode) (ctrl.Result, error) {
-	log := r.Log.WithValues("kode", client.ObjectKeyFromObject(kode))
-
-	if kode.ObjectMeta.DeletionTimestamp.IsZero() {
-		// Object is not being deleted, so ensure the finalizer is present
-		if !controllerutil.ContainsFinalizer(kode, common.FinalizerName) {
-			controllerutil.AddFinalizer(kode, common.FinalizerName)
-			log.Info("Adding finalizer", "finalizer", common.FinalizerName)
-			if err := r.Update(ctx, kode); err != nil {
-				log.Error(err, "Failed to add finalizer")
-				return ctrl.Result{}, err
-			}
-		}
-	} else {
-		// Object is being deleted
-		if controllerutil.ContainsFinalizer(kode, common.FinalizerName) {
-			// Run finalization logic
-			if err := r.finalize(ctx, kode); err != nil {
-				log.Error(err, "Failed to run finalizer")
-				// Don't return here, continue to remove the finalizer
-			}
-
-			// Remove finalizer
-			controllerutil.RemoveFinalizer(kode, common.FinalizerName)
-			log.Info("Removing finalizer", "finalizer", common.FinalizerName)
-			if err := r.Update(ctx, kode); err != nil {
-				log.Error(err, "Failed to remove finalizer")
-				return ctrl.Result{}, err
-			}
-		}
-		// Stop reconciliation as the item is being deleted
-		return ctrl.Result{}, nil
-	}
-
-	return ctrl.Result{}, nil
-}
-
-func (r *KodeReconciler) finalize(ctx context.Context, kode *kodev1alpha1.Kode) error {
-	log := r.Log.WithValues("kode", client.ObjectKeyFromObject(kode))
-	log.V(1).Info("Running finalizer")
-
-	// Initialize Kode resources config without templates
-	config := &common.KodeResourcesConfig{
-		Kode:          *kode,
-		KodeName:      kode.Name,
-		KodeNamespace: kode.Namespace,
-		PVCName:       kode.Name + "-pvc",
-		ServiceName:   kode.Name + "-svc",
-	}
-
-	// Perform cleanup
-	return r.CleanupManager.Cleanup(ctx, config)
 }
 
 func (r *KodeReconciler) SetupWithManager(mgr ctrl.Manager) error {
