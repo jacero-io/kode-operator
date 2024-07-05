@@ -1,16 +1,26 @@
 # kode-operator
 
-WARNING! THIS PROJECT IS UNDER HEAVY DEVELOPMENT AND NOT MEANT FOR PRODUCTION USE JUST YET.
+<span style="color: red;">WARNING! THIS PROJECT IS UNDER HEAVY DEVELOPMENT AND NOT MEANT FOR PRODUCTION USE JUST YET.</span>
 
-Kode-Operator is a Kubernetes operator designed to manage the full lifecycle of various ephemeral and semi ephemeral development environments and tools. It automates the deployment, configuration, and management of Code-server, Webtop, DevContainers, Alnoda, and Jupyter environments within a Kubernetes cluster.
+Kode-Operator is designed to enhance the developer experience with a strong focus on security and observability.
 
-Additionally, it supports authentication and authorization using Envoy Proxy and a standard way for the user to add custom configuration and data.
+## Overview
+
+Kode-Operator is a Kubernetes operator that manages the entire lifecycle of various ephemeral and semi-ephemeral development environments. It integrates a comprehensive suite of security tools (Falco, Envoy proxy) and observability standards (OpenTelemetry), ensuring robust security and transparency.
+
+Currently, Kode-Operator supports Code-server, Webtop, Alnoda, and Jupyter environments, with plans to support more in the future. It is also easily extendable to support other environments and tools beyond those listed.
 
 ## Description
 
-Kode-Operator streamlines the setup and management of development environments on Kubernetes. By leveraging custom resource definitions (CRDs), it allows users to declaratively specify the desired state of their environments and automates the deployment process.
+Kode-Operator simplifies the setup and management of development environments on Kubernetes. Using custom resource definitions (CRDs), users can declaratively specify their desired environment state, and Kode-Operator automates the deployment process.
 
-Whether you need a code server, a web-based development environment, or a data science notebook, Kode-Operator handles the orchestration, ensuring consistency and efficiency.
+## Key Features
+
+* Define your development environments using CRDs for consistent and repeatable setups.
+* Integrated security tools like Falco and Envoy proxy protect your environments.
+* OpenTelemetry standards provide deep insights into your development environments.
+* Manage a variety of development environments such as Code-server, Webtop, Alnoda, and Jupyter.
+* Easily extendable to support additional environments and tools beyond the current offerings.
 
 ## Key Concepts
 
@@ -127,20 +137,20 @@ spec:
 
 ### Features
 
-- [x] *Provisioning and update of [Code-server](https://docs.linuxserver.io/images/docker-code-server/).
-- [ ] *Provisioning and update of [Webtop](https://docs.linuxserver.io/images/docker-webtop/).
-- [ ] Authentication & Authorization support using Envoy Proxy sidecar.
-  - [OAuth2](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/oauth2_filter) With external Oauth2 provider.
-  - [Ext_Authz](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/ext_authz_filter) HTTP and GRPC (Used by for example OPA to authorize the users).
-- [ ] [Falco](https://falco.org/) sidecar support
-- [ ] Kode instance bound to the user identity and namespaced for isolation, an identity provided by an IAM (e.g Keycloak).
-- [x] Ability to include InitPlugins which are executed in order. InitPlugins can mutate the instance in any way the administrator or user like.
-  - Could for example add VSCode extensions or install software that is not built into the image.
-- [ ] Include dotfiles and other user settings in the Kode instance.
-- [ ] Pause/Prune container on inactivity, keeping the persistent storage.
-  - [ ] Backup & restore of the Kode instance state. Maybe not feasible.
-- [ ] Backup & Restore of user data to S3.
-- [ ] A Kode CLI to manage Kode resources
+* [x] *Provisioning and update of [Code-server](https://docs.linuxserver.io/images/docker-code-server/).
+* [ ] *Provisioning and update of [Webtop](https://docs.linuxserver.io/images/docker-webtop/).
+* [ ] Authentication & Authorization support using Envoy Proxy sidecar.
+  * [OAuth2](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/oauth2_filter) With external Oauth2 provider.
+  * [Ext_Authz](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/ext_authz_filter) HTTP and GRPC (Used by for example OPA to authorize the users).
+* [ ] [Falco](https://falco.org/) sidecar support
+* [ ] Kode instance bound to the user identity and namespaced for isolation, an identity provided by an IAM (e.g Keycloak).
+* [x] Ability to include InitPlugins which are executed in order. InitPlugins can mutate the instance in any way the administrator or user like.
+  * Could for example add VSCode extensions or install software that is not built into the image.
+* [ ] Include dotfiles and other user settings in the Kode instance.
+* [ ] Pause/Prune container on inactivity, keeping the persistent storage.
+  * [ ] Backup & restore of the Kode instance state. Maybe not feasible.
+* [ ] Backup & Restore of user data to S3.
+* [ ] A Kode CLI to manage Kode resources
 
 ## Usage Scenarios
 
@@ -174,8 +184,7 @@ spec:
     kind: KodeTemplate
     name: code-server-template
   user: devuser
-  password: devpassword
-  workspace: my-project
+  workspace: my-project # Overrides the template workspace
 ```
 
 **3. Apply the Configuration:**
@@ -245,8 +254,8 @@ kubectl apply -f secure-code-server.yaml
 
 ### Kustomize Prerequisites
 
-- kubectl version v1.28.0+.
-- Access to a Kubernetes v1.28.0+ cluster.
+* kubectl version v1.28.0+.
+* Access to a Kubernetes v1.28.0+ cluster.
 
 ### To Deploy on the cluster
 
@@ -260,7 +269,7 @@ TBD
 
 ### Helm Prerequisites
 
-- helm version 3.10+.
+* helm version 3.10+.
 
 ### Helm install
 
@@ -278,10 +287,10 @@ We welcome contributions to the Kode-Operator project! Here are some guidelines 
 
 Source: <https://dev.to/varbsan/a-simplified-convention-for-naming-branches-and-commits-in-git-il4>
 
-- `feature` is for adding, refactoring or removing a feature
-- `bugfix` is for fixing a bug
-- `hotfix` is for changing code with a temporary solution and/or without following the usual process (usually because of an emergency)
-- `test` is for experimenting outside of an issue/ticket
+* `feature` is for adding, refactoring or removing a feature
+* `bugfix` is for fixing a bug
+* `hotfix` is for changing code with a temporary solution and/or without following the usual process (usually because of an emergency)
+* `test` is for experimenting outside of an issue/ticket
 
 ### How to Contribute
 
@@ -330,10 +339,10 @@ If you find a bug or have a feature request, please create an issue in the [issu
 ### Development Setup
 
 1. **Install Dependencies**: Ensure you have the required dependencies installed:
-    - Go version v1.22.0+
-    - Docker version 25.0.0+
-    - kubectl version v1.29.1+
-    - Access to a Kubernetes v1.29.1+ cluster or kind
+    * Go version v1.22.0+
+    * Docker version 25.0.0+
+    * kubectl version v1.29.1+
+    * Access to a Kubernetes v1.29.1+ cluster or kind
 
 2. **Run the Project**: Use `make` to run the controller.
 
@@ -361,7 +370,7 @@ Thank you for your interest in contributing to Kode-Operator! Your contributions
 ## License
 
 ```
-Copyright 2024.
+Copyright emil@jacero.se 2024.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
