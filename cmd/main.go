@@ -133,11 +133,11 @@ func main() {
 	if err = (&kodecontroller.KodeReconciler{
 		Client:          mgr.GetClient(),
 		Scheme:          mgr.GetScheme(),
-		Log:             ctrl.Log.WithName("controllers").WithName("Kode").WithName("Reconcile"),
-		ResourceManager: resource.NewDefaultResourceManager(mgr.GetClient(), ctrl.Log.WithName("controllers").WithName("Kode").WithName("ResourceManager")),
-		TemplateManager: template.NewDefaultTemplateManager(mgr.GetClient(), ctrl.Log.WithName("controllers").WithName("Kode").WithName("TemplateManager")),
-		CleanupManager:  cleanup.NewDefaultCleanupManager(mgr.GetClient(), ctrl.Log.WithName("controllers").WithName("Kode").WithName("CleanupManager")),
-		StatusUpdater:   status.NewDefaultStatusUpdater(mgr.GetClient(), ctrl.Log.WithName("controllers").WithName("Kode").WithName("StatusUpdater")),
+		Log:             ctrl.Log.WithName("Kode").WithName("Reconcile"),
+		ResourceManager: resource.NewDefaultResourceManager(mgr.GetClient(), ctrl.Log.WithName("Kode").WithName("ResourceManager")),
+		TemplateManager: template.NewDefaultTemplateManager(mgr.GetClient(), ctrl.Log.WithName("Kode").WithName("TemplateManager")),
+		CleanupManager:  cleanup.NewDefaultCleanupManager(mgr.GetClient(), ctrl.Log.WithName("Kode").WithName("CleanupManager")),
+		StatusUpdater:   status.NewDefaultStatusUpdater(mgr.GetClient(), ctrl.Log.WithName("Kode").WithName("StatusUpdater")),
 		Validator:       validation.NewDefaultValidator(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Kode")
