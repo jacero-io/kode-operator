@@ -1,6 +1,6 @@
 # kode-operator
 
-<span style="color: red;">WARNING! THIS PROJECT IS UNDER HEAVY DEVELOPMENT AND NOT MEANT FOR PRODUCTION USE JUST YET.</span>
+<span style="color: red;">DISCLAIMER! THIS PROJECT IS UNDER HEAVY DEVELOPMENT AND NOT MEANT FOR PRODUCTION USE JUST YET.</span>
 
 Kode-Operator is designed to enhance the developer experience with a strong focus on security and observability.
 
