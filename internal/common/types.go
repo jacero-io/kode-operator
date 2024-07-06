@@ -54,6 +54,7 @@ type BootstrapConfigOptions struct {
 	Clusters     []kodev1alpha1.Cluster
 	LocalPort    int32
 	ExternalPort int32
+	AuthConfig   kodev1alpha1.AuthConfig
 }
 
 type TemplateNotFoundError struct {

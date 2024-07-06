@@ -32,7 +32,7 @@ type SharedEnvoyProxyConfigSpec struct {
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default="envoyproxy/envoy:v1.30-latest"
 	Image string `json:"image"`
-	
+
 	// AuthConfig is custom authentication configuration. Can be used to configure basic auth, JWT, etc.
 	// +kubebuilder:validation:Description="Custom authentication configuration. Can be used to configure basic auth, JWT, etc."
 	// +kubebuilder:validation:Optional
