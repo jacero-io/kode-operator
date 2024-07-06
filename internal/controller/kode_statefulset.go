@@ -105,16 +105,17 @@ func (r *KodeReconciler) constructStatefulSetSpec(config *common.KodeResourcesCo
 	containers[0].VolumeMounts = volumeMounts
 
 	if config.Templates.EnvoyProxyConfig != nil {
-		log.Info("Constructing EnvoyProxy sidecar container and init containers")
+		log.Info("Constructing Envoy sidecar container and init containers")
+		bootstrapGenerator := envoy.NewBootstrapConfigGenerator(r.Log.WithName("EnvoyBootstrapConfigGenerator").WithValues("kode", client.ObjectKeyFromObject(&config.Kode)))
 		envoySidecarContainer, envoyInitContainer, err := envoy.NewContainerConstructor(
-			r.Log,
-			envoy.NewBootstrapConfigGenerator(r.Log.WithName("EnvoyContainerConstructor"))).ConstructEnvoyProxyContainer(config)
+			r.Log.WithName("EnvoyContainerConstructor").WithValues("kode", client.ObjectKeyFromObject(&config.Kode)),
+			bootstrapGenerator).ConstructEnvoyProxyContainer(config)
 		if err != nil {
-			return nil, fmt.Errorf("failed to construct EnvoyProxy sidecar: %v", err)
+			return nil, fmt.Errorf("failed to construct Envoy sidecar: %v", err)
 		}
 		containers = append(containers, envoySidecarContainer)
 		initContainers = append(initContainers, envoyInitContainer)
-		log.Info("Successfully added EnvoyProxy sidecar container and init containers")
+		log.Info("Successfully added Envoy sidecar container and init containers")
 	}
 
 	// Add TemplateInitPlugins as InitContainers

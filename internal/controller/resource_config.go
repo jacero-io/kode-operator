@@ -19,8 +19,11 @@ limitations under the License.
 package controller
 
 import (
+	"fmt"
+
 	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
 	"github.com/jacero-io/kode-operator/internal/common"
+	corev1 "k8s.io/api/core/v1"
 )
 
 func InitKodeResourcesConfig(
@@ -29,6 +32,14 @@ func InitKodeResourcesConfig(
 
 	var localServicePort int32
 	var externalServicePort int32
+	var secretName string
+
+	// If ExistingSecret is specified, use it
+	if kode.Spec.ExistingSecret != "" {
+		secretName = kode.Spec.ExistingSecret
+	} else { // If ExistingSecret is not specified, use Kode.Name
+		secretName = fmt.Sprintf("%s-auth", kode.Name)
+	}
 
 	// If EnvoyProxyConfig is not specified, use KodeTemplate.Port
 	localServicePort = templates.KodeTemplate.Port
@@ -39,13 +50,15 @@ func InitKodeResourcesConfig(
 		externalServicePort = templates.KodeTemplate.Port
 	}
 
-	pvcName := kode.Name + "-pvc"
-	serviceName := kode.Name + "-svc"
+	pvcName := common.GetPVCName(kode)
+	serviceName := common.GetServiceName(kode)
 
 	return &common.KodeResourcesConfig{
 		Kode:                *kode,
 		KodeName:            kode.Name,
 		KodeNamespace:       kode.Namespace,
+		ExistingSecretName:  secretName,
+		ExistingSecret:      corev1.Secret{},
 		PVCName:             pvcName,
 		ServiceName:         serviceName,
 		Templates:           *templates,

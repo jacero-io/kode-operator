@@ -19,6 +19,8 @@ limitations under the License.
 package envoy
 
 import (
+	"encoding/base64"
+	"fmt"
 	"strconv"
 
 	"github.com/go-logr/logr"
@@ -40,13 +42,13 @@ func NewContainerConstructor(log logr.Logger, configGenerator *BootstrapConfigGe
 
 // ConstructEnvoyProxyContainer constructs the Envoy Proxy init container
 func (c *ContainerConstructor) ConstructEnvoyProxyContainer(config *common.KodeResourcesConfig) (corev1.Container, corev1.Container, error) {
-	c.log.Info("Constructing Envoy Proxy container")
 
 	envoyConfig, err := c.configGenerator.Generate(common.BootstrapConfigOptions{
 		HTTPFilters:  config.Templates.EnvoyProxyConfig.HTTPFilters,
 		Clusters:     config.Templates.EnvoyProxyConfig.Clusters,
 		LocalPort:    config.LocalServicePort,
 		ExternalPort: config.ExternalServicePort,
+		AuthConfig:   config.Templates.EnvoyProxyConfig.AuthConfig,
 	})
 	if err != nil {
 		c.log.Error(err, "Failed to generate bootstrap config")
@@ -81,6 +83,20 @@ func (c *ContainerConstructor) ConstructEnvoyProxyContainer(config *common.KodeR
 		},
 	}
 
-	c.log.Info("Successfully constructed Envoy Proxy and Init containers")
+	// if config.Templates.EnvoyProxyConfig.AuthConfig.AuthType == "basic" && config.Kode.Spec.User != "" && config.Kode.Spec.Password != "" {
+	//     basicAuthFilter, err := generateBasicAuthConfig(config.Kode.Spec.User, config.Kode.Spec.Password)
+	//     if err != nil {
+	//         return corev1.Container{}, corev1.Container{}, fmt.Errorf("failed to generate basic auth config: %w", err)
+	//     }
+	// 	// TODO: Add basic auth filter to HTTP filters
+	// }
+
+	c.log.V(1).Info("Envoy Proxy container", "name", envoyContainer.Name, "image", envoyContainer.Image, "ports", envoyContainer.Ports)
+
 	return envoyContainer, proxySetupContainer, nil
+}
+
+func generateBasicAuthConfig(username, password string) (string, error) {
+	hash := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", username, password)))
+	return hash, nil
 }

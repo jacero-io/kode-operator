@@ -42,8 +42,8 @@ const (
 )
 
 type BootstrapConfigGenerator struct {
-	log logr.Logger
-	ctx *cue.Context
+	Log    logr.Logger
+	CueCtx *cue.Context
 }
 
 //go:embed cue/bootstrap.cue
@@ -69,14 +69,14 @@ var embeddedCueSchema string
 
 func NewBootstrapConfigGenerator(log logr.Logger) *BootstrapConfigGenerator {
 	return &BootstrapConfigGenerator{
-		log: log,
-		ctx: cuecontext.New(),
+		Log:    log,
+		CueCtx: cuecontext.New(),
 	}
 }
 
 func (g *BootstrapConfigGenerator) Generate(options common.BootstrapConfigOptions) (string, error) {
-	g.log.Info("Starting bootstrap config generation")
-	g.log.V(1).Info("Config options", "options", options)
+	g.Log.Info("Starting bootstrap config generation")
+	g.Log.V(1).Info("Config options", "options", options)
 
 	cueFiles := map[string]string{
 		"schema.cue": embeddedCueSchema,
@@ -92,6 +92,16 @@ func (g *BootstrapConfigGenerator) Generate(options common.BootstrapConfigOption
 
 	// Ensure that the Router filter is included in the HTTP filters
 	options.HTTPFilters = g.ensureRouterFilter(options.HTTPFilters)
+
+	if options.AuthConfig.AuthType == "basic" {
+		basicAuthFilter := kodev1alpha1.HTTPFilter{
+			Name: "envoy.filters.http.basic_auth",
+			TypedConfig: runtime.RawExtension{
+				Raw: []byte(fmt.Sprintf(`{"@type": "%s", "users": {"inline_string": "%s"}}`, BasicAuthFilterType, options.AuthConfig)),
+			},
+		}
+		options.HTTPFilters = append([]kodev1alpha1.HTTPFilter{basicAuthFilter}, options.HTTPFilters...)
+	}
 
 	// Write the embedded files to a temporary directory
 	tempDir, err := g.writeEmbeddedFilesToTempDir(cueFiles)
@@ -119,7 +129,7 @@ func (g *BootstrapConfigGenerator) Generate(options common.BootstrapConfigOption
 	}
 	// return "", fmt.Errorf("FAILED TO DO STUFF: %w", err)
 
-	g.log.Info("Successfully rendered bootstrap config")
+	g.Log.Info("Successfully rendered bootstrap config")
 	return result, nil
 }
 
@@ -158,20 +168,20 @@ func (g *BootstrapConfigGenerator) loadAndBuildCueInstance(cueFiles map[string]s
 		filepaths = append(filepaths, filepath.Join(tempDir, name))
 	}
 
-	g.log.V(1).Info("Loading CUE instance")
+	g.Log.V(1).Info("Loading CUE instance")
 	inst := load.Instances(filepaths, nil)[0]
 	if inst.Err != nil {
 		return cue.Value{}, fmt.Errorf("failed to load CUE instance: %w", inst.Err)
 	}
 
-	g.log.V(1).Info("Building CUE instance")
-	value := g.ctx.BuildInstance(inst)
+	g.Log.V(1).Info("Building CUE instance")
+	value := g.CueCtx.BuildInstance(inst)
 	if value.Err() != nil {
 		return cue.Value{}, fmt.Errorf("failed to build CUE instance: %w", inst.Err)
 	}
 
-	g.log.V(1).Info("Successfully loaded and built CUE instance")
-	g.log.V(2).Info("CUE instance", "value", value)
+	g.Log.V(1).Info("Successfully loaded and built CUE instance")
+	g.Log.V(2).Info("CUE instance", "value", value)
 	return value, nil
 }
 
@@ -191,7 +201,7 @@ func (g *BootstrapConfigGenerator) encodeAndFillPaths(value cue.Value, options c
 
 	for _, p := range paths {
 		var err error
-		value, err = common.EncodeAndFillPath(g.ctx, value, p.parsePath, p.valuePath, p.schema, p.data)
+		value, err = common.EncodeAndFillPath(g.CueCtx, value, p.parsePath, p.valuePath, p.schema, p.data)
 		if err != nil {
 			return cue.Value{}, fmt.Errorf("failed to encode and fill path %s: %w", p.parsePath, err)
 		}

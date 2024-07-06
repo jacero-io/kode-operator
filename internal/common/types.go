@@ -20,6 +20,7 @@ import (
 	"fmt"
 
 	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -38,6 +39,8 @@ type KodeResourcesConfig struct {
 	Kode                kodev1alpha1.Kode
 	KodeName            string
 	KodeNamespace       string
+	ExistingSecretName  string
+	ExistingSecret      corev1.Secret
 	PVCName             string
 	ServiceName         string
 	Templates           Templates
