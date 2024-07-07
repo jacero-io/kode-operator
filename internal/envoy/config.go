@@ -52,21 +52,6 @@ var embeddedCueBootstrapConfig string
 //go:embed cue/schema.cue
 var embeddedCueSchema string
 
-// //go:embed cue/cluster_schema.cue
-// var embeddedCueClusterSchema string
-
-// //go:embed cue/filter_schema.cue
-// var embeddedCueFilterSchema string
-
-// //go:embed cue/listener_schema.cue
-// var embeddedCueListenerSchema string
-
-// //go:embed cue/route_schema.cue
-// var embeddedCueRouteSchema string
-
-// //go:embed cue/common_schema.cue
-// var embeddedCueCommonSchema string
-
 func NewBootstrapConfigGenerator(log logr.Logger) *BootstrapConfigGenerator {
 	return &BootstrapConfigGenerator{
 		Log:    log,
@@ -79,12 +64,7 @@ func (g *BootstrapConfigGenerator) Generate(options common.BootstrapConfigOption
 	g.Log.V(1).Info("Config options", "options", options)
 
 	cueFiles := map[string]string{
-		"schema.cue": embeddedCueSchema,
-		// "cluster_schema.cue.cue": embeddedCueClusterSchema,
-		// "filter_schema.cue":      embeddedCueFilterSchema,
-		// "listener_schema.cue":    embeddedCueListenerSchema,
-		// "route_schema.cue":       embeddedCueRouteSchema,
-		// "common_schema.cue":      embeddedCueCommonSchema,
+		"schema.cue":    embeddedCueSchema,
 		"bootstrap.cue": embeddedCueBootstrapConfig,
 	}
 
@@ -127,7 +107,6 @@ func (g *BootstrapConfigGenerator) Generate(options common.BootstrapConfigOption
 	if err != nil {
 		return "", err
 	}
-	// return "", fmt.Errorf("FAILED TO DO STUFF: %w", err)
 
 	g.Log.Info("Successfully rendered bootstrap config")
 	return result, nil

@@ -37,16 +37,18 @@ type Templates struct {
 // KodeResourcesConfig holds configuration for Kode resources
 type KodeResourcesConfig struct {
 	Kode                kodev1alpha1.Kode
+	Labels              map[string]string
 	KodeName            string
 	KodeNamespace       string
-	ExistingSecretName  string
-	ExistingSecret      corev1.Secret
+	SecretName          string
+	ExistingSecret      *corev1.Secret
 	PVCName             string
 	ServiceName         string
+	Containers          []corev1.Container
+	InitContainers      []corev1.Container
 	Templates           Templates
 	UserInitPlugins     []kodev1alpha1.InitPluginSpec
 	TemplateInitPlugins []kodev1alpha1.InitPluginSpec
-	Labels              map[string]string
 	LocalServicePort    int32
 	ExternalServicePort int32
 }

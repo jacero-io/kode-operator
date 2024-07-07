@@ -41,7 +41,10 @@ func NewContainerConstructor(log logr.Logger, configGenerator *BootstrapConfigGe
 }
 
 // ConstructEnvoyProxyContainer constructs the Envoy Proxy init container
-func (c *ContainerConstructor) ConstructEnvoyProxyContainer(config *common.KodeResourcesConfig) (corev1.Container, corev1.Container, error) {
+func (c *ContainerConstructor) ConstructEnvoyContainers(config *common.KodeResourcesConfig) ([]corev1.Container, []corev1.Container, error) {
+
+	containers := []corev1.Container{}
+	initContainers := []corev1.Container{}
 
 	envoyConfig, err := c.configGenerator.Generate(common.BootstrapConfigOptions{
 		HTTPFilters:  config.Templates.EnvoyProxyConfig.HTTPFilters,
@@ -52,8 +55,22 @@ func (c *ContainerConstructor) ConstructEnvoyProxyContainer(config *common.KodeR
 	})
 	if err != nil {
 		c.log.Error(err, "Failed to generate bootstrap config")
-		return corev1.Container{}, corev1.Container{}, err
+		return []corev1.Container{}, []corev1.Container{}, err
 	}
+
+	proxySetupContainer := corev1.Container{
+		Name:  common.ProxyInitContainerName,
+		Image: common.ProxyInitContainerImage,
+		Args:  []string{"-p", strconv.Itoa(int(config.ExternalServicePort)), "-u", strconv.FormatInt(common.EnvoyProxyRunAsUser, 16)},
+		SecurityContext: &corev1.SecurityContext{
+			Capabilities: &corev1.Capabilities{
+				Add: []corev1.Capability{"NET_ADMIN"},
+			},
+			RunAsNonRoot: common.BoolPtr(false),
+			RunAsUser:    common.Int64Ptr(0),
+		},
+	}
+	initContainers = append(initContainers, proxySetupContainer)
 
 	envoyContainer := corev1.Container{
 		Name:  common.EnvoyProxyContainerName,
@@ -69,19 +86,7 @@ func (c *ContainerConstructor) ConstructEnvoyProxyContainer(config *common.KodeR
 		},
 		// RestartPolicy: corev1.ContainerRestartPolicyAlways,
 	}
-
-	proxySetupContainer := corev1.Container{
-		Name:  common.ProxyInitContainerName,
-		Image: common.ProxyInitContainerImage,
-		Args:  []string{"-p", strconv.Itoa(int(config.ExternalServicePort)), "-u", strconv.FormatInt(common.EnvoyProxyRunAsUser, 16)},
-		SecurityContext: &corev1.SecurityContext{
-			Capabilities: &corev1.Capabilities{
-				Add: []corev1.Capability{"NET_ADMIN"},
-			},
-			RunAsNonRoot: common.BoolPtr(false),
-			RunAsUser:    common.Int64Ptr(0),
-		},
-	}
+	containers = append(containers, envoyContainer)
 
 	// if config.Templates.EnvoyProxyConfig.AuthConfig.AuthType == "basic" && config.Kode.Spec.User != "" && config.Kode.Spec.Password != "" {
 	//     basicAuthFilter, err := generateBasicAuthConfig(config.Kode.Spec.User, config.Kode.Spec.Password)
@@ -91,9 +96,10 @@ func (c *ContainerConstructor) ConstructEnvoyProxyContainer(config *common.KodeR
 	// 	// TODO: Add basic auth filter to HTTP filters
 	// }
 
-	c.log.V(1).Info("Envoy Proxy container", "name", envoyContainer.Name, "image", envoyContainer.Image, "ports", envoyContainer.Ports)
+	c.log.V(1).Info("Envoy container constructed", "Name", envoyContainer.Name, "Image", envoyContainer.Image, "ports", envoyContainer.Ports)
+	c.log.V(1).Info("Envoy setup container constructed", "Name", proxySetupContainer.Name, "Image", proxySetupContainer.Image, "ports", envoyContainer.Ports)
 
-	return envoyContainer, proxySetupContainer, nil
+	return containers, initContainers, nil
 }
 
 func generateBasicAuthConfig(username, password string) (string, error) {

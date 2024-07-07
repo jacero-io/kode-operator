@@ -129,6 +129,14 @@ func (r *KodeReconciler) ensureResources(ctx context.Context, config *common.Kod
 		return err
 	}
 
+	// If the KodeTemplate has an EnvoyProxyRef, ensure the EnvoyContainer
+	if config.Templates.EnvoyProxyConfig != nil {
+		if err := r.ensureEnvoy(ctx, config); err != nil {
+			log.Error(err, "Failed to ensure EnvoyContainer")
+			return err
+		}
+	}
+
 	// Ensure StatefulSet
 	if err := r.ensureStatefulSet(ctx, config); err != nil {
 		log.Error(err, "Failed to ensure StatefulSet")
@@ -158,9 +166,24 @@ func (r *KodeReconciler) checkResourcesReady(ctx context.Context, config *common
 	ctx, cancel := common.ContextWithTimeout(ctx, 20) // 20 seconds timeout
 	defer cancel()
 
+	// Check Secret
+	secret := &corev1.Secret{}
+	err := r.Get(ctx, types.NamespacedName{Name: config.SecretName, Namespace: config.KodeNamespace}, secret)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			log.Info("Secret not found")
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to get Secret: %w", err)
+	}
+
+	// TODO: Add check update status on:
+	// - Image pull backoff
+	// - Image pull error
+	// - Image pull timeout
 	// Check StatefulSet
 	statefulSet := &appsv1.StatefulSet{}
-	err := r.Get(ctx, types.NamespacedName{Name: config.KodeName, Namespace: config.KodeNamespace}, statefulSet)
+	err = r.Get(ctx, types.NamespacedName{Name: config.KodeName, Namespace: config.KodeNamespace}, statefulSet)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			log.Info("StatefulSet not found")

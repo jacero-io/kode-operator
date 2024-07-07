@@ -22,7 +22,6 @@ import (
 	"context"
 	"fmt"
 
-	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
 	"github.com/jacero-io/kode-operator/internal/common"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -119,9 +118,6 @@ func (r *KodeReconciler) constructPVCSpec(config *common.KodeResourcesConfig) (*
 			Name:      config.PVCName,
 			Namespace: config.KodeNamespace,
 			Labels:    config.Labels,
-			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(&config.Kode, kodev1alpha1.GroupVersion.WithKind("Kode")),
-			},
 			// Finalizers: []string{common.PVCFinalizerName},
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{

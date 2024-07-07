@@ -40,30 +40,40 @@ func (r *KodeReconciler) ensureSecret(ctx context.Context, config *common.KodeRe
 
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      config.KodeName,
+			Name:      config.SecretName,
 			Namespace: config.KodeNamespace,
 		},
 	}
 
-	// Create or patch the secret
-	err := r.ResourceManager.CreateOrPatch(ctx, secret, func() error {
-		constructedSecret, err := r.constructSecretSpec(config)
+	if config.Kode.Spec.ExistingSecret != "" {
+		// ExistingSecret is specified, fetch the secret
+		err := r.ResourceManager.Get(ctx, client.ObjectKeyFromObject(secret), secret)
 		if err != nil {
-			return fmt.Errorf("failed to construct Secret spec: %v", err)
+			return fmt.Errorf("failed to get Secret: %v", err)
 		}
 
-		secret.Data = constructedSecret.Data
-		secret.ObjectMeta.Labels = constructedSecret.ObjectMeta.Labels
+		log.V(1).Info("Using existing secret", "Name", secret.Name, "Data", common.MaskSecretData(secret))
+	} else {
+		// ExistingSecret is not specified, construct a new Secret
+		err := r.ResourceManager.CreateOrPatch(ctx, secret, func() error {
+			constructedSecret, err := r.constructSecretSpec(config)
+			if err != nil {
+				return fmt.Errorf("failed to construct Secret spec: %v", err)
+			}
 
-		return controllerutil.SetControllerReference(&config.Kode, secret, r.Scheme)
-	})
+			// Update metadata for the secret
+			secret.Data = constructedSecret.Data
+			secret.ObjectMeta.Labels = constructedSecret.ObjectMeta.Labels
+			secret.ObjectMeta.Annotations = constructedSecret.ObjectMeta.Annotations
 
-	// Add secret to the KodeResourcesConfig
-	config.ExistingSecret = *secret
-	log.V(1).Info("Secret ensured", "secret", secret)
+			return controllerutil.SetControllerReference(&config.Kode, secret, r.Scheme)
+		})
 
-	if err != nil {
-		return fmt.Errorf("failed to create or patch Secret: %v", err)
+		if err != nil {
+			return fmt.Errorf("failed to create or patch Secret: %v", err)
+		}
+
+		log.V(1).Info("Using constructed secret", "Name", secret.Name, "Data", common.MaskSecretData(secret))
 	}
 
 	return nil
@@ -71,21 +81,19 @@ func (r *KodeReconciler) ensureSecret(ctx context.Context, config *common.KodeRe
 
 // constructSecret constructs a Secret for the Kode instance
 func (r *KodeReconciler) constructSecretSpec(config *common.KodeResourcesConfig) (*corev1.Secret, error) {
-	log := r.Log.WithName("SecretConstructor").WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
+	// log := r.Log.WithName("SecretConstructor").WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
 
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      config.KodeName,
+			Name:      config.SecretName,
 			Namespace: config.KodeNamespace,
+			Labels:    config.Labels,
 		},
 		Data: map[string][]byte{
 			"username": []byte(config.Kode.Spec.User),
 			"password": []byte(config.Kode.Spec.Password),
 		},
 	}
-
-	maskedData := common.MaskSecretData(secret)
-	log.V(1).Info("Secret constructed", "Name", secret.Name, "Data", maskedData)
 
 	return secret, nil
 }

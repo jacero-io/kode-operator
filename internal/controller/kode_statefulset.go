@@ -26,7 +26,6 @@ import (
 
 	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
 	"github.com/jacero-io/kode-operator/internal/common"
-	"github.com/jacero-io/kode-operator/internal/envoy"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -104,18 +103,22 @@ func (r *KodeReconciler) constructStatefulSetSpec(config *common.KodeResourcesCo
 	volumes, volumeMounts := constructVolumesAndMounts(mountPath, config)
 	containers[0].VolumeMounts = volumeMounts
 
-	if config.Templates.EnvoyProxyConfig != nil {
-		log.Info("Constructing Envoy sidecar container and init containers")
-		bootstrapGenerator := envoy.NewBootstrapConfigGenerator(r.Log.WithName("EnvoyBootstrapConfigGenerator").WithValues("kode", client.ObjectKeyFromObject(&config.Kode)))
-		envoySidecarContainer, envoyInitContainer, err := envoy.NewContainerConstructor(
-			r.Log.WithName("EnvoyContainerConstructor").WithValues("kode", client.ObjectKeyFromObject(&config.Kode)),
-			bootstrapGenerator).ConstructEnvoyProxyContainer(config)
-		if err != nil {
-			return nil, fmt.Errorf("failed to construct Envoy sidecar: %v", err)
+	// If KodeResourcesConfig has containers, append to containers
+	if config.Containers != nil {
+		containers = append(containers, config.Containers...)
+		for _, container := range config.Containers {
+			log.Info("Container added", "Name", container.Name)
+			log.V(1).Info("Container added", "Container", container)
 		}
-		containers = append(containers, envoySidecarContainer)
-		initContainers = append(initContainers, envoyInitContainer)
-		log.Info("Successfully added Envoy sidecar container and init containers")
+	}
+
+	// If KodeResourcesConfig has initContainers, append to initContainers
+	if config.InitContainers != nil {
+		initContainers = append(initContainers, config.InitContainers...)
+		for _, container := range config.Containers {
+			log.Info("InitContainer added", "Name", container.Name)
+			log.V(1).Info("InitContainer added", "Container", container)
+		}
 	}
 
 	// Add TemplateInitPlugins as InitContainers

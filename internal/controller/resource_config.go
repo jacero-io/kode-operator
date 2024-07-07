@@ -55,14 +55,16 @@ func InitKodeResourcesConfig(
 
 	return &common.KodeResourcesConfig{
 		Kode:                *kode,
+		Labels:              createLabels(kode, templates),
 		KodeName:            kode.Name,
 		KodeNamespace:       kode.Namespace,
-		ExistingSecretName:  secretName,
-		ExistingSecret:      corev1.Secret{},
+		SecretName:          secretName,
+		ExistingSecret:      nil,
 		PVCName:             pvcName,
 		ServiceName:         serviceName,
+		Containers:          []corev1.Container{},
+		InitContainers:      []corev1.Container{},
 		Templates:           *templates,
-		Labels:              CreateLabels(kode, templates),
 		UserInitPlugins:     kode.Spec.InitPlugins,
 		TemplateInitPlugins: templates.KodeTemplate.InitPlugins,
 		LocalServicePort:    localServicePort,
@@ -70,7 +72,7 @@ func InitKodeResourcesConfig(
 	}
 }
 
-func CreateLabels(kode *kodev1alpha1.Kode, templates *common.Templates) map[string]string {
+func createLabels(kode *kodev1alpha1.Kode, templates *common.Templates) map[string]string {
 	return map[string]string{
 		"app.kubernetes.io/name":           kode.Name,
 		"app.kubernetes.io/managed-by":     "kode-operator",
