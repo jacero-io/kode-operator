@@ -103,21 +103,21 @@ func (r *KodeReconciler) constructStatefulSetSpec(config *common.KodeResourcesCo
 	volumes, volumeMounts := constructVolumesAndMounts(mountPath, config)
 	containers[0].VolumeMounts = volumeMounts
 
-	// If KodeResourcesConfig has containers, append to containers
-	if config.Containers != nil {
-		containers = append(containers, config.Containers...)
-		for _, container := range config.Containers {
-			log.V(1).Info("Container added", "Name", container.Name)
-			log.V(2).Info("Container added", "Name", container.Name, "Container", container)
-		}
-	}
-
 	// If KodeResourcesConfig has initContainers, append to initContainers
 	if config.InitContainers != nil {
 		initContainers = append(initContainers, config.InitContainers...)
 		for _, container := range config.Containers {
 			log.V(1).Info("InitContainer added", "Name", container.Name)
 			log.V(2).Info("InitContainer added", "Name", container.Name, "Container", container)
+		}
+	}
+
+	// If KodeResourcesConfig has containers, append to containers
+	if config.Containers != nil {
+		containers = append(containers, config.Containers...)
+		for _, container := range config.Containers {
+			log.V(1).Info("Container added", "Name", container.Name)
+			log.V(2).Info("Container added", "Name", container.Name, "Container", container)
 		}
 	}
 
@@ -155,11 +155,6 @@ func (r *KodeReconciler) constructStatefulSetSpec(config *common.KodeResourcesCo
 				},
 			},
 		},
-	}
-
-	// Add type information to the object
-	if err := common.AddTypeInformationToObject(statefulSet); err != nil {
-		return nil, fmt.Errorf("failed to add type information to StatefulSet: %v", err)
 	}
 
 	maskedSpec := common.MaskSpec(statefulSet.Spec.Template.Spec.Containers[0]) // Mask sensitive values

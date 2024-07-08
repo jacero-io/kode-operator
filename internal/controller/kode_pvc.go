@@ -130,12 +130,6 @@ func (r *KodeReconciler) constructPVCSpec(config *common.KodeResourcesConfig) (*
 		pvc.Spec.StorageClassName = config.Kode.Spec.Storage.StorageClassName
 	}
 
-	// Add type information to the object
-	if err := common.AddTypeInformationToObject(pvc); err != nil {
-		log.Error(err, "Failed to add type information to PVC")
-		return nil, err
-	}
-
 	log.V(1).Info("PVC object constructed", "PVC", pvc, "Spec", pvc.Spec)
 
 	return pvc, nil

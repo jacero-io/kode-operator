@@ -84,12 +84,6 @@ func (r *KodeReconciler) constructServiceSpec(config *common.KodeResourcesConfig
 		},
 	}
 
-	// Add type information to the object
-	if err := common.AddTypeInformationToObject(service); err != nil {
-		log.Error(err, "Failed to add type information to Service")
-		return nil, err
-	}
-
 	log.V(1).Info("Service object constructed", "Service", service, "Spec", service.Spec)
 
 	return service, nil
