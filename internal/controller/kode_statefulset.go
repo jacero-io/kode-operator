@@ -107,8 +107,8 @@ func (r *KodeReconciler) constructStatefulSetSpec(config *common.KodeResourcesCo
 	if config.Containers != nil {
 		containers = append(containers, config.Containers...)
 		for _, container := range config.Containers {
-			log.Info("Container added", "Name", container.Name)
-			log.V(1).Info("Container added", "Container", container)
+			log.V(1).Info("Container added", "Name", container.Name)
+			log.V(2).Info("Container added", "Name", container.Name, "Container", container)
 		}
 	}
 
@@ -116,8 +116,8 @@ func (r *KodeReconciler) constructStatefulSetSpec(config *common.KodeResourcesCo
 	if config.InitContainers != nil {
 		initContainers = append(initContainers, config.InitContainers...)
 		for _, container := range config.Containers {
-			log.Info("InitContainer added", "Name", container.Name)
-			log.V(1).Info("InitContainer added", "Container", container)
+			log.V(1).Info("InitContainer added", "Name", container.Name)
+			log.V(2).Info("InitContainer added", "Name", container.Name, "Container", container)
 		}
 	}
 

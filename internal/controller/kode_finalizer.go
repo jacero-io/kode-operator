@@ -66,8 +66,6 @@ func (r *KodeReconciler) handleFinalizer(ctx context.Context, kode *kodev1alpha1
 }
 
 func (r *KodeReconciler) finalize(ctx context.Context, kode *kodev1alpha1.Kode) error {
-	log := r.Log.WithValues("kode", client.ObjectKeyFromObject(kode))
-	log.V(1).Info("Running finalizer")
 
 	// Initialize Kode resources config without templates
 	config := &common.KodeResourcesConfig{

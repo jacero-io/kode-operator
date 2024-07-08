@@ -139,9 +139,14 @@ lint-fix: golangci-lint ## Run golangci-lint linter and perform fixes
 build: manifests generate fmt vet ## Build manager binary.
 	go build -o bin/manager cmd/main.go
 
+##@ Run
+
+ENV ?= development
+LOG_LEVEL ?= info
+
 .PHONY: run
 run: manifests generate fmt vet ## Run a controller from your host.
-	go run ./cmd/main.go
+	ENV=$(ENV) go run ./cmd/main.go --log-level $(LOG_LEVEL)
 
 # .PHONY: run-delve
 # run-delve: manifests generate fmt vet

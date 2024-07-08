@@ -134,10 +134,6 @@ spec:
                     description: Namespace is the namespace of the EnvoyProxyConfig
                       or EnvoyProxyClusterConfig
                     type: string
-                required:
-                - kind
-                - name
-                - namespace
                 type: object
               envs:
                 description: Specifies the environment variables.

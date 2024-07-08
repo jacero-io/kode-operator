@@ -160,7 +160,7 @@ func (g *BootstrapConfigGenerator) loadAndBuildCueInstance(cueFiles map[string]s
 	}
 
 	g.Log.V(1).Info("Successfully loaded and built CUE instance")
-	g.Log.V(2).Info("CUE instance", "value", value)
+	g.Log.V(1).Info("CUE instance", "value", value)
 	return value, nil
 }
 
