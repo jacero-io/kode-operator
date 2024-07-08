@@ -57,8 +57,6 @@ type AuthConfig struct {
 	AuthType string `json:"authType"`
 }
 
-// TODO: Fix the validation for the EnvoyProxyReference
-
 // EnvoyProxyReference is a reference to an EnvoyProxyConfig or EnvoyProxyClusterConfig
 type EnvoyProxyReference struct {
 	// Kind is the resource kind
