@@ -42,7 +42,12 @@ func NewDefaultStatusUpdater(client client.Client, log logr.Logger) StatusUpdate
 	}
 }
 
-func (u *defaultStatusUpdater) UpdateStatus(ctx context.Context, config *common.KodeResourcesConfig, phase kodev1alpha1.KodePhase, conditions []metav1.Condition, lastError string, lastErrorTime *metav1.Time) error {
+func (u *defaultStatusUpdater) UpdateStatus(ctx context.Context, phase string, conditions []metav1.Condition, lastError string, lastErrorTime *metav1.Time) error {
+	// Not implemented
+	return nil
+}
+
+func (u *defaultStatusUpdater) UpdateKodeStatus(ctx context.Context, config *common.KodeResourcesConfig, phase kodev1alpha1.KodePhase, conditions []metav1.Condition, lastError string, lastErrorTime *metav1.Time) error {
 	log := u.log.WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
 
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
@@ -67,6 +72,36 @@ func (u *defaultStatusUpdater) UpdateStatus(ctx context.Context, config *common.
 
 		// Update was successful, update the config's Kode with the latest version
 		config.Kode = latestKode
+
+		return nil
+	})
+}
+
+func (u *defaultStatusUpdater) UpdateEntryPointsStatus(ctx context.Context, config *common.EntryPointResourceConfig, phase kodev1alpha1.EntryPointPhase, conditions []metav1.Condition, lastError string, lastErrorTime *metav1.Time) error {
+	log := u.log.WithValues("entryPoint", client.ObjectKeyFromObject(&config.EntryPoint))
+
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		// Fetch the latest version of EntryPoint
+		var latestEntryPoint kodev1alpha1.EntryPoint
+		if err := u.client.Get(ctx, types.NamespacedName{Name: config.EntryPoint.Name, Namespace: config.EntryPoint.Namespace}, &latestEntryPoint); err != nil {
+			log.Error(err, "Failed to get latest version of EntryPoint")
+			return err
+		}
+
+		// Update the status
+		latestEntryPoint.Status.Phase = phase
+		latestEntryPoint.Status.Conditions = conditions
+		latestEntryPoint.Status.LastError = lastError
+		latestEntryPoint.Status.LastErrorTime = lastErrorTime
+
+		// Try to update
+		if err := u.client.Status().Update(ctx, &latestEntryPoint); err != nil {
+			log.Error(err, "Failed to update EntryPoint status")
+			return err
+		}
+
+		// Update was successful, update the config's EntryPoint with the latest version
+		config.EntryPoint = latestEntryPoint
 
 		return nil
 	})

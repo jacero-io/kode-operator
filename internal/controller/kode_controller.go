@@ -97,22 +97,22 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 
 	// Ensure resources
 	if err := r.ensureResources(ctx, config); err != nil {
-		return ctrl.Result{RequeueAfter: common.RequeueInterval}, r.UpdateStatusWithError(ctx, config, err)
+		return ctrl.Result{RequeueAfter: common.RequeueInterval}, r.updateKodeStatusWithError(ctx, config, err)
 	}
 
 	// Check if all resources are ready
 	ready, err := r.checkResourcesReady(ctx, config)
 	if err != nil {
-		return ctrl.Result{RequeueAfter: common.RequeueInterval}, r.UpdateStatusWithError(ctx, config, fmt.Errorf("failed to check resource readiness: %w", err))
+		return ctrl.Result{RequeueAfter: common.RequeueInterval}, r.updateKodeStatusWithError(ctx, config, fmt.Errorf("failed to check resource readiness: %w", err))
 	}
 	if !ready {
 		log.Info("Resources not ready, requeuing")
 		currentTime := r.GetCurrentTime()
-		return ctrl.Result{RequeueAfter: common.RequeueInterval}, r.StatusUpdater.UpdateStatus(ctx, config, kodev1alpha1.KodePhaseActive, nil, "resources not ready", &currentTime)
+		return ctrl.Result{RequeueAfter: common.RequeueInterval}, r.StatusUpdater.UpdateKodeStatus(ctx, config, kodev1alpha1.KodePhaseActive, nil, "resources not ready", &currentTime)
 	}
 
 	// Update status to success
-	if err := r.UpdateStatusWithSuccess(ctx, config); err != nil {
+	if err := r.updateKodeStatusWithSuccess(ctx, config); err != nil {
 		log.Error(err, "Failed to update status")
 		return ctrl.Result{Requeue: true}, nil
 	}

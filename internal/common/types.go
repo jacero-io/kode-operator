@@ -48,6 +48,15 @@ type KodeResourcesConfig struct {
 	ExternalServicePort int32
 }
 
+type EntryPointResourceConfig struct {
+	EntryPoint          kodev1alpha1.EntryPoint
+	Labels              map[string]string
+	EntryPointName      string
+	EntryPointNamespace string
+	EntryPointService   string
+	EntryPointURL       string	
+}
+
 // BootstrapConfigOptions contains options for generating Envoy bootstrap config
 type BootstrapConfigOptions struct {
 	HTTPFilters  []kodev1alpha1.HTTPFilter

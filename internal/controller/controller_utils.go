@@ -29,7 +29,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (r *KodeReconciler) UpdateStatusWithSuccess(ctx context.Context, config *common.KodeResourcesConfig) error {
+func (r *KodeReconciler) updateKodeStatusWithSuccess(ctx context.Context, config *common.KodeResourcesConfig) error {
 
 	now := metav1.NewTime(time.Now())
 	conditions := []metav1.Condition{
@@ -49,10 +49,10 @@ func (r *KodeReconciler) UpdateStatusWithSuccess(ctx context.Context, config *co
 		},
 	}
 
-	return r.StatusUpdater.UpdateStatus(ctx, config, kodev1alpha1.KodePhaseActive, conditions, "", nil)
+	return r.StatusUpdater.UpdateKodeStatus(ctx, config, kodev1alpha1.KodePhaseActive, conditions, "", nil)
 }
 
-func (r *KodeReconciler) UpdateStatusWithError(ctx context.Context, config *common.KodeResourcesConfig, err error) error {
+func (r *KodeReconciler) updateKodeStatusWithError(ctx context.Context, config *common.KodeResourcesConfig, err error) error {
 	log := r.Log.WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
 	log.Error(err, "Reconciliation error")
 
@@ -74,10 +74,10 @@ func (r *KodeReconciler) UpdateStatusWithError(ctx context.Context, config *comm
 		},
 	}
 
-	return r.StatusUpdater.UpdateStatus(ctx, config, kodev1alpha1.KodePhaseError, conditions, err.Error(), &now)
+	return r.StatusUpdater.UpdateKodeStatus(ctx, config, kodev1alpha1.KodePhaseFailed, conditions, err.Error(), &now)
 }
 
-func (r *KodeReconciler) UpdateStatusInactive(ctx context.Context, config *common.KodeResourcesConfig) error {
+func (r *KodeReconciler) updateKodeStatusInactive(ctx context.Context, config *common.KodeResourcesConfig) error {
 	log := r.Log.WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
 	log.Info("Resource marked as inactive")
 
@@ -92,10 +92,10 @@ func (r *KodeReconciler) UpdateStatusInactive(ctx context.Context, config *commo
 		},
 	}
 
-	return r.StatusUpdater.UpdateStatus(ctx, config, kodev1alpha1.KodePhaseInactive, conditions, "", nil)
+	return r.StatusUpdater.UpdateKodeStatus(ctx, config, kodev1alpha1.KodePhaseInactive, conditions, "", nil)
 }
 
-func (r *KodeReconciler) UpdateStatusRecycled(ctx context.Context, config *common.KodeResourcesConfig) error {
+func (r *KodeReconciler) updateKodeStatusRecycled(ctx context.Context, config *common.KodeResourcesConfig) error {
 	log := r.Log.WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
 	log.Info("Resource recycled")
 
@@ -110,7 +110,7 @@ func (r *KodeReconciler) UpdateStatusRecycled(ctx context.Context, config *commo
 		},
 	}
 
-	return r.StatusUpdater.UpdateStatus(ctx, config, kodev1alpha1.KodePhaseRecycled, conditions, "", nil)
+	return r.StatusUpdater.UpdateKodeStatus(ctx, config, kodev1alpha1.KodePhaseRecycling, conditions, "", nil)
 }
 
 func (r *KodeReconciler) clearErrorStatus(ctx context.Context, config *common.KodeResourcesConfig) error {

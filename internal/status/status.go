@@ -26,7 +26,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// StatusUpdater defines the interface for updating Kode status
+// StatusUpdater defines the interface for updating the status of a Kode and entry point resources.
 type StatusUpdater interface {
-	UpdateStatus(ctx context.Context, config *common.KodeResourcesConfig, phase kodev1alpha1.KodePhase, conditions []metav1.Condition, lastError string, lastErrorTime *metav1.Time) error
+	UpdateStatus(ctx context.Context, phase string, conditions []metav1.Condition, lastError string, lastErrorTime *metav1.Time) error
+	UpdateKodeStatus(ctx context.Context, config *common.KodeResourcesConfig, phase kodev1alpha1.KodePhase, conditions []metav1.Condition, lastError string, lastErrorTime *metav1.Time) error
+	UpdateEntryPointsStatus(ctx context.Context, config *common.EntryPointResourceConfig, phase kodev1alpha1.EntryPointPhase, conditions []metav1.Condition, lastError string, lastErrorTime *metav1.Time) error
 }
