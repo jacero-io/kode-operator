@@ -57,8 +57,8 @@ type AuthConfig struct {
 	AuthType string `json:"authType"`
 }
 
-// EnvoyProxyReference is a reference to an EnvoyProxyConfig or EnvoyProxyClusterConfig
-type EnvoyProxyReference struct {
+// EnvoyConfigReference is a reference to an EnvoyProxyConfig or EnvoyProxyClusterConfig
+type EnvoyConfigReference struct {
 	// Kind is the resource kind
 	// +kubebuilder:validation:Description="Resource kind"
 	// +kubebuilder:validation:Enum=EnvoyProxyConfig;EnvoyProxyClusterConfig

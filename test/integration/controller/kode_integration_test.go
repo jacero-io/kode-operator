@@ -111,7 +111,7 @@ var _ = Describe("Kode Controller Integration", Ordered, func() {
 			},
 			Spec: kodev1alpha1.KodeClusterTemplateSpec{
 				SharedKodeTemplateSpec: kodev1alpha1.SharedKodeTemplateSpec{
-					EnvoyProxyRef: kodev1alpha1.EnvoyProxyReference{
+					EnvoyConfigRef: kodev1alpha1.EnvoyConfigReference{
 						Kind: envoyProxyConfigKind,
 						Name: envoyProxyConfigName,
 					},

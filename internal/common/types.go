@@ -54,6 +54,7 @@ type KodeResourcesConfig struct {
 	ExternalServicePort int32
 }
 
+// EntryPointResourceConfig holds configuration for EntryPoint resources
 type EntryPointResourceConfig struct {
 	EntryPoint          kodev1alpha1.EntryPoint
 	Labels              map[string]string
