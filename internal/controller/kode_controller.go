@@ -185,7 +185,7 @@ func (r *KodeReconciler) ensureCredentials(ctx context.Context, config *common.K
 
 		username, password, err := common.GetUsernameAndPasswordFromSecret(secret)
 		if err != nil {
-			return fmt.Errorf("failed to get username and password from Secret: %w", err )
+			return fmt.Errorf("failed to get username and password from Secret: %w", err)
 		}
 
 		config.Credentials.Username = username

@@ -246,7 +246,6 @@ func unifyAndValidate(schema, value cue.Value) (cue.Value, error) {
 	return unifiedValue, nil
 }
 
-
 func generateBasicAuthConfig(username, password string) (string, error) {
 	hash := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", username, password)))
 	if hash == "" {

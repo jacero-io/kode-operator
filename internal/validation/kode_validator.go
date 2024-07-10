@@ -97,7 +97,6 @@ func validateExistingSecret(ctx context.Context, secretName string) error {
 	// 	return fmt.Errorf("failed to get Secret: %v", err)
 	// }
 
-
 	return nil
 
 }
