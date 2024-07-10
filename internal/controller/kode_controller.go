@@ -1,7 +1,7 @@
 // internal/controller/kode_controller.go
 
 /*
-Copyright emil@jacero.se 2024.
+Copyright 2024 Emil Larsson.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -39,7 +39,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	client "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 type KodeReconciler struct {
@@ -92,6 +91,11 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		return ctrl.Result{RequeueAfter: common.RequeueInterval}, err
 	}
 
+	// Validate Kode instance and resources
+	// if err := r.Validator.Validate(kode, templates); err != nil {
+	// 	return ctrl.Result{}, r.UpdateStatusWithError(ctx, config, fmt.Errorf("failed to validate Kode instance: %w", err))
+	// }
+
 	// Initialize Kode resources config
 	config := InitKodeResourcesConfig(kode, templates)
 
@@ -128,6 +132,26 @@ func (r *KodeReconciler) ensureResources(ctx context.Context, config *common.Kod
 		return err
 	}
 
+	// Ensure Secret
+	if err := r.ensureSecret(ctx, config); err != nil {
+		log.Error(err, "Failed to ensure Secret")
+		return err
+	}
+
+	// Ensure Credentials
+	if err := r.ensureCredentials(ctx, config); err != nil {
+		log.Error(err, "Failed to ensure Credentials")
+		return err
+	}
+
+	// If the KodeTemplate has an EnvoyProxyRef, ensure the EnvoyContainer
+	if config.Templates.EnvoyProxyConfig != nil {
+		if err := r.ensureEnvoy(ctx, config); err != nil {
+			log.Error(err, "Failed to ensure EnvoyContainer")
+			return err
+		}
+	}
+
 	// Ensure StatefulSet
 	if err := r.ensureStatefulSet(ctx, config); err != nil {
 		log.Error(err, "Failed to ensure StatefulSet")
@@ -158,69 +182,36 @@ func (r *KodeReconciler) ensureResources(ctx context.Context, config *common.Kod
 	return nil
 }
 
-func (r *KodeReconciler) handleFinalizer(ctx context.Context, kode *kodev1alpha1.Kode) (ctrl.Result, error) {
-	log := r.Log.WithValues("kode", client.ObjectKeyFromObject(kode))
+func (r *KodeReconciler) ensureCredentials(ctx context.Context, config *common.KodeResourcesConfig) error {
+	log := r.Log.WithName("CredentialsEnsurer").WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
 
-	if kode.ObjectMeta.DeletionTimestamp.IsZero() {
-		// Object is not being deleted, so ensure the finalizer is present
-		if !controllerutil.ContainsFinalizer(kode, common.FinalizerName) {
-			controllerutil.AddFinalizer(kode, common.FinalizerName)
-			log.Info("Adding finalizer", "finalizer", common.FinalizerName)
-			if err := r.Update(ctx, kode); err != nil {
-				log.Error(err, "Failed to add finalizer")
-				return ctrl.Result{}, err
-			}
+	if config.Kode.Spec.ExistingSecret != "" {
+		// ExistingSecret is specified, fetch the secret
+		secret := &corev1.Secret{}
+		err := r.Get(ctx, types.NamespacedName{Name: config.Kode.Spec.ExistingSecret, Namespace: config.KodeNamespace}, secret)
+		if err != nil {
+			return fmt.Errorf("failed to get Secret: %w", err)
 		}
+
+		username, password, err := common.GetUsernameAndPasswordFromSecret(secret)
+		if err != nil {
+			return fmt.Errorf("failed to get username and password from Secret: %w", err)
+		}
+
+		config.Credentials.Username = username
+		config.Credentials.Password = password
+
+		log.Info("Using existing secret", "Name", secret.Name, "Data", common.MaskSecretData(secret))
+	} else if config.Kode.Spec.Password != "" {
+		config.Credentials.Username = config.Kode.Spec.Username
+		config.Credentials.Password = config.Kode.Spec.Password
 	} else {
-		// Object is being deleted
-		if controllerutil.ContainsFinalizer(kode, common.FinalizerName) {
-			// Run finalization logic
-			if err := r.finalize(ctx, kode); err != nil {
-				log.Error(err, "Failed to run finalizer")
-				// Don't return here, continue to remove the finalizer
-			}
-
-			// Remove finalizer
-			controllerutil.RemoveFinalizer(kode, common.FinalizerName)
-			log.Info("Removing finalizer", "finalizer", common.FinalizerName)
-			if err := r.Update(ctx, kode); err != nil {
-				log.Error(err, "Failed to remove finalizer")
-				return ctrl.Result{}, err
-			}
-		}
-		// Stop reconciliation as the item is being deleted
-		return ctrl.Result{}, nil
+		config.Credentials.Username = config.Kode.Spec.Username
+		config.Credentials.Password = ""
 	}
 
-	return ctrl.Result{}, nil
-}
-
-func (r *KodeReconciler) finalize(ctx context.Context, kode *kodev1alpha1.Kode) error {
-	log := r.Log.WithValues("kode", client.ObjectKeyFromObject(kode))
-	log.V(1).Info("Running finalizer")
-
-	// Initialize Kode resources config without templates
-	config := &common.KodeResourcesConfig{
-		Kode:          *kode,
-		KodeName:      kode.Name,
-		KodeNamespace: kode.Namespace,
-		PVCName:       kode.Name + "-pvc",
-		ServiceName:   kode.Name + "-svc",
-	}
-
-	// Before cleanup
-	if err := r.updateKodePhaseRecycling(ctx, config); err != nil {
-		return err
-	}
-
-	// Perform cleanup
-	if err := r.CleanupManager.Cleanup(ctx, config); err != nil {
-		r.updateKodePhaseFailed(ctx, config, err)
-		return err
-	}
-
-	// After successful cleanup
-	return r.updateKodePhaseRecycled(ctx, config)
+	log.Info("Credentials ensured successfully")
+	return nil
 }
 
 // TODO: Add inactivity check
@@ -229,9 +220,24 @@ func (r *KodeReconciler) checkResourcesReady(ctx context.Context, config *common
 	ctx, cancel := common.ContextWithTimeout(ctx, 20) // 20 seconds timeout
 	defer cancel()
 
+	// Check Secret
+	secret := &corev1.Secret{}
+	err := r.Get(ctx, types.NamespacedName{Name: config.SecretName, Namespace: config.KodeNamespace}, secret)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			log.Info("Secret not found")
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to get Secret: %w", err)
+	}
+
+	// TODO: Add check update status on:
+	// - Image pull backoff
+	// - Image pull error
+	// - Image pull timeout
 	// Check StatefulSet
 	statefulSet := &appsv1.StatefulSet{}
-	err := r.Get(ctx, types.NamespacedName{Name: config.KodeName, Namespace: config.KodeNamespace}, statefulSet)
+	err = r.Get(ctx, types.NamespacedName{Name: config.KodeName, Namespace: config.KodeNamespace}, statefulSet)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			log.Info("StatefulSet not found")

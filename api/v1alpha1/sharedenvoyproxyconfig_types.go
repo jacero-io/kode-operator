@@ -1,5 +1,5 @@
 /*
-Copyright emil@jacero.se 2024.
+Copyright 2024 Emil Larsson.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -18,44 +18,61 @@ package v1alpha1
 
 import runtime "k8s.io/apimachinery/pkg/runtime"
 
-// Spec for the EnvoyProxyConfig.
-type SharedEnvoyProxyConfigSpec struct {
-	// Image is the Docker image for the Envoy proxy
-	// +kubebuilder:validation:MinLength=1
-	// +kubebuilder:validation:Required
-	// +kubebuilder:default="envoyproxy/envoy:v1.30-latest"
-	Image string `json:"image"`
-
-	// HTTPFilters is a list of Envoy HTTP filters to be applied
-	// +kubebuilder:validation:Description="HTTP filters to be applied"
-	HTTPFilters []HTTPFilter `json:"httpFilters"`
-
-	// Clusters is a list of Envoy clusters
-	// +kubebuilder:validation:Description="Envoy clusters"
-	Clusters []Cluster `json:"clusters,omitempty"`
-}
-
-// EnvoyProxyStatus defines the observed state of EnvoyProxy
+// SharedEnvoyProxyStatus defines the observed state of EnvoyProxy
 type SharedEnvoyProxyStatus struct {
 	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
 	// Important: Run "make" to regenerate code after modifying this file
 }
 
-// TODO: Fix the validation for the EnvoyProxyReference
+// SharedEnvoyProxyConfigSpec defines the desired state of EnvoyProxy
+type SharedEnvoyProxyConfigSpec struct {
+	// Image is the Docker image for the Envoy proxy
+	// +kubebuilder:validation:Description="Docker image for the Envoy proxy"
+	// +kubebuilder:validation:MinLength=1
+	// +kubebuilder:validation:Required
+	// +kubebuilder:default="envoyproxy/envoy:v1.30-latest"
+	Image string `json:"image"`
+
+	// AuthConfig is custom authentication configuration. Can be used to configure basic auth, JWT, etc.
+	// +kubebuilder:validation:Description="Custom authentication configuration. Can be used to configure basic auth, JWT, etc."
+	// +kubebuilder:validation:Optional
+	AuthConfig AuthConfig `json:"authConfig"`
+
+	// HTTPFilters is a list of Envoy HTTP filters to be applied
+	// +kubebuilder:validation:Description="HTTP filters to be applied"
+	// +kubebuilder:validation:Optional
+	HTTPFilters []HTTPFilter `json:"httpFilters"`
+
+	// Clusters is a list of Envoy clusters
+	// +kubebuilder:validation:Description="Envoy clusters"
+	// +kubebuilder:validation:Optional
+	Clusters []Cluster `json:"clusters,omitempty"`
+}
+
+type AuthConfig struct {
+	// AuthType is the type of authentication. Can be set to "basic" or "jwt"
+	// +kubebuilder:validation:Description="Type of authentication. Can be set to 'basic' or 'jwt'"
+	// +kubebuilder:validation:enum="basic";"jwt"
+	// +kubebuilder:validation:Required
+	AuthType string `json:"authType"`
+}
 
 // EnvoyProxyReference is a reference to an EnvoyProxyConfig or EnvoyProxyClusterConfig
 type EnvoyProxyReference struct {
 	// Kind is the resource kind
 	// +kubebuilder:validation:Description="Resource kind"
 	// +kubebuilder:validation:Enum=EnvoyProxyConfig;EnvoyProxyClusterConfig
+	// +kubebuilder:validation:Optional
 	Kind string `json:"kind,omitempty"`
 
 	// Name is the name of the EnvoyProxyConfig or EnvoyProxyClusterConfig
 	// +kubebuilder:validation:Description="Name of the config"
+	// +kubebuilder:validation:Optional
 	Name string `json:"name,omitempty"`
 
 	// Namespace is the namespace of the EnvoyProxyConfig or EnvoyProxyClusterConfig
 	// +kubebuilder:validation:Description="Namespace of the Envoy Proxy config"
+	// +kubebuilder:validation:Optional
 	Namespace string `json:"namespace,omitempty"`
 }
 

@@ -1,6 +1,6 @@
 # kode-operator
 
-<span style="color: red;">WARNING! THIS PROJECT IS UNDER HEAVY DEVELOPMENT AND NOT MEANT FOR PRODUCTION USE JUST YET.</span>
+<span style="color: red;">DISCLAIMER! THIS PROJECT IS UNDER HEAVY DEVELOPMENT AND NOT MEANT FOR PRODUCTION USE JUST YET.</span>
 
 Kode-Operator is designed to enhance the developer experience with a strong focus on security and observability.
 
@@ -38,7 +38,7 @@ spec:
   templateRef:
     kind: KodeTemplate
     name: my-kode-template
-  user: myuser
+  username: myuser
   password: mypassword
   home: /home/myuser
   workspace: my-workspace
@@ -183,7 +183,7 @@ spec:
   templateRef:
     kind: KodeTemplate
     name: code-server-template
-  user: devuser
+  username: devuser
   workspace: my-project # Overrides the template workspace
 ```
 
@@ -237,7 +237,7 @@ spec:
   templateRef:
     kind: KodeTemplate
     name: secure-code-server-template
-  user: devuser # Sent to the Envoy proxy Basic Auth
+  username: devuser # Sent to the Envoy proxy Basic Auth
   password: devpassword # Sent to the Envoy proxy Basic Auth
   workspace: my-secure-project # Overrides the template workspace
 ```
@@ -370,7 +370,7 @@ Thank you for your interest in contributing to Kode-Operator! Your contributions
 ## License
 
 ```
-Copyright emil@jacero.se 2024.
+Copyright 2024 Emil Larsson.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

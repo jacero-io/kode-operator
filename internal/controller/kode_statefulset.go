@@ -1,7 +1,7 @@
 // internal/controller/kode_statefulset.go
 
 /*
-Copyright emil@jacero.se 2024.
+Copyright 2024 Emil Larsson.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -26,7 +26,6 @@ import (
 
 	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
 	"github.com/jacero-io/kode-operator/internal/common"
-	"github.com/jacero-io/kode-operator/internal/envoy"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -66,6 +65,9 @@ func (r *KodeReconciler) ensureStatefulSet(ctx context.Context, config *common.K
 		return fmt.Errorf("failed to create or patch StatefulSet: %v", err)
 	}
 
+	maskedSpec := common.MaskSpec(statefulSet.Spec.Template.Spec.Containers[0]) // Mask sensitive values
+	log.V(1).Info("StatefulSet object created", "StatefulSet", statefulSet, "Spec", maskedSpec)
+
 	return nil
 }
 
@@ -104,17 +106,22 @@ func (r *KodeReconciler) constructStatefulSetSpec(config *common.KodeResourcesCo
 	volumes, volumeMounts := constructVolumesAndMounts(mountPath, config)
 	containers[0].VolumeMounts = volumeMounts
 
-	if config.Templates.EnvoyProxyConfig != nil {
-		log.Info("Constructing EnvoyProxy sidecar container and init containers")
-		envoySidecarContainer, envoyInitContainer, err := envoy.NewContainerConstructor(
-			r.Log,
-			envoy.NewBootstrapConfigGenerator(r.Log.WithName("EnvoyContainerConstructor"))).ConstructEnvoyProxyContainer(config)
-		if err != nil {
-			return nil, fmt.Errorf("failed to construct EnvoyProxy sidecar: %v", err)
+	// If KodeResourcesConfig has initContainers, append to initContainers
+	if config.InitContainers != nil {
+		initContainers = append(initContainers, config.InitContainers...)
+		for _, container := range config.Containers {
+			log.V(1).Info("InitContainer added", "Name", container.Name)
+			log.V(2).Info("InitContainer added", "Name", container.Name, "Container", container)
 		}
-		containers = append(containers, envoySidecarContainer)
-		initContainers = append(initContainers, envoyInitContainer)
-		log.Info("Successfully added EnvoyProxy sidecar container and init containers")
+	}
+
+	// If KodeResourcesConfig has containers, append to containers
+	if config.Containers != nil {
+		containers = append(containers, config.Containers...)
+		for _, container := range config.Containers {
+			log.V(1).Info("Container added", "Name", container.Name)
+			log.V(2).Info("Container added", "Name", container.Name, "Container", container)
+		}
 	}
 
 	// Add TemplateInitPlugins as InitContainers
@@ -153,14 +160,6 @@ func (r *KodeReconciler) constructStatefulSetSpec(config *common.KodeResourcesCo
 		},
 	}
 
-	// Add type information to the object
-	if err := common.AddTypeInformationToObject(statefulSet); err != nil {
-		return nil, fmt.Errorf("failed to add type information to StatefulSet: %v", err)
-	}
-
-	maskedSpec := common.MaskSpec(statefulSet.Spec.Template.Spec.Containers[0]) // Mask sensitive values
-	log.V(1).Info("StatefulSet object created", "StatefulSet", statefulSet, "Spec", maskedSpec)
-
 	return statefulSet, nil
 }
 
@@ -175,8 +174,8 @@ func constructCodeServerContainers(config *common.KodeResourcesConfig,
 			{Name: "PGID", Value: fmt.Sprintf("%d", config.Templates.KodeTemplate.PGID)},
 			{Name: "TZ", Value: config.Templates.KodeTemplate.TZ},
 			{Name: "PORT", Value: fmt.Sprintf("%d", config.LocalServicePort)},
-			{Name: "USERNAME", Value: config.Kode.Spec.User},
-			{Name: "PASSWORD", Value: config.Kode.Spec.Password},
+			{Name: "USERNAME", Value: config.Kode.Spec.Username},
+			// {Name: "PASSWORD", Value: config.Kode.Spec.Password},
 			{Name: "DEFAULT_WORKSPACE", Value: workspace},
 		},
 		Ports: []corev1.ContainerPort{{
@@ -196,8 +195,8 @@ func constructWebtopContainers(config *common.KodeResourcesConfig) []corev1.Cont
 			{Name: "PGID", Value: fmt.Sprintf("%d", config.Templates.KodeTemplate.PGID)},
 			{Name: "TZ", Value: config.Templates.KodeTemplate.TZ},
 			{Name: "CUSTOM_PORT", Value: fmt.Sprintf("%d", config.LocalServicePort)},
-			{Name: "CUSTOM_USER", Value: config.Kode.Spec.User},
-			{Name: "PASSWORD", Value: config.Kode.Spec.Password},
+			{Name: "CUSTOM_USER", Value: config.Kode.Spec.Username},
+			// {Name: "PASSWORD", Value: config.Kode.Spec.Password},
 		},
 		Ports: []corev1.ContainerPort{{
 			Name:          "http",

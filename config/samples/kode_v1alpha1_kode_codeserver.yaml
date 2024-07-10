@@ -12,7 +12,7 @@ spec:
     kind: KodeTemplate
     name: kodetemplate-codeserver-sample
     namespace: default
-  user: user1
+  username: user1
   password: password1
   storage:
     accessModes:

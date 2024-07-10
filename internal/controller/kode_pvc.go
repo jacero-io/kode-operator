@@ -1,7 +1,7 @@
 // internal/controller/kode_pvc.go
 
 /*
-Copyright emil@jacero.se 2024.
+Copyright 2024 Emil Larsson.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -22,7 +22,6 @@ import (
 	"context"
 	"fmt"
 
-	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
 	"github.com/jacero-io/kode-operator/internal/common"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -31,7 +30,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-// TODO: Investigate if "if pvc == nil" is really required
 // ensurePVC ensures that the PersistentVolumeClaim exists for the Kode instance
 func (r *KodeReconciler) ensurePVC(ctx context.Context, config *common.KodeResourcesConfig) error {
 	log := r.Log.WithName("PVCEnsurer").WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
@@ -93,6 +91,8 @@ func (r *KodeReconciler) ensurePVC(ctx context.Context, config *common.KodeResou
 		return fmt.Errorf("failed to create or patch PVC: %v", err)
 	}
 
+	log.V(1).Info("PVC object constructed", "PVC", pvc, "Spec", pvc.Spec)
+
 	return nil
 }
 
@@ -112,16 +112,13 @@ func (r *KodeReconciler) ensurePVC(ctx context.Context, config *common.KodeResou
 
 // constructPVCSpec constructs a PersistentVolumeClaim for the Kode instance
 func (r *KodeReconciler) constructPVCSpec(config *common.KodeResourcesConfig) (*corev1.PersistentVolumeClaim, error) {
-	log := r.Log.WithName("PvcConstructor").WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
+	// log := r.Log.WithName("PvcConstructor").WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
 
 	pvc := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      config.PVCName,
 			Namespace: config.KodeNamespace,
 			Labels:    config.Labels,
-			OwnerReferences: []metav1.OwnerReference{
-				*metav1.NewControllerRef(&config.Kode, kodev1alpha1.GroupVersion.WithKind("Kode")),
-			},
 			// Finalizers: []string{common.PVCFinalizerName},
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{
@@ -133,14 +130,6 @@ func (r *KodeReconciler) constructPVCSpec(config *common.KodeResourcesConfig) (*
 	if config.Kode.Spec.Storage.StorageClassName != nil {
 		pvc.Spec.StorageClassName = config.Kode.Spec.Storage.StorageClassName
 	}
-
-	// Add type information to the object
-	if err := common.AddTypeInformationToObject(pvc); err != nil {
-		log.Error(err, "Failed to add type information to PVC")
-		return nil, err
-	}
-
-	log.V(1).Info("PVC object constructed", "PVC", pvc, "Spec", pvc.Spec)
 
 	return pvc, nil
 }

@@ -1,5 +1,5 @@
 /*
-Copyright emil@jacero.se 2024.
+Copyright 2024 Emil Larsson.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -17,10 +17,13 @@ limitations under the License.
 package validation
 
 import (
+	"context"
+
 	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
+	"github.com/jacero-io/kode-operator/internal/common"
 )
 
 // Validator defines the interface for validating Kode resources
 type Validator interface {
-	Validate(kode *kodev1alpha1.Kode) error
+	ValidateKode(ctx context.Context, kode *kodev1alpha1.Kode, templates *common.Templates) error
 }
