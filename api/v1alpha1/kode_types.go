@@ -102,11 +102,11 @@ const (
 	// KodePhaseCreating indicates that the Kode resource is being created.
 	KodePhaseCreating KodePhase = "Creating"
 
-	// KodePhaseFailed indicates that the Kode resource has failed to be created.
-	KodePhaseFailed KodePhase = "Failed"
-
 	// KodePhaseCreated indicates that the Kode resource has been created.
 	KodePhaseCreated KodePhase = "Created"
+
+	// KodePhaseFailed indicates that the Kode resource has failed to be created.
+	KodePhaseFailed KodePhase = "Failed"
 
 	// KodePhasePending indicates that the Kode resource is pending and waiting for resources to be created.
 	KodePhasePending KodePhase = "Pending"
