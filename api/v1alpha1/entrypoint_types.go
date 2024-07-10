@@ -48,23 +48,20 @@ type EntryPointSpec struct {
 type EntryPointPhase string
 
 const (
-	// EntryPointPhasePending means the EntryPoint is pending.
-	EntryPointPhasePending EntryPointPhase = "Pending"
-
 	// EntryPointPhaseCreating means the EntryPoint is being created.
 	EntryPointPhaseCreating EntryPointPhase = "Creating"
 
-	// EntryPointPhaseActive means the EntryPoint is active.
-	EntryPointPhaseActive EntryPointPhase = "Active"
-
-	// EntryPointPhaseDeleting means the EntryPoint is being deleted.
-	EntryPointPhaseDeleting EntryPointPhase = "Deleting"
+	// KodePhaseCreated indicates that the Kode resource has been created.
+	EntryPointPhaseCreated EntryPointPhase = "Created"
 
 	// EntryPointPhaseFailed means the EntryPoint has failed.
 	EntryPointPhaseFailed EntryPointPhase = "Failed"
 
-	// EntryPointPhaseUnknown means the EntryPoint is in an unknown state.
-	EntryPointPhaseUnknown EntryPointPhase = "Unknown"
+	// EntryPointPhasePending means the EntryPoint is pending.
+	EntryPointPhasePending EntryPointPhase = "Pending"
+
+	// EntryPointPhaseDeleting means the EntryPoint is being deleted.
+	EntryPointPhaseDeleting EntryPointPhase = "Deleting"
 )
 
 // EntryPointStatus defines the observed state of EntryPoint
