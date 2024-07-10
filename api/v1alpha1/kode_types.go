@@ -99,29 +99,26 @@ type KodeStorageSpec struct {
 type KodePhase string
 
 const (
-	// KodePhasePending means the Kode is pending.
-	KodePhasePending KodePhase = "Pending"
-
-	// KodePhaseCreating means the Kode is being created.
+	// KodePhaseCreating indicates that the Kode resource is being created.
 	KodePhaseCreating KodePhase = "Creating"
 
-	// KodePhaseActive means the Kode is active.
-	KodePhaseActive KodePhase = "Active"
-
-	// KodePhaseInactive means the Kode is inactive.
-	KodePhaseInactive KodePhase = "Inactive"
-
-	// KodePhaseDeleting means the Kode is being deleted.
-	KodePhaseDeleting KodePhase = "Deleting"
-
-	// KodePhaseFailed means the Kode has failed.
+	// KodePhaseFailed indicates that the Kode resource has failed to be created.
 	KodePhaseFailed KodePhase = "Failed"
 
-	// KodePhaseUnknown means the Kode is in an unknown state.
-	KodePhaseUnknown KodePhase = "Unknown"
+	// KodePhaseCreated indicates that the Kode resource has been created.
+	KodePhaseCreated KodePhase = "Created"
 
-	// KodePhaseRecycling means the Kode is being recycled.
-	KodePhaseRecycling KodePhase = "Recycling"
+	// KodePhasePending indicates that the Kode resource is pending and waiting for resources to be created.
+	KodePhasePending KodePhase = "Pending"
+
+	// KodePhaseActive indicates that the Kode resource is active and running.
+	KodePhaseActive KodePhase = "Active"
+
+	// KodePhaseInactive indicates that the Kode resource has been marked as inactive and will be deleted.
+	KodePhaseInactive KodePhase = "Inactive"
+
+	// KodePhaseRecycled indicates that the Kode resource has been completely recycled and all resources have been deleted.
+	KodePhaseRecycled KodePhase = "Recycled"
 )
 
 // KodeStatus defines the observed state of Kode
