@@ -1,7 +1,7 @@
 // internal/controller/resource_config.go
 
 /*
-Copyright emil@jacero.se 2024.
+Copyright 2024 Emil Larsson.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,8 +19,6 @@ limitations under the License.
 package controller
 
 import (
-	"fmt"
-
 	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
 	"github.com/jacero-io/kode-operator/internal/common"
 	corev1 "k8s.io/api/core/v1"
@@ -33,13 +31,6 @@ func InitKodeResourcesConfig(
 	var localServicePort int32
 	var externalServicePort int32
 	var secretName string
-
-	// If ExistingSecret is specified, use it
-	if kode.Spec.ExistingSecret != "" {
-		secretName = kode.Spec.ExistingSecret
-	} else { // If ExistingSecret is not specified, use Kode.Name
-		secretName = fmt.Sprintf("%s-auth", kode.Name)
-	}
 
 	// If EnvoyProxyConfig is not specified, use KodeTemplate.Port
 	localServicePort = templates.KodeTemplate.Port
@@ -58,13 +49,14 @@ func InitKodeResourcesConfig(
 		Labels:              createLabels(kode, templates),
 		KodeName:            kode.Name,
 		KodeNamespace:       kode.Namespace,
+		Secret:              corev1.Secret{},
 		SecretName:          secretName,
-		ExistingSecret:      nil,
+		Credentials: 	     common.Credentials{},
 		PVCName:             pvcName,
 		ServiceName:         serviceName,
+		Templates:           *templates,
 		Containers:          []corev1.Container{},
 		InitContainers:      []corev1.Container{},
-		Templates:           *templates,
 		UserInitPlugins:     kode.Spec.InitPlugins,
 		TemplateInitPlugins: templates.KodeTemplate.InitPlugins,
 		LocalServicePort:    localServicePort,

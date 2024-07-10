@@ -1,7 +1,7 @@
 // internal/controller/kode_controller.go
 
 /*
-Copyright emil@jacero.se 2024.
+Copyright 2024 Emil Larsson.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -91,6 +91,11 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		return ctrl.Result{RequeueAfter: common.RequeueInterval}, err
 	}
 
+	// Validate Kode instance and resources
+	// if err := r.Validator.Validate(kode, templates); err != nil {
+	// 	return ctrl.Result{}, r.UpdateStatusWithError(ctx, config, fmt.Errorf("failed to validate Kode instance: %w", err))
+	// }
+
 	// Initialize Kode resources config
 	config := InitKodeResourcesConfig(kode, templates)
 
@@ -129,6 +134,12 @@ func (r *KodeReconciler) ensureResources(ctx context.Context, config *common.Kod
 		return err
 	}
 
+	// Ensure Credentials
+	if err := r.ensureCredentials(ctx, config); err != nil {
+		log.Error(err, "Failed to ensure Credentials")
+		return err
+	}
+
 	// If the KodeTemplate has an EnvoyProxyRef, ensure the EnvoyContainer
 	if config.Templates.EnvoyProxyConfig != nil {
 		if err := r.ensureEnvoy(ctx, config); err != nil {
@@ -158,6 +169,38 @@ func (r *KodeReconciler) ensureResources(ctx context.Context, config *common.Kod
 	}
 
 	log.Info("All resources ensured successfully")
+	return nil
+}
+
+func (r *KodeReconciler) ensureCredentials(ctx context.Context, config *common.KodeResourcesConfig) error {
+	log := r.Log.WithName("CredentialsEnsurer").WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
+
+	if config.Kode.Spec.ExistingSecret != "" {
+		// ExistingSecret is specified, fetch the secret
+		secret := &corev1.Secret{}
+		err := r.Get(ctx, types.NamespacedName{Name: config.Kode.Spec.ExistingSecret, Namespace: config.KodeNamespace}, secret)
+		if err != nil {
+			return fmt.Errorf("failed to get Secret: %w", err)
+		}
+
+		username, password, err := common.GetUsernameAndPasswordFromSecret(secret)
+		if err != nil {
+			return fmt.Errorf("failed to get username and password from Secret: %w", err )
+		}
+
+		config.Credentials.Username = username
+		config.Credentials.Password = password
+
+		log.Info("Using existing secret", "Name", secret.Name, "Data", common.MaskSecretData(secret))
+	} else if config.Kode.Spec.Password != "" {
+		config.Credentials.Username = config.Kode.Spec.Username
+		config.Credentials.Password = config.Kode.Spec.Password
+	} else {
+		config.Credentials.Username = config.Kode.Spec.Username
+		config.Credentials.Password = ""
+	}
+
+	log.Info("Credentials ensured successfully")
 	return nil
 }
 

@@ -1,7 +1,7 @@
 // internal/controller/kode_statefulset.go
 
 /*
-Copyright emil@jacero.se 2024.
+Copyright 2024 Emil Larsson.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -64,6 +64,9 @@ func (r *KodeReconciler) ensureStatefulSet(ctx context.Context, config *common.K
 	if err != nil {
 		return fmt.Errorf("failed to create or patch StatefulSet: %v", err)
 	}
+
+	maskedSpec := common.MaskSpec(statefulSet.Spec.Template.Spec.Containers[0]) // Mask sensitive values
+	log.V(1).Info("StatefulSet object created", "StatefulSet", statefulSet, "Spec", maskedSpec)
 
 	return nil
 }
@@ -157,9 +160,6 @@ func (r *KodeReconciler) constructStatefulSetSpec(config *common.KodeResourcesCo
 		},
 	}
 
-	maskedSpec := common.MaskSpec(statefulSet.Spec.Template.Spec.Containers[0]) // Mask sensitive values
-	log.V(1).Info("StatefulSet object created", "StatefulSet", statefulSet, "Spec", maskedSpec)
-
 	return statefulSet, nil
 }
 
@@ -174,8 +174,8 @@ func constructCodeServerContainers(config *common.KodeResourcesConfig,
 			{Name: "PGID", Value: fmt.Sprintf("%d", config.Templates.KodeTemplate.PGID)},
 			{Name: "TZ", Value: config.Templates.KodeTemplate.TZ},
 			{Name: "PORT", Value: fmt.Sprintf("%d", config.LocalServicePort)},
-			{Name: "USERNAME", Value: config.Kode.Spec.User},
-			{Name: "PASSWORD", Value: config.Kode.Spec.Password},
+			{Name: "USERNAME", Value: config.Kode.Spec.Username},
+			// {Name: "PASSWORD", Value: config.Kode.Spec.Password},
 			{Name: "DEFAULT_WORKSPACE", Value: workspace},
 		},
 		Ports: []corev1.ContainerPort{{
@@ -195,8 +195,8 @@ func constructWebtopContainers(config *common.KodeResourcesConfig) []corev1.Cont
 			{Name: "PGID", Value: fmt.Sprintf("%d", config.Templates.KodeTemplate.PGID)},
 			{Name: "TZ", Value: config.Templates.KodeTemplate.TZ},
 			{Name: "CUSTOM_PORT", Value: fmt.Sprintf("%d", config.LocalServicePort)},
-			{Name: "CUSTOM_USER", Value: config.Kode.Spec.User},
-			{Name: "PASSWORD", Value: config.Kode.Spec.Password},
+			{Name: "CUSTOM_USER", Value: config.Kode.Spec.Username},
+			// {Name: "PASSWORD", Value: config.Kode.Spec.Password},
 		},
 		Ports: []corev1.ContainerPort{{
 			Name:          "http",

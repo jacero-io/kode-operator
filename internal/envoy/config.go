@@ -1,7 +1,7 @@
 // envoy/config.go
 
 /*
-Copyright emil@jacero.se 2024.
+Copyright 2024 Emil Larsson.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ package envoy
 
 import (
 	_ "embed"
+	"encoding/base64"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -63,25 +64,31 @@ func (g *BootstrapConfigGenerator) Generate(options common.BootstrapConfigOption
 	g.Log.Info("Starting bootstrap config generation")
 	g.Log.V(1).Info("Config options", "options", options)
 
+	var err error
+
+	// Embedded CUE files
 	cueFiles := map[string]string{
 		"schema.cue":    embeddedCueSchema,
 		"bootstrap.cue": embeddedCueBootstrapConfig,
 	}
 
-	var err error
-
-	// Ensure that the Router filter is included in the HTTP filters
-	options.HTTPFilters = g.ensureRouterFilter(options.HTTPFilters)
-
+	// Add the basic auth filter if the auth type is basic
 	if options.AuthConfig.AuthType == "basic" {
+		credentials, err := generateBasicAuthConfig(options.Credentials.Username, options.Credentials.Password)
+		if err != nil {
+			return "", fmt.Errorf("failed to generate basic auth config: %w", err)
+		}
 		basicAuthFilter := kodev1alpha1.HTTPFilter{
 			Name: "envoy.filters.http.basic_auth",
 			TypedConfig: runtime.RawExtension{
-				Raw: []byte(fmt.Sprintf(`{"@type": "%s", "users": {"inline_string": "%s"}}`, BasicAuthFilterType, options.AuthConfig)),
+				Raw: []byte(fmt.Sprintf(`{"@type": "%s", "users": {"inline_string": "%s"}}`, BasicAuthFilterType, credentials)),
 			},
 		}
 		options.HTTPFilters = append([]kodev1alpha1.HTTPFilter{basicAuthFilter}, options.HTTPFilters...)
 	}
+
+	// Ensure that the Router filter is included in the HTTP filters
+	options.HTTPFilters = g.ensureRouterFilter(options.HTTPFilters)
 
 	// Write the embedded files to a temporary directory
 	tempDir, err := g.writeEmbeddedFilesToTempDir(cueFiles)
@@ -180,7 +187,7 @@ func (g *BootstrapConfigGenerator) encodeAndFillPaths(value cue.Value, options c
 
 	for _, p := range paths {
 		var err error
-		value, err = common.EncodeAndFillPath(g.CueCtx, value, p.parsePath, p.valuePath, p.schema, p.data)
+		value, err = encodeAndFillPath(g.CueCtx, value, p.parsePath, p.valuePath, p.schema, p.data)
 		if err != nil {
 			return cue.Value{}, fmt.Errorf("failed to encode and fill path %s: %w", p.parsePath, err)
 		}
@@ -195,4 +202,55 @@ func (g *BootstrapConfigGenerator) encodeToYAML(value cue.Value) (string, error)
 		return "", fmt.Errorf("failed to encode YAML: %w", err)
 	}
 	return string(yamlBytes), nil
+}
+
+// EncodeAndFillPath encodes a data structure, fills it into a CUE value at a specified path, and validates the result
+// The ctx is the CUE context
+// The value is the CUE value to fill
+// The parsePath is used to parse the schema
+// The valuePath is used to fill the data structure into the CUE value
+// The schema is used to validate the data structure
+// The data is the data structure to encode and fill
+// The function returns the updated CUE value and nil if successful
+// If an error occurs, the function returns the original CUE value and the error
+func encodeAndFillPath(ctx *cue.Context, value cue.Value, parsePath string, valuePath string, schema string, data interface{}) (cue.Value, error) {
+	tempSchema := ctx.CompileString(schema).LookupPath(cue.ParsePath(parsePath))
+	if tempSchema.Err() != nil {
+		return value, fmt.Errorf("failed to parse path %s: %w", parsePath, tempSchema.Err())
+	}
+
+	valueAsCUE := ctx.Encode(data)
+	if valueAsCUE.Err() != nil {
+		return value, fmt.Errorf("failed to encode data: %w", valueAsCUE.Err())
+	}
+
+	unifiedValue, err := unifyAndValidate(tempSchema, valueAsCUE)
+	if err != nil {
+		return value, fmt.Errorf("failed to unify and validate: %w", err)
+	}
+
+	// Fill the unified value into the CUE value at the specified path
+	value = value.FillPath(cue.ParsePath(valuePath), unifiedValue)
+	if err := value.Err(); err != nil {
+		return value, fmt.Errorf("failed to fill path %s: %w", valuePath, value.Err())
+	}
+	return value, nil
+}
+
+// unifyAndValidate unifies the schema and value, then validates the result
+func unifyAndValidate(schema, value cue.Value) (cue.Value, error) {
+	unifiedValue := schema.Unify(value)
+	if err := unifiedValue.Validate(); err != nil {
+		return cue.Value{}, fmt.Errorf("failed to validate unified value: %w", err)
+	}
+	return unifiedValue, nil
+}
+
+
+func generateBasicAuthConfig(username, password string) (string, error) {
+	hash := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", username, password)))
+	if hash == "" {
+		return "", fmt.Errorf("failed to generate basic auth config: hash is empty")
+	}
+	return hash, nil
 }

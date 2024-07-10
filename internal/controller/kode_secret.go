@@ -1,7 +1,7 @@
 // internal/controller/kode_secret.go
 
 /*
-Copyright emil@jacero.se 2024.
+Copyright 2024 Emil Larsson.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -53,8 +53,11 @@ func (r *KodeReconciler) ensureSecret(ctx context.Context, config *common.KodeRe
 		}
 
 		log.V(1).Info("Using existing secret", "Name", secret.Name, "Data", common.MaskSecretData(secret))
+
+		config.Secret = *secret
+
 	} else {
-		// ExistingSecret is not specified, construct a new Secret
+		// ExistingSecret is not specified, create or patch the secret
 		err := r.ResourceManager.CreateOrPatch(ctx, secret, func() error {
 			constructedSecret, err := r.constructSecretSpec(config)
 			if err != nil {
@@ -74,6 +77,8 @@ func (r *KodeReconciler) ensureSecret(ctx context.Context, config *common.KodeRe
 		}
 
 		log.V(1).Info("Using constructed secret", "Name", secret.Name, "Data", common.MaskSecretData(secret))
+
+		config.Secret = *secret
 	}
 
 	return nil
@@ -90,8 +95,8 @@ func (r *KodeReconciler) constructSecretSpec(config *common.KodeResourcesConfig)
 			Labels:    config.Labels,
 		},
 		Data: map[string][]byte{
-			"username": []byte(config.Kode.Spec.User),
-			"password": []byte(config.Kode.Spec.Password),
+			"username": []byte(config.Credentials.Username),
+			"password": []byte(config.Credentials.Password),
 		},
 	}
 

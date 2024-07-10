@@ -1,5 +1,5 @@
 /*
-Copyright emil@jacero.se 2024.
+Copyright 2024 Emil Larsson.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -40,17 +40,24 @@ type KodeResourcesConfig struct {
 	Labels              map[string]string
 	KodeName            string
 	KodeNamespace       string
+	Secret              corev1.Secret
 	SecretName          string
-	ExistingSecret      *corev1.Secret
+	Credentials         Credentials
 	PVCName             string
 	ServiceName         string
+	Templates           Templates
 	Containers          []corev1.Container
 	InitContainers      []corev1.Container
-	Templates           Templates
 	UserInitPlugins     []kodev1alpha1.InitPluginSpec
 	TemplateInitPlugins []kodev1alpha1.InitPluginSpec
 	LocalServicePort    int32
 	ExternalServicePort int32
+}
+
+// Credentials holds username and password
+type Credentials struct {
+	Username string
+	Password string
 }
 
 // BootstrapConfigOptions contains options for generating Envoy bootstrap config
@@ -60,6 +67,7 @@ type BootstrapConfigOptions struct {
 	LocalPort    int32
 	ExternalPort int32
 	AuthConfig   kodev1alpha1.AuthConfig
+	Credentials  Credentials
 }
 
 type TemplateNotFoundError struct {

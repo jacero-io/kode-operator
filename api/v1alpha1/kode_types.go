@@ -28,10 +28,10 @@ type KodeSpec struct {
 	// +kubebuilder:validation:Required
 	TemplateRef KodeTemplateReference `json:"templateRef"`
 
-	// User is the HTTP Basic auth username or the user the container should run as, abc is default.
-	// +kubebuilder:validation:Description="User is the HTTP Basic auth username or the user the container should run as. Defaults to 'abc'."
+	// Username is both the the HTTP Basic auth username (when used) and the user the container should run as, abc is default.
+	// +kubebuilder:validation:Description="Is both the the HTTP Basic auth username (when used) and the user the container should run as. Defaults to 'abc'."
 	// +kubebuilder:default="abc"
-	User string `json:"user,omitempty"`
+	Username string `json:"username,omitempty"`
 
 	// Password HTTP Basic auth password. If unset there will be no auth.
 	// +kubebuilder:validation:Description="HTTP Basic auth password. If unset, there will be no authentication."

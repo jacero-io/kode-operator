@@ -1,5 +1,5 @@
 /*
-Copyright emil@jacero.se 2024.
+Copyright 2024 Emil Larsson.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,15 +19,12 @@ package common
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
-	"cuelang.org/go/cue"
 	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 )
 
@@ -83,6 +80,17 @@ func MaskSpec(spec corev1.Container) corev1.Container {
 	return spec
 }
 
+func GetUsernameAndPasswordFromSecret(secret *corev1.Secret) (string, string, error) {
+	username := string(secret.Data["username"])
+	password := string(secret.Data["password"])
+	if password == "" {
+		password = ""
+		err := fmt.Errorf("password not found in secret")
+		return username, password, err
+	}
+	return username, password, nil
+}
+
 // joins multiple errors into a single error
 func JoinErrors(errs ...error) error {
 	var errStrings []string
@@ -95,11 +103,6 @@ func JoinErrors(errs ...error) error {
 		return nil
 	}
 	return fmt.Errorf(strings.Join(errStrings, "; "))
-}
-
-// creates a types.NamespacedName from a namespace and name
-func NamespacedName(namespace string, name string) types.NamespacedName {
-	return types.NamespacedName{Namespace: namespace, Name: name}
 }
 
 // wraps a context with a timeout
@@ -125,14 +128,6 @@ func Int64Ptr(i int64) *int64 {
 // returns a pointer to a string
 func StringPtr(s string) *string {
 	return &s
-}
-
-// gets an environment variable or returns a default value
-func GetEnvOrDefault(key, defaultValue string) string {
-	if value, exists := os.LookupEnv(key); exists {
-		return value
-	}
-	return defaultValue
 }
 
 // merges multiple sets of labels
@@ -166,46 +161,4 @@ func AddTypeInformationToObject(obj runtime.Object) error {
 	}
 
 	return nil
-}
-
-// EncodeAndFillPath encodes a data structure, fills it into a CUE value at a specified path, and validates the result
-// The ctx is the CUE context
-// The value is the CUE value to fill
-// The parsePath is used to parse the schema
-// The valuePath is used to fill the data structure into the CUE value
-// The schema is used to validate the data structure
-// The data is the data structure to encode and fill
-// The function returns the updated CUE value and nil if successful
-// If an error occurs, the function returns the original CUE value and the error
-func EncodeAndFillPath(ctx *cue.Context, value cue.Value, parsePath string, valuePath string, schema string, data interface{}) (cue.Value, error) {
-	tempSchema := ctx.CompileString(schema).LookupPath(cue.ParsePath(parsePath))
-	if tempSchema.Err() != nil {
-		return value, fmt.Errorf("failed to parse path %s: %w", parsePath, tempSchema.Err())
-	}
-
-	valueAsCUE := ctx.Encode(data)
-	if valueAsCUE.Err() != nil {
-		return value, fmt.Errorf("failed to encode data: %w", valueAsCUE.Err())
-	}
-
-	unifiedValue, err := unifyAndValidate(tempSchema, valueAsCUE)
-	if err != nil {
-		return value, fmt.Errorf("failed to unify and validate: %w", err)
-	}
-
-	// Fill the unified value into the CUE value at the specified path
-	value = value.FillPath(cue.ParsePath(valuePath), unifiedValue)
-	if err := value.Err(); err != nil {
-		return value, fmt.Errorf("failed to fill path %s: %w", valuePath, value.Err())
-	}
-	return value, nil
-}
-
-// unifyAndValidate unifies the schema and value, then validates the result
-func unifyAndValidate(schema, value cue.Value) (cue.Value, error) {
-	unifiedValue := schema.Unify(value)
-	if err := unifiedValue.Validate(); err != nil {
-		return cue.Value{}, fmt.Errorf("failed to validate unified value: %w", err)
-	}
-	return unifiedValue, nil
 }

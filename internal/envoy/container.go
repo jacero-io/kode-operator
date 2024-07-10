@@ -1,7 +1,7 @@
 // envoy/container.go
 
 /*
-Copyright emil@jacero.se 2024.
+Copyright 2024 Emil Larsson.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,8 +19,6 @@ limitations under the License.
 package envoy
 
 import (
-	"encoding/base64"
-	"fmt"
 	"strconv"
 
 	"github.com/go-logr/logr"
@@ -43,6 +41,7 @@ func NewContainerConstructor(log logr.Logger, configGenerator *BootstrapConfigGe
 // ConstructEnvoyProxyContainer constructs the Envoy Proxy init container
 func (c *ContainerConstructor) ConstructEnvoyContainers(config *common.KodeResourcesConfig) ([]corev1.Container, []corev1.Container, error) {
 
+	err := error(nil)
 	containers := []corev1.Container{}
 	initContainers := []corev1.Container{}
 
@@ -52,6 +51,7 @@ func (c *ContainerConstructor) ConstructEnvoyContainers(config *common.KodeResou
 		LocalPort:    config.LocalServicePort,
 		ExternalPort: config.ExternalServicePort,
 		AuthConfig:   config.Templates.EnvoyProxyConfig.AuthConfig,
+		Credentials:  config.Credentials,
 	})
 	if err != nil {
 		c.log.Error(err, "Failed to generate bootstrap config")
@@ -88,21 +88,8 @@ func (c *ContainerConstructor) ConstructEnvoyContainers(config *common.KodeResou
 	}
 	containers = append(containers, envoyContainer)
 
-	// if config.Templates.EnvoyProxyConfig.AuthConfig.AuthType == "basic" && config.Kode.Spec.User != "" && config.Kode.Spec.Password != "" {
-	//     basicAuthFilter, err := generateBasicAuthConfig(config.Kode.Spec.User, config.Kode.Spec.Password)
-	//     if err != nil {
-	//         return corev1.Container{}, corev1.Container{}, fmt.Errorf("failed to generate basic auth config: %w", err)
-	//     }
-	// 	// TODO: Add basic auth filter to HTTP filters
-	// }
-
 	c.log.V(1).Info("Envoy container constructed", "Name", envoyContainer.Name, "Image", envoyContainer.Image, "ports", envoyContainer.Ports)
 	c.log.V(1).Info("Envoy setup container constructed", "Name", proxySetupContainer.Name, "Image", proxySetupContainer.Image, "ports", envoyContainer.Ports)
 
 	return containers, initContainers, nil
-}
-
-func generateBasicAuthConfig(username, password string) (string, error) {
-	hash := base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%s:%s", username, password)))
-	return hash, nil
 }

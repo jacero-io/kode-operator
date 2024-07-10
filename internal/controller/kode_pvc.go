@@ -1,7 +1,7 @@
 // internal/controller/kode_pvc.go
 
 /*
-Copyright emil@jacero.se 2024.
+Copyright 2024 Emil Larsson.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -30,7 +30,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-// TODO: Investigate if "if pvc == nil" is really required
 // ensurePVC ensures that the PersistentVolumeClaim exists for the Kode instance
 func (r *KodeReconciler) ensurePVC(ctx context.Context, config *common.KodeResourcesConfig) error {
 	log := r.Log.WithName("PVCEnsurer").WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
@@ -92,6 +91,8 @@ func (r *KodeReconciler) ensurePVC(ctx context.Context, config *common.KodeResou
 		return fmt.Errorf("failed to create or patch PVC: %v", err)
 	}
 
+	log.V(1).Info("PVC object constructed", "PVC", pvc, "Spec", pvc.Spec)
+
 	return nil
 }
 
@@ -111,7 +112,7 @@ func (r *KodeReconciler) ensurePVC(ctx context.Context, config *common.KodeResou
 
 // constructPVCSpec constructs a PersistentVolumeClaim for the Kode instance
 func (r *KodeReconciler) constructPVCSpec(config *common.KodeResourcesConfig) (*corev1.PersistentVolumeClaim, error) {
-	log := r.Log.WithName("PvcConstructor").WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
+	// log := r.Log.WithName("PvcConstructor").WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
 
 	pvc := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
@@ -129,8 +130,6 @@ func (r *KodeReconciler) constructPVCSpec(config *common.KodeResourcesConfig) (*
 	if config.Kode.Spec.Storage.StorageClassName != nil {
 		pvc.Spec.StorageClassName = config.Kode.Spec.Storage.StorageClassName
 	}
-
-	log.V(1).Info("PVC object constructed", "PVC", pvc, "Spec", pvc.Spec)
 
 	return pvc, nil
 }
