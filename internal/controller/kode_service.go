@@ -1,7 +1,7 @@
 // internal/controller/kode_service.go
 
 /*
-Copyright emil@jacero.se 2024.
+Copyright 2024 Emil Larsson.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -62,12 +62,14 @@ func (r *KodeReconciler) ensureService(ctx context.Context, config *common.KodeR
 		return fmt.Errorf("failed to create or patch Service: %v", err)
 	}
 
+	log.V(1).Info("Service object constructed", "Service", service, "Spec", service.Spec)
+
 	return nil
 }
 
 // constructService constructs a Service for the Kode instance
 func (r *KodeReconciler) constructServiceSpec(config *common.KodeResourcesConfig) (*corev1.Service, error) {
-	log := r.Log.WithName("ServiceConstructor").WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
+	// log := r.Log.WithName("ServiceConstructor").WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -83,14 +85,6 @@ func (r *KodeReconciler) constructServiceSpec(config *common.KodeResourcesConfig
 			}},
 		},
 	}
-
-	// Add type information to the object
-	if err := common.AddTypeInformationToObject(service); err != nil {
-		log.Error(err, "Failed to add type information to Service")
-		return nil, err
-	}
-
-	log.V(1).Info("Service object constructed", "Service", service, "Spec", service.Spec)
 
 	return service, nil
 }

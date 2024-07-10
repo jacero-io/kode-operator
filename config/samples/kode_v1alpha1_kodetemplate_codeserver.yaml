@@ -13,7 +13,7 @@ spec:
     name: envoyproxyconfig-sample
     namespace: default
   type: code-server
-  image: lscr.io/linuxserver/code-server:latest
+  image: linuxserver/code-server:latest
   tz: "Europe/Stockholm"
   puid: 1000
   pgid: 1000

@@ -1,7 +1,7 @@
 // envoy/container.go
 
 /*
-Copyright emil@jacero.se 2024.
+Copyright 2024 Emil Larsson.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -39,19 +39,38 @@ func NewContainerConstructor(log logr.Logger, configGenerator *BootstrapConfigGe
 }
 
 // ConstructEnvoyProxyContainer constructs the Envoy Proxy init container
-func (c *ContainerConstructor) ConstructEnvoyProxyContainer(config *common.KodeResourcesConfig) (corev1.Container, corev1.Container, error) {
-	c.log.Info("Constructing Envoy Proxy container")
+func (c *ContainerConstructor) ConstructEnvoyContainers(config *common.KodeResourcesConfig) ([]corev1.Container, []corev1.Container, error) {
+
+	err := error(nil)
+	containers := []corev1.Container{}
+	initContainers := []corev1.Container{}
 
 	envoyConfig, err := c.configGenerator.Generate(common.BootstrapConfigOptions{
 		HTTPFilters:  config.Templates.EnvoyProxyConfig.HTTPFilters,
 		Clusters:     config.Templates.EnvoyProxyConfig.Clusters,
 		LocalPort:    config.LocalServicePort,
 		ExternalPort: config.ExternalServicePort,
+		AuthConfig:   config.Templates.EnvoyProxyConfig.AuthConfig,
+		Credentials:  config.Credentials,
 	})
 	if err != nil {
 		c.log.Error(err, "Failed to generate bootstrap config")
-		return corev1.Container{}, corev1.Container{}, err
+		return []corev1.Container{}, []corev1.Container{}, err
 	}
+
+	proxySetupContainer := corev1.Container{
+		Name:  common.ProxyInitContainerName,
+		Image: common.ProxyInitContainerImage,
+		Args:  []string{"-p", strconv.Itoa(int(config.ExternalServicePort)), "-u", strconv.FormatInt(common.EnvoyProxyRunAsUser, 16)},
+		SecurityContext: &corev1.SecurityContext{
+			Capabilities: &corev1.Capabilities{
+				Add: []corev1.Capability{"NET_ADMIN"},
+			},
+			RunAsNonRoot: common.BoolPtr(false),
+			RunAsUser:    common.Int64Ptr(0),
+		},
+	}
+	initContainers = append(initContainers, proxySetupContainer)
 
 	envoyContainer := corev1.Container{
 		Name:  common.EnvoyProxyContainerName,
@@ -67,20 +86,10 @@ func (c *ContainerConstructor) ConstructEnvoyProxyContainer(config *common.KodeR
 		},
 		// RestartPolicy: corev1.ContainerRestartPolicyAlways,
 	}
+	containers = append(containers, envoyContainer)
 
-	proxySetupContainer := corev1.Container{
-		Name:  common.ProxyInitContainerName,
-		Image: common.ProxyInitContainerImage,
-		Args:  []string{"-p", strconv.Itoa(int(config.ExternalServicePort)), "-u", strconv.FormatInt(common.EnvoyProxyRunAsUser, 16)},
-		SecurityContext: &corev1.SecurityContext{
-			Capabilities: &corev1.Capabilities{
-				Add: []corev1.Capability{"NET_ADMIN"},
-			},
-			RunAsNonRoot: common.BoolPtr(false),
-			RunAsUser:    common.Int64Ptr(0),
-		},
-	}
+	c.log.V(1).Info("Envoy container constructed", "Name", envoyContainer.Name, "Image", envoyContainer.Image, "ports", envoyContainer.Ports)
+	c.log.V(1).Info("Envoy setup container constructed", "Name", proxySetupContainer.Name, "Image", proxySetupContainer.Image, "ports", envoyContainer.Ports)
 
-	c.log.Info("Successfully constructed Envoy Proxy and Init containers")
-	return envoyContainer, proxySetupContainer, nil
+	return containers, initContainers, nil
 }

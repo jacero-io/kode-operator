@@ -1,10 +1,12 @@
 package validation
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
 	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
+	"github.com/jacero-io/kode-operator/internal/common"
 	"k8s.io/apimachinery/pkg/api/resource"
 )
 
@@ -14,7 +16,7 @@ func NewDefaultValidator() Validator {
 	return &validator{}
 }
 
-func (v *validator) Validate(kode *kodev1alpha1.Kode) error {
+func (v *validator) ValidateKode(ctx context.Context, kode *kodev1alpha1.Kode, templates *common.Templates) error {
 	if err := v.validateKodeSpec(kode); err != nil {
 		return err
 	}
@@ -30,7 +32,7 @@ func (v *validator) validateKodeSpec(kode *kodev1alpha1.Kode) error {
 	}
 
 	// Validate User
-	if err := validateUser(kode.Spec.User); err != nil {
+	if err := validateUser(kode.Spec.Username); err != nil {
 		errors = append(errors, err.Error())
 	}
 
@@ -38,6 +40,14 @@ func (v *validator) validateKodeSpec(kode *kodev1alpha1.Kode) error {
 	if kode.Spec.Password != "" {
 		if err := validatePassword(kode.Spec.Password); err != nil {
 			errors = append(errors, err.Error())
+		}
+	}
+
+	// Validate ExistingSecret (if set)
+	if kode.Spec.ExistingSecret != "" {
+		// Secret must contain both username and password in Data
+		if kode.Spec.Username == "" || kode.Spec.Password == "" {
+			errors = append(errors, "existingSecret is specified, but username and password are not set")
 		}
 	}
 
@@ -70,10 +80,25 @@ func (v *validator) validateKodeSpec(kode *kodev1alpha1.Kode) error {
 	}
 
 	if len(errors) > 0 {
-		return fmt.Errorf("Kode spec validation failed: %s", strings.Join(errors, "; "))
+		return fmt.Errorf("kode spec validation failed: %s", strings.Join(errors, "; "))
 	}
 
 	return nil
+}
+
+// Validate exisitingSecret
+func validateExistingSecret(ctx context.Context, secretName string) error {
+	if secretName == "" {
+		return fmt.Errorf("existingSecret is required")
+	}
+	// Secret must contain both username and password in Data
+	// secret := &corev1.Secret{}
+	// if err := common.Get(ctx, client.ObjectKey{Name: secretName, Namespace: common.Namespace}, secret); err != nil {
+	// 	return fmt.Errorf("failed to get Secret: %v", err)
+	// }
+
+	return nil
+
 }
 
 func validateTemplateRef(ref kodev1alpha1.KodeTemplateReference) error {
@@ -86,7 +111,7 @@ func validateTemplateRef(ref kodev1alpha1.KodeTemplateReference) error {
 	return nil
 }
 
-func validateKodeTempalateSpec(spec kodev1alpha1.KodeTemplateSpec) error {
+func validateKodeTemplateSpec(spec kodev1alpha1.KodeTemplateSpec) error {
 	if spec.Type != "code-server" && spec.Type != "webtop" {
 		return fmt.Errorf("invalid template type: %s, must be either code-server or webtop", spec.Type)
 	}

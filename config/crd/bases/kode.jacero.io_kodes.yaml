@@ -401,14 +401,14 @@ spec:
                 - kind
                 - name
                 type: object
-              user:
-                default: abc
-                description: User is the HTTP Basic auth username or the user the
-                  container should run as, abc is default.
-                type: string
               userConfig:
                 description: UserConfig specifies a git repository URL to get user
                   configuration from.
+                type: string
+              username:
+                default: abc
+                description: Username is both the the HTTP Basic auth username (when
+                  used) and the user the container should run as, abc is default.
                 type: string
               workspace:
                 description: Workspace is the user specified workspace directory (e.g.

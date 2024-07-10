@@ -1,5 +1,5 @@
 /*
-Copyright emil@jacero.se 2024.
+Copyright 2024 Emil Larsson.
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -19,60 +19,47 @@ package common
 import (
 	"context"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
-	"cuelang.org/go/cue"
-	"github.com/go-logr/logr"
+	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // returns the name of the PersistentVolumeClaim for the Kode instance
-func GetPVCName(config *KodeResourcesConfig) string {
-	return config.KodeName + "-pvc"
-}
-
-// returns the name of the Kode container
-func GetContainerName(config *KodeResourcesConfig) string {
-	return "kode-" + config.KodeName
+func GetPVCName(kode *kodev1alpha1.Kode) string {
+	return kode.Name + "-pvc"
 }
 
 // returns the name of the Kode service
-func GetServiceName(config *KodeResourcesConfig) string {
-	return "kode-" + config.KodeName
+func GetServiceName(kode *kodev1alpha1.Kode) string {
+	return kode.Name + "-svc"
 }
 
 // masks sensitive string values
-func MaskSensitiveValue(s string) string {
-	return "********"
+func maskSensitiveValue(s string) string {
+	masked := ""
+	for range s {
+		masked += "*"
+	}
+	return masked
 }
 
-// addTypeInformationToObject adds TypeMeta information to a runtime.Object based upon the loaded scheme.Scheme
-// taken from: https://github.com/kubernetes/kubernetes/issues/3030#issuecomment-700099699
-func AddTypeInformationToObject(obj runtime.Object) error {
-	gvks, _, err := scheme.Scheme.ObjectKinds(obj)
-	if err != nil {
-		return fmt.Errorf("missing apiVersion or kind and cannot assign it; %w", err)
-	}
+// masks sensitive values in a secret
+func MaskSecretData(secret *corev1.Secret) map[string]string {
+	maskedData := make(map[string]string)
 
-	for _, gvk := range gvks {
-		if len(gvk.Kind) == 0 {
-			continue
+	secret = secret.DeepCopy()
+	for k, v := range secret.Data {
+		if k == "password" || k == "secret" {
+			maskedData[k] = maskSensitiveValue(string(v))
+		} else {
+			maskedData[k] = string(v)
 		}
-		if len(gvk.Version) == 0 || gvk.Version == runtime.APIVersionInternal {
-			continue
-		}
-		obj.GetObjectKind().SetGroupVersionKind(gvk)
-		break
 	}
-
-	return nil
+	return maskedData
 }
 
 // masks sensitive environment variables
@@ -80,7 +67,7 @@ func MaskEnvVars(envs []corev1.EnvVar) []corev1.EnvVar {
 	maskedEnvs := make([]corev1.EnvVar, len(envs))
 	for i, env := range envs {
 		if env.Name == "PASSWORD" || env.Name == "SECRET" {
-			env.Value = MaskSensitiveValue(env.Value)
+			env.Value = maskSensitiveValue(env.Value)
 		}
 		maskedEnvs[i] = env
 	}
@@ -93,34 +80,15 @@ func MaskSpec(spec corev1.Container) corev1.Container {
 	return spec
 }
 
-// logs an object's key details
-func LogObject(log logr.Logger, obj client.Object, msg string) {
-	log.Info(msg,
-		"Kind", obj.GetObjectKind().GroupVersionKind().Kind,
-		"Namespace", obj.GetNamespace(),
-		"Name", obj.GetName(),
-	)
-}
-
-// checks if a string slice contains a specific string
-func ContainsString(slice []string, s string) bool {
-	for _, item := range slice {
-		if item == s {
-			return true
-		}
+func GetUsernameAndPasswordFromSecret(secret *corev1.Secret) (string, string, error) {
+	username := string(secret.Data["username"])
+	password := string(secret.Data["password"])
+	if password == "" {
+		password = ""
+		err := fmt.Errorf("password not found in secret")
+		return username, password, err
 	}
-	return false
-}
-
-// removes a string from a slice of strings
-func RemoveString(slice []string, s string) []string {
-	result := []string{}
-	for _, item := range slice {
-		if item != s {
-			result = append(result, item)
-		}
-	}
-	return result
+	return username, password, nil
 }
 
 // joins multiple errors into a single error
@@ -135,16 +103,6 @@ func JoinErrors(errs ...error) error {
 		return nil
 	}
 	return fmt.Errorf(strings.Join(errStrings, "; "))
-}
-
-// checks if an error is a "not found" error
-func IsNotFound(err error) bool {
-	return errors.IsNotFound(err)
-}
-
-// creates a types.NamespacedName from a namespace and name
-func NamespacedName(namespace string, name string) types.NamespacedName {
-	return types.NamespacedName{Namespace: namespace, Name: name}
 }
 
 // wraps a context with a timeout
@@ -172,14 +130,6 @@ func StringPtr(s string) *string {
 	return &s
 }
 
-// gets an environment variable or returns a default value
-func GetEnvOrDefault(key, defaultValue string) string {
-	if value, exists := os.LookupEnv(key); exists {
-		return value
-	}
-	return defaultValue
-}
-
 // merges multiple sets of labels
 func MergeLabels(labelsSlice ...map[string]string) map[string]string {
 	result := make(map[string]string)
@@ -191,44 +141,24 @@ func MergeLabels(labelsSlice ...map[string]string) map[string]string {
 	return result
 }
 
-// EncodeAndFillPath encodes a data structure, fills it into a CUE value at a specified path, and validates the result
-// The ctx is the CUE context
-// The value is the CUE value to fill
-// The parsePath is used to parse the schema
-// The valuePath is used to fill the data structure into the CUE value
-// The schema is used to validate the data structure
-// The data is the data structure to encode and fill
-// The function returns the updated CUE value and nil if successful
-// If an error occurs, the function returns the original CUE value and the error
-func EncodeAndFillPath(ctx *cue.Context, value cue.Value, parsePath string, valuePath string, schema string, data interface{}) (cue.Value, error) {
-	tempSchema := ctx.CompileString(schema).LookupPath(cue.ParsePath(parsePath))
-	if tempSchema.Err() != nil {
-		return value, fmt.Errorf("failed to parse path %s: %w", parsePath, tempSchema.Err())
-	}
-
-	valueAsCUE := ctx.Encode(data)
-	if valueAsCUE.Err() != nil {
-		return value, fmt.Errorf("failed to encode data: %w", valueAsCUE.Err())
-	}
-
-	unifiedValue, err := unifyAndValidate(tempSchema, valueAsCUE)
+// addTypeInformationToObject adds TypeMeta information to a runtime.Object based upon the loaded scheme.Scheme
+// taken from: https://github.com/kubernetes/kubernetes/issues/3030#issuecomment-700099699
+func AddTypeInformationToObject(obj runtime.Object) error {
+	gvks, _, err := scheme.Scheme.ObjectKinds(obj)
 	if err != nil {
-		return value, fmt.Errorf("failed to unify and validate: %w", err)
+		return fmt.Errorf("missing apiVersion or kind and cannot assign it; %w", err)
 	}
 
-	// Fill the unified value into the CUE value at the specified path
-	value = value.FillPath(cue.ParsePath(valuePath), unifiedValue)
-	if err := value.Err(); err != nil {
-		return value, fmt.Errorf("failed to fill path %s: %w", valuePath, value.Err())
+	for _, gvk := range gvks {
+		if len(gvk.Kind) == 0 {
+			continue
+		}
+		if len(gvk.Version) == 0 || gvk.Version == runtime.APIVersionInternal {
+			continue
+		}
+		obj.GetObjectKind().SetGroupVersionKind(gvk)
+		break
 	}
-	return value, nil
-}
 
-// unifyAndValidate unifies the schema and value, then validates the result
-func unifyAndValidate(schema, value cue.Value) (cue.Value, error) {
-	unifiedValue := schema.Unify(value)
-	if err := unifiedValue.Validate(); err != nil {
-		return cue.Value{}, fmt.Errorf("failed to validate unified value: %w", err)
-	}
-	return unifiedValue, nil
+	return nil
 }
