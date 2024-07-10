@@ -1,4 +1,4 @@
-// internal/controller/resource_config.go
+// internal/controllers/kode/config.go
 
 /*
 Copyright 2024 Emil Larsson.

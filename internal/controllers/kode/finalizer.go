@@ -1,4 +1,4 @@
-// internal/controller/kode_finalizer.go
+// internal/controllers/kode/finalizer.go
 
 /*
 Copyright 2024 Emil Larsson.

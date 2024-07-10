@@ -1,4 +1,4 @@
-// internal/controller/kode_statefulset.go
+// internal/controllers/kode/ensure_statefulset.go
 
 /*
 Copyright 2024 Emil Larsson.

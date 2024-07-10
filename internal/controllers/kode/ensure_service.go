@@ -1,4 +1,4 @@
-// internal/controller/kode_service.go
+// internal/controllers/kode/ensure_service.go
 
 /*
 Copyright 2024 Emil Larsson.

@@ -21,7 +21,7 @@ package integration
 import (
 	"context"
 
-	"github.com/jacero-io/kode-operator/internal/controller"
+	controller "github.com/jacero-io/kode-operator/internal/controllers/entrypoint"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 	"k8s.io/apimachinery/pkg/api/errors"

@@ -1,4 +1,4 @@
-// internal/controller/kode_envoy.go
+// internal/controllers/kode/ensure_envoy.go
 
 /*
 Copyright 2024 Emil Larsson.
@@ -19,26 +19,31 @@ limitations under the License.
 package controller
 
 import (
-	"context"
 	"fmt"
 
+	"github.com/go-logr/logr"
 	"github.com/jacero-io/kode-operator/internal/common"
 	"github.com/jacero-io/kode-operator/internal/envoy"
 	client "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// ensureEnvoyContainer ensures that the Envoy container exists for the Kode instance
-func (r *KodeReconciler) ensureEnvoy(ctx context.Context, config *common.KodeResourcesConfig) error {
-	log := r.Log.WithName("EnvoyEnsurer").WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
-
-	ctx, cancel := common.ContextWithTimeout(ctx, 30) // 30 seconds timeout
-	defer cancel()
+// ensureSidecarContainers ensures that the Envoy container exists for the Kode instance
+func (r *KodeReconciler) ensureSidecarContainers(config *common.KodeResourcesConfig) error {
+	log := r.Log.WithName("SidecarContainerEnsurer").WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
 
 	log.Info("Ensuring Envoy Container")
+	if err := ensureEnvoySidecar(config, log); err != nil {
+		log.Error(err, "Failed to ensure Envoy sidecar container")
+		return err
+	}
 
-	configGenerator := envoy.NewBootstrapConfigGenerator(r.Log.WithName("EnvoyConfigGenerator").WithValues("kode", client.ObjectKeyFromObject(&config.Kode)))
+	return nil
+}
+
+func ensureEnvoySidecar(config *common.KodeResourcesConfig, log logr.Logger) error {
+	configGenerator := envoy.NewBootstrapConfigGenerator(log.WithName("EnvoyConfigGenerator").WithValues("kode", client.ObjectKeyFromObject(&config.Kode)))
 	evnoyContainers, envoyInitContainers, err := envoy.NewContainerConstructor(
-		r.Log.WithName("EnvoyContainerConstructor").WithValues("kode", client.ObjectKeyFromObject(&config.Kode)),
+		log.WithName("EnvoyContainerConstructor").WithValues("kode", client.ObjectKeyFromObject(&config.Kode)),
 		configGenerator).ConstructEnvoyContainers(config)
 	if err != nil {
 		return fmt.Errorf("failed to construct Envoy sidecar: %v", err)

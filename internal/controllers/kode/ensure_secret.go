@@ -1,4 +1,4 @@
-// internal/controller/kode_secret.go
+// internal/controllers/kode/ensure_secret.go
 
 /*
 Copyright 2024 Emil Larsson.

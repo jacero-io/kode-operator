@@ -1,4 +1,4 @@
-// internal/controller/kode_pvc.go
+// internal/controllers/kode/ensure_pvc.go
 
 /*
 Copyright 2024 Emil Larsson.

@@ -1,4 +1,4 @@
-// internal/controller/controller_utils.go
+// internal/controllers/kode/utils.go
 
 /*
 Copyright 2024 Emil Larsson.
