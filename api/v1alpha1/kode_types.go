@@ -117,6 +117,9 @@ const (
 	// KodePhaseInactive indicates that the Kode resource has been marked as inactive and will be deleted.
 	KodePhaseInactive KodePhase = "Inactive"
 
+	// KodePhaseRecycling indicates that the Kode resource is being recycled.
+	KodePhaseRecycling KodePhase = "Recycling"
+
 	// KodePhaseRecycled indicates that the Kode resource has been completely recycled and all resources have been deleted.
 	KodePhaseRecycled KodePhase = "Recycled"
 )

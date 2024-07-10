@@ -54,7 +54,7 @@ type EntryPointResourceConfig struct {
 	EntryPointName      string
 	EntryPointNamespace string
 	EntryPointService   string
-	EntryPointURL       string	
+	EntryPointURL       string
 }
 
 // BootstrapConfigOptions contains options for generating Envoy bootstrap config

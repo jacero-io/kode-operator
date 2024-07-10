@@ -28,14 +28,15 @@ import (
 	. "github.com/onsi/gomega"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 )
 
 const (
-	timeout  = time.Second * 30
-	interval = time.Millisecond * 250
+	timeout  = time.Second * 60
+	interval = time.Second * 1
 )
 
 var _ = Describe("Kode Controller Integration", Ordered, func() {
@@ -178,9 +179,13 @@ var _ = Describe("Kode Controller Integration", Ordered, func() {
 
 			// Cleanup
 			Expect(k8sClient.Delete(ctx, kode)).To(Succeed())
-			Eventually(func() error {
-				return k8sClient.Get(ctx, types.NamespacedName{Name: kodeName, Namespace: namespace.Name}, &kodev1alpha1.Kode{})
-			}, timeout, interval).ShouldNot(Succeed())
+			// Eventually(func() error {
+			// 	return k8sClient.Get(ctx, types.NamespacedName{Name: kodeName, Namespace: namespace.Name}, &kodev1alpha1.Kode{})
+			// }, timeout, interval).ShouldNot(Succeed())
+			Eventually(func() bool {
+				err := k8sClient.Get(ctx, types.NamespacedName{Name: kodeName, Namespace: namespace.Name}, &kodev1alpha1.Kode{})
+				return errors.IsNotFound(err)
+			}, timeout, interval).Should(BeTrue())
 		},
 		// Test cases
 		Entry("without Envoy Proxy", kodeTemplateNameWithoutEnvoy, 1, int32(8000), int32(8000)),

@@ -58,26 +58,42 @@ const (
 	// Annotation keys
 	AnnotationLastUpdated = "kode.jacero.io/last-updated"
 
-	// Status condition types
-	ConditionTypeCreated  = "Created"
-	ConditionTypeReady    = "Ready"
+	// These are the condition types that are used in the status of the Kode and EntryPoint resources
+	// ConditionTypeReady indicates that the resource is fully operational and prepared to serve its intended purpose.
+	ConditionTypeReady = "Ready"
+
+	// ConditionTypeAvailable indicates that the resource is accessible and can actively serve requests or perform its function.
+	ConditionTypeAvailable = "Available"
+
+	// ConditionTypeProgressing indicates that the resource is actively working towards a desired state.
+	ConditionTypeProgressing = "Progressing"
+
+	// ConditionTypeDegraded indicates that the resource is operational but not functioning optimally or with full capabilities.
+	ConditionTypeDegraded = "Degraded"
+
+	// ConditionTypeError indicates that the resource has encountered an error state that requires attention.
+	ConditionTypeError = "Error"
+
+	// ConditionTypeConfigured indicates that the resource has been properly configured with all necessary settings.
+	ConditionTypeConfigured = "Configured"
+
+	// ConditionTypeCreating indicates that the resource is in the process of being created.
+	ConditionTypeCreating = "Creating"
+
+	// ConditionTypeCreated indicates that the resource has been successfully created.
+	ConditionTypeCreated = "Created"
+
+	// ConditionTypeRecycling indicates that the resource is in the process of being recycled or restarted.
+	ConditionTypeRecycling = "Recycling"
+
+	// ConditionTypeRecycled indicates that the resource has completed the recycling process.
 	ConditionTypeRecycled = "Recycled"
-	ConditionTypeInactive = "Inactive"
-	ConditionTypeError    = "Error"
 
-	// Default values
-	DefaultUser        = "abc"
-	DefaultHome        = "/config"
-	DefaultWorkspace   = "workspace"
-	DefaultStorageSize = "1Gi"
+	// ConditionTypeUpdating indicates that the resource is in the process of being updated.
+	ConditionTypeUpdating = "Updating"
 
-	// Environment variable names
-	EnvVarPassword = "PASSWORD"
-	EnvVarUser     = "USER"
-	EnvVarHome     = "HOME"
-	EnvVarPUID     = "PUID"
-	EnvVarPGID     = "PGID"
-	EnvVarTZ       = "TZ"
+	// ConditionTypeDeleting indicates that the resource is in the process of being deleted.
+	ConditionTypeDeleting = "Deleting"
 
 	// Validation constants
 	MinPasswordLength = 8

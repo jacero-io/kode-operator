@@ -47,7 +47,12 @@ func (u *defaultStatusUpdater) UpdateStatus(ctx context.Context, phase string, c
 	return nil
 }
 
-func (u *defaultStatusUpdater) UpdateKodeStatus(ctx context.Context, config *common.KodeResourcesConfig, phase kodev1alpha1.KodePhase, conditions []metav1.Condition, lastError string, lastErrorTime *metav1.Time) error {
+func (u *defaultStatusUpdater) UpdateKodeStatus(ctx context.Context,
+	config *common.KodeResourcesConfig,
+	phase kodev1alpha1.KodePhase,
+	conditions []metav1.Condition,
+	lastError string,
+	lastErrorTime *metav1.Time) error {
 	log := u.log.WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
 
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {

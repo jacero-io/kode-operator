@@ -97,24 +97,22 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 
 	// Ensure resources
 	if err := r.ensureResources(ctx, config); err != nil {
-		return ctrl.Result{RequeueAfter: common.RequeueInterval}, r.updateKodeStatusWithError(ctx, config, err)
+		// No need to update status here, as it's done in ensureResources
+		return ctrl.Result{RequeueAfter: common.RequeueInterval}, err
 	}
 
 	// Check if all resources are ready
 	ready, err := r.checkResourcesReady(ctx, config)
 	if err != nil {
-		return ctrl.Result{RequeueAfter: common.RequeueInterval}, r.updateKodeStatusWithError(ctx, config, fmt.Errorf("failed to check resource readiness: %w", err))
+		return ctrl.Result{RequeueAfter: common.RequeueInterval}, r.updateKodePhaseFailed(ctx, config, fmt.Errorf("failed to check resource readiness: %w", err))
 	}
 	if !ready {
-		log.Info("Resources not ready, requeuing")
-		currentTime := r.GetCurrentTime()
-		return ctrl.Result{RequeueAfter: common.RequeueInterval}, r.StatusUpdater.UpdateKodeStatus(ctx, config, kodev1alpha1.KodePhaseActive, nil, "resources not ready", &currentTime)
+		return ctrl.Result{RequeueAfter: common.RequeueInterval}, r.updateKodePhasePending(ctx, config)
 	}
 
-	// Update status to success
-	if err := r.updateKodeStatusWithSuccess(ctx, config); err != nil {
-		log.Error(err, "Failed to update status")
-		return ctrl.Result{Requeue: true}, nil
+	// Update status to active
+	if err := r.updateKodePhaseActive(ctx, config); err != nil {
+		return ctrl.Result{Requeue: true}, err
 	}
 
 	log.Info("Kode reconciliation successful")
@@ -124,24 +122,36 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 func (r *KodeReconciler) ensureResources(ctx context.Context, config *common.KodeResourcesConfig) error {
 	log := r.Log.WithName("ResourceEnsurer").WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
 
+	// Update status to Creating before starting resource creation
+	if err := r.updateKodePhaseCreating(ctx, config); err != nil {
+		log.Error(err, "Failed to update status to Creating")
+		return err
+	}
+
 	// Ensure StatefulSet
 	if err := r.ensureStatefulSet(ctx, config); err != nil {
 		log.Error(err, "Failed to ensure StatefulSet")
-		return err
+		return r.updateKodePhaseFailed(ctx, config, err)
 	}
 
 	// Ensure Service
 	if err := r.ensureService(ctx, config); err != nil {
 		log.Error(err, "Failed to ensure Service")
-		return err
+		return r.updateKodePhaseFailed(ctx, config, err)
 	}
 
 	// Ensure PVC if storage is specified
-	if !config.Kode.Spec.DeepCopy().Storage.IsEmpty() {
+	if !config.Kode.Spec.Storage.IsEmpty() {
 		if err := r.ensurePVC(ctx, config); err != nil {
 			log.Error(err, "Failed to ensure PVC")
-			return err
+			return r.updateKodePhaseFailed(ctx, config, err)
 		}
+	}
+
+	// Update status to Created after all resources are ensured
+	if err := r.updateKodePhaseCreated(ctx, config); err != nil {
+		log.Error(err, "Failed to update status to Created")
+		return err
 	}
 
 	log.Info("All resources ensured successfully")
@@ -198,10 +208,22 @@ func (r *KodeReconciler) finalize(ctx context.Context, kode *kodev1alpha1.Kode) 
 		ServiceName:   kode.Name + "-svc",
 	}
 
+	// Before cleanup
+	if err := r.updateKodePhaseRecycling(ctx, config); err != nil {
+		return err
+	}
+
 	// Perform cleanup
-	return r.CleanupManager.Cleanup(ctx, config)
+	if err := r.CleanupManager.Cleanup(ctx, config); err != nil {
+		r.updateKodePhaseFailed(ctx, config, err)
+		return err
+	}
+
+	// After successful cleanup
+	return r.updateKodePhaseRecycled(ctx, config)
 }
 
+// TODO: Add inactivity check
 func (r *KodeReconciler) checkResourcesReady(ctx context.Context, config *common.KodeResourcesConfig) (bool, error) {
 	log := r.Log.WithName("ResourceReadyChecker").WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
 	ctx, cancel := common.ContextWithTimeout(ctx, 20) // 20 seconds timeout
