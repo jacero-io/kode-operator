@@ -21,15 +21,17 @@ package controller
 import (
 	"context"
 	"fmt"
+	"time"
 
+	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
 	"github.com/jacero-io/kode-operator/internal/common"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	client "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 func (r *KodeReconciler) ensureResources(ctx context.Context, config *common.KodeResourcesConfig) error {
-	log := r.Log.WithName("ResourceEnsurer").WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
+	log := r.Log.WithValues("kode", types.NamespacedName{Name: config.KodeName, Namespace: config.KodeNamespace})
 
 	// Update status to Creating before starting resource creation
 	if err := r.updateKodePhaseCreating(ctx, config); err != nil {
@@ -37,43 +39,80 @@ func (r *KodeReconciler) ensureResources(ctx context.Context, config *common.Kod
 		return err
 	}
 
+	// Fetch the latest Kode object
+	kode, err := r.getLatestKode(ctx, config.KodeName, config.KodeNamespace)
+	if err != nil {
+		return fmt.Errorf("failed to get Kode: %w", err)
+	}
+
+	now := metav1.NewTime(time.Now())
+
 	// Ensure Secret
-	if err := r.ensureSecret(ctx, config); err != nil {
+	if err := r.ensureSecret(ctx, config, kode); err != nil {
 		log.Error(err, "Failed to ensure Secret")
-		return err
+		return r.updateKodePhaseFailed(ctx, config, err, metav1.Condition{
+			Type:               "SecretCreationFailed",
+			Status:             metav1.ConditionTrue,
+			Reason:             "SecretCreationError",
+			Message:            fmt.Sprintf("Failed to create Secret: %s", err.Error()),
+			LastTransitionTime: now,
+		})
 	}
 
 	// Ensure Credentials
-	if err := r.ensureCredentials(ctx, config); err != nil {
+	if err := r.ensureCredentials(ctx, config, kode); err != nil {
 		log.Error(err, "Failed to ensure Credentials")
-		return err
+		return r.updateKodePhaseFailed(ctx, config, err, metav1.Condition{
+			Type:               "CredentialsCreationFailed",
+			Status:             metav1.ConditionTrue,
+			Reason:             "CredentialsCreationError",
+			Message:            fmt.Sprintf("Failed to create Credentials: %s", err.Error()),
+			LastTransitionTime: now,
+		})
 	}
 
 	// If the KodeTemplate has an EnvoyConfigRef, ensure the EnvoyContainer
 	if config.Templates.EnvoyProxyConfig != nil {
-		if err := r.ensureSidecarContainers(config); err != nil {
-			log.Error(err, "Failed to ensure EnvoyContainer")
+		if err := r.ensureSidecarContainers(ctx, config); err != nil {
 			return err
 		}
 	}
 
 	// Ensure StatefulSet
-	if err := r.ensureStatefulSet(ctx, config); err != nil {
+	if err := r.ensureStatefulSet(ctx, config, kode); err != nil {
 		log.Error(err, "Failed to ensure StatefulSet")
-		return r.updateKodePhaseFailed(ctx, config, err)
+		return r.updateKodePhaseFailed(ctx, config, err, metav1.Condition{
+			Type:               "StatefulSetCreationFailed",
+			Status:             metav1.ConditionTrue,
+			Reason:             "StatefulSetCreationError",
+			Message:            fmt.Sprintf("Failed to create StatefulSet: %s", err.Error()),
+			LastTransitionTime: now,
+		})
 	}
 
 	// Ensure Service
-	if err := r.ensureService(ctx, config); err != nil {
+	if err := r.ensureService(ctx, config, kode); err != nil {
 		log.Error(err, "Failed to ensure Service")
-		return r.updateKodePhaseFailed(ctx, config, err)
+		return r.updateKodePhaseFailed(ctx, config, err, metav1.Condition{
+			Type:               "ServiceCreationFailed",
+			Status:             metav1.ConditionTrue,
+			Reason:             "ServiceCreationError",
+			Message:            fmt.Sprintf("Failed to create Service: %s", err.Error()),
+			LastTransitionTime: now,
+		})
 	}
 
 	// Ensure PVC if storage is specified
-	if !config.Kode.Spec.Storage.IsEmpty() {
-		if err := r.ensurePVC(ctx, config); err != nil {
+	if !kode.Spec.Storage.IsEmpty() {
+		if err := r.ensurePVC(ctx, config, kode); err != nil {
 			log.Error(err, "Failed to ensure PVC")
-			return r.updateKodePhaseFailed(ctx, config, err)
+			return r.updateKodePhaseFailed(ctx, config, err, metav1.Condition{
+				Type:               "PVCCreationFailed",
+				Status:             metav1.ConditionTrue,
+				Reason:             "PVCCreationError",
+				Message:            fmt.Sprintf("Failed to create PersistentVolumeClaim: %s", err.Error()),
+				LastTransitionTime: now,
+			})
 		}
 	}
 
@@ -87,13 +126,13 @@ func (r *KodeReconciler) ensureResources(ctx context.Context, config *common.Kod
 	return nil
 }
 
-func (r *KodeReconciler) ensureCredentials(ctx context.Context, config *common.KodeResourcesConfig) error {
-	log := r.Log.WithName("CredentialsEnsurer").WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
+func (r *KodeReconciler) ensureCredentials(ctx context.Context, config *common.KodeResourcesConfig, kode *kodev1alpha1.Kode) error {
+	log := r.Log.WithName("CredentialsEnsurer").WithValues("kode", common.ObjectKeyFromConfig(config))
 
-	if config.Kode.Spec.ExistingSecret != "" {
+	if config.KodeSpec.ExistingSecret != "" {
 		// ExistingSecret is specified, fetch the secret
 		secret := &corev1.Secret{}
-		err := r.Get(ctx, types.NamespacedName{Name: config.Kode.Spec.ExistingSecret, Namespace: config.KodeNamespace}, secret)
+		err := r.Get(ctx, types.NamespacedName{Name: config.KodeSpec.ExistingSecret, Namespace: config.KodeNamespace}, secret)
 		if err != nil {
 			return fmt.Errorf("failed to get Secret: %w", err)
 		}
@@ -107,11 +146,11 @@ func (r *KodeReconciler) ensureCredentials(ctx context.Context, config *common.K
 		config.Credentials.Password = password
 
 		log.Info("Using existing secret", "Name", secret.Name, "Data", common.MaskSecretData(secret))
-	} else if config.Kode.Spec.Password != "" {
-		config.Credentials.Username = config.Kode.Spec.Username
-		config.Credentials.Password = config.Kode.Spec.Password
+	} else if config.KodeSpec.Password != "" {
+		config.Credentials.Username = config.KodeSpec.Username
+		config.Credentials.Password = config.KodeSpec.Password
 	} else {
-		config.Credentials.Username = config.Kode.Spec.Username
+		config.Credentials.Username = config.KodeSpec.Username
 		config.Credentials.Password = ""
 	}
 

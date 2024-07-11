@@ -22,6 +22,7 @@ import (
 	"context"
 	"fmt"
 
+	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
 	"github.com/jacero-io/kode-operator/internal/common"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -31,8 +32,8 @@ import (
 )
 
 // ensurePVC ensures that the PersistentVolumeClaim exists for the Kode instance
-func (r *KodeReconciler) ensurePVC(ctx context.Context, config *common.KodeResourcesConfig) error {
-	log := r.Log.WithName("PVCEnsurer").WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
+func (r *KodeReconciler) ensurePVC(ctx context.Context, config *common.KodeResourcesConfig, kode *kodev1alpha1.Kode) error {
+	log := r.Log.WithName("PVCEnsurer").WithValues("kode", common.ObjectKeyFromConfig(config))
 
 	ctx, cancel := common.ContextWithTimeout(ctx, 30) // 30 seconds timeout
 	defer cancel()
@@ -40,8 +41,8 @@ func (r *KodeReconciler) ensurePVC(ctx context.Context, config *common.KodeResou
 	log.Info("Ensuring PVC")
 
 	// If ExistingVolumeClaim is specified, return nil
-	if config.Kode.Spec.Storage.ExistingVolumeClaim != "" {
-		log.Info("ExistingVolumeClaim specified, skipping PVC creation", "ExistingVolumeClaim", config.Kode.Spec.Storage.ExistingVolumeClaim)
+	if config.KodeSpec.Storage.ExistingVolumeClaim != "" {
+		log.Info("ExistingVolumeClaim specified, skipping PVC creation", "ExistingVolumeClaim", config.KodeSpec.Storage.ExistingVolumeClaim)
 		return nil
 	}
 
@@ -84,14 +85,12 @@ func (r *KodeReconciler) ensurePVC(ctx context.Context, config *common.KodeResou
 		pvc.ObjectMeta.Labels = constructedPVC.ObjectMeta.Labels
 		pvc.ObjectMeta.Annotations = constructedPVC.ObjectMeta.Annotations
 
-		return controllerutil.SetControllerReference(&config.Kode, pvc, r.Scheme)
+		return controllerutil.SetControllerReference(kode, pvc, r.Scheme)
 	})
 
 	if err != nil {
 		return fmt.Errorf("failed to create or patch PVC: %v", err)
 	}
-
-	log.V(1).Info("PVC object constructed", "PVC", pvc, "Spec", pvc.Spec)
 
 	return nil
 }
@@ -112,7 +111,7 @@ func (r *KodeReconciler) ensurePVC(ctx context.Context, config *common.KodeResou
 
 // constructPVCSpec constructs a PersistentVolumeClaim for the Kode instance
 func (r *KodeReconciler) constructPVCSpec(config *common.KodeResourcesConfig) (*corev1.PersistentVolumeClaim, error) {
-	// log := r.Log.WithName("PvcConstructor").WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
+	log := r.Log.WithName("PvcConstructor").WithValues("kode", common.ObjectKeyFromConfig(config))
 
 	pvc := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
@@ -122,14 +121,16 @@ func (r *KodeReconciler) constructPVCSpec(config *common.KodeResourcesConfig) (*
 			// Finalizers: []string{common.PVCFinalizerName},
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{
-			AccessModes: config.Kode.Spec.Storage.AccessModes,
-			Resources:   config.Kode.Spec.Storage.Resources,
+			AccessModes: config.KodeSpec.Storage.AccessModes,
+			Resources:   config.KodeSpec.Storage.Resources,
 		},
 	}
 
-	if config.Kode.Spec.Storage.StorageClassName != nil {
-		pvc.Spec.StorageClassName = config.Kode.Spec.Storage.StorageClassName
+	if config.KodeSpec.Storage.StorageClassName != nil {
+		pvc.Spec.StorageClassName = config.KodeSpec.Storage.StorageClassName
 	}
+
+	log.V(1).Info("PVC object constructed", "PVC", pvc, "Spec", pvc.Spec)
 
 	return pvc, nil
 }

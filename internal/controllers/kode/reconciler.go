@@ -21,6 +21,8 @@ package controller
 import (
 	"context"
 	"fmt"
+	"math"
+	"time"
 
 	"github.com/go-logr/logr"
 	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
@@ -30,6 +32,7 @@ import (
 	"github.com/jacero-io/kode-operator/internal/status"
 	"github.com/jacero-io/kode-operator/internal/template"
 	"github.com/jacero-io/kode-operator/internal/validation"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -65,7 +68,11 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	// Fetch the Kode instance
 	kode := &kodev1alpha1.Kode{}
 	if err := r.Get(ctx, req.NamespacedName, kode); err != nil {
-		return ctrl.Result{}, client.IgnoreNotFound(err)
+		if errors.IsNotFound(err) {
+			return ctrl.Result{}, nil
+		}
+		log.Error(err, "Unable to fetch Kode")
+		return ctrl.Result{RequeueAfter: r.calculateBackoff(1)}, nil
 	}
 
 	// Handle finalizer
@@ -80,38 +87,75 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		return ctrl.Result{}, nil
 	}
 
-	// Fetch templates for normal reconciliation
-	templates, err := r.fetchTemplatesWithRetry(ctx, kode)
-	if err != nil {
-		log.Error(err, "Failed to fetch templates after retries")
-		return ctrl.Result{RequeueAfter: common.RequeueInterval}, err
+	// Increment attempts at the start of reconciliation
+	kode.Status.ReconcileAttempts++
+	if err := r.Status().Update(ctx, kode); err != nil {
+		log.Error(err, "Failed to update Kode ReconcileAttempts")
+		return ctrl.Result{RequeueAfter: r.calculateBackoff(kode.Status.ReconcileAttempts)}, err
 	}
 
-	// Validate Kode instance and resources
-	// if err := r.Validator.Validate(kode, templates); err != nil {
-	// 	return ctrl.Result{}, r.UpdateStatusWithError(ctx, config, fmt.Errorf("failed to validate Kode instance: %w", err))
-	// }
+	// Refresh the Kode resource to get the updated ReconcileAttempts
+	if err := r.Get(ctx, req.NamespacedName, kode); err != nil {
+		log.Error(err, "Unable to fetch Kode")
+		return ctrl.Result{RequeueAfter: r.calculateBackoff(1)}, nil
+	}
 
-	// Initialize Kode resources config
+	// Fetch templates and initialize config
+	templates, err := r.fetchTemplatesWithRetry(ctx, kode)
+	if err != nil {
+		log.Error(err, "Failed to fetch templates")
+		if updateErr := r.updateKodePhaseFailed(ctx, InitKodeResourcesConfig(kode, nil), fmt.Errorf("failed to fetch templates: %w", err)); updateErr != nil {
+			log.Error(updateErr, "Failed to update Kode status")
+		}
+		return ctrl.Result{RequeueAfter: r.calculateBackoff(kode.Status.ReconcileAttempts)}, err
+	}
+
 	config := InitKodeResourcesConfig(kode, templates)
 
 	// Ensure resources
 	if err := r.ensureResources(ctx, config); err != nil {
-		return ctrl.Result{RequeueAfter: common.RequeueInterval}, err
+		log.Error(err, "Failed to ensure resources")
+		if updateErr := r.updateKodePhaseFailed(ctx, config, err); updateErr != nil {
+			log.Error(updateErr, "Failed to update Kode status")
+		}
+		return ctrl.Result{RequeueAfter: r.calculateBackoff(kode.Status.ReconcileAttempts)}, err
 	}
 
 	// Check if all resources are ready
 	ready, err := r.checkResourcesReady(ctx, config)
 	if err != nil {
-		return ctrl.Result{RequeueAfter: common.RequeueInterval}, r.updateKodePhaseFailed(ctx, config, fmt.Errorf("failed to check resource readiness: %w", err))
+		log.Error(err, "Failed to check resource readiness")
+		if updateErr := r.updateKodePhaseFailed(ctx, config, fmt.Errorf("failed to check resource readiness: %w", err)); updateErr != nil {
+			log.Error(updateErr, "Failed to update Kode status")
+			return ctrl.Result{RequeueAfter: r.calculateBackoff(kode.Status.ReconcileAttempts)}, nil
+		}
+		return ctrl.Result{RequeueAfter: r.calculateBackoff(kode.Status.ReconcileAttempts)}, nil
 	}
 	if !ready {
-		return ctrl.Result{RequeueAfter: common.RequeueInterval}, r.updateKodePhasePending(ctx, config)
+		log.Info("Resources not ready, requeuing")
+		// Refresh the Kode resource to get the updated ReconcileAttempts
+		if err := r.Get(ctx, req.NamespacedName, kode); err != nil {
+			log.Error(err, "Unable to fetch Kode")
+			return ctrl.Result{RequeueAfter: r.calculateBackoff(1)}, nil
+		}
+		kode.Status.ReconcileAttempts++
+		if updateErr := r.Status().Update(ctx, kode); updateErr != nil {
+			log.Error(updateErr, "Failed to update Kode ReconcileAttempts")
+			// If we fail to update, we'll still requeue with backoff but won't increment the attempts
+			return ctrl.Result{RequeueAfter: r.calculateBackoff(kode.Status.ReconcileAttempts)}, nil
+		}
+		return ctrl.Result{RequeueAfter: r.calculateBackoff(kode.Status.ReconcileAttempts)}, nil
 	}
 
-	// Update status to active
+	// Resources are ready, reset attempts and update status to active
+	kode.Status.ReconcileAttempts = 0
+	if err := r.Update(ctx, kode); err != nil {
+		log.Error(err, "Failed to update Kode ReconcileAttempts")
+		return ctrl.Result{RequeueAfter: r.calculateBackoff(1)}, err
+	}
 	if err := r.updateKodePhaseActive(ctx, config); err != nil {
-		return ctrl.Result{Requeue: true}, err
+		log.Error(err, "Failed to update Kode status to Active")
+		return ctrl.Result{RequeueAfter: r.calculateBackoff(1)}, nil
 	}
 
 	log.Info("Kode reconciliation successful")
@@ -126,6 +170,17 @@ func (r *KodeReconciler) fetchTemplatesWithRetry(ctx context.Context, kode *kode
 		return err
 	})
 	return templates, err
+}
+
+func (r *KodeReconciler) calculateBackoff(attempts int) time.Duration {
+	baseDelay := time.Second * 5
+	maxDelay := time.Minute * 5
+	multiplier := math.Pow(2, float64(attempts))
+	delay := time.Duration(float64(baseDelay) * multiplier)
+	if delay > maxDelay {
+		return maxDelay
+	}
+	return delay
 }
 
 func (r *KodeReconciler) SetupWithManager(mgr ctrl.Manager) error {

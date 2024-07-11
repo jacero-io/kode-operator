@@ -23,6 +23,7 @@ import (
 
 	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
 	"github.com/jacero-io/kode-operator/internal/common"
+	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	client "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -47,13 +48,26 @@ func (r *KodeReconciler) handleFinalizer(ctx context.Context, kode *kodev1alpha1
 			// Run finalization logic
 			if err := r.finalize(ctx, kode); err != nil {
 				log.Error(err, "Failed to run finalizer")
-				// Don't return here, continue to remove the finalizer
+				return ctrl.Result{}, err
 			}
 
 			// Remove finalizer
-			controllerutil.RemoveFinalizer(kode, common.FinalizerName)
-			log.Info("Removing finalizer", "finalizer", common.FinalizerName)
-			if err := r.Update(ctx, kode); err != nil {
+			err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+				// Fetch the latest version of Kode
+				latestKode := &kodev1alpha1.Kode{}
+				if err := r.Get(ctx, client.ObjectKeyFromObject(kode), latestKode); err != nil {
+					return err
+				}
+
+				if controllerutil.ContainsFinalizer(latestKode, common.FinalizerName) {
+					controllerutil.RemoveFinalizer(latestKode, common.FinalizerName)
+					log.Info("Removing finalizer", "finalizer", common.FinalizerName)
+					return r.Update(ctx, latestKode)
+				}
+				return nil
+			})
+
+			if err != nil {
 				log.Error(err, "Failed to remove finalizer")
 				return ctrl.Result{}, err
 			}
@@ -69,7 +83,7 @@ func (r *KodeReconciler) finalize(ctx context.Context, kode *kodev1alpha1.Kode) 
 
 	// Initialize Kode resources config without templates
 	config := &common.KodeResourcesConfig{
-		Kode:          *kode,
+		KodeSpec:      kode.Spec,
 		KodeName:      kode.Name,
 		KodeNamespace: kode.Namespace,
 		PVCName:       common.GetPVCName(kode),

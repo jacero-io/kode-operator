@@ -27,12 +27,11 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
-	client "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // TODO: Add inactivity check
 func (r *KodeReconciler) checkResourcesReady(ctx context.Context, config *common.KodeResourcesConfig) (bool, error) {
-	log := r.Log.WithName("ResourceReadyChecker").WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
+	log := r.Log.WithName("ResourceReadyChecker").WithValues("kode", common.ObjectKeyFromConfig(config))
 	ctx, cancel := common.ContextWithTimeout(ctx, 20) // 20 seconds timeout
 	defer cancel()
 
@@ -79,7 +78,7 @@ func (r *KodeReconciler) checkResourcesReady(ctx context.Context, config *common
 	}
 
 	// Check PersistentVolumeClaim if storage is specified
-	if !config.Kode.Spec.Storage.IsEmpty() {
+	if !config.KodeSpec.Storage.IsEmpty() {
 		pvc := &corev1.PersistentVolumeClaim{}
 		err = r.Get(ctx, types.NamespacedName{Name: config.PVCName, Namespace: config.KodeNamespace}, pvc)
 		if err != nil {
@@ -113,7 +112,7 @@ func (r *KodeReconciler) checkResourcesReady(ctx context.Context, config *common
 }
 
 func (r *KodeReconciler) checkEnvoySidecarReady(ctx context.Context, config *common.KodeResourcesConfig) (bool, error) {
-	log := r.Log.WithName("EnvoySidecarReadyChecker").WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
+	log := r.Log.WithName("EnvoySidecarReadyChecker").WithValues("kode", common.ObjectKeyFromConfig(config))
 
 	pod := &corev1.Pod{}
 	err := r.Get(ctx, types.NamespacedName{Name: config.KodeName + "-0", Namespace: config.KodeNamespace}, pod)

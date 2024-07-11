@@ -504,6 +504,10 @@ spec:
               phase:
                 description: Phase represents the current phase of the Kode resource.
                 type: string
+              reconcileAttempts:
+                description: ReconcileAttempts is the number of times the Kode resource
+                  has been reconciled.
+                type: integer
             required:
             - phase
             type: object

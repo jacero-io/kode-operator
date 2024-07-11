@@ -25,8 +25,16 @@ import (
 	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 )
+
+func ObjectKeyFromConfig(config *KodeResourcesConfig) types.NamespacedName {
+	return types.NamespacedName{
+		Name:      config.KodeName,
+		Namespace: config.KodeNamespace,
+	}
+}
 
 // returns the name of the PersistentVolumeClaim for the Kode instance
 func GetPVCName(kode *kodev1alpha1.Kode) string {

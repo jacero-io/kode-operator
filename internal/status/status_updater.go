@@ -20,6 +20,7 @@ package status
 
 import (
 	"context"
+	"reflect"
 
 	"github.com/go-logr/logr"
 	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
@@ -42,47 +43,50 @@ func NewDefaultStatusUpdater(client client.Client, log logr.Logger) StatusUpdate
 	}
 }
 
-func (u *defaultStatusUpdater) UpdateStatus(ctx context.Context, phase string, conditions []metav1.Condition, lastError string, lastErrorTime *metav1.Time) error {
-	// Not implemented
-	return nil
-}
-
 func (u *defaultStatusUpdater) UpdateKodeStatus(ctx context.Context,
 	config *common.KodeResourcesConfig,
 	phase kodev1alpha1.KodePhase,
 	conditions []metav1.Condition,
 	lastError string,
 	lastErrorTime *metav1.Time) error {
-	log := u.log.WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
 
-	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+	log := u.log.WithValues("kode", common.ObjectKeyFromConfig(config))
+
+	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
 		// Fetch the latest version of Kode
-		var latestKode kodev1alpha1.Kode
-		if err := u.client.Get(ctx, types.NamespacedName{Name: config.Kode.Name, Namespace: config.Kode.Namespace}, &latestKode); err != nil {
-			log.Error(err, "Failed to get latest version of Kode")
+		kode := &kodev1alpha1.Kode{}
+		if err := u.client.Get(ctx, types.NamespacedName{Name: config.KodeName, Namespace: config.KodeNamespace}, kode); err != nil {
 			return err
+		}
+
+		// Check if status has changed
+		if statusUnchanged(&kode.Status, phase, conditions, lastError, lastErrorTime) {
+			log.V(1).Info("Status unchanged, skipping update")
+			return nil
 		}
 
 		// Update the status
-		latestKode.Status.Phase = phase
-		latestKode.Status.Conditions = conditions
-		latestKode.Status.LastError = lastError
-		latestKode.Status.LastErrorTime = lastErrorTime
+		kode.Status.Phase = phase
+		kode.Status.Conditions = conditions
+		kode.Status.LastError = lastError
+		kode.Status.LastErrorTime = lastErrorTime
 
 		// Try to update
-		if err := u.client.Status().Update(ctx, &latestKode); err != nil {
+		if err := u.client.Status().Update(ctx, kode); err != nil {
 			log.Error(err, "Failed to update Kode status")
 			return err
 		}
-
-		// Update was successful, update the config's Kode with the latest version
-		config.Kode = latestKode
 
 		return nil
 	})
 }
 
-func (u *defaultStatusUpdater) UpdateEntryPointsStatus(ctx context.Context, config *common.EntryPointResourceConfig, phase kodev1alpha1.EntryPointPhase, conditions []metav1.Condition, lastError string, lastErrorTime *metav1.Time) error {
+func (u *defaultStatusUpdater) UpdateEntryPointsStatus(ctx context.Context,
+	config *common.EntryPointResourceConfig,
+	phase kodev1alpha1.EntryPointPhase,
+	conditions []metav1.Condition,
+	lastError string,
+	lastErrorTime *metav1.Time) error {
 	log := u.log.WithValues("entryPoint", client.ObjectKeyFromObject(&config.EntryPoint))
 
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
@@ -110,4 +114,12 @@ func (u *defaultStatusUpdater) UpdateEntryPointsStatus(ctx context.Context, conf
 
 		return nil
 	})
+}
+
+func statusUnchanged(currentStatus *kodev1alpha1.KodeStatus, phase kodev1alpha1.KodePhase, conditions []metav1.Condition, lastError string, lastErrorTime *metav1.Time) bool {
+	return currentStatus.Phase == phase &&
+		reflect.DeepEqual(currentStatus.Conditions, conditions) &&
+		currentStatus.LastError == lastError &&
+		((currentStatus.LastErrorTime == nil && lastErrorTime == nil) ||
+			(currentStatus.LastErrorTime != nil && lastErrorTime != nil && currentStatus.LastErrorTime.Equal(lastErrorTime)))
 }

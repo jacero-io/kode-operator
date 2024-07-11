@@ -36,7 +36,7 @@ type Templates struct {
 
 // KodeResourcesConfig holds configuration for Kode resources
 type KodeResourcesConfig struct {
-	Kode                kodev1alpha1.Kode
+	KodeSpec            kodev1alpha1.KodeSpec
 	Labels              map[string]string
 	KodeName            string
 	KodeNamespace       string
