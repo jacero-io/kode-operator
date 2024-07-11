@@ -93,26 +93,26 @@ func (g *BootstrapConfigGenerator) Generate(options common.BootstrapConfigOption
 	// Write the embedded files to a temporary directory
 	tempDir, err := g.writeEmbeddedFilesToTempDir(cueFiles)
 	if err != nil {
-		return "", fmt.Errorf("failed to write embedded files to temp directory: %w", err)
+		return "", NewEnvoyError(EnvoyErrorTypeConfiguration, "Failed to write embedded files", err)
 	}
 	defer os.RemoveAll(tempDir)
 
 	// Load and build the CUE instance
 	value, err := g.loadAndBuildCueInstance(cueFiles, tempDir)
 	if err != nil {
-		return "", err
+		return "", NewEnvoyError(EnvoyErrorTypeConfiguration, "Failed to load and build CUE instance", err)
 	}
 
 	// Encode and fill paths
 	value, err = g.encodeAndFillPaths(value, options)
 	if err != nil {
-		return "", err
+		return "", NewEnvoyError(EnvoyErrorTypeConfiguration, "Failed to encode and fill paths", err)
 	}
 
 	// Encode to YAML
 	result, err := g.encodeToYAML(value)
 	if err != nil {
-		return "", err
+		return "", NewEnvoyError(EnvoyErrorTypeConfiguration, "Failed to encode to YAML", err)
 	}
 
 	g.Log.Info("Successfully rendered bootstrap config")

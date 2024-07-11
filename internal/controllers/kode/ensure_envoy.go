@@ -19,36 +19,83 @@ limitations under the License.
 package controller
 
 import (
+	"context"
 	"fmt"
+	"strings"
+	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/jacero-io/kode-operator/internal/common"
 	"github.com/jacero-io/kode-operator/internal/envoy"
-	client "sigs.k8s.io/controller-runtime/pkg/client"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // ensureSidecarContainers ensures that the Envoy container exists for the Kode instance
-func (r *KodeReconciler) ensureSidecarContainers(config *common.KodeResourcesConfig) error {
-	log := r.Log.WithName("SidecarContainerEnsurer").WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
+func (r *KodeReconciler) ensureSidecarContainers(ctx context.Context, config *common.KodeResourcesConfig) error {
+	log := r.Log.WithName("SidecarContainerEnsurer").WithValues("kode", common.ObjectKeyFromConfig(config))
 
-	log.Info("Ensuring Envoy Container")
+	log.Info("Ensuring sidecar containers")
 	if err := ensureEnvoySidecar(config, log); err != nil {
 		log.Error(err, "Failed to ensure Envoy sidecar container")
-		return err
+
+		if envoy.IsEnvoyError(err) {
+			now := metav1.NewTime(time.Now())
+			var condition metav1.Condition
+
+			switch envoy.GetEnvoyErrorType(err) {
+			case envoy.EnvoyErrorTypeConfiguration:
+				condition = metav1.Condition{
+					Type:               string(common.ConditionTypeConfigured),
+					Status:             metav1.ConditionFalse,
+					Reason:             "EnvoyConfigurationFailed",
+					Message:            err.Error(),
+					LastTransitionTime: now,
+				}
+			case envoy.EnvoyErrorTypeCreation:
+				condition = metav1.Condition{
+					Type:               "EnvoyContainerCreationFailed",
+					Status:             metav1.ConditionTrue,
+					Reason:             "EnvoyContainerCreationError",
+					Message:            err.Error(),
+					LastTransitionTime: now,
+				}
+			default:
+				condition = metav1.Condition{
+					Type:               "EnvoyError",
+					Status:             metav1.ConditionTrue,
+					Reason:             "UnknownEnvoyError",
+					Message:            err.Error(),
+					LastTransitionTime: now,
+				}
+			}
+			return r.updateKodePhaseFailed(ctx, config, err, condition)
+		}
+
+		// Handle other sidecar container errors
+		return r.updateKodePhaseFailed(ctx, config, err, metav1.Condition{
+			Type:               "SidecarContainerCreationFailed",
+			Status:             metav1.ConditionTrue,
+			Reason:             "SidecarContainerCreationError",
+			Message:            fmt.Sprintf("Failed to create sidecar container: %s", err.Error()),
+			LastTransitionTime: metav1.NewTime(time.Now()),
+		})
 	}
 
 	return nil
 }
 
 func ensureEnvoySidecar(config *common.KodeResourcesConfig, log logr.Logger) error {
-	configGenerator := envoy.NewBootstrapConfigGenerator(log.WithName("EnvoyConfigGenerator").WithValues("kode", client.ObjectKeyFromObject(&config.Kode)))
-	evnoyContainers, envoyInitContainers, err := envoy.NewContainerConstructor(
-		log.WithName("EnvoyContainerConstructor").WithValues("kode", client.ObjectKeyFromObject(&config.Kode)),
+	configGenerator := envoy.NewBootstrapConfigGenerator(log.WithName("EnvoyConfigGenerator").WithValues("kode", common.ObjectKeyFromConfig(config)))
+	envoyContainers, envoyInitContainers, err := envoy.NewContainerConstructor(
+		log.WithName("EnvoyContainerConstructor").WithValues("kode", common.ObjectKeyFromConfig(config)),
 		configGenerator).ConstructEnvoyContainers(config)
 	if err != nil {
-		return fmt.Errorf("failed to construct Envoy sidecar: %v", err)
+		if strings.Contains(err.Error(), "configuration") {
+			return envoy.NewEnvoyError(envoy.EnvoyErrorTypeConfiguration, "Failed to configure Envoy", err)
+		}
+		return envoy.NewEnvoyError(envoy.EnvoyErrorTypeCreation, "Failed to create Envoy container", err)
 	}
-	config.Containers = append(config.Containers, evnoyContainers...)
+	config.Containers = append(config.Containers, envoyContainers...)
 	config.InitContainers = append(config.InitContainers, envoyInitContainers...)
 
 	return nil
