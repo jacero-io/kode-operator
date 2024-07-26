@@ -21,12 +21,10 @@ package controller
 import (
 	"context"
 	"fmt"
-	"time"
 
 	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
 	"github.com/jacero-io/kode-operator/internal/common"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -34,10 +32,10 @@ func (r *KodeReconciler) ensureResources(ctx context.Context, config *common.Kod
 	log := r.Log.WithValues("kode", types.NamespacedName{Name: config.KodeName, Namespace: config.KodeNamespace})
 
 	// Update status to Creating before starting resource creation
-	if err := r.updateKodePhaseCreating(ctx, config); err != nil {
-		log.Error(err, "Failed to update status to Creating")
-		return err
-	}
+	// if err := r.updateKodePhaseCreating(ctx, config); err != nil {
+	// 	log.Error(err, "Failed to update status to Creating")
+	// 	return err
+	// }
 
 	// Fetch the latest Kode object
 	kode, err := r.getLatestKode(ctx, config.KodeName, config.KodeNamespace)
@@ -45,30 +43,32 @@ func (r *KodeReconciler) ensureResources(ctx context.Context, config *common.Kod
 		return fmt.Errorf("failed to get Kode: %w", err)
 	}
 
-	now := metav1.NewTime(time.Now())
+	// now := metav1.NewTime(time.Now())
 
 	// Ensure Secret
 	if err := r.ensureSecret(ctx, config, kode); err != nil {
 		log.Error(err, "Failed to ensure Secret")
-		return r.updateKodePhaseFailed(ctx, config, err, metav1.Condition{
-			Type:               "SecretCreationFailed",
-			Status:             metav1.ConditionTrue,
-			Reason:             "SecretCreationError",
-			Message:            fmt.Sprintf("Failed to create Secret: %s", err.Error()),
-			LastTransitionTime: now,
-		})
+		// r.updateKodePhaseFailed(ctx, config, err, metav1.Condition{
+		// 	Type:               "SecretCreationFailed",
+		// 	Status:             metav1.ConditionTrue,
+		// 	Reason:             "SecretCreationError",
+		// 	Message:            fmt.Sprintf("Failed to create Secret: %s", err.Error()),
+		// 	LastTransitionTime: now,
+		// })
+		return err
 	}
 
 	// Ensure Credentials
 	if err := r.ensureCredentials(ctx, config, kode); err != nil {
 		log.Error(err, "Failed to ensure Credentials")
-		return r.updateKodePhaseFailed(ctx, config, err, metav1.Condition{
-			Type:               "CredentialsCreationFailed",
-			Status:             metav1.ConditionTrue,
-			Reason:             "CredentialsCreationError",
-			Message:            fmt.Sprintf("Failed to create Credentials: %s", err.Error()),
-			LastTransitionTime: now,
-		})
+		// r.updateKodePhaseFailed(ctx, config, err, metav1.Condition{
+		// 	Type:               "CredentialsCreationFailed",
+		// 	Status:             metav1.ConditionTrue,
+		// 	Reason:             "CredentialsCreationError",
+		// 	Message:            fmt.Sprintf("Failed to create Credentials: %s", err.Error()),
+		// 	LastTransitionTime: now,
+		// })
+		return err
 	}
 
 	// If the KodeTemplate has an EnvoyConfigRef, ensure the EnvoyContainer
@@ -81,46 +81,49 @@ func (r *KodeReconciler) ensureResources(ctx context.Context, config *common.Kod
 	// Ensure StatefulSet
 	if err := r.ensureStatefulSet(ctx, config, kode); err != nil {
 		log.Error(err, "Failed to ensure StatefulSet")
-		return r.updateKodePhaseFailed(ctx, config, err, metav1.Condition{
-			Type:               "StatefulSetCreationFailed",
-			Status:             metav1.ConditionTrue,
-			Reason:             "StatefulSetCreationError",
-			Message:            fmt.Sprintf("Failed to create StatefulSet: %s", err.Error()),
-			LastTransitionTime: now,
-		})
+		// r.updateKodePhaseFailed(ctx, config, err, metav1.Condition{
+		// 	Type:               "StatefulSetCreationFailed",
+		// 	Status:             metav1.ConditionTrue,
+		// 	Reason:             "StatefulSetCreationError",
+		// 	Message:            fmt.Sprintf("Failed to create StatefulSet: %s", err.Error()),
+		// 	LastTransitionTime: now,
+		// })
+		return err
 	}
 
 	// Ensure Service
 	if err := r.ensureService(ctx, config, kode); err != nil {
 		log.Error(err, "Failed to ensure Service")
-		return r.updateKodePhaseFailed(ctx, config, err, metav1.Condition{
-			Type:               "ServiceCreationFailed",
-			Status:             metav1.ConditionTrue,
-			Reason:             "ServiceCreationError",
-			Message:            fmt.Sprintf("Failed to create Service: %s", err.Error()),
-			LastTransitionTime: now,
-		})
+		// r.updateKodePhaseFailed(ctx, config, err, metav1.Condition{
+		// 	Type:               "ServiceCreationFailed",
+		// 	Status:             metav1.ConditionTrue,
+		// 	Reason:             "ServiceCreationError",
+		// 	Message:            fmt.Sprintf("Failed to create Service: %s", err.Error()),
+		// 	LastTransitionTime: now,
+		// })
+		return err
 	}
 
 	// Ensure PVC if storage is specified
 	if !kode.Spec.Storage.IsEmpty() {
 		if err := r.ensurePVC(ctx, config, kode); err != nil {
 			log.Error(err, "Failed to ensure PVC")
-			return r.updateKodePhaseFailed(ctx, config, err, metav1.Condition{
-				Type:               "PVCCreationFailed",
-				Status:             metav1.ConditionTrue,
-				Reason:             "PVCCreationError",
-				Message:            fmt.Sprintf("Failed to create PersistentVolumeClaim: %s", err.Error()),
-				LastTransitionTime: now,
-			})
+			// r.updateKodePhaseFailed(ctx, config, err, metav1.Condition{
+			// 	Type:               "PVCCreationFailed",
+			// 	Status:             metav1.ConditionTrue,
+			// 	Reason:             "PVCCreationError",
+			// 	Message:            fmt.Sprintf("Failed to create PersistentVolumeClaim: %s", err.Error()),
+			// 	LastTransitionTime: now,
+			// })
+			return err
 		}
 	}
 
 	// Update status to Created after all resources are ensured
-	if err := r.updateKodePhaseCreated(ctx, config); err != nil {
-		log.Error(err, "Failed to update status to Created")
-		return err
-	}
+	// if err := r.updateKodePhaseCreated(ctx, config); err != nil {
+	// 	log.Error(err, "Failed to update status to Created")
+	// 	return err
+	// }
 
 	log.Info("All resources ensured successfully")
 	return nil

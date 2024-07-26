@@ -20,7 +20,6 @@ package controller
 
 import (
 	"context"
-	"fmt"
 	"math"
 	"time"
 
@@ -51,6 +50,10 @@ type KodeReconciler struct {
 	Validator       validation.Validator
 }
 
+const (
+	RequeueInterval = 5 * time.Second
+)
+
 // +kubebuilder:rbac:groups=kode.kode.jacero.io,resources=kodes,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=kode.kode.jacero.io,resources=kodes/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=kode.kode.jacero.io,resources=kodes/finalizers,verbs=update
@@ -69,10 +72,11 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	kode := &kodev1alpha1.Kode{}
 	if err := r.Get(ctx, req.NamespacedName, kode); err != nil {
 		if errors.IsNotFound(err) {
+			log.Info("Kode resource not found. Ignoring since object must be deleted.")
 			return ctrl.Result{}, nil
 		}
-		log.Error(err, "Unable to fetch Kode")
-		return ctrl.Result{RequeueAfter: r.calculateBackoff(1)}, nil
+		log.Error(err, "Failed to get Kode")
+		return ctrl.Result{RequeueAfter: RequeueInterval}, err
 	}
 
 	// Handle finalizer
@@ -87,75 +91,36 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		return ctrl.Result{}, nil
 	}
 
-	// Increment attempts at the start of reconciliation
-	kode.Status.ReconcileAttempts++
-	if err := r.Status().Update(ctx, kode); err != nil {
-		log.Error(err, "Failed to update Kode ReconcileAttempts")
-		return ctrl.Result{RequeueAfter: r.calculateBackoff(kode.Status.ReconcileAttempts)}, err
-	}
-
-	// Refresh the Kode resource to get the updated ReconcileAttempts
-	if err := r.Get(ctx, req.NamespacedName, kode); err != nil {
-		log.Error(err, "Unable to fetch Kode")
-		return ctrl.Result{RequeueAfter: r.calculateBackoff(1)}, nil
-	}
-
 	// Fetch templates and initialize config
 	templates, err := r.fetchTemplatesWithRetry(ctx, kode)
 	if err != nil {
 		log.Error(err, "Failed to fetch templates")
-		if updateErr := r.updateKodePhaseFailed(ctx, InitKodeResourcesConfig(kode, nil), fmt.Errorf("failed to fetch templates: %w", err)); updateErr != nil {
-			log.Error(updateErr, "Failed to update Kode status")
-		}
-		return ctrl.Result{RequeueAfter: r.calculateBackoff(kode.Status.ReconcileAttempts)}, err
+		return ctrl.Result{RequeueAfter: RequeueInterval}, err
 	}
-
 	config := InitKodeResourcesConfig(kode, templates)
 
 	// Ensure resources
 	if err := r.ensureResources(ctx, config); err != nil {
 		log.Error(err, "Failed to ensure resources")
-		if updateErr := r.updateKodePhaseFailed(ctx, config, err); updateErr != nil {
-			log.Error(updateErr, "Failed to update Kode status")
+		// Update status to Failed if ensuring resources failed
+		if statusErr := r.updateKodePhaseFailed(ctx, config, err); statusErr != nil {
+			log.Error(statusErr, "Failed to update status to Failed")
 		}
-		return ctrl.Result{RequeueAfter: r.calculateBackoff(kode.Status.ReconcileAttempts)}, err
+		return ctrl.Result{RequeueAfter: RequeueInterval}, err
 	}
 
-	// Check if all resources are ready
-	ready, err := r.checkResourcesReady(ctx, config)
-	if err != nil {
-		log.Error(err, "Failed to check resource readiness")
-		if updateErr := r.updateKodePhaseFailed(ctx, config, fmt.Errorf("failed to check resource readiness: %w", err)); updateErr != nil {
-			log.Error(updateErr, "Failed to update Kode status")
-			return ctrl.Result{RequeueAfter: r.calculateBackoff(kode.Status.ReconcileAttempts)}, nil
+	// Check resource readiness and update status accordingly
+	allResourcesReady, err := r.checkResourcesReady(ctx, config)
+	if allResourcesReady {
+		if err := r.updateKodePhaseActive(ctx, config); err != nil {
+			log.Error(err, "Failed to update status to Active")
+			return ctrl.Result{}, err
 		}
-		return ctrl.Result{RequeueAfter: r.calculateBackoff(kode.Status.ReconcileAttempts)}, nil
-	}
-	if !ready {
-		log.Info("Resources not ready, requeuing")
-		// Refresh the Kode resource to get the updated ReconcileAttempts
-		if err := r.Get(ctx, req.NamespacedName, kode); err != nil {
-			log.Error(err, "Unable to fetch Kode")
-			return ctrl.Result{RequeueAfter: r.calculateBackoff(1)}, nil
+	} else {
+		if err := r.updateKodePhasePending(ctx, config); err != nil {
+			log.Error(err, "Failed to update status to Pending")
+			return ctrl.Result{RequeueAfter: RequeueInterval}, err
 		}
-		kode.Status.ReconcileAttempts++
-		if updateErr := r.Status().Update(ctx, kode); updateErr != nil {
-			log.Error(updateErr, "Failed to update Kode ReconcileAttempts")
-			// If we fail to update, we'll still requeue with backoff but won't increment the attempts
-			return ctrl.Result{RequeueAfter: r.calculateBackoff(kode.Status.ReconcileAttempts)}, nil
-		}
-		return ctrl.Result{RequeueAfter: r.calculateBackoff(kode.Status.ReconcileAttempts)}, nil
-	}
-
-	// Resources are ready, reset attempts and update status to active
-	kode.Status.ReconcileAttempts = 0
-	if err := r.Update(ctx, kode); err != nil {
-		log.Error(err, "Failed to update Kode ReconcileAttempts")
-		return ctrl.Result{RequeueAfter: r.calculateBackoff(1)}, err
-	}
-	if err := r.updateKodePhaseActive(ctx, config); err != nil {
-		log.Error(err, "Failed to update Kode status to Active")
-		return ctrl.Result{RequeueAfter: r.calculateBackoff(1)}, nil
 	}
 
 	log.Info("Kode reconciliation successful")
