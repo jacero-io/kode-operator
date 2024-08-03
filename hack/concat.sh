@@ -7,8 +7,7 @@ output_file="concatenated_output.txt"
 > "$output_file"
 
 # Exclude patterns
-exclude_patterns=('*deepcopy.go' 'entrypoint*' '*validator*' '*_test.go')
-# '*_test.go'
+exclude_patterns=('*deepcopy.go' 'entrypoint*' '*validator*' '*_test.go' 'cleanup*' 'template*')
 
 # Function to process files
 process_files() {
@@ -19,11 +18,14 @@ process_files() {
   done
 
   eval "$find_command" | while read -r file; do
-    echo "##########################" >> "$output_file"
+    echo "#####################################" >> "$output_file"
     txtFile="${file#../}"
     echo "// $txtFile" >> "$output_file"
     echo "" >> "$output_file"  # Add a newline for separation
-    cat "$file" >> "$output_file"
+    
+    # Remove multiline comments and output the result
+    sed '/\/\*/,/\*\//d' "$file" >> "$output_file"
+    
     echo "" >> "$output_file"  # Add a newline for separation
   done
 }
