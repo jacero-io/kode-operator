@@ -42,15 +42,16 @@ func (r *KodeReconciler) ensureResources(ctx context.Context, config *common.Kod
 	if kode.Generation != kode.Status.ObservedGeneration {
 		log.Info("Resource has changed, ensuring all resources")
 
-		// Update status to Creating before starting resource creation
+		// Update status depending on the current phase
 		if kode.Status.Phase != kodev1alpha1.KodePhasePending {
+			// If the Kode is already Active, update the status to Pending
 			if kode.Status.Phase == kodev1alpha1.KodePhaseActive {
-				if err := r.updateKodePhasePending(ctx, kode); err != nil {
+				if err := r.updateKodeStatus(ctx, kode, kodev1alpha1.KodePhasePending, []metav1.Condition{}, nil); err != nil {
 					log.Error(err, "Failed to update status to Pending")
 					return err
 				}
-			} else {
-				if err := r.updateKodePhaseCreating(ctx, kode); err != nil {
+			} else { // If the Kode is not Active, update the status to Creating
+				if err := r.updateKodeStatus(ctx, kode, kodev1alpha1.KodePhaseCreating, []metav1.Condition{}, nil); err != nil {
 					log.Error(err, "Failed to update status to Creating")
 					return err
 				}
@@ -60,26 +61,35 @@ func (r *KodeReconciler) ensureResources(ctx context.Context, config *common.Kod
 		// Ensure Secret
 		if err := r.ensureSecret(ctx, config, kode); err != nil {
 			log.Error(err, "Failed to ensure Secret")
-			r.updateKodePhaseFailed(ctx, kode, err, metav1.Condition{
+			r.updateKodeStatus(ctx, kode, kodev1alpha1.KodePhaseFailed, []metav1.Condition{{
 				Type:               "SecretCreationFailed",
 				Status:             metav1.ConditionTrue,
 				Reason:             "SecretCreationError",
 				Message:            fmt.Sprintf("Failed to create Secret: %s", err.Error()),
 				LastTransitionTime: metav1.Now(),
-			})
+			}}, err)
 			return err
 		}
+		// 	r.updateKodePhaseFailed(ctx, kode, err, metav1.Condition{
+		// 		Type:               "SecretCreationFailed",
+		// 		Status:             metav1.ConditionTrue,
+		// 		Reason:             "SecretCreationError",
+		// 		Message:            fmt.Sprintf("Failed to create Secret: %s", err.Error()),
+		// 		LastTransitionTime: metav1.Now(),
+		// 	})
+		// 	return err
+		// }
 
 		// Ensure Credentials
 		if err := r.ensureCredentials(ctx, config); err != nil {
 			log.Error(err, "Failed to ensure Credentials")
-			r.updateKodePhaseFailed(ctx, kode, err, metav1.Condition{
+			r.updateKodeStatus(ctx, kode, kodev1alpha1.KodePhaseFailed, []metav1.Condition{{
 				Type:               "CredentialsCreationFailed",
 				Status:             metav1.ConditionTrue,
 				Reason:             "CredentialsCreationError",
 				Message:            fmt.Sprintf("Failed to create Credentials: %s", err.Error()),
 				LastTransitionTime: metav1.Now(),
-			})
+			}}, err)
 			return err
 		}
 
@@ -94,26 +104,26 @@ func (r *KodeReconciler) ensureResources(ctx context.Context, config *common.Kod
 		// Ensure StatefulSet
 		if err := r.ensureStatefulSet(ctx, config, kode); err != nil {
 			log.Error(err, "Failed to ensure StatefulSet")
-			r.updateKodePhaseFailed(ctx, kode, err, metav1.Condition{
+			r.updateKodeStatus(ctx, kode, kodev1alpha1.KodePhaseFailed, []metav1.Condition{{
 				Type:               "StatefulSetCreationFailed",
 				Status:             metav1.ConditionTrue,
 				Reason:             "StatefulSetCreationError",
 				Message:            fmt.Sprintf("Failed to create StatefulSet: %s", err.Error()),
 				LastTransitionTime: metav1.Now(),
-			})
+			}}, err)
 			return err
 		}
 
 		// Ensure Service
 		if err := r.ensureService(ctx, config, kode); err != nil {
 			log.Error(err, "Failed to ensure Service")
-			r.updateKodePhaseFailed(ctx, kode, err, metav1.Condition{
+			r.updateKodeStatus(ctx, kode, kodev1alpha1.KodePhaseFailed, []metav1.Condition{{
 				Type:               "ServiceCreationFailed",
 				Status:             metav1.ConditionTrue,
 				Reason:             "ServiceCreationError",
 				Message:            fmt.Sprintf("Failed to create Service: %s", err.Error()),
 				LastTransitionTime: metav1.Now(),
-			})
+			}}, err)
 			return err
 		}
 
@@ -121,56 +131,33 @@ func (r *KodeReconciler) ensureResources(ctx context.Context, config *common.Kod
 		if !kode.Spec.Storage.IsEmpty() {
 			if err := r.ensurePVC(ctx, config, kode); err != nil {
 				log.Error(err, "Failed to ensure PVC")
-				r.updateKodePhaseFailed(ctx, kode, err, metav1.Condition{
+				r.updateKodeStatus(ctx, kode, kodev1alpha1.KodePhaseFailed, []metav1.Condition{{
 					Type:               "PVCCreationFailed",
 					Status:             metav1.ConditionTrue,
 					Reason:             "PVCCreationError",
 					Message:            fmt.Sprintf("Failed to create PersistentVolumeClaim: %s", err.Error()),
 					LastTransitionTime: metav1.Now(),
-				})
+				}}, err)
 				return err
 			}
 		}
 
-		// Update status to Created after all resources are ensured
+		// Update status depending on the current phase
 		if kode.Status.Phase != kodev1alpha1.KodePhasePending {
+			// If the Kode is Active, update the status to Pending
 			if kode.Status.Phase == kodev1alpha1.KodePhaseActive {
-				if err := r.updateKodePhasePending(ctx, kode); err != nil {
+				if err := r.updateKodeStatus(ctx, kode, kodev1alpha1.KodePhasePending, []metav1.Condition{}, nil); err != nil {
 					log.Error(err, "Failed to update status to Pending")
 					return err
 				}
-			} else {
-				if err := r.updateKodePhaseCreated(ctx, kode); err != nil {
-					log.Error(err, "Failed to update status to Created")
+			} else { // If the Kode is not Active, update the status to Created
+				if err := r.updateKodeStatus(ctx, kode, kodev1alpha1.KodePhaseCreating, []metav1.Condition{}, nil); err != nil {
+					log.Error(err, "Failed to update status to Creating")
 					return err
 				}
 			}
 		}
 	}
-	// else {
-	// 	log.Info("Resource hasn't changed, checking readiness")
-	// }
-
-	// // Check if all resources are ready
-	// ready, err := r.checkResourcesReady(ctx, config)
-	// if err != nil {
-	// 	log.Error(err, "Failed to check resource readiness")
-	// 	return err
-	// }
-
-	// if !ready {
-	// 	log.V(1).Info("Resources not ready, updating status to Pending")
-	// 	if err := r.updateKodePhasePending(ctx, kode); err != nil {
-	// 		log.Error(err, "Failed to update status to Pending")
-	// 		return err
-	// 	}
-	// } else {
-	// 	log.V(1).Info("All resources ready, updating status to Active")
-	// 	if err := r.updateKodePhaseActive(ctx, kode); err != nil {
-	// 		log.Error(err, "Failed to update status to Active")
-	// 		return err
-	// 	}
-	// }
 
 	return nil
 }

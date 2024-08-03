@@ -69,17 +69,17 @@ func (r *KodeReconciler) ensureSidecarContainers(ctx context.Context, config *co
 					LastTransitionTime: now,
 				}
 			}
-			return r.updateKodePhaseFailed(ctx, kode, err, condition)
+			return r.updateKodeStatus(ctx, kode, kodev1alpha1.KodePhaseFailed, []metav1.Condition{condition}, err)
 		}
 
 		// Handle other sidecar container errors
-		return r.updateKodePhaseFailed(ctx, kode, err, metav1.Condition{
+		return r.updateKodeStatus(ctx, kode, kodev1alpha1.KodePhaseFailed, []metav1.Condition{{
 			Type:               "SidecarContainerCreationFailed",
 			Status:             metav1.ConditionTrue,
 			Reason:             "SidecarContainerCreationError",
 			Message:            fmt.Sprintf("Failed to create sidecar container: %s", err.Error()),
 			LastTransitionTime: metav1.NewTime(time.Now()),
-		})
+		}}, err)
 	}
 
 	return nil

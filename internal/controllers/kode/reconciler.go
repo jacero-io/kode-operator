@@ -32,6 +32,7 @@ import (
 	"github.com/jacero-io/kode-operator/internal/template"
 	"github.com/jacero-io/kode-operator/internal/validation"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
@@ -104,9 +105,10 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		log.Error(err, "Failed to fetch templates")
 		if errors.IsNotFound(err) {
 			// Update the Kode status to reflect that the template is missing (ctx, kode, err, "TemplateMissing", "KodeTemplate not found"); updateErr != nil {)
-			if statusErr := r.updateKodePhaseFailed(ctx, kode, err); statusErr != nil {
+			if statusErr := r.updateKodeStatus(ctx, kode, kodev1alpha1.KodePhaseFailed, []metav1.Condition{}, err); statusErr != nil {
 				log.Error(statusErr, "Failed to update Kode status")
 			}
+
 			// Requeue after a longer interval as the template is missing
 			return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil
 		}
@@ -118,7 +120,7 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	// Ensure resources
 	if err := r.ensureResources(ctx, config); err != nil {
 		log.Error(err, "Failed to ensure resources")
-		if statusErr := r.updateKodePhaseFailed(ctx, kode, err); statusErr != nil {
+		if statusErr := r.updateKodeStatus(ctx, kode, kodev1alpha1.KodePhaseFailed, []metav1.Condition{}, err); statusErr != nil {
 			log.Error(statusErr, "Failed to update status to Failed")
 		}
 		return ctrl.Result{RequeueAfter: RequeueInterval}, err
@@ -134,7 +136,7 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	if !ready {
 		if kode.Status.Phase != kodev1alpha1.KodePhasePending {
 			log.Info("Resources not ready, updating status to Pending")
-			if err := r.updateKodePhasePending(ctx, kode); err != nil {
+			if err := r.updateKodeStatus(ctx, kode, kodev1alpha1.KodePhasePending, []metav1.Condition{}, nil); err != nil {
 				log.Error(err, "Failed to update status to Pending")
 				return ctrl.Result{RequeueAfter: RequeueInterval}, err
 			}
@@ -145,7 +147,7 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	// Resources are ready, update status to Active if it's not already
 	if kode.Status.Phase != kodev1alpha1.KodePhaseActive {
 		log.Info("Resources ready, updating status to Active")
-		if err := r.updateKodePhaseActive(ctx, kode); err != nil {
+		if err := r.updateKodeStatus(ctx, kode, kodev1alpha1.KodePhaseActive, []metav1.Condition{}, nil); err != nil {
 			log.Error(err, "Failed to update status to Active")
 			return ctrl.Result{RequeueAfter: RequeueInterval}, err
 		}
