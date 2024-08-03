@@ -27,7 +27,8 @@ import (
 )
 
 // StatusUpdater defines the interface for updating the status of a Kode and entry point resources.
+// config *common.KodeResourcesConfig,
 type StatusUpdater interface {
-	UpdateKodeStatus(ctx context.Context, config *common.KodeResourcesConfig, phase kodev1alpha1.KodePhase, conditions []metav1.Condition, lastError string, lastErrorTime *metav1.Time) error
+	UpdateKodeStatus(ctx context.Context, kode *kodev1alpha1.Kode, phase kodev1alpha1.KodePhase, conditions []metav1.Condition, lastError string, lastErrorTime *metav1.Time) error
 	UpdateEntryPointsStatus(ctx context.Context, config *common.EntryPointResourceConfig, phase kodev1alpha1.EntryPointPhase, conditions []metav1.Condition, lastError string, lastErrorTime *metav1.Time) error
 }

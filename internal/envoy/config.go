@@ -61,7 +61,7 @@ func NewBootstrapConfigGenerator(log logr.Logger) *BootstrapConfigGenerator {
 }
 
 func (g *BootstrapConfigGenerator) Generate(options common.BootstrapConfigOptions) (string, error) {
-	g.Log.Info("Starting bootstrap config generation")
+	g.Log.V(1).Info("Starting bootstrap config generation")
 	g.Log.V(1).Info("Config options", "options", options)
 
 	var err error
@@ -115,7 +115,7 @@ func (g *BootstrapConfigGenerator) Generate(options common.BootstrapConfigOption
 		return "", NewEnvoyError(EnvoyErrorTypeConfiguration, "Failed to encode to YAML", err)
 	}
 
-	g.Log.Info("Successfully rendered bootstrap config")
+	g.Log.V(1).Info("Successfully rendered bootstrap config")
 	return result, nil
 }
 

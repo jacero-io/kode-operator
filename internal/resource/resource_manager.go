@@ -55,7 +55,7 @@ func (m *defaultResourceManager) CreateOrPatch(ctx context.Context, obj client.O
 		return err
 	}
 
-	log.Info("Resource operation completed", "Result", result)
+	log.V(1).Info("Resource operation completed", "Result", result)
 	return nil
 }
 

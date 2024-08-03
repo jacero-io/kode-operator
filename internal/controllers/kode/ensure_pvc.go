@@ -38,11 +38,11 @@ func (r *KodeReconciler) ensurePVC(ctx context.Context, config *common.KodeResou
 	ctx, cancel := common.ContextWithTimeout(ctx, 30) // 30 seconds timeout
 	defer cancel()
 
-	log.Info("Ensuring PVC")
+	log.V(1).Info("Ensuring PVC")
 
 	// If ExistingVolumeClaim is specified, return nil
 	if config.KodeSpec.Storage.ExistingVolumeClaim != "" {
-		log.Info("ExistingVolumeClaim specified, skipping PVC creation", "ExistingVolumeClaim", config.KodeSpec.Storage.ExistingVolumeClaim)
+		log.V(1).Info("ExistingVolumeClaim specified, skipping PVC creation", "ExistingVolumeClaim", config.KodeSpec.Storage.ExistingVolumeClaim)
 		return nil
 	}
 

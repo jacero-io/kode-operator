@@ -37,7 +37,7 @@ func (r *KodeReconciler) ensureSecret(ctx context.Context, config *common.KodeRe
 	ctx, cancel := common.ContextWithTimeout(ctx, 30) // 30 seconds timeout
 	defer cancel()
 
-	log.Info("Ensuring Secret")
+	log.V(1).Info("Ensuring Secret")
 
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{

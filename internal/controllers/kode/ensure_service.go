@@ -37,7 +37,7 @@ func (r *KodeReconciler) ensureService(ctx context.Context, config *common.KodeR
 	ctx, cancel := common.ContextWithTimeout(ctx, 30) // 30 seconds timeout
 	defer cancel()
 
-	log.Info("Ensuring Service")
+	log.V(1).Info("Ensuring Service")
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{

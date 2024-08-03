@@ -105,7 +105,7 @@ metadata:
   name: my-envoy-proxy-config
   namespace: default
 spec:
-  image: envoyproxy/envoy:v1.30-latest
+  image: envoyproxy/envoy:v1.31-latest
   httpFilters:
     - name: envoy.filters.http.ext_authz
       typed_config:

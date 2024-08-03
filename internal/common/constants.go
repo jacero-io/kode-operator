@@ -77,24 +77,6 @@ const (
 	// ConditionTypeConfigured indicates that the resource has been properly configured with all necessary settings.
 	ConditionTypeConfigured = "Configured"
 
-	// ConditionTypeCreating indicates that the resource is in the process of being created.
-	ConditionTypeCreating = "Creating"
-
-	// ConditionTypeCreated indicates that the resource has been successfully created.
-	ConditionTypeCreated = "Created"
-
-	// ConditionTypeRecycling indicates that the resource is in the process of being recycled or restarted.
-	ConditionTypeRecycling = "Recycling"
-
-	// ConditionTypeRecycled indicates that the resource has completed the recycling process.
-	ConditionTypeRecycled = "Recycled"
-
-	// ConditionTypeUpdating indicates that the resource is in the process of being updated.
-	ConditionTypeUpdating = "Updating"
-
-	// ConditionTypeDeleting indicates that the resource is in the process of being deleted.
-	ConditionTypeDeleting = "Deleting"
-
 	// Validation constants
 	MinPasswordLength = 8
 	MinUsernameLength = 3

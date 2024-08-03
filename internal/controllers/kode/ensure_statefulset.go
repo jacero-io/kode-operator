@@ -39,7 +39,7 @@ func (r *KodeReconciler) ensureStatefulSet(ctx context.Context, config *common.K
 	ctx, cancel := common.ContextWithTimeout(ctx, 30) // 30 seconds timeout
 	defer cancel()
 
-	log.Info("Ensuring StatefulSet")
+	log.V(1).Info("Ensuring StatefulSet")
 
 	statefulSet := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{

@@ -20,7 +20,6 @@ package status
 
 import (
 	"context"
-	"reflect"
 
 	"github.com/go-logr/logr"
 	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
@@ -44,39 +43,42 @@ func NewDefaultStatusUpdater(client client.Client, log logr.Logger) StatusUpdate
 }
 
 func (u *defaultStatusUpdater) UpdateKodeStatus(ctx context.Context,
-	config *common.KodeResourcesConfig,
+	kode *kodev1alpha1.Kode,
 	phase kodev1alpha1.KodePhase,
-	conditions []metav1.Condition,
+	newConditions []metav1.Condition,
 	lastError string,
 	lastErrorTime *metav1.Time) error {
 
-	log := u.log.WithValues("kode", common.ObjectKeyFromConfig(config))
+	log := u.log.WithValues("kode", client.ObjectKeyFromObject(kode))
 
-	return retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+	log.V(1).Info("Updating Kode status", "Phase", phase)
+
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		// Fetch the latest version of Kode
-		kode := &kodev1alpha1.Kode{}
-		if err := u.client.Get(ctx, types.NamespacedName{Name: config.KodeName, Namespace: config.KodeNamespace}, kode); err != nil {
+		latestKode, err := common.GetLatestKode(ctx, u.client, kode.Name, kode.Namespace)
+		if err != nil {
 			return err
 		}
 
-		// Check if status has changed
-		if statusUnchanged(&kode.Status, phase, conditions, lastError, lastErrorTime) {
-			log.V(1).Info("Status unchanged, skipping update")
-			return nil
-		}
+		// Create a copy of the latest status
+		updatedStatus := latestKode.Status.DeepCopy()
 
-		// Update the status
-		kode.Status.Phase = phase
-		kode.Status.Conditions = conditions
-		kode.Status.LastError = lastError
-		kode.Status.LastErrorTime = lastErrorTime
+		// Update only the fields we want to change
+		updatedStatus.Phase = phase
+		updatedStatus.Conditions = mergeConditions(updatedStatus.Conditions, newConditions)
+		updatedStatus.LastError = lastError
+		updatedStatus.LastErrorTime = lastErrorTime
+		updatedStatus.ObservedGeneration = latestKode.Generation
 
-		// Try to update
-		if err := u.client.Status().Update(ctx, kode); err != nil {
+		// Create a patch
+		patch := client.MergeFrom(latestKode.DeepCopy())
+		latestKode.Status = *updatedStatus
+
+		// Apply the patch
+		if err := u.client.Status().Patch(ctx, latestKode, patch); err != nil {
 			log.Error(err, "Failed to update Kode status")
 			return err
 		}
-
 		return nil
 	})
 }
@@ -116,10 +118,32 @@ func (u *defaultStatusUpdater) UpdateEntryPointsStatus(ctx context.Context,
 	})
 }
 
-func statusUnchanged(currentStatus *kodev1alpha1.KodeStatus, phase kodev1alpha1.KodePhase, conditions []metav1.Condition, lastError string, lastErrorTime *metav1.Time) bool {
-	return currentStatus.Phase == phase &&
-		reflect.DeepEqual(currentStatus.Conditions, conditions) &&
-		currentStatus.LastError == lastError &&
-		((currentStatus.LastErrorTime == nil && lastErrorTime == nil) ||
-			(currentStatus.LastErrorTime != nil && lastErrorTime != nil && currentStatus.LastErrorTime.Equal(lastErrorTime)))
+func mergeConditions(existing, new []metav1.Condition) []metav1.Condition {
+	merged := make([]metav1.Condition, 0, len(existing)+len(new))
+	existingMap := make(map[string]metav1.Condition)
+
+	for _, condition := range existing {
+		existingMap[condition.Type] = condition
+	}
+
+	for _, condition := range new {
+		if existing, ok := existingMap[condition.Type]; ok {
+			if existing.Status != condition.Status ||
+				existing.Reason != condition.Reason ||
+				existing.Message != condition.Message {
+				merged = append(merged, condition)
+			} else {
+				merged = append(merged, existing)
+			}
+			delete(existingMap, condition.Type)
+		} else {
+			merged = append(merged, condition)
+		}
+	}
+
+	for _, condition := range existingMap {
+		merged = append(merged, condition)
+	}
+
+	return merged
 }

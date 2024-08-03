@@ -134,9 +134,6 @@ const (
 
 // KodeStatus defines the observed state of Kode
 type KodeStatus struct {
-	// ReconcileAttempts is the number of times the Kode resource has been reconciled.
-	ReconcileAttempts int `json:"reconcileAttempts,omitempty"`
-
 	// Phase represents the current phase of the Kode resource.
 	Phase KodePhase `json:"phase"`
 
@@ -148,6 +145,9 @@ type KodeStatus struct {
 
 	// LastErrorTime is the timestamp when the last error occurred.
 	LastErrorTime *metav1.Time `json:"lastErrorTime,omitempty"`
+
+	// ObservedGeneration is the last observed generation of the Kode resource.
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
 //+kubebuilder:object:root=true

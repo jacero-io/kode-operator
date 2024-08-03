@@ -37,10 +37,10 @@ func (r *KodeReconciler) checkResourcesReady(ctx context.Context, config *common
 
 	// Check Secret
 	secret := &corev1.Secret{}
-	err := r.Get(ctx, types.NamespacedName{Name: config.SecretName, Namespace: config.KodeNamespace}, secret)
+	err := r.Client.Get(ctx, types.NamespacedName{Name: config.SecretName, Namespace: config.KodeNamespace}, secret)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			log.Info("Secret not found")
+			log.V(1).Info("Secret not found")
 			return false, nil
 		}
 		return false, fmt.Errorf("failed to get Secret: %w", err)
@@ -52,26 +52,26 @@ func (r *KodeReconciler) checkResourcesReady(ctx context.Context, config *common
 	// - Image pull timeout
 	// Check StatefulSet
 	statefulSet := &appsv1.StatefulSet{}
-	err = r.Get(ctx, types.NamespacedName{Name: config.KodeName, Namespace: config.KodeNamespace}, statefulSet)
+	err = r.Client.Get(ctx, types.NamespacedName{Name: config.KodeName, Namespace: config.KodeNamespace}, statefulSet)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			log.Info("StatefulSet not found")
+			log.V(1).Info("StatefulSet not found")
 			return false, nil
 		}
 		return false, fmt.Errorf("failed to get StatefulSet: %w", err)
 	}
 
 	if statefulSet.Status.ReadyReplicas != statefulSet.Status.Replicas {
-		log.Info("StatefulSet not ready", "ReadyReplicas", statefulSet.Status.ReadyReplicas, "DesiredReplicas", statefulSet.Status.Replicas)
+		log.V(1).Info("StatefulSet not ready", "ReadyReplicas", statefulSet.Status.ReadyReplicas, "DesiredReplicas", statefulSet.Status.Replicas)
 		return false, nil
 	}
 
 	// Check Service
 	service := &corev1.Service{}
-	err = r.Get(ctx, types.NamespacedName{Name: config.ServiceName, Namespace: config.KodeNamespace}, service)
+	err = r.Client.Get(ctx, types.NamespacedName{Name: config.ServiceName, Namespace: config.KodeNamespace}, service)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			log.Info("Service not found")
+			log.V(1).Info("Service not found")
 			return false, nil
 		}
 		return false, fmt.Errorf("failed to get Service: %w", err)
@@ -80,17 +80,17 @@ func (r *KodeReconciler) checkResourcesReady(ctx context.Context, config *common
 	// Check PersistentVolumeClaim if storage is specified
 	if !config.KodeSpec.Storage.IsEmpty() {
 		pvc := &corev1.PersistentVolumeClaim{}
-		err = r.Get(ctx, types.NamespacedName{Name: config.PVCName, Namespace: config.KodeNamespace}, pvc)
+		err = r.Client.Get(ctx, types.NamespacedName{Name: config.PVCName, Namespace: config.KodeNamespace}, pvc)
 		if err != nil {
 			if errors.IsNotFound(err) {
-				log.Info("PersistentVolumeClaim not found")
+				log.V(1).Info("PersistentVolumeClaim not found")
 				return false, nil
 			}
 			return false, fmt.Errorf("failed to get PersistentVolumeClaim: %w", err)
 		}
 
 		if pvc.Status.Phase != corev1.ClaimBound {
-			log.Info("PersistentVolumeClaim not bound", "Phase", pvc.Status.Phase)
+			log.V(1).Info("PersistentVolumeClaim not bound", "Phase", pvc.Status.Phase)
 			return false, nil
 		}
 	}
@@ -102,12 +102,12 @@ func (r *KodeReconciler) checkResourcesReady(ctx context.Context, config *common
 			return false, fmt.Errorf("failed to check Envoy sidecar readiness: %w", err)
 		}
 		if !ready {
-			log.Info("Envoy sidecar not ready")
+			log.V(1).Info("Envoy sidecar not ready")
 			return false, nil
 		}
 	}
 
-	log.Info("All resources are ready")
+	log.V(1).Info("All resources are ready")
 	return true, nil
 }
 
@@ -115,10 +115,10 @@ func (r *KodeReconciler) checkEnvoySidecarReady(ctx context.Context, config *com
 	log := r.Log.WithName("EnvoySidecarReadyChecker").WithValues("kode", common.ObjectKeyFromConfig(config))
 
 	pod := &corev1.Pod{}
-	err := r.Get(ctx, types.NamespacedName{Name: config.KodeName + "-0", Namespace: config.KodeNamespace}, pod)
+	err := r.Client.Get(ctx, types.NamespacedName{Name: config.KodeName + "-0", Namespace: config.KodeNamespace}, pod)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			log.Info("Pod not found")
+			log.V(1).Info("Pod not found")
 			return false, nil
 		}
 		return false, fmt.Errorf("failed to get Pod: %w", err)
@@ -127,13 +127,13 @@ func (r *KodeReconciler) checkEnvoySidecarReady(ctx context.Context, config *com
 	for _, containerStatus := range pod.Status.ContainerStatuses {
 		if containerStatus.Name == "envoy-proxy" {
 			if !containerStatus.Ready {
-				log.Info("Envoy sidecar container not ready")
+				log.V(1).Info("Envoy sidecar container not ready")
 				return false, nil
 			}
 			return true, nil
 		}
 	}
 
-	log.Info("Envoy sidecar container not found in pod")
+	log.V(1).Info("Envoy sidecar container not found in pod")
 	return false, nil
 }

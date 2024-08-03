@@ -25,16 +25,17 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
+	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
 	"github.com/jacero-io/kode-operator/internal/common"
 	"github.com/jacero-io/kode-operator/internal/envoy"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // ensureSidecarContainers ensures that the Envoy container exists for the Kode instance
-func (r *KodeReconciler) ensureSidecarContainers(ctx context.Context, config *common.KodeResourcesConfig) error {
+func (r *KodeReconciler) ensureSidecarContainers(ctx context.Context, config *common.KodeResourcesConfig, kode *kodev1alpha1.Kode) error {
 	log := r.Log.WithName("SidecarContainerEnsurer").WithValues("kode", common.ObjectKeyFromConfig(config))
 
-	log.Info("Ensuring sidecar containers")
+	log.V(1).Info("Ensuring sidecar containers")
 	if err := ensureEnvoySidecar(config, log); err != nil {
 		log.Error(err, "Failed to ensure Envoy sidecar container")
 
@@ -68,11 +69,11 @@ func (r *KodeReconciler) ensureSidecarContainers(ctx context.Context, config *co
 					LastTransitionTime: now,
 				}
 			}
-			return r.updateKodePhaseFailed(ctx, config, err, condition)
+			return r.updateKodePhaseFailed(ctx, kode, err, condition)
 		}
 
 		// Handle other sidecar container errors
-		return r.updateKodePhaseFailed(ctx, config, err, metav1.Condition{
+		return r.updateKodePhaseFailed(ctx, kode, err, metav1.Condition{
 			Type:               "SidecarContainerCreationFailed",
 			Status:             metav1.ConditionTrue,
 			Reason:             "SidecarContainerCreationError",

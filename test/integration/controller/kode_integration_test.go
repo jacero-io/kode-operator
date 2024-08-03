@@ -49,7 +49,7 @@ var _ = Describe("Kode Controller Integration", Ordered, func() {
 		kodeTemplateImage            = "lscr.io/linuxserver/code-server:latest"
 		envoyProxyConfigKind         = "EnvoyProxyClusterConfig"
 		envoyProxyConfigName         = "test-envoyproxyconfig"
-		envoyProxyConfigImage        = "envoyproxy/envoy:v1.30-latest"
+		envoyProxyConfigImage        = "envoyproxy/envoy:v1.31-latest"
 	)
 
 	var (
