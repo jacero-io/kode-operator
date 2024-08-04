@@ -55,7 +55,10 @@ func (c *ContainerConstructor) ConstructEnvoyContainers(config *common.KodeResou
 	})
 	if err != nil {
 		c.log.Error(err, "Failed to generate bootstrap config")
-		return []corev1.Container{}, []corev1.Container{}, err
+		if IsEnvoyError(err) {
+			return nil, nil, err // Already an EnvoyError, so we can return it directly
+		}
+		return nil, nil, NewEnvoyError(EnvoyErrorTypeCreation, "Failed to generate Envoy configuration", err)
 	}
 
 	proxySetupContainer := corev1.Container{

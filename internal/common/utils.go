@@ -24,9 +24,29 @@ import (
 
 	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+func GetCurrentTime() metav1.Time {
+	return metav1.NewTime(time.Now())
+}
+
+func GetLatestKode(ctx context.Context, client client.Client, name, namespace string) (*kodev1alpha1.Kode, error) {
+	kode := &kodev1alpha1.Kode{}
+	err := client.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, kode)
+	return kode, err
+}
+
+func ObjectKeyFromConfig(config *KodeResourcesConfig) types.NamespacedName {
+	return types.NamespacedName{
+		Name:      config.KodeName,
+		Namespace: config.KodeNamespace,
+	}
+}
 
 // returns the name of the PersistentVolumeClaim for the Kode instance
 func GetPVCName(kode *kodev1alpha1.Kode) string {

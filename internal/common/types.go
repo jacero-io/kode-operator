@@ -36,7 +36,7 @@ type Templates struct {
 
 // KodeResourcesConfig holds configuration for Kode resources
 type KodeResourcesConfig struct {
-	Kode                kodev1alpha1.Kode
+	KodeSpec            kodev1alpha1.KodeSpec
 	Labels              map[string]string
 	KodeName            string
 	KodeNamespace       string
@@ -52,6 +52,17 @@ type KodeResourcesConfig struct {
 	TemplateInitPlugins []kodev1alpha1.InitPluginSpec
 	LocalServicePort    int32
 	ExternalServicePort int32
+	RetryCount          int
+}
+
+// EntryPointResourceConfig holds configuration for EntryPoint resources
+type EntryPointResourceConfig struct {
+	EntryPoint          kodev1alpha1.EntryPoint
+	Labels              map[string]string
+	EntryPointName      string
+	EntryPointNamespace string
+	EntryPointService   string
+	EntryPointURL       string
 }
 
 // Credentials holds username and password

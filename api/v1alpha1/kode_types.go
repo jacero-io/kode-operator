@@ -99,19 +99,36 @@ type KodeStorageSpec struct {
 type KodePhase string
 
 const (
-	// KodePhaseCreated indicates that the Kode resource has been created.
+	// KodePhaseCreating indicates that the Kode resource is in the process of being created.
+	// This includes the initial setup and creation of associated Kubernetes resources.
+	KodePhaseCreating KodePhase = "Creating"
+
+	// KodePhaseCreated indicates that all the necessary Kubernetes resources for the Kode
+	// have been successfully created, but may not yet be fully operational.
 	KodePhaseCreated KodePhase = "Created"
 
-	// KodePhaseActive indicates that the Kode resource is active and running.
+	// KodePhaseFailed indicates that an error occurred during the creation, updating,
+	// or management of the Kode resource or its associated Kubernetes resources.
+	KodePhaseFailed KodePhase = "Failed"
+
+	// KodePhasePending indicates that the Kode resource has been created, but is waiting
+	// for its associated resources to become ready or for external dependencies to be met.
+	KodePhasePending KodePhase = "Pending"
+
+	// KodePhaseActive indicates that the Kode resource and all its associated Kubernetes
+	// resources are fully operational and ready to serve requests.
 	KodePhaseActive KodePhase = "Active"
 
-	// KodePhaseError indicates that the Kode resource encountered an error and is not running.
-	KodePhaseError KodePhase = "Error"
-
-	// KodePhaseInactive indicates that the Kode resource has been marked as inactive and will be deleted.
+	// KodePhaseInactive indicates that the Kode resource has been marked for deletion
+	// due to inactivity. Resources may be partially or fully removed in this state.
 	KodePhaseInactive KodePhase = "Inactive"
 
-	// KodePhaseRecycled indicates that the Kode resource has been completely recycled and all resources have been deleted.
+	// KodePhaseRecycling indicates that the Kode resource is in the process of being
+	// cleaned up and its resources are being partially or fully deleted.
+	KodePhaseRecycling KodePhase = "Recycling"
+
+	// KodePhaseRecycled indicates that the Kode resource has been fully recycled,
+	// with all associated resources either partially or fully deleted.
 	KodePhaseRecycled KodePhase = "Recycled"
 )
 
@@ -128,6 +145,9 @@ type KodeStatus struct {
 
 	// LastErrorTime is the timestamp when the last error occurred.
 	LastErrorTime *metav1.Time `json:"lastErrorTime,omitempty"`
+
+	// ObservedGeneration is the last observed generation of the Kode resource.
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 }
 
 //+kubebuilder:object:root=true

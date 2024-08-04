@@ -1,4 +1,4 @@
-// internal/controller/resource_config.go
+// internal/controllers/kode/config.go
 
 /*
 Copyright 2024 Emil Larsson.
@@ -54,7 +54,15 @@ func InitKodeResourcesConfig(
 	serviceName := common.GetServiceName(kode)
 
 	return &common.KodeResourcesConfig{
-		Kode:                *kode,
+		KodeSpec: kodev1alpha1.KodeSpec{
+			Username:       kode.Spec.Username,
+			Password:       kode.Spec.Password,
+			ExistingSecret: kode.Spec.ExistingSecret,
+			Storage:        kode.Spec.Storage,
+			InitPlugins:    kode.Spec.InitPlugins,
+			Workspace:      kode.Spec.Workspace,
+			Home:           kode.Spec.Home,
+		},
 		Labels:              createLabels(kode, templates),
 		KodeName:            kode.Name,
 		KodeNamespace:       kode.Namespace,
@@ -70,6 +78,7 @@ func InitKodeResourcesConfig(
 		TemplateInitPlugins: templates.KodeTemplate.InitPlugins,
 		LocalServicePort:    localServicePort,
 		ExternalServicePort: externalServicePort,
+		RetryCount:          0,
 	}
 }
 

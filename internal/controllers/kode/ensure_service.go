@@ -1,4 +1,4 @@
-// internal/controller/kode_service.go
+// internal/controllers/kode/ensure_service.go
 
 /*
 Copyright 2024 Emil Larsson.
@@ -22,22 +22,22 @@ import (
 	"context"
 	"fmt"
 
+	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
 	"github.com/jacero-io/kode-operator/internal/common"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
-	client "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 // ensureService ensures that the Service exists for the Kode instance
-func (r *KodeReconciler) ensureService(ctx context.Context, config *common.KodeResourcesConfig) error {
-	log := r.Log.WithName("ServiceEnsurer").WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
+func (r *KodeReconciler) ensureService(ctx context.Context, config *common.KodeResourcesConfig, kode *kodev1alpha1.Kode) error {
+	log := r.Log.WithName("ServiceEnsurer").WithValues("kode", common.ObjectKeyFromConfig(config))
 
 	ctx, cancel := common.ContextWithTimeout(ctx, 30) // 30 seconds timeout
 	defer cancel()
 
-	log.Info("Ensuring Service")
+	log.V(1).Info("Ensuring Service")
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -55,21 +55,19 @@ func (r *KodeReconciler) ensureService(ctx context.Context, config *common.KodeR
 		service.Spec = constructedService.Spec
 		service.ObjectMeta.Labels = constructedService.ObjectMeta.Labels
 
-		return controllerutil.SetControllerReference(&config.Kode, service, r.Scheme)
+		return controllerutil.SetControllerReference(kode, service, r.Scheme)
 	})
 
 	if err != nil {
 		return fmt.Errorf("failed to create or patch Service: %v", err)
 	}
 
-	log.V(1).Info("Service object constructed", "Service", service, "Spec", service.Spec)
-
 	return nil
 }
 
 // constructService constructs a Service for the Kode instance
 func (r *KodeReconciler) constructServiceSpec(config *common.KodeResourcesConfig) (*corev1.Service, error) {
-	// log := r.Log.WithName("ServiceConstructor").WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
+	log := r.Log.WithName("ServiceConstructor").WithValues("kode", common.ObjectKeyFromConfig(config))
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
@@ -85,6 +83,8 @@ func (r *KodeReconciler) constructServiceSpec(config *common.KodeResourcesConfig
 			}},
 		},
 	}
+
+	log.V(1).Info("Service object constructed", "Service", service, "Spec", service.Spec)
 
 	return service, nil
 }

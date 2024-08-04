@@ -58,26 +58,24 @@ const (
 	// Annotation keys
 	AnnotationLastUpdated = "kode.jacero.io/last-updated"
 
-	// Status condition types
-	ConditionTypeCreated  = "Created"
-	ConditionTypeReady    = "Ready"
-	ConditionTypeRecycled = "Recycled"
-	ConditionTypeInactive = "Inactive"
-	ConditionTypeError    = "Error"
+	// These are the condition types that are used in the status of the Kode and EntryPoint resources
+	// ConditionTypeReady indicates that the resource is fully operational and prepared to serve its intended purpose.
+	ConditionTypeReady = "Ready"
 
-	// Default values
-	DefaultUser        = "abc"
-	DefaultHome        = "/config"
-	DefaultWorkspace   = "workspace"
-	DefaultStorageSize = "1Gi"
+	// ConditionTypeAvailable indicates that the resource is accessible and can actively serve requests or perform its function.
+	ConditionTypeAvailable = "Available"
 
-	// Environment variable names
-	EnvVarPassword = "PASSWORD"
-	EnvVarUser     = "USER"
-	EnvVarHome     = "HOME"
-	EnvVarPUID     = "PUID"
-	EnvVarPGID     = "PGID"
-	EnvVarTZ       = "TZ"
+	// ConditionTypeProgressing indicates that the resource is actively working towards a desired state.
+	ConditionTypeProgressing = "Progressing"
+
+	// ConditionTypeDegraded indicates that the resource is operational but not functioning optimally or with full capabilities.
+	ConditionTypeDegraded = "Degraded"
+
+	// ConditionTypeError indicates that the resource has encountered an error state that requires attention.
+	ConditionTypeError = "Error"
+
+	// ConditionTypeConfigured indicates that the resource has been properly configured with all necessary settings.
+	ConditionTypeConfigured = "Configured"
 
 	// Validation constants
 	MinPasswordLength = 8

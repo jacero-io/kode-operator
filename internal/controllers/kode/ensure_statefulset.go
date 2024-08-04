@@ -1,4 +1,4 @@
-// internal/controller/kode_statefulset.go
+// internal/controllers/kode/ensure_statefulset.go
 
 /*
 Copyright 2024 Emil Larsson.
@@ -29,18 +29,17 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	client "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 // ensureStatefulSet ensures that the StatefulSet exists for the Kode instance
-func (r *KodeReconciler) ensureStatefulSet(ctx context.Context, config *common.KodeResourcesConfig) error {
-	log := r.Log.WithName("StatefulSetEnsurer").WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
+func (r *KodeReconciler) ensureStatefulSet(ctx context.Context, config *common.KodeResourcesConfig, kode *kodev1alpha1.Kode) error {
+	log := r.Log.WithName("StatefulSetEnsurer").WithValues("kode", common.ObjectKeyFromConfig(config))
 
 	ctx, cancel := common.ContextWithTimeout(ctx, 30) // 30 seconds timeout
 	defer cancel()
 
-	log.Info("Ensuring StatefulSet")
+	log.V(1).Info("Ensuring StatefulSet")
 
 	statefulSet := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
@@ -58,22 +57,22 @@ func (r *KodeReconciler) ensureStatefulSet(ctx context.Context, config *common.K
 		statefulSet.Spec = constructedstatefulSet.Spec
 		statefulSet.ObjectMeta.Labels = constructedstatefulSet.ObjectMeta.Labels
 
-		return controllerutil.SetControllerReference(&config.Kode, statefulSet, r.Scheme)
+		return controllerutil.SetControllerReference(kode, statefulSet, r.Scheme)
 	})
 
 	if err != nil {
 		return fmt.Errorf("failed to create or patch StatefulSet: %v", err)
 	}
 
-	maskedSpec := common.MaskSpec(statefulSet.Spec.Template.Spec.Containers[0]) // Mask sensitive values
-	log.V(1).Info("StatefulSet object created", "StatefulSet", statefulSet, "Spec", maskedSpec)
+	// maskedSpec := common.MaskSpec(statefulSet.Spec.Template.Spec.Containers[0]) // Mask sensitive values
+	// log.V(1).Info("StatefulSet object created", "StatefulSet", statefulSet, "Spec", maskedSpec)
 
 	return nil
 }
 
 // constructStatefulSetSpec constructs a StatefulSet for the Kode instance
 func (r *KodeReconciler) constructStatefulSetSpec(config *common.KodeResourcesConfig) (*appsv1.StatefulSet, error) {
-	log := r.Log.WithName("SatefulSetConstructor").WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
+	log := r.Log.WithName("SatefulSetConstructor").WithValues("kode", common.ObjectKeyFromConfig(config))
 
 	replicas := int32(1)
 	templateSpec := config.Templates.KodeTemplate
@@ -83,12 +82,12 @@ func (r *KodeReconciler) constructStatefulSetSpec(config *common.KodeResourcesCo
 
 	workspace = path.Join(templateSpec.DefaultHome, templateSpec.DefaultWorkspace)
 	mountPath = templateSpec.DefaultHome
-	if config.Kode.Spec.Workspace != "" {
-		if config.Kode.Spec.Home != "" {
-			workspace = path.Join(config.Kode.Spec.Home, config.Kode.Spec.Workspace)
-			mountPath = config.Kode.Spec.Home
+	if config.KodeSpec.Workspace != "" {
+		if config.KodeSpec.Home != "" {
+			workspace = path.Join(config.KodeSpec.Home, config.KodeSpec.Workspace)
+			mountPath = config.KodeSpec.Home
 		} else {
-			workspace = path.Join(templateSpec.DefaultHome, config.Kode.Spec.Workspace)
+			workspace = path.Join(templateSpec.DefaultHome, config.KodeSpec.Workspace)
 		}
 	}
 
@@ -174,7 +173,7 @@ func constructCodeServerContainers(config *common.KodeResourcesConfig,
 			{Name: "PGID", Value: fmt.Sprintf("%d", config.Templates.KodeTemplate.PGID)},
 			{Name: "TZ", Value: config.Templates.KodeTemplate.TZ},
 			{Name: "PORT", Value: fmt.Sprintf("%d", config.LocalServicePort)},
-			{Name: "USERNAME", Value: config.Kode.Spec.Username},
+			{Name: "USERNAME", Value: config.KodeSpec.Username},
 			// {Name: "PASSWORD", Value: config.Kode.Spec.Password},
 			{Name: "DEFAULT_WORKSPACE", Value: workspace},
 		},
@@ -195,7 +194,7 @@ func constructWebtopContainers(config *common.KodeResourcesConfig) []corev1.Cont
 			{Name: "PGID", Value: fmt.Sprintf("%d", config.Templates.KodeTemplate.PGID)},
 			{Name: "TZ", Value: config.Templates.KodeTemplate.TZ},
 			{Name: "CUSTOM_PORT", Value: fmt.Sprintf("%d", config.LocalServicePort)},
-			{Name: "CUSTOM_USER", Value: config.Kode.Spec.Username},
+			{Name: "CUSTOM_USER", Value: config.KodeSpec.Username},
 			// {Name: "PASSWORD", Value: config.Kode.Spec.Password},
 		},
 		Ports: []corev1.ContainerPort{{
@@ -210,16 +209,16 @@ func constructVolumesAndMounts(mountPath string, config *common.KodeResourcesCon
 	volumeMounts := []corev1.VolumeMount{}
 
 	// Add volume and volume mount if storage is defined
-	if !reflect.DeepEqual(config.Kode.Spec.Storage, kodev1alpha1.KodeStorageSpec{}) {
+	if !reflect.DeepEqual(config.KodeSpec.Storage, kodev1alpha1.KodeStorageSpec{}) {
 		var volumeSource corev1.VolumeSource
 
-		if config.Kode.Spec.Storage.ExistingVolumeClaim != "" {
+		if config.KodeSpec.Storage.ExistingVolumeClaim != "" {
 			volumeSource = corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: config.Kode.Spec.Storage.ExistingVolumeClaim,
+					ClaimName: config.KodeSpec.Storage.ExistingVolumeClaim,
 				},
 			}
-		} else if !config.Kode.Spec.DeepCopy().Storage.IsEmpty() {
+		} else if !config.KodeSpec.DeepCopy().Storage.IsEmpty() {
 			volumeSource = corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 					ClaimName: config.PVCName,

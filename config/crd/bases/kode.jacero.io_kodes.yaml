@@ -501,6 +501,11 @@ spec:
                 description: LastErrorTime is the timestamp when the last error occurred.
                 format: date-time
                 type: string
+              observedGeneration:
+                description: ObservedGeneration is the last observed generation of
+                  the Kode resource.
+                format: int64
+                type: integer
               phase:
                 description: Phase represents the current phase of the Kode resource.
                 type: string

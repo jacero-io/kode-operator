@@ -35,20 +35,24 @@ func (m *defaultTemplateManager) Fetch(ctx context.Context, ref kodev1alpha1.Kod
 		templates.KodeTemplateNamespace = common.DefaultNamespace
 	}
 
+	var err error
 	switch ref.Kind {
 	case "KodeTemplate":
-		if err := m.fetchKodeTemplate(ctx, templates); err != nil {
-			return nil, err
-		}
+		m.log.V(1).Info("Fetching KodeTemplate", "Name", templates.KodeTemplateName, "Namespace", templates.KodeTemplateNamespace)
+		err = m.fetchKodeTemplate(ctx, templates)
 	case "KodeClusterTemplate":
-		if err := m.fetchKodeClusterTemplate(ctx, templates); err != nil {
-			return nil, err
-		}
+		m.log.V(1).Info("Fetching KodeClusterTemplate", "Name", templates.KodeTemplateName, "Namespace", templates.KodeTemplateNamespace)
+		err = m.fetchKodeClusterTemplate(ctx, templates)
 	default:
 		return nil, fmt.Errorf("invalid template kind: %s", ref.Kind)
 	}
 
-	if templates.KodeTemplate.EnvoyProxyRef.Name != "" {
+	if err != nil {
+		return nil, err
+	}
+
+	if templates.KodeTemplate.EnvoyConfigRef.Name != "" {
+		m.log.V(1).Info("Fetching EnvoyProxy config", "Name", templates.KodeTemplate.EnvoyConfigRef.Name, "Namespace", templates.KodeTemplate.EnvoyConfigRef.Namespace)
 		if err := m.fetchEnvoyProxyConfig(ctx, templates); err != nil {
 			return nil, err
 		}
@@ -57,62 +61,79 @@ func (m *defaultTemplateManager) Fetch(ctx context.Context, ref kodev1alpha1.Kod
 	return templates, nil
 }
 
-func (m *defaultTemplateManager) fetchKodeTemplate(ctx context.Context, templates *common.Templates) error {
-	template := &kodev1alpha1.KodeTemplate{}
-	if err := m.client.Get(ctx, types.NamespacedName{Name: templates.KodeTemplateName, Namespace: templates.KodeTemplateNamespace}, template); err != nil {
+func (m *defaultTemplateManager) fetchTemplate(ctx context.Context, templates *common.Templates, obj client.Object, kind string) error {
+	namespacedName := types.NamespacedName{Name: templates.KodeTemplateName}
+	if kind == "KodeTemplate" {
+		namespacedName.Namespace = templates.KodeTemplateNamespace
+	}
+
+	if err := m.client.Get(ctx, namespacedName, obj); err != nil {
 		if errors.IsNotFound(err) {
-			return &common.TemplateNotFoundError{NamespacedName: types.NamespacedName{Name: templates.KodeTemplateName, Namespace: templates.KodeTemplateNamespace}, Kind: "KodeTemplate"}
+			return &common.TemplateNotFoundError{NamespacedName: namespacedName, Kind: kind}
 		}
 		return err
 	}
-	templates.KodeTemplate = &template.Spec.SharedKodeTemplateSpec
+
+	switch t := obj.(type) {
+	case *kodev1alpha1.KodeTemplate:
+		templates.KodeTemplate = &t.Spec.SharedKodeTemplateSpec
+	case *kodev1alpha1.KodeClusterTemplate:
+		templates.KodeTemplate = &t.Spec.SharedKodeTemplateSpec
+	default:
+		return fmt.Errorf("unsupported template type: %T", obj)
+	}
+
 	return nil
 }
 
+func (m *defaultTemplateManager) fetchKodeTemplate(ctx context.Context, templates *common.Templates) error {
+	return m.fetchTemplate(ctx, templates, &kodev1alpha1.KodeTemplate{}, "KodeTemplate")
+}
+
 func (m *defaultTemplateManager) fetchKodeClusterTemplate(ctx context.Context, templates *common.Templates) error {
-	template := &kodev1alpha1.KodeClusterTemplate{}
-	if err := m.client.Get(ctx, types.NamespacedName{Name: templates.KodeTemplateName}, template); err != nil {
+	return m.fetchTemplate(ctx, templates, &kodev1alpha1.KodeClusterTemplate{}, "KodeClusterTemplate")
+}
+
+func (m *defaultTemplateManager) fetchEnvoyConfig(ctx context.Context, templates *common.Templates, obj client.Object, kind string) error {
+	namespacedName := types.NamespacedName{Name: templates.EnvoyProxyConfigName}
+	if kind == "EnvoyProxyConfig" {
+		namespacedName.Namespace = templates.EnvoyProxyConfigNamespace
+	}
+
+	if err := m.client.Get(ctx, namespacedName, obj); err != nil {
 		if errors.IsNotFound(err) {
-			return &common.TemplateNotFoundError{NamespacedName: types.NamespacedName{Name: templates.KodeTemplateName}, Kind: "KodeClusterTemplate"}
+			return &common.TemplateNotFoundError{NamespacedName: namespacedName, Kind: kind}
 		}
 		return err
 	}
-	templates.KodeTemplate = &template.Spec.SharedKodeTemplateSpec
+
+	switch t := obj.(type) {
+	case *kodev1alpha1.EnvoyProxyConfig:
+		templates.EnvoyProxyConfig = &t.Spec.SharedEnvoyProxyConfigSpec
+	case *kodev1alpha1.EnvoyProxyClusterConfig:
+		templates.EnvoyProxyConfig = &t.Spec.SharedEnvoyProxyConfigSpec
+	default:
+		return fmt.Errorf("unsupported EnvoyProxy config type: %T", obj)
+	}
+
 	return nil
 }
 
 func (m *defaultTemplateManager) fetchEnvoyProxyConfig(ctx context.Context, templates *common.Templates) error {
-	envoyProxyRef := templates.KodeTemplate.EnvoyProxyRef
-	templates.EnvoyProxyConfigName = envoyProxyRef.Name
-	templates.EnvoyProxyConfigNamespace = envoyProxyRef.Namespace
+	EnvoyConfigRef := templates.KodeTemplate.EnvoyConfigRef
+	templates.EnvoyProxyConfigName = EnvoyConfigRef.Name
+	templates.EnvoyProxyConfigNamespace = EnvoyConfigRef.Namespace
 
-	// If no namespace is provided, use the default namespace
 	if templates.EnvoyProxyConfigNamespace == "" {
 		templates.EnvoyProxyConfigNamespace = common.DefaultNamespace
 	}
 
-	switch envoyProxyRef.Kind {
+	switch EnvoyConfigRef.Kind {
 	case "EnvoyProxyConfig":
-		config := &kodev1alpha1.EnvoyProxyConfig{}
-		if err := m.client.Get(ctx, types.NamespacedName{Name: templates.EnvoyProxyConfigName, Namespace: templates.EnvoyProxyConfigNamespace}, config); err != nil {
-			if errors.IsNotFound(err) {
-				return &common.TemplateNotFoundError{NamespacedName: types.NamespacedName{Name: templates.EnvoyProxyConfigName, Namespace: templates.EnvoyProxyConfigNamespace}, Kind: "EnvoyProxyConfig"}
-			}
-			return err
-		}
-		templates.EnvoyProxyConfig = &config.Spec.SharedEnvoyProxyConfigSpec
+		return m.fetchEnvoyConfig(ctx, templates, &kodev1alpha1.EnvoyProxyConfig{}, "EnvoyProxyConfig")
 	case "EnvoyProxyClusterConfig":
-		config := &kodev1alpha1.EnvoyProxyClusterConfig{}
-		if err := m.client.Get(ctx, types.NamespacedName{Name: templates.EnvoyProxyConfigName}, config); err != nil {
-			if errors.IsNotFound(err) {
-				return &common.TemplateNotFoundError{NamespacedName: types.NamespacedName{Name: templates.EnvoyProxyConfigName}, Kind: "EnvoyProxyClusterConfig"}
-			}
-			return err
-		}
-		templates.EnvoyProxyConfig = &config.Spec.SharedEnvoyProxyConfigSpec
+		return m.fetchEnvoyConfig(ctx, templates, &kodev1alpha1.EnvoyProxyClusterConfig{}, "EnvoyProxyClusterConfig")
 	default:
-		return fmt.Errorf("invalid EnvoyProxy config kind: %s", envoyProxyRef.Kind)
+		return fmt.Errorf("invalid EnvoyProxy config kind: %s", EnvoyConfigRef.Kind)
 	}
-
-	return nil
 }

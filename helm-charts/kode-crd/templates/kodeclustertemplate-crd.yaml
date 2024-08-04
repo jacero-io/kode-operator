@@ -118,8 +118,8 @@ spec:
                       x-kubernetes-map-type: atomic
                   type: object
                 type: array
-              envoyProxyRef:
-                description: EnvoyProxyRef is the reference to the EnvoyProxy configuration.
+              EnvoyConfigRef:
+                description: EnvoyConfigRef is the reference to the EnvoyProxy configuration.
                 properties:
                   kind:
                     description: Kind is the resource kind

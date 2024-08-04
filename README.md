@@ -69,7 +69,7 @@ spec:
   tz: UTC
   defaultHome: /config
   defaultWorkspace: workspace
-  envoyProxyRef:
+  envoyConfigRef:
     name: my-envoy-proxy-config
     namespace: default
 ```
@@ -87,7 +87,7 @@ spec:
   tz: UTC
   defaultHome: /config
   defaultWorkspace: workspace
-  envoyProxyRef:
+  envoyConfigRef:
     name: my-cluster-envoy-proxy-config
 ```
 
@@ -105,7 +105,7 @@ metadata:
   name: my-envoy-proxy-config
   namespace: default
 spec:
-  image: envoyproxy/envoy:v1.30-latest
+  image: envoyproxy/envoy:v1.31-latest
   httpFilters:
     - name: envoy.filters.http.ext_authz
       typed_config:
@@ -219,7 +219,7 @@ metadata:
 spec:
   type: code-server
   image: linuxserver/code-server:latest
-  envoyProxyRef:
+  envoyConfigRef:
     kind: EnvoyProxyClusterConfig
     name: basic-auth-proxy
   defaultHome: /config

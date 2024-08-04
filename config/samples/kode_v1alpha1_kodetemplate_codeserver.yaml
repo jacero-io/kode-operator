@@ -8,7 +8,7 @@ metadata:
   name: kodetemplate-codeserver-sample
   namespace: default
 spec:
-  envoyProxyRef:
+  envoyConfigRef:
     kind: EnvoyProxyConfig
     name: envoyproxyconfig-sample
     namespace: default

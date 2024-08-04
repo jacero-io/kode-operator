@@ -41,7 +41,7 @@ func NewDefaultCleanupManager(client client.Client, log logr.Logger) CleanupMana
 }
 
 func (m *defaultCleanupManager) Cleanup(ctx context.Context, config *common.KodeResourcesConfig) error {
-	log := m.log.WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
+	log := m.log.WithValues("kode", common.ObjectKeyFromConfig(config))
 	log.Info("Starting cleanup of Kode resources")
 
 	if err := m.deleteStatefulSet(ctx, config); err != nil {
@@ -55,7 +55,7 @@ func (m *defaultCleanupManager) Cleanup(ctx context.Context, config *common.Kode
 	}
 
 	// If KeepVolume is not set to true, delete PVC
-	if !config.Kode.Spec.DeepCopy().Storage.IsEmpty() && (config.Kode.Spec.Storage.KeepVolume == nil || !*config.Kode.Spec.Storage.KeepVolume) {
+	if !config.KodeSpec.DeepCopy().Storage.IsEmpty() && (config.KodeSpec.Storage.KeepVolume == nil || !*config.KodeSpec.Storage.KeepVolume) {
 		if err := m.deletePVC(ctx, config); err != nil {
 			log.Error(err, "Failed to delete PVC")
 			// Continue with cleanup even if this fails
@@ -67,7 +67,7 @@ func (m *defaultCleanupManager) Cleanup(ctx context.Context, config *common.Kode
 }
 
 func (m *defaultCleanupManager) Recycle(ctx context.Context, config *common.KodeResourcesConfig) error {
-	log := m.log.WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
+	log := m.log.WithValues("kode", common.ObjectKeyFromConfig(config))
 	log.Info("Starting recycle of Kode resources")
 
 	if err := m.deleteStatefulSet(ctx, config); err != nil {
@@ -79,7 +79,7 @@ func (m *defaultCleanupManager) Recycle(ctx context.Context, config *common.Kode
 	}
 
 	// If KeepVolume is set to true, do not delete PVC
-	if !config.Kode.Spec.DeepCopy().Storage.IsEmpty() && (config.Kode.Spec.Storage.KeepVolume != nil && *config.Kode.Spec.Storage.KeepVolume) {
+	if !config.KodeSpec.DeepCopy().Storage.IsEmpty() && (config.KodeSpec.Storage.KeepVolume != nil && *config.KodeSpec.Storage.KeepVolume) {
 		return nil
 	}
 
