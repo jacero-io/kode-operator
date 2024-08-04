@@ -4,7 +4,7 @@ go 1.22.5
 
 require (
 	cuelang.org/go v0.9.2
-	github.com/go-logr/logr v1.4.1
+	github.com/go-logr/logr v1.4.2
 	github.com/go-logr/zapr v1.3.0
 	github.com/onsi/ginkgo/v2 v2.17.1
 	github.com/onsi/gomega v1.32.0
