@@ -20,7 +20,9 @@ package integration
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	. "github.com/onsi/ginkgo/v2"
@@ -41,6 +43,8 @@ import (
 	"github.com/jacero-io/kode-operator/internal/status"
 	"github.com/jacero-io/kode-operator/internal/template"
 	"github.com/jacero-io/kode-operator/internal/validation"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -48,18 +52,24 @@ import (
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
 var (
-	cfg        *rest.Config
-	ctx        context.Context
-	cancel     context.CancelFunc
-	testEnv    *envtest.Environment
-	k8sClient  client.Client
-	k8sManager ctrl.Manager
-	reconciler *controller.KodeReconciler
+	cfg           *rest.Config
+	ctx           context.Context
+	cancel        context.CancelFunc
+	testEnv       *envtest.Environment
+	k8sClient     client.Client
+	mockK8sClient *mockClient
+	k8sManager    ctrl.Manager
+	reconciler    *controller.KodeReconciler
 )
 
 func TestControllers(t *testing.T) {
 	RegisterFailHandler(Fail)
 	RunSpecs(t, "Controllers Suite")
+}
+
+type mockClient struct {
+	client.Client
+	deletedResources sync.Map
 }
 
 var _ = BeforeSuite(func() {
@@ -87,14 +97,19 @@ var _ = BeforeSuite(func() {
 	k8sClient = k8sManager.GetClient()
 	Expect(k8sClient).ToNot(BeNil())
 
+	mockK8sClient = &mockClient{
+		Client:           k8sClient,
+		deletedResources: sync.Map{},
+	}
+
 	reconciler = &controller.KodeReconciler{
-		Client:          k8sClient,
+		Client:          mockK8sClient, // Use mockK8sClient instead of k8sClient
 		Scheme:          k8sManager.GetScheme(),
 		Log:             ctrl.Log.WithName("controllers").WithName("Kode").WithName("Reconcile"),
-		ResourceManager: resource.NewDefaultResourceManager(k8sClient, ctrl.Log.WithName("controllers").WithName("Kode").WithName("ResourceManager")),
-		TemplateManager: template.NewDefaultTemplateManager(k8sClient, ctrl.Log.WithName("controllers").WithName("Kode").WithName("TemplateManager")),
-		CleanupManager:  cleanup.NewDefaultCleanupManager(k8sClient, ctrl.Log.WithName("controllers").WithName("Kode").WithName("CleanupManager")),
-		StatusUpdater:   status.NewDefaultStatusUpdater(k8sClient, ctrl.Log.WithName("controllers").WithName("Kode").WithName("StatusUpdater")),
+		ResourceManager: resource.NewDefaultResourceManager(mockK8sClient, ctrl.Log.WithName("controllers").WithName("Kode").WithName("ResourceManager")),
+		TemplateManager: template.NewDefaultTemplateManager(mockK8sClient, ctrl.Log.WithName("controllers").WithName("Kode").WithName("TemplateManager")),
+		CleanupManager:  cleanup.NewDefaultCleanupManager(mockK8sClient, ctrl.Log.WithName("controllers").WithName("Kode").WithName("CleanupManager")),
+		StatusUpdater:   status.NewDefaultStatusUpdater(mockK8sClient, ctrl.Log.WithName("controllers").WithName("Kode").WithName("StatusUpdater")),
 		Validator:       validation.NewDefaultValidator(),
 	}
 
@@ -115,3 +130,18 @@ var _ = AfterSuite(func() {
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
 })
+
+func (m *mockClient) Delete(ctx context.Context, obj client.Object, opts ...client.DeleteOption) error {
+	key := fmt.Sprintf("%T/%s/%s", obj, obj.GetNamespace(), obj.GetName())
+	m.deletedResources.Store(key, true)
+	return nil
+}
+
+func (m *mockClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
+	resourceKey := fmt.Sprintf("%T/%s/%s", obj, key.Namespace, key.Name)
+	_, deleted := m.deletedResources.Load(resourceKey)
+	if deleted {
+		return apierrors.NewNotFound(schema.GroupResource{}, key.Name)
+	}
+	return m.Client.Get(ctx, key, obj, opts...)
+}
