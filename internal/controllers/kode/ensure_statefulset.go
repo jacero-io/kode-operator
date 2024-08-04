@@ -22,7 +22,6 @@ import (
 	"context"
 	"fmt"
 	"path"
-	"reflect"
 
 	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
 	"github.com/jacero-io/kode-operator/internal/common"
@@ -103,6 +102,7 @@ func (r *KodeReconciler) constructStatefulSetSpec(config *common.KodeResourcesCo
 	}
 
 	volumes, volumeMounts := constructVolumesAndMounts(mountPath, config)
+	log.V(1).Info("Constructed volumes and mounts", "volumes", volumes, "volumeMounts", volumeMounts)
 	containers[0].VolumeMounts = volumeMounts
 
 	// If KodeResourcesConfig has initContainers, append to initContainers
@@ -135,7 +135,7 @@ func (r *KodeReconciler) constructStatefulSetSpec(config *common.KodeResourcesCo
 
 	statefulSet := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      config.KodeName,
+			Name:      config.StatefulSetName,
 			Namespace: config.KodeNamespace,
 			Labels:    config.Labels,
 		},
@@ -144,7 +144,7 @@ func (r *KodeReconciler) constructStatefulSetSpec(config *common.KodeResourcesCo
 			Selector: &metav1.LabelSelector{
 				MatchLabels: config.Labels,
 			},
-			ServiceName: config.KodeName,
+			ServiceName: config.ServiceName,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels:            config.Labels,
@@ -166,7 +166,7 @@ func constructCodeServerContainers(config *common.KodeResourcesConfig,
 	workspace string) []corev1.Container {
 
 	return []corev1.Container{{
-		Name:  config.KodeName,
+		Name:  "code-server",
 		Image: config.Templates.KodeTemplate.Image,
 		Env: []corev1.EnvVar{
 			{Name: "PUID", Value: fmt.Sprintf("%d", config.Templates.KodeTemplate.PUID)},
@@ -187,7 +187,7 @@ func constructCodeServerContainers(config *common.KodeResourcesConfig,
 func constructWebtopContainers(config *common.KodeResourcesConfig) []corev1.Container {
 
 	return []corev1.Container{{
-		Name:  config.KodeName,
+		Name:  "webtop",
 		Image: config.Templates.KodeTemplate.Image,
 		Env: []corev1.EnvVar{
 			{Name: "PUID", Value: fmt.Sprintf("%d", config.Templates.KodeTemplate.PUID)},
@@ -208,8 +208,8 @@ func constructVolumesAndMounts(mountPath string, config *common.KodeResourcesCon
 	volumes := []corev1.Volume{}
 	volumeMounts := []corev1.VolumeMount{}
 
-	// Add volume and volume mount if storage is defined
-	if !reflect.DeepEqual(config.KodeSpec.Storage, kodev1alpha1.KodeStorageSpec{}) {
+	// Only add volume and volume mount if storage is explicitly defined
+	if !config.KodeSpec.Storage.IsEmpty() {
 		var volumeSource corev1.VolumeSource
 
 		if config.KodeSpec.Storage.ExistingVolumeClaim != "" {
@@ -218,7 +218,7 @@ func constructVolumesAndMounts(mountPath string, config *common.KodeResourcesCon
 					ClaimName: config.KodeSpec.Storage.ExistingVolumeClaim,
 				},
 			}
-		} else if !config.KodeSpec.DeepCopy().Storage.IsEmpty() {
+		} else {
 			volumeSource = corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 					ClaimName: config.PVCName,

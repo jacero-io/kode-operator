@@ -11,7 +11,7 @@ spec:
     kind: EnvoyProxyClusterConfig
     name: envoyproxyclusterconfig-sample
   type: webtop
-  image: lscr.io/linuxserver/webtop:latest
+  image: linuxserver/webtop:debian-xfce
   tz: "Europe/Stockholm"
   puid: 1000
   pgid: 1000

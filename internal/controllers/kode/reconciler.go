@@ -53,7 +53,7 @@ type KodeReconciler struct {
 }
 
 const (
-	RequeueInterval = 1 * time.Second
+	RequeueInterval = 250 * time.Millisecond
 )
 
 // +kubebuilder:rbac:groups=kode.kode.jacero.io,resources=kodes,verbs=get;list;watch;create;update;patch;delete
@@ -82,9 +82,11 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	}
 
 	// Handle finalizer
-	if result, err := r.handleFinalizer(ctx, kode); err != nil {
+	result, err := r.handleFinalizer(ctx, kode)
+	if err != nil {
 		return result, err
-	} else if !result.IsZero() {
+	}
+	if !result.IsZero() {
 		return result, nil
 	}
 

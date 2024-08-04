@@ -42,54 +42,63 @@ func (r *KodeReconciler) handleFinalizer(ctx context.Context, kode *kodev1alpha1
 				return ctrl.Result{}, err
 			}
 		}
-	} else {
-		// Object is being deleted
-		if controllerutil.ContainsFinalizer(kode, common.FinalizerName) {
-			// Run finalization logic
-			if err := r.finalize(ctx, kode); err != nil {
-				log.Error(err, "Failed to run finalizer")
-				return ctrl.Result{}, err
-			}
-
-			// Remove finalizer
-			err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-				// Fetch the latest version of Kode
-				latestKode, err := common.GetLatestKode(ctx, r.Client, kode.Name, kode.Namespace)
-				if err != nil {
-					return err
-				}
-
-				if controllerutil.ContainsFinalizer(latestKode, common.FinalizerName) {
-					controllerutil.RemoveFinalizer(latestKode, common.FinalizerName)
-					log.Info("Removing finalizer", "finalizer", common.FinalizerName)
-					return r.Client.Update(ctx, latestKode)
-				}
-				return nil
-			})
-
-			if err != nil {
-				log.Error(err, "Failed to remove finalizer")
-				return ctrl.Result{}, err
-			}
-		}
-		// Stop reconciliation as the item is being deleted
 		return ctrl.Result{}, nil
 	}
 
+	// Object is being deleted
+	if controllerutil.ContainsFinalizer(kode, common.FinalizerName) {
+		// Run finalization logic
+		if err := r.finalize(ctx, kode); err != nil {
+			log.Error(err, "Failed to run finalizer")
+			return ctrl.Result{}, err
+		}
+
+		// Remove finalizer
+		err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+			// Fetch the latest version of Kode
+			latestKode, err := common.GetLatestKode(ctx, r.Client, kode.Name, kode.Namespace)
+			if err != nil {
+				return err
+			}
+
+			if controllerutil.ContainsFinalizer(latestKode, common.FinalizerName) {
+				controllerutil.RemoveFinalizer(latestKode, common.FinalizerName)
+				log.Info("Removing finalizer", "finalizer", common.FinalizerName)
+				return r.Client.Update(ctx, latestKode)
+			}
+			return nil
+		})
+
+		if err != nil {
+			log.Error(err, "Failed to remove finalizer")
+			return ctrl.Result{}, err
+		}
+	}
+
+	// Stop reconciliation as the item is being deleted
 	return ctrl.Result{}, nil
 }
 
 func (r *KodeReconciler) finalize(ctx context.Context, kode *kodev1alpha1.Kode) error {
+	log := r.Log.WithValues("kode", client.ObjectKeyFromObject(kode))
 
 	// Initialize Kode resources config without templates
 	config := &common.KodeResourcesConfig{
-		KodeSpec:      kode.Spec,
-		KodeName:      kode.Name,
-		KodeNamespace: kode.Namespace,
-		PVCName:       common.GetPVCName(kode),
-		ServiceName:   common.GetServiceName(kode),
+		KodeSpec:        kode.Spec,
+		KodeName:        kode.Name,
+		KodeNamespace:   kode.Namespace,
+		StatefulSetName: kode.Name,
+		PVCName:         common.GetPVCName(kode),
+		ServiceName:     common.GetServiceName(kode),
 	}
 
 	// Perform cleanup
-	return r.CleanupManager.Cleanup(ctx, config)
+	err := r.CleanupManager.Cleanup(ctx, config)
+	if err != nil {
+		log.Error(err, "Failed to cleanup resources")
+		return err
+	}
+
+	log.Info("Finalization completed successfully")
+	return nil
 }

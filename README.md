@@ -83,7 +83,7 @@ metadata:
   name: my-kode-cluster-template
 spec:
   type: webtop
-  image: linuxserver/webtop:ubuntu-mate
+  image: linuxserver/webtop:debian-xfce
   tz: UTC
   defaultHome: /config
   defaultWorkspace: workspace

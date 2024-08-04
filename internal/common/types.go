@@ -43,6 +43,7 @@ type KodeResourcesConfig struct {
 	Secret              corev1.Secret
 	SecretName          string
 	Credentials         Credentials
+	StatefulSetName     string
 	PVCName             string
 	ServiceName         string
 	Templates           Templates
