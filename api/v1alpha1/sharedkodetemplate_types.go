@@ -23,10 +23,10 @@ import (
 
 // SharedKodeTemplateSpec defines the desired state of KodeClusterTemplate
 type SharedKodeTemplateSpec struct {
-	// EnvoyProxyRef is the reference to the EnvoyProxy configuration.
+	// EnvoyConfigRef is the reference to the EnvoyProxy configuration.
 	// +kubebuilder:validation:Description="Reference to the EnvoyProxy configuration."
 	// +kubebuilder:validation:Optional
-	EnvoyProxyRef EnvoyProxyReference `json:"envoyProxyRef,omitempty"`
+	EnvoyConfigRef EnvoyConfigReference `json:"envoyConfigRef,omitempty"`
 
 	// Type is the type of container to use. Can be one of 'code-server', 'webtop', 'devcontainers', 'jupyter', 'alnoda'.
 	// +kubebuilder:validation:Description="Type of container to use. Can be one of 'code-server', 'webtop', 'jupyter', 'alnoda'."

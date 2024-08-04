@@ -36,7 +36,7 @@ import (
 
 	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
 	"github.com/jacero-io/kode-operator/internal/cleanup"
-	"github.com/jacero-io/kode-operator/internal/controller"
+	controller "github.com/jacero-io/kode-operator/internal/controllers/kode"
 	"github.com/jacero-io/kode-operator/internal/resource"
 	"github.com/jacero-io/kode-operator/internal/status"
 	"github.com/jacero-io/kode-operator/internal/template"

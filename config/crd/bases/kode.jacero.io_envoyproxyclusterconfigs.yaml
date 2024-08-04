@@ -160,7 +160,7 @@ spec:
                   type: object
                 type: array
               image:
-                default: envoyproxy/envoy:v1.30-latest
+                default: envoyproxy/envoy:v1.31-latest
                 description: Image is the Docker image for the Envoy proxy
                 minLength: 1
                 type: string

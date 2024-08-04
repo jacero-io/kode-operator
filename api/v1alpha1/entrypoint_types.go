@@ -44,8 +44,39 @@ type EntryPointSpec struct {
 	URL string `json:"url"`
 }
 
+// EntryPointPhase defines the phase of the EntryPoint
+type EntryPointPhase string
+
+const (
+	// EntryPointPhaseCreating means the EntryPoint is being created.
+	EntryPointPhaseCreating EntryPointPhase = "Creating"
+
+	// KodePhaseCreated indicates that the Kode resource has been created.
+	EntryPointPhaseCreated EntryPointPhase = "Created"
+
+	// EntryPointPhaseFailed means the EntryPoint has failed.
+	EntryPointPhaseFailed EntryPointPhase = "Failed"
+
+	// EntryPointPhasePending means the EntryPoint is pending.
+	EntryPointPhasePending EntryPointPhase = "Pending"
+
+	// EntryPointPhaseDeleting means the EntryPoint is being deleted.
+	EntryPointPhaseDeleting EntryPointPhase = "Deleting"
+)
+
 // EntryPointStatus defines the observed state of EntryPoint
 type EntryPointStatus struct {
+	// Phase represents the current phase of the Kode resource.
+	Phase EntryPointPhase `json:"phase"`
+
+	// Conditions represent the latest available observations of a Kode's state.
+	Conditions []metav1.Condition `json:"conditions,omitempty"`
+
+	// LastError contains the last error message encountered during reconciliation.
+	LastError string `json:"lastError,omitempty"`
+
+	// LastErrorTime is the timestamp when the last error occurred.
+	LastErrorTime *metav1.Time `json:"lastErrorTime,omitempty"`
 }
 
 // +kubebuilder:object:root=true

@@ -42,32 +42,108 @@ func NewDefaultStatusUpdater(client client.Client, log logr.Logger) StatusUpdate
 	}
 }
 
-func (u *defaultStatusUpdater) UpdateStatus(ctx context.Context, config *common.KodeResourcesConfig, phase kodev1alpha1.KodePhase, conditions []metav1.Condition, lastError string, lastErrorTime *metav1.Time) error {
-	log := u.log.WithValues("kode", client.ObjectKeyFromObject(&config.Kode))
+func (u *defaultStatusUpdater) UpdateKodeStatus(ctx context.Context,
+	kode *kodev1alpha1.Kode,
+	phase kodev1alpha1.KodePhase,
+	newConditions []metav1.Condition,
+	lastError string,
+	lastErrorTime *metav1.Time) error {
+
+	log := u.log.WithValues("kode", client.ObjectKeyFromObject(kode))
+
+	log.V(1).Info("Updating Kode status", "Phase", phase)
 
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		// Fetch the latest version of Kode
-		var latestKode kodev1alpha1.Kode
-		if err := u.client.Get(ctx, types.NamespacedName{Name: config.Kode.Name, Namespace: config.Kode.Namespace}, &latestKode); err != nil {
-			log.Error(err, "Failed to get latest version of Kode")
+		latestKode, err := common.GetLatestKode(ctx, u.client, kode.Name, kode.Namespace)
+		if err != nil {
+			return err
+		}
+
+		// Create a copy of the latest status
+		updatedStatus := latestKode.Status.DeepCopy()
+
+		// Update only the fields we want to change
+		updatedStatus.Phase = phase
+		updatedStatus.Conditions = mergeConditions(updatedStatus.Conditions, newConditions)
+		updatedStatus.LastError = lastError
+		updatedStatus.LastErrorTime = lastErrorTime
+		updatedStatus.ObservedGeneration = latestKode.Generation
+
+		// Create a patch
+		patch := client.MergeFrom(latestKode.DeepCopy())
+		latestKode.Status = *updatedStatus
+
+		// Apply the patch
+		if err := u.client.Status().Patch(ctx, latestKode, patch); err != nil {
+			log.Error(err, "Failed to update Kode status")
+			return err
+		}
+		return nil
+	})
+}
+
+func (u *defaultStatusUpdater) UpdateEntryPointsStatus(ctx context.Context,
+	config *common.EntryPointResourceConfig,
+	phase kodev1alpha1.EntryPointPhase,
+	conditions []metav1.Condition,
+	lastError string,
+	lastErrorTime *metav1.Time) error {
+	log := u.log.WithValues("entryPoint", client.ObjectKeyFromObject(&config.EntryPoint))
+
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		// Fetch the latest version of EntryPoint
+		var latestEntryPoint kodev1alpha1.EntryPoint
+		if err := u.client.Get(ctx, types.NamespacedName{Name: config.EntryPoint.Name, Namespace: config.EntryPoint.Namespace}, &latestEntryPoint); err != nil {
+			log.Error(err, "Failed to get latest version of EntryPoint")
 			return err
 		}
 
 		// Update the status
-		latestKode.Status.Phase = phase
-		latestKode.Status.Conditions = conditions
-		latestKode.Status.LastError = lastError
-		latestKode.Status.LastErrorTime = lastErrorTime
+		latestEntryPoint.Status.Phase = phase
+		latestEntryPoint.Status.Conditions = conditions
+		latestEntryPoint.Status.LastError = lastError
+		latestEntryPoint.Status.LastErrorTime = lastErrorTime
 
 		// Try to update
-		if err := u.client.Status().Update(ctx, &latestKode); err != nil {
-			log.Error(err, "Failed to update Kode status")
+		if err := u.client.Status().Update(ctx, &latestEntryPoint); err != nil {
+			log.Error(err, "Failed to update EntryPoint status")
 			return err
 		}
 
-		// Update was successful, update the config's Kode with the latest version
-		config.Kode = latestKode
+		// Update was successful, update the config's EntryPoint with the latest version
+		config.EntryPoint = latestEntryPoint
 
 		return nil
 	})
+}
+
+func mergeConditions(existing, new []metav1.Condition) []metav1.Condition {
+	merged := make([]metav1.Condition, 0, len(existing)+len(new))
+	existingMap := make(map[string]metav1.Condition)
+
+	for _, condition := range existing {
+		existingMap[condition.Type] = condition
+	}
+
+	for _, condition := range new {
+		if existing, ok := existingMap[condition.Type]; ok {
+			if existing.Status != condition.Status ||
+				existing.Reason != condition.Reason ||
+				existing.Message != condition.Message {
+				merged = append(merged, condition)
+			} else {
+				merged = append(merged, existing)
+			}
+			delete(existingMap, condition.Type)
+		} else {
+			merged = append(merged, condition)
+		}
+	}
+
+	for _, condition := range existingMap {
+		merged = append(merged, condition)
+	}
+
+	return merged
 }

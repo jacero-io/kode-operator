@@ -47,7 +47,7 @@ func (m *defaultResourceManager) CreateOrPatch(ctx context.Context, obj client.O
 	}
 	log := m.log.WithValues("kind", obj.GetObjectKind().GroupVersionKind().Kind, "name", obj.GetName(), "namespace", obj.GetNamespace())
 
-	log.V(1).Info("Starting CreateOrPatch", "Object", obj)
+	log.V(2).Info("Starting CreateOrPatch for object", "Object", obj)
 
 	result, err := controllerutil.CreateOrPatch(ctx, m.client, obj, f)
 	if err != nil {
@@ -55,7 +55,7 @@ func (m *defaultResourceManager) CreateOrPatch(ctx context.Context, obj client.O
 		return err
 	}
 
-	log.Info("Resource operation completed", "Result", result)
+	log.V(1).Info("Resource operation completed", "Result", result)
 	return nil
 }
 
