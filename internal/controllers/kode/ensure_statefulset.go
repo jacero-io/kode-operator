@@ -135,7 +135,7 @@ func (r *KodeReconciler) constructStatefulSetSpec(config *common.KodeResourcesCo
 
 	statefulSet := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      config.KodeName,
+			Name:      config.StatefulSetName,
 			Namespace: config.KodeNamespace,
 			Labels:    config.Labels,
 		},
@@ -144,7 +144,7 @@ func (r *KodeReconciler) constructStatefulSetSpec(config *common.KodeResourcesCo
 			Selector: &metav1.LabelSelector{
 				MatchLabels: config.Labels,
 			},
-			ServiceName: config.KodeName,
+			ServiceName: config.ServiceName,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Labels:            config.Labels,

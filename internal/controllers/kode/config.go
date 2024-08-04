@@ -54,21 +54,14 @@ func InitKodeResourcesConfig(
 	serviceName := common.GetServiceName(kode)
 
 	return &common.KodeResourcesConfig{
-		KodeSpec: kodev1alpha1.KodeSpec{
-			Username:       kode.Spec.Username,
-			Password:       kode.Spec.Password,
-			ExistingSecret: kode.Spec.ExistingSecret,
-			Storage:        kode.Spec.Storage,
-			InitPlugins:    kode.Spec.InitPlugins,
-			Workspace:      kode.Spec.Workspace,
-			Home:           kode.Spec.Home,
-		},
+		KodeSpec:            kode.Spec,
 		Labels:              createLabels(kode, templates),
 		KodeName:            kode.Name,
 		KodeNamespace:       kode.Namespace,
 		Secret:              corev1.Secret{},
 		SecretName:          secretName,
 		Credentials:         common.Credentials{},
+		StatefulSetName:     kode.Name,
 		PVCName:             pvcName,
 		ServiceName:         serviceName,
 		Templates:           *templates,
