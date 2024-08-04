@@ -7,9 +7,9 @@ appVersion: "PLACEHOLDER_VERSION" # This is automatically set by the GitHub Acti
 dependencies:
   - name: kode-crd
     version: "PLACEHOLDER_VERSION" # This is automatically set by the GitHub Actions workflow
-    repository: "oci://ghcr.io/jacero-io"
+    repository: "oci://ghcr.io/jacero-io/charts"
   - name: cert-manager
     repository: https://charts.jetstack.io
     condition: certmanager.enabled
     alias: certmanager
-    version: "1.15.0"
+    version: "1.15.2"

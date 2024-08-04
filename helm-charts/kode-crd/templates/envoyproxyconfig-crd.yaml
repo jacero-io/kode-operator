@@ -40,6 +40,17 @@ spec:
           spec:
             description: EnvoyProxyConfigSpec defines the desired state of EnvoyProxyConfig
             properties:
+              authConfig:
+                description: AuthConfig is custom authentication configuration. Can
+                  be used to configure basic auth, JWT, etc.
+                properties:
+                  authType:
+                    description: AuthType is the type of authentication. Can be set
+                      to "basic" or "jwt"
+                    type: string
+                required:
+                - authType
+                type: object
               clusters:
                 description: Clusters is a list of Envoy clusters
                 items:
@@ -148,12 +159,11 @@ spec:
                   type: object
                 type: array
               image:
-                default: envoyproxy/envoy:v1.30-latest
+                default: envoyproxy/envoy:v1.31-latest
                 description: Image is the Docker image for the Envoy proxy
                 minLength: 1
                 type: string
             required:
-            - httpFilters
             - image
             type: object
           status:

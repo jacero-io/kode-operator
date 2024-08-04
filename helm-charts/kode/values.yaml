@@ -11,8 +11,8 @@ controllerManager:
         drop:
         - ALL
     image:
-      repository: ghcr.io/emil-jacero/kode-operator
-      tag: "PLACEHOLDER_VERSION" # This is automatically set by the GitHub Actions workflow
+      repository: ghcr.io/jacero.io/kode-operator
+      tag: latest
     resources:
       limits:
         cpu: 500m
