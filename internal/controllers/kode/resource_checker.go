@@ -90,7 +90,7 @@ func (r *KodeReconciler) checkResourcesReady(ctx context.Context, config *common
 		}
 
 		if pvc.Status.Phase != corev1.ClaimBound {
-			log.V(1).Info("PersistentVolumeClaim not bound", "Phase", pvc.Status.Phase)
+			log.V(1).Info("PersistentVolumeClaim not bound", "Phase", pvc.Status.Phase, "Spec", pvc.Spec, "Status", pvc.Status)
 			return false, nil
 		}
 	}
