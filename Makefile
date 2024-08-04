@@ -96,7 +96,7 @@ test-integration: manifests generate fmt vet envtest ## Run integration tests wi
 # fi
 
 .PHONY: test-e2e
-test-e2e: manifests generate fmt vet docker-build kind-create-cluster kind-load-image ## Run end-to-end tests with Kind cluster
+test-e2e: manifests generate fmt vet docker-build kind-create-cluster kind-load-images ## Run end-to-end tests with Kind cluster
 	go test $(TEST_VERBOSITY) -tags=e2e ./test/e2e/...
 	$(MAKE) kind-delete-cluster
 
@@ -121,9 +121,21 @@ kind-create-cluster:
 kind-delete-cluster:
 	kind delete cluster --name test
 
-.PHONY: kind-load-image
-kind-load-image: docker-build
-	kind load docker-image ${IMG} --name test
+INT_IMAGES_TO_LOAD ?= controller:latest
+EXT_IMAGES_TO_LOAD ?= envoyproxy/envoy:v1.31-latest linuxserver/code-server:latest linuxserver/webtop:debian-xfce
+
+.PHONY: kind-load-images
+kind-load-images: docker-build
+	@for img in $(INT_IMAGES_TO_LOAD); do \
+		echo "Loading $$img"; \
+		kind load docker-image $$img --name test; \
+	done
+	@for img in $(EXT_IMAGES_TO_LOAD); do \
+		echo "Pulling $$img"; \
+		$(CONTAINER_TOOL) pull $$img; \
+		echo "Loading $$img"; \
+		kind load docker-image $$img --name test; \
+	done
 
 .PHONY: lint
 lint: golangci-lint ## Run golangci-lint linter & yamllint
