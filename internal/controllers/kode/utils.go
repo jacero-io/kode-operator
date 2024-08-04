@@ -332,7 +332,3 @@ func (r *KodeReconciler) updateKodePhaseRecycled(ctx context.Context, kode *kode
 
 	return r.StatusUpdater.UpdateKodeStatus(ctx, kode, phase, conditions, "", nil)
 }
-
-func (r *KodeReconciler) clearErrorStatus(ctx context.Context, kode *kodev1alpha1.Kode) error {
-	return r.StatusUpdater.UpdateKodeStatus(ctx, kode, "", []metav1.Condition{}, "", nil)
-}
