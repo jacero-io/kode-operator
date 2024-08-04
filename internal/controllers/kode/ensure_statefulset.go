@@ -166,7 +166,7 @@ func constructCodeServerContainers(config *common.KodeResourcesConfig,
 	workspace string) []corev1.Container {
 
 	return []corev1.Container{{
-		Name:  config.KodeName,
+		Name:  "code-server",
 		Image: config.Templates.KodeTemplate.Image,
 		Env: []corev1.EnvVar{
 			{Name: "PUID", Value: fmt.Sprintf("%d", config.Templates.KodeTemplate.PUID)},
@@ -187,7 +187,7 @@ func constructCodeServerContainers(config *common.KodeResourcesConfig,
 func constructWebtopContainers(config *common.KodeResourcesConfig) []corev1.Container {
 
 	return []corev1.Container{{
-		Name:  config.KodeName,
+		Name:  "webtop",
 		Image: config.Templates.KodeTemplate.Image,
 		Env: []corev1.EnvVar{
 			{Name: "PUID", Value: fmt.Sprintf("%d", config.Templates.KodeTemplate.PUID)},
