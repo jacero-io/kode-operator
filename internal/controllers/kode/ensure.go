@@ -40,8 +40,7 @@ func (r *KodeReconciler) ensureResources(ctx context.Context, config *common.Kod
 
 	// Check if the resource has changed since last reconciliation
 	if kode.Generation != kode.Status.ObservedGeneration {
-		log.Info("Resource has changed, ensuring all resources")
-
+		log.Info("Resource has changed, ensuring all resources", "Generation", kode.Generation, "ObservedGeneration", kode.Status.ObservedGeneration)
 		// Update status depending on the current phase
 		if kode.Status.Phase != kodev1alpha1.KodePhasePending {
 			// If the Kode is already Active, update the status to Pending
@@ -70,15 +69,6 @@ func (r *KodeReconciler) ensureResources(ctx context.Context, config *common.Kod
 			}}, err)
 			return err
 		}
-		// 	r.updateKodePhaseFailed(ctx, kode, err, metav1.Condition{
-		// 		Type:               "SecretCreationFailed",
-		// 		Status:             metav1.ConditionTrue,
-		// 		Reason:             "SecretCreationError",
-		// 		Message:            fmt.Sprintf("Failed to create Secret: %s", err.Error()),
-		// 		LastTransitionTime: metav1.Now(),
-		// 	})
-		// 	return err
-		// }
 
 		// Ensure Credentials
 		if err := r.ensureCredentials(ctx, config); err != nil {
