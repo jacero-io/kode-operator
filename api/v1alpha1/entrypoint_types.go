@@ -19,7 +19,6 @@ package v1alpha1
 import (
 	networkingv1 "k8s.io/api/networking/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	gatewayv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 // EntryPointSpec defines the desired state of EntryPoint
@@ -28,13 +27,13 @@ type EntryPointSpec struct {
 	// +kubebuilder:validation:description=Type is the type of the gateway. It could be ingress-api or gateway-api.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Enum=ingress-api;gateway-api
-	ApiType string `json:"apiType"`
+	Api string `json:"api"`
 
 	// Type is the way the Kode resource is accessed. It could be subdomain or path.
 	// +kubebuilder:validation:description=Type is the way the Kode resource is accessed. It could be subdomain or path.
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Enum=domain;path
-	Type string `json:"type"`
+	RoutingType string `json:"routingType"`
 
 	// URL is the domain name to use either as a suffix in the case of Type=domain or as a prefix/domain in the case of Type=path.
 	// When the type is domain, the controller will try to publish the Kode resource as a subdomain of the given domain (e.g <kode-resource>.kode.example.com).
@@ -42,6 +41,16 @@ type EntryPointSpec struct {
 	// +kubebuilder:validation:description=URL is the domain name to use either as a suffix in the case of Type=domain or as a prefix/domain in the case of Type=path. When the type is domain, the controller will try to publish the Kode resource as a subdomain of the given domain (e.g <kode-resource>.kode.example.com). When the type is path, the controller will try to publish the Kode resource as a path of the given URL (e.g kode.example.com/<kode-resource>).
 	// +kubebuilder:validation:Required
 	URL string `json:"url"`
+
+	// GatewaySpec defines the GatewaySpec for the EntryPoint.
+	// +kubebuilder:validation:description=GatewaySpec defines the GatewaySpec for the EntryPoint.
+	// +kubebuilder:validation:Optional
+	GatewaySpec *GatewaySpec `json:"gatewaySpec,omitempty"`
+
+	// IngressSpec defines the IngressSpec for the EntryPoint.
+	// +kubebuilder:validation:description=IngressSpec defines the IngressSpec for the EntryPoint.
+	// +kubebuilder:validation:Optional
+	// IngressSpec *IngressSpec `json:"ingressSpec,omitempty"`
 }
 
 // EntryPointPhase defines the phase of the EntryPoint
@@ -60,8 +69,8 @@ const (
 	// EntryPointPhasePending means the EntryPoint is pending.
 	EntryPointPhasePending EntryPointPhase = "Pending"
 
-	// EntryPointPhaseDeleting means the EntryPoint is being deleted.
-	EntryPointPhaseDeleting EntryPointPhase = "Deleting"
+	// EntryPointPhaseActive means the EntryPoint is active.
+	EntryPointPhaseActive EntryPointPhase = "Active"
 )
 
 // EntryPointStatus defines the observed state of EntryPoint
@@ -118,14 +127,6 @@ type GatewaySpec struct {
 	// GatewayClassName is the name of the GatewayClass resource.
 	// +kubebuilder:validation:Description="Name of the GatewayClass resource."
 	GatewayClassName *string `json:"gatewayClassName,omitempty"`
-
-	// Listeners contains the listener configuration for the Gateway.
-	// +kubebuilder:validation:Description="Contains the listener configuration for the Gateway."
-	Listeners []gatewayv1.Listener `json:"listeners,omitempty"`
-
-	// Routes contains the route configuration for the Gateway.
-	// +kubebuilder:validation:Description="Contains the route configuration for the Gateway."
-	Routes []gatewayv1.HTTPRoute `json:"routes,omitempty"`
 }
 
 func init() {

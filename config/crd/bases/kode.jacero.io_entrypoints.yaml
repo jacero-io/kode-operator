@@ -39,14 +39,22 @@ spec:
           spec:
             description: EntryPointSpec defines the desired state of EntryPoint
             properties:
-              apiType:
+              api:
                 description: Type is the type of the gateway. It could be ingress-api
                   or gateway-api.
                 enum:
                 - ingress-api
                 - gateway-api
                 type: string
-              type:
+              gatewaySpec:
+                description: GatewaySpec defines the GatewaySpec for the EntryPoint.
+                properties:
+                  gatewayClassName:
+                    description: GatewayClassName is the name of the GatewayClass
+                      resource.
+                    type: string
+                type: object
+              routingType:
                 description: Type is the way the Kode resource is accessed. It could
                   be subdomain or path.
                 enum:
@@ -60,8 +68,8 @@ spec:
                   When the type is path, the controller will try to publish the Kode resource as a path of the given URL (e.g kode.example.com/<kode-resource>).
                 type: string
             required:
-            - apiType
-            - type
+            - api
+            - routingType
             - url
             type: object
           status:

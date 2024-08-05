@@ -28,8 +28,12 @@ type SharedKodeTemplateSpec struct {
 	// +kubebuilder:validation:Optional
 	EnvoyConfigRef EnvoyConfigReference `json:"envoyConfigRef,omitempty"`
 
-	// Type is the type of container to use. Can be one of 'code-server', 'webtop', 'devcontainers', 'jupyter', 'alnoda'.
-	// +kubebuilder:validation:Description="Type of container to use. Can be one of 'code-server', 'webtop', 'jupyter', 'alnoda'."
+	// EntryPointSpec defines the desired state of the entrypoint.
+	// +kubebuilder:validation:Description="Desired state of the entrypoint."
+	EntryPointSpec EntryPointSpec `json:"entryPointSpec,omitempty"`
+
+	// Type is the type of container to use. Can be one of 'code-server', 'webtop', 'devcontainers', 'jupyter'.
+	// +kubebuilder:validation:Description="Type of container to use. Can be one of 'code-server', 'webtop', 'jupyter'."
 	// +kubebuilder:validation:Required
 	// +kubebuilder:validation:Enum=code-server;webtop
 	Type string `json:"type"`
@@ -108,18 +112,6 @@ type SharedKodeTemplateSpec struct {
 	// InitPlugins specifies the OCI containers to be run before the main container. It is an ordered list.
 	// +kubebuilder:validation:Description="OCI containers to be run before the main container. It is an ordered list."
 	InitPlugins []InitPluginSpec `json:"initPlugins,omitempty"`
-
-	// // Ingress contains the Ingress configuration for the Kode resource. It will override the KodeTemplate Ingress configuration.
-	// // +kubebuilder:validation:Description="Contains the Ingress configuration for the Kode resource. It will override the KodeTemplate Ingress configuration."
-	// Ingress *IngressSpec `json:"ingress,omitempty"`
-
-	// // Gateway contains the Gateway configuration for the Kode resource. It will override the KodeTemplate Gateway configuration.
-	// // +kubebuilder:validation:Description="Contains the Gateway configuration for the Kode resource. It will override the KodeTemplate Gateway configuration."
-	// Gateway *GatewaySpec `json:"gateway,omitempty"`
-
-	// EntryPointSpec defines the desired state of the entrypoint.
-	// +kubebuilder:validation:Description="Desired state of the entrypoint."
-	// EntryPointSpec EntryPointSpec `json:"entryPointSpec,omitempty"`
 }
 
 // SharedKodeTemplateStatus defines the observed state
