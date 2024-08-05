@@ -25,22 +25,22 @@ import (
 type EntryPointSpec struct {
 	// Type is the type of the gateway. It could be ingress-api or gateway-api.
 	// +kubebuilder:validation:description=Type is the type of the gateway. It could be ingress-api or gateway-api.
-	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Optional
 	// +kubebuilder:validation:Enum=ingress-api;gateway-api
-	Api string `json:"api"`
+	Api string `json:"api,omitempty"`
 
 	// Type is the way the Kode resource is accessed. It could be subdomain or path.
 	// +kubebuilder:validation:description=Type is the way the Kode resource is accessed. It could be subdomain or path.
-	// +kubebuilder:validation:Required
+	// +kubebuilder:validation:Optional
 	// +kubebuilder:validation:Enum=domain;path
-	RoutingType string `json:"routingType"`
+	RoutingType string `json:"routingType,omitempty"`
 
 	// URL is the domain name to use either as a suffix in the case of Type=domain or as a prefix/domain in the case of Type=path.
 	// When the type is domain, the controller will try to publish the Kode resource as a subdomain of the given domain (e.g <kode-resource>.kode.example.com).
 	// When the type is path, the controller will try to publish the Kode resource as a path of the given URL (e.g kode.example.com/<kode-resource>).
 	// +kubebuilder:validation:description=URL is the domain name to use either as a suffix in the case of Type=domain or as a prefix/domain in the case of Type=path. When the type is domain, the controller will try to publish the Kode resource as a subdomain of the given domain (e.g <kode-resource>.kode.example.com). When the type is path, the controller will try to publish the Kode resource as a path of the given URL (e.g kode.example.com/<kode-resource>).
-	// +kubebuilder:validation:Required
-	URL string `json:"url"`
+	// +kubebuilder:validation:Optional
+	URL string `json:"url,omitempty"`
 
 	// GatewaySpec defines the GatewaySpec for the EntryPoint.
 	// +kubebuilder:validation:description=GatewaySpec defines the GatewaySpec for the EntryPoint.

@@ -2,7 +2,7 @@
 
 <span style="color: red;">DISCLAIMER! THIS PROJECT IS UNDER HEAVY DEVELOPMENT AND NOT MEANT FOR PRODUCTION USE JUST YET.</span>
 
-Kode-Operator is designed to enhance the developer experience with a strong focus on security and observability.
+Kode is designed to enhance the developer experience with a focus on security and observability.
 
 ## Overview
 
@@ -138,8 +138,8 @@ spec:
 ### Features
 
 * [x] *Provisioning and update of [Code-server](https://docs.linuxserver.io/images/docker-code-server/).
-* [ ] *Provisioning and update of [Webtop](https://docs.linuxserver.io/images/docker-webtop/).
-* [ ] Authentication & Authorization support using Envoy Proxy sidecar.
+* [x] *Provisioning and update of [Webtop](https://docs.linuxserver.io/images/docker-webtop/).
+* [x] Authentication & Authorization support using Envoy Proxy sidecar.
   * [OAuth2](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/oauth2_filter) With external Oauth2 provider.
   * [Ext_Authz](https://www.envoyproxy.io/docs/envoy/latest/configuration/http/http_filters/ext_authz_filter) HTTP and GRPC (Used by for example OPA to authorize the users).
 * [ ] [Falco](https://falco.org/) sidecar support

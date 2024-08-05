@@ -67,10 +67,6 @@ spec:
                   When the type is domain, the controller will try to publish the Kode resource as a subdomain of the given domain (e.g <kode-resource>.kode.example.com).
                   When the type is path, the controller will try to publish the Kode resource as a path of the given URL (e.g kode.example.com/<kode-resource>).
                 type: string
-            required:
-            - api
-            - routingType
-            - url
             type: object
           status:
             description: EntryPointStatus defines the observed state of EntryPoint
