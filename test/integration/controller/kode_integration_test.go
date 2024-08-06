@@ -137,6 +137,8 @@ var _ = Describe("Kode Controller Integration", Ordered, func() {
 						Kind: kodeTemplateKind,
 						Name: templateName,
 					},
+					Username: "abc",
+					Password: "123",
 					Storage: kodev1alpha1.KodeStorageSpec{
 						AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
 						Resources: corev1.VolumeResourceRequirements{

@@ -53,7 +53,6 @@ type KodeResourcesConfig struct {
 	TemplateInitPlugins []kodev1alpha1.InitPluginSpec
 	LocalServicePort    int32
 	ExternalServicePort int32
-	RetryCount          int
 }
 
 // EntryPointResourceConfig holds configuration for EntryPoint resources

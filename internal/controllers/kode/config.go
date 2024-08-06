@@ -71,7 +71,6 @@ func InitKodeResourcesConfig(
 		TemplateInitPlugins: templates.KodeTemplate.InitPlugins,
 		LocalServicePort:    localServicePort,
 		ExternalServicePort: externalServicePort,
-		RetryCount:          0,
 	}
 }
 
