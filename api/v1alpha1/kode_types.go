@@ -143,12 +143,6 @@ type KodeStatus struct {
 	// Conditions represent the latest available observations of a Kode's state.
 	Conditions []metav1.Condition `json:"conditions,omitempty"`
 
-	// LastError contains the last error message encountered during reconciliation.
-	LastError string `json:"lastError,omitempty"`
-
-	// LastErrorTime is the timestamp when the last error occurred.
-	LastErrorTime *metav1.Time `json:"lastErrorTime,omitempty"`
-
 	// KodeUrl is the URL to access the Kode.
 	KodeUrl string `json:"kodeUrl,omitempty"`
 
@@ -157,6 +151,12 @@ type KodeStatus struct {
 
 	// LastActivityTime is the timestamp when the last activity occurred.
 	LastActivityTime *metav1.Time `json:"lastActivityTime,omitempty"`
+
+	// LastError contains the last error message encountered during reconciliation.
+	LastError string `json:"lastError,omitempty"`
+
+	// LastErrorTime is the timestamp when the last error occurred.
+	LastErrorTime *metav1.Time `json:"lastErrorTime,omitempty"`
 }
 
 //+kubebuilder:object:root=true
