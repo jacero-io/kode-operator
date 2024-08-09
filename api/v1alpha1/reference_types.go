@@ -17,36 +17,24 @@ limitations under the License.
 package v1alpha1
 
 
-type KodeTemplateReference struct {
+type CrossNamespaceObjectReference struct {
 	// Kind is the resource kind.
 	// +kubebuilder:validation:Description="Resource kind"
-	// +kubebuilder:validation:Enum=KodeTemplate;KodeClusterTemplate
 	Kind string `json:"kind"`
 
-	// Name is the name of the KodeTemplate.
-	// +kubebuilder:validation:Description="Name of the KodeTemplate"
+	// Name is the name of the resource.
+	// +kubebuilder:validation:Description="Name of the resource"
 	Name string `json:"name"`
 
-	// Namespace is the namespace of the KodeTemplate.
-	// +kubebuilder:validation:Description="Namespace of the KodeTemplate"
+	// Namespace is the namespace of the resource.
+	// +kubebuilder:validation:Description="Namespace of the resource"
 	Namespace string `json:"namespace,omitempty"`
 }
 
+// TODO: Add in code validation for the kind field
+// KodeTemplateReference is a reference to a KodeTemplate or KodeClusterTemplate
+type KodeTemplateReference CrossNamespaceObjectReference
+
+// TODO: Add in code validation for the kind field
 // EnvoyConfigReference is a reference to an EnvoyProxyConfig or EnvoyProxyClusterConfig
-type EnvoyConfigReference struct {
-	// Kind is the resource kind
-	// +kubebuilder:validation:Description="Resource kind"
-	// +kubebuilder:validation:Enum=EnvoyProxyConfig;EnvoyProxyClusterConfig
-	// +kubebuilder:validation:Optional
-	Kind string `json:"kind,omitempty"`
-
-	// Name is the name of the EnvoyProxyConfig or EnvoyProxyClusterConfig
-	// +kubebuilder:validation:Description="Name of the config"
-	// +kubebuilder:validation:Optional
-	Name string `json:"name,omitempty"`
-
-	// Namespace is the namespace of the EnvoyProxyConfig or EnvoyProxyClusterConfig
-	// +kubebuilder:validation:Description="Namespace of the Envoy Proxy config"
-	// +kubebuilder:validation:Optional
-	Namespace string `json:"namespace,omitempty"`
-}
+type EnvoyConfigReference CrossNamespaceObjectReference
