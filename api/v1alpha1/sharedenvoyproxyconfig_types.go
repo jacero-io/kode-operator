@@ -57,25 +57,6 @@ type AuthConfig struct {
 	AuthType string `json:"authType"`
 }
 
-// EnvoyConfigReference is a reference to an EnvoyProxyConfig or EnvoyProxyClusterConfig
-type EnvoyConfigReference struct {
-	// Kind is the resource kind
-	// +kubebuilder:validation:Description="Resource kind"
-	// +kubebuilder:validation:Enum=EnvoyProxyConfig;EnvoyProxyClusterConfig
-	// +kubebuilder:validation:Optional
-	Kind string `json:"kind,omitempty"`
-
-	// Name is the name of the EnvoyProxyConfig or EnvoyProxyClusterConfig
-	// +kubebuilder:validation:Description="Name of the config"
-	// +kubebuilder:validation:Optional
-	Name string `json:"name,omitempty"`
-
-	// Namespace is the namespace of the EnvoyProxyConfig or EnvoyProxyClusterConfig
-	// +kubebuilder:validation:Description="Namespace of the Envoy Proxy config"
-	// +kubebuilder:validation:Optional
-	Namespace string `json:"namespace,omitempty"`
-}
-
 type SocketAddress struct {
 	// Address is the address of the socket
 	// +kubebuilder:validation:Required

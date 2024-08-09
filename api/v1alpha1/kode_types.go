@@ -134,6 +134,9 @@ const (
 
 // KodeStatus defines the observed state of Kode
 type KodeStatus struct {
+	// ObservedGeneration is the last observed generation of the Kode resource.
+	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+
 	// Phase represents the current phase of the Kode resource.
 	Phase KodePhase `json:"phase"`
 
@@ -146,8 +149,14 @@ type KodeStatus struct {
 	// LastErrorTime is the timestamp when the last error occurred.
 	LastErrorTime *metav1.Time `json:"lastErrorTime,omitempty"`
 
-	// ObservedGeneration is the last observed generation of the Kode resource.
-	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+	// KodeUrl is the URL to access the Kode.
+	KodeUrl string `json:"kodeUrl,omitempty"`
+
+	// LogoUrl is the URL to the logo for the Kode.
+	LogoUrl string `json:"logoUrl,omitempty"`
+
+	// LastActivityTime is the timestamp when the last activity occurred.
+	LastActivityTime *metav1.Time `json:"lastActivityTime,omitempty"`
 }
 
 //+kubebuilder:object:root=true
@@ -169,53 +178,6 @@ type KodeList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []Kode `json:"items"`
-}
-
-type KodeTemplateReference struct {
-	// Kind is the resource kind.
-	// +kubebuilder:validation:Description="Resource kind"
-	// +kubebuilder:validation:Enum=KodeTemplate;KodeClusterTemplate
-	Kind string `json:"kind"`
-
-	// Name is the name of the KodeTemplate.
-	// +kubebuilder:validation:Description="Name of the KodeTemplate"
-	Name string `json:"name"`
-
-	// Namespace is the namespace of the KodeTemplate.
-	// +kubebuilder:validation:Description="Namespace of the KodeTemplate"
-	Namespace string `json:"namespace,omitempty"`
-}
-
-type InitPluginSpec struct {
-	// Name is the name of the container.
-	// +kubebuilder:validation:Description="Name of the container."
-	// +kubebuilder:validation:Required
-	Name string `json:"name"`
-
-	// Image is the OCI image for the container.
-	// +kubebuilder:validation:Description="OCI image for the container."
-	// +kubebuilder:validation:Required
-	Image string `json:"image"`
-
-	// Command is the command to run in the container.
-	// +kubebuilder:validation:Description="Command to run in the container."
-	Command []string `json:"command,omitempty"`
-
-	// Args are the arguments to the container.
-	// +kubebuilder:validation:Description="Arguments to the container."
-	Args []string `json:"args,omitempty"`
-
-	// Env are the environment variables to the container.
-	// +kubebuilder:validation:Description="Environment variables to the container."
-	Env []corev1.EnvVar `json:"env,omitempty"`
-
-	// EnvFrom are the environment variables taken from a Secret or ConfigMap.
-	// +kubebuilder:validation:Description="Environment variables taken from a Secret or ConfigMap."
-	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
-
-	// VolumeMounts are the volume mounts for the container. Can be used to mount a ConfigMap or Secret.
-	// +kubebuilder:validation:Description="Volume mounts for the container. Can be used to mount a ConfigMap or Secret."
-	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
 }
 
 func (s KodeStorageSpec) IsEmpty() bool {

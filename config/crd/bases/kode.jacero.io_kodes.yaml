@@ -493,6 +493,14 @@ spec:
                   - type
                   type: object
                 type: array
+              kodeUrl:
+                description: KodeUrl is the URL to access the Kode.
+                type: string
+              lastActivityTime:
+                description: LastActivityTime is the timestamp when the last activity
+                  occurred.
+                format: date-time
+                type: string
               lastError:
                 description: LastError contains the last error message encountered
                   during reconciliation.
@@ -500,6 +508,9 @@ spec:
               lastErrorTime:
                 description: LastErrorTime is the timestamp when the last error occurred.
                 format: date-time
+                type: string
+              logoUrl:
+                description: LogoUrl is the URL to the logo for the Kode.
                 type: string
               observedGeneration:
                 description: ObservedGeneration is the last observed generation of

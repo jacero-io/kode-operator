@@ -46,6 +46,23 @@ spec:
                 - ingress-api
                 - gateway-api
                 type: string
+              envoyConfigRef:
+                description: EnvoyConfigRef is the reference to the EnvoyProxy configuration.
+                properties:
+                  kind:
+                    description: Kind is the resource kind
+                    enum:
+                    - EnvoyProxyConfig
+                    - EnvoyProxyClusterConfig
+                    type: string
+                  name:
+                    description: Name is the name of the EnvoyProxyConfig or EnvoyProxyClusterConfig
+                    type: string
+                  namespace:
+                    description: Namespace is the namespace of the EnvoyProxyConfig
+                      or EnvoyProxyClusterConfig
+                    type: string
+                type: object
               gatewaySpec:
                 description: GatewaySpec defines the GatewaySpec for the EntryPoint.
                 properties:

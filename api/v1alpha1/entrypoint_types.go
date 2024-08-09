@@ -42,6 +42,11 @@ type EntryPointSpec struct {
 	// +kubebuilder:validation:Optional
 	URL string `json:"url,omitempty"`
 
+	// EnvoyConfigRef is the reference to the EnvoyProxy configuration.
+	// +kubebuilder:validation:Description="Reference to the EnvoyProxy configuration."
+	// +kubebuilder:validation:Optional
+	EnvoyConfigRef EnvoyConfigReference `json:"envoyConfigRef,omitempty"`
+
 	// GatewaySpec defines the GatewaySpec for the EntryPoint.
 	// +kubebuilder:validation:description=GatewaySpec defines the GatewaySpec for the EntryPoint.
 	// +kubebuilder:validation:Optional
