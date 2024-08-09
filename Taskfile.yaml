@@ -1,0 +1,304 @@
+version: '3'
+
+vars:
+  IMG: controller:latest
+  ENVTEST_K8S_VERSION: 1.30.3
+  GO_VERSION: '1.22'
+  GOBIN:
+    sh: echo "${GOBIN:-$(go env GOPATH)/bin}"
+  CONTAINER_TOOL: docker
+  PLATFORMS: linux/arm64,linux/amd64,linux/s390x,linux/ppc64le
+  LOCALBIN: '{{.ROOT_DIR}}/bin'
+  KUBECTL: kubectl
+  KUSTOMIZE_VERSION: v5.4.2
+  CONTROLLER_TOOLS_VERSION: v0.15.0
+  ENVTEST_VERSION: release-0.18
+  GOLANGCI_LINT_VERSION: v1.57.2
+  TEST_VERBOSITY: -v
+  ENV: development
+  LOG_LEVEL: info
+
+tasks:
+  default:
+    cmds:
+      - task: list
+  
+  list:
+    desc: Display all available tasks
+    cmds:
+      - task --list
+
+  manifests:
+    desc: Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects
+    cmds:
+      - '{{.LOCALBIN}}/controller-gen-{{.CONTROLLER_TOOLS_VERSION}} rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases'
+    deps:
+      - controller-gen
+
+  generate:
+    desc: Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations
+    cmds:
+      - '{{.LOCALBIN}}/controller-gen-{{.CONTROLLER_TOOLS_VERSION}} object:headerFile="hack/boilerplate.go.txt" paths="./..."'
+    deps:
+      - controller-gen
+
+  fmt:
+    desc: Run go fmt against code
+    cmds:
+      - go fmt ./...
+
+  vet:
+    desc: Run go vet against code
+    cmds:
+      - go vet ./...
+
+  test-unit:
+    desc: Run unit tests with coverage
+    cmds:
+      - rm -rf coverage
+      - mkdir -p coverage
+      - go test {{.TEST_VERBOSITY}} -tags=unit ./...
+    deps:
+      - manifests
+      - generate
+      - fmt
+      - vet
+
+  test-integration:
+    desc: Run integration tests with coverage
+    cmds:
+      - rm -rf coverage
+      - mkdir -p coverage
+      - |
+        KUBEBUILDER_ASSETS="$({{.LOCALBIN}}/setup-envtest use {{.ENVTEST_K8S_VERSION}} --bin-dir {{.LOCALBIN}} -p path)" \
+        go test {{.TEST_VERBOSITY}} ./test/integration/...
+    deps:
+      - manifests
+      - generate
+      - fmt
+      - vet
+      - envtest
+
+  test-e2e:
+    desc: Run end-to-end tests with Kind cluster
+    cmds:
+      - go test {{.TEST_VERBOSITY}} -tags=e2e ./test/e2e/...
+      - task: kind-delete-cluster
+    deps:
+      - manifests
+      - generate
+      - fmt
+      - vet
+      - docker-build
+      - kind-create-cluster
+      - kind-load-image
+
+  test-all:
+    desc: Run all tests
+    cmds:
+      - task: test-unit
+      - task: test-integration
+      - task: test-e2e
+      - echo "All tests completed"
+
+  coverage-report:
+    desc: Generate a combined coverage report
+    cmds:
+      - mkdir -p coverage
+      - echo "mode set" > coverage/coverage.out
+      - tail -q -n +2 coverage/*.out >> coverage/coverage.out
+      - go tool cover -html=coverage/coverage.out -o coverage/coverage.html
+      - go tool cover -func=coverage/coverage.out
+      - echo "Combined test coverage report generated at coverage/coverage.html"
+    deps:
+      - test-unit
+      - test-integration
+
+  kind-create-cluster:
+    cmds:
+      - kind create cluster --name test --image kindest/node:v{{.ENVTEST_K8S_VERSION}}
+
+  kind-delete-cluster:
+    cmds:
+      - kind delete cluster --name test
+
+  kind-load-image:
+    cmds:
+      - kind load docker-image {{.IMG}} --name test
+    deps:
+      - docker-build
+
+  lint:
+    desc: Run golangci-lint linter
+    cmds:
+      - '{{.LOCALBIN}}/golangci-lint run'
+    deps:
+      - golangci-lint
+
+  lint-fix:
+    desc: Run golangci-lint linter and perform fixes
+    cmds:
+      - '{{.LOCALBIN}}/golangci-lint run --fix'
+    deps:
+      - golangci-lint
+
+  build:
+    desc: Build manager binary
+    cmds:
+      - go build -o bin/manager cmd/main.go
+    deps:
+      - manifests
+      - generate
+      - fmt
+      - vet
+
+  run:
+    desc: Run a controller from your host
+    cmds:
+      - ENV={{.ENV}} go run ./cmd/main.go --log-level {{.LOG_LEVEL}}
+    deps:
+      - manifests
+      - generate
+      - fmt
+      - vet
+
+  docker-build:
+    desc: Build docker image with the manager
+    cmds:
+      - '{{.CONTAINER_TOOL}} build -t {{.IMG}} .'
+
+  docker-buildx:
+    desc: Build and push docker image for the manager for cross-platform support
+    cmds:
+      - sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
+      - '{{.CONTAINER_TOOL}} buildx create --name project-v3-builder || true'
+      - '{{.CONTAINER_TOOL}} buildx use project-v3-builder'
+      - '{{.CONTAINER_TOOL}} buildx build --push --platform={{.PLATFORMS}} --tag {{.IMG}} -f Dockerfile.cross .'
+      - '{{.CONTAINER_TOOL}} buildx rm project-v3-builder || true'
+      - rm Dockerfile.cross
+
+  docker-push:
+    desc: Push docker image with the manager
+    cmds:
+      - '{{.CONTAINER_TOOL}} push {{.IMG}}'
+
+  build-installer:
+    desc: Generate a consolidated YAML with CRDs and deployment
+    cmds:
+      - mkdir -p dist
+      - cd config/manager && {{.LOCALBIN}}/kustomize edit set image controller={{.IMG}}
+      - '{{.LOCALBIN}}/kustomize build config/default > dist/install.yaml'
+    deps:
+      - manifests
+      - generate
+      - kustomize
+
+  helm-package-kode-crd:
+    desc: Package kode-crd Helm chart
+    cmds:
+      - echo "Packaging kode-crd chart..."
+      - mkdir -p /tmp/helm-charts/kode-crd
+      - cp -r helm-charts/kode-crd/* /tmp/helm-charts/kode-crd/
+      - sed -i "s/PLACEHOLDER_VERSION/${VERSION}/g" /tmp/helm-charts/kode-crd/Chart.yaml
+      - helm package /tmp/helm-charts/kode-crd --version $VERSION --destination /tmp
+      - mv /tmp/kode-crd-$VERSION.tgz ./kode-crd-$VERSION.tgz
+      - rm -rf /tmp/helm-charts/kode-crd
+
+  helm-package-kode:
+    desc: Package kode Helm chart
+    cmds:
+      - echo "Packaging kode chart..."
+      - mkdir -p /tmp/helm-charts/kode
+      - cp -r helm-charts/kode/* /tmp/helm-charts/kode/
+      - sed -i "s/PLACEHOLDER_VERSION/${VERSION}/g" /tmp/helm-charts/kode/Chart.yaml
+      - helm package /tmp/helm-charts/kode --version $VERSION --destination /tmp
+      - mv /tmp/kode-$VERSION.tgz ./kode-$VERSION.tgz
+      - rm -rf /tmp/helm-charts/kode
+
+  set-version:
+    desc: Set the version for Helm charts
+    cmds:
+      - |
+        VERSION=$(echo $GITHUB_REF | sed 's/refs\/tags\///')
+        echo "Version set to $VERSION"
+
+  helm-package-all:
+    desc: Package all Helm charts
+    cmds:
+      - task: set-version
+      - task: helm-package-kode-crd
+      - task: helm-package-kode
+
+  install:
+    desc: Install CRDs into the K8s cluster specified in ~/.kube/config
+    cmds:
+      - '{{.LOCALBIN}}/kustomize-{{.KUSTOMIZE_VERSION}} build config/crd | {{.KUBECTL}} apply -f -'
+    deps:
+      - manifests
+      - kustomize
+
+  uninstall:
+    desc: Uninstall CRDs from the K8s cluster specified in ~/.kube/config
+    cmds:
+      - '{{.LOCALBIN}}/kustomize-{{.KUSTOMIZE_VERSION}} build config/crd | {{.KUBECTL}} delete --ignore-not-found={{.IGNORE_NOT_FOUND}} -f -'
+    deps:
+      - manifests
+      - kustomize
+    vars:
+      IGNORE_NOT_FOUND: '{{default "false" .IGNORE_NOT_FOUND}}'
+
+  deploy:
+    desc: Deploy controller to the K8s cluster specified in ~/.kube/config
+    cmds:
+      - cd config/manager && {{.LOCALBIN}}/kustomize edit set image controller={{.IMG}}
+      - '{{.LOCALBIN}}/kustomize-{{.KUSTOMIZE_VERSION}} build config/default | {{.KUBECTL}} apply -f -'
+    deps:
+      - manifests
+      - kustomize
+
+  undeploy:
+    desc: Undeploy controller from the K8s cluster specified in ~/.kube/config
+    cmds:
+      - '{{.LOCALBIN}}/kustomize-{{.KUSTOMIZE_VERSION}} build config/default | {{.KUBECTL}} delete --ignore-not-found={{.IGNORE_NOT_FOUND}} -f -'
+    deps:
+      - kustomize
+    vars:
+      IGNORE_NOT_FOUND: '{{default "false" .IGNORE_NOT_FOUND}}'
+
+  kustomize:
+    desc: Download kustomize locally if necessary
+    cmds:
+      - go install sigs.k8s.io/kustomize/kustomize/v5@{{.KUSTOMIZE_VERSION}}
+      - mv {{.GOBIN}}/kustomize {{.LOCALBIN}}/kustomize-{{.KUSTOMIZE_VERSION}}
+
+  controller-gen:
+    desc: Download controller-gen locally if necessary
+    cmds:
+      - go install sigs.k8s.io/controller-tools/cmd/controller-gen@{{.CONTROLLER_TOOLS_VERSION}}
+      - mv {{.GOBIN}}/controller-gen {{.LOCALBIN}}/controller-gen-{{.CONTROLLER_TOOLS_VERSION}}
+
+  envtest:
+    desc: Download setup-envtest locally if necessary
+    cmds:
+      - go install sigs.k8s.io/controller-runtime/tools/setup-envtest@{{.ENVTEST_VERSION}}
+      - mv {{.GOBIN}}/setup-envtest {{.LOCALBIN}}/setup-envtest-{{.ENVTEST_VERSION}}
+
+  golangci-lint:
+    desc: Download golangci-lint locally if necessary
+    cmds:
+      - go install github.com/golangci/golangci-lint/cmd/golangci-lint@{{.GOLANGCI_LINT_VERSION}}
+      - mv {{.GOBIN}}/golangci-lint {{.LOCALBIN}}/golangci-lint-{{.GOLANGCI_LINT_VERSION}}
+
+  helmify:
+    desc: Download helmify locally if necessary
+    cmds:
+      - test -s {{.LOCALBIN}}/helmify || GOBIN={{.LOCALBIN}} go install github.com/arttor/helmify/cmd/helmify@latest
+
+  helm:
+    desc: Generate Helm chart
+    cmds:
+      - '{{.LOCALBIN}}/kustomize-{{.KUSTOMIZE_VERSION}} build config/default | {{.LOCALBIN}}/helmify'
+    deps:
+      - manifests
+      - kustomize
+      - helmify
