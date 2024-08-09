@@ -1,6 +1,6 @@
 module github.com/jacero-io/kode-operator
 
-go 1.22.5
+go 1.22.6
 
 require (
 	cuelang.org/go v0.9.2
