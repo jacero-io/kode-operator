@@ -60,9 +60,9 @@ type SharedKodeTemplateSpec struct {
 	// +kubebuilder:validation:Description="Virtual machine specification."
 	VirtualMachineSpec virtinkv1alpha1.VirtualMachineSpec `json:"virtualMachineSpec,omitempty"`
 
-	// TerraformSpec is the terraform specification.
+	// TofuSpec is the terraform specification.
 	// +kubebuilder:validation:Description="Terraform specification."
-	// TerraformSpec tofuv1alpha2.TerraformSpec `json:"terraformSpec,omitempty"`
+	// TofuSpec tofuv1alpha2.TerraformSpec `json:"tofuSpec,omitempty"`
 
 	// Specifies the period before controller inactive the resource (delete all resources except volume).
 	// +kubebuilder:validation:Description="Period before controller inactive the resource (delete all resources except volume)."
