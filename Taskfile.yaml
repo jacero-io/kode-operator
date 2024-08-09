@@ -114,13 +114,23 @@ tasks:
       - test-unit
       - test-integration
 
-  kind-create-cluster:
+  kind-create:
     cmds:
       - kind create cluster --name test --image kindest/node:v{{.ENVTEST_K8S_VERSION}}
 
-  kind-delete-cluster:
+  kind-delete:
     cmds:
       - kind delete cluster --name test
+
+  kind-stop:
+    desc: Stop the Kind cluster
+    cmds:
+      - docker stop test-control-plane || true
+
+  kind-start:
+    desc: Start the Kind cluster
+    cmds:
+      - docker start test-control-plane || true
 
   kind-load-image:
     cmds:
