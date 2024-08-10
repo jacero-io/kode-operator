@@ -39,10 +39,24 @@ spec:
           spec:
             description: KodeSpec defines the desired state of Kode
             properties:
-              existingSecret:
-                description: ExistingSecret is a reference to an existing secret containing
-                  user and password.
-                type: string
+              credentials:
+                description: Credentials specifies the credentials for the service.
+                properties:
+                  existingSecret:
+                    description: ExistingSecret is a reference to an existing secret
+                      containing user and password.
+                    type: string
+                  password:
+                    description: Password HTTP Basic auth password. If unset there
+                      will be no auth.
+                    type: string
+                  username:
+                    default: abc
+                    description: Username is both the the HTTP Basic auth username
+                      (when used) and the user the container should run as, abc is
+                      default.
+                    type: string
+                type: object
               home:
                 default: /config
                 description: Home is the path to the directory for the user data
@@ -320,10 +334,6 @@ spec:
                   - name
                   type: object
                 type: array
-              password:
-                description: Password HTTP Basic auth password. If unset there will
-                  be no auth.
-                type: string
               privileged:
                 default: false
                 description: Privileged specifies if the container should run in privileged
@@ -387,15 +397,12 @@ spec:
                 properties:
                   kind:
                     description: Kind is the resource kind.
-                    enum:
-                    - KodeTemplate
-                    - KodeClusterTemplate
                     type: string
                   name:
-                    description: Name is the name of the KodeTemplate.
+                    description: Name is the name of the resource.
                     type: string
                   namespace:
-                    description: Namespace is the namespace of the KodeTemplate.
+                    description: Namespace is the namespace of the resource.
                     type: string
                 required:
                 - kind
@@ -404,11 +411,6 @@ spec:
               userConfig:
                 description: UserConfig specifies a git repository URL to get user
                   configuration from.
-                type: string
-              username:
-                default: abc
-                description: Username is both the the HTTP Basic auth username (when
-                  used) and the user the container should run as, abc is default.
                 type: string
               workspace:
                 description: Workspace is the user specified workspace directory (e.g.
@@ -493,6 +495,9 @@ spec:
                   - type
                   type: object
                 type: array
+              iconUrl:
+                description: IconUrl is the URL to the icon for the Kode.
+                type: string
               kodeUrl:
                 description: KodeUrl is the URL to access the Kode.
                 type: string
@@ -509,9 +514,6 @@ spec:
                 description: LastErrorTime is the timestamp when the last error occurred.
                 format: date-time
                 type: string
-              logoUrl:
-                description: LogoUrl is the URL to the logo for the Kode.
-                type: string
               observedGeneration:
                 description: ObservedGeneration is the last observed generation of
                   the Kode resource.
@@ -519,6 +521,10 @@ spec:
                 type: integer
               phase:
                 description: Phase represents the current phase of the Kode resource.
+                type: string
+              runtime:
+                description: Runtime is the runtime for the kode. Can be one of 'container',
+                  'virtual', 'tofu'.
                 type: string
             required:
             - phase

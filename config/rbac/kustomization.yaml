@@ -16,10 +16,6 @@ resources:
 # if you do not want those helpers be installed with your Project.
 - entrypoint_editor_role.yaml
 - entrypoint_viewer_role.yaml
-- envoyproxyclusterconfig_editor_role.yaml
-- envoyproxyclusterconfig_viewer_role.yaml
-- envoyproxyconfig_editor_role.yaml
-- envoyproxyconfig_viewer_role.yaml
 - kodeclustertemplate_editor_role.yaml
 - kodeclustertemplate_viewer_role.yaml
 - kodetemplate_editor_role.yaml

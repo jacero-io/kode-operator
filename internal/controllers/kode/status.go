@@ -28,10 +28,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (r *KodeReconciler) updateKodeStatus(ctx context.Context, kode *kodev1alpha1.Kode, phase kodev1alpha1.KodePhase, conditions []metav1.Condition, err error) error {
-	// log := r.Log.WithValues("kode", client.ObjectKeyFromObject(kode))
-
-	// Update the status
+func (r *KodeReconciler) updateStatus(ctx context.Context, kode *kodev1alpha1.Kode, phase kodev1alpha1.KodePhase, conditions []metav1.Condition, err error) error {
 	switch phase {
 	case kodev1alpha1.KodePhaseCreating:
 		if err := r.updateKodePhaseCreating(ctx, kode); err != nil {
@@ -71,9 +68,6 @@ func (r *KodeReconciler) updateKodeStatus(ctx context.Context, kode *kodev1alpha
 
 // updateKodePhaseCreating updates the Kode status to indicate that the resources are being created.
 func (r *KodeReconciler) updateKodePhaseCreating(ctx context.Context, kode *kodev1alpha1.Kode) error {
-	// log := r.Log.WithValues("kode", common.ObjectKeyFromConfig(config))
-	// log.Info("Creating resources")
-
 	now := metav1.NewTime(time.Now())
 	phase := kodev1alpha1.KodePhaseCreating
 	conditions := []metav1.Condition{
@@ -86,14 +80,11 @@ func (r *KodeReconciler) updateKodePhaseCreating(ctx context.Context, kode *kode
 		},
 	}
 
-	return r.StatusUpdater.UpdateKodeStatus(ctx, kode, phase, conditions, "", nil)
+	return r.StatusUpdater.UpdateStatusKode(ctx, kode, phase, conditions, "", nil)
 }
 
 // updateKodePhaseCreated updates the Kode status to indicate that the resources have been created.
 func (r *KodeReconciler) updateKodePhaseCreated(ctx context.Context, kode *kodev1alpha1.Kode) error {
-	// log := r.Log.WithValues("kode", common.ObjectKeyFromConfig(config))
-	// log.Info("Resources created")
-
 	now := metav1.NewTime(time.Now())
 	phase := kodev1alpha1.KodePhaseCreated
 	conditions := []metav1.Condition{
@@ -106,15 +97,11 @@ func (r *KodeReconciler) updateKodePhaseCreated(ctx context.Context, kode *kodev
 		},
 	}
 
-	return r.StatusUpdater.UpdateKodeStatus(ctx, kode, phase, conditions, "", nil)
+	return r.StatusUpdater.UpdateStatusKode(ctx, kode, phase, conditions, "", nil)
 }
 
 // updateKodePhaseFailed updates the Kode status to indicate that the resource has failed.
-// func (r *KodeReconciler) updateKodePhaseFailed(ctx context.Context,  kode *kodev1alpha1.Kode, err error, additionalConditions ...metav1.Condition) error {
 func (r *KodeReconciler) updateKodePhaseFailed(ctx context.Context, kode *kodev1alpha1.Kode, err error, additionalConditions []metav1.Condition) error {
-	// log := r.Log.WithValues("kode", types.NamespacedName{Name: config.KodeName, Namespace: config.KodeNamespace})
-	// log.Error(err, "Resource failed")
-
 	now := metav1.NewTime(time.Now())
 	phase := kodev1alpha1.KodePhaseFailed
 	errorMessage := err.Error()
@@ -153,7 +140,7 @@ func (r *KodeReconciler) updateKodePhaseFailed(ctx context.Context, kode *kodev1
 	// // If the resource was in the process of being created when it failed
 	// // We need to fetch the current status to check this
 	// kode := &kodev1alpha1.Kode{}
-	// if err := r.Get(ctx, types.NamespacedName{Name: config.KodeName, Namespace: config.KodeNamespace}, kode); err != nil {
+	// if err := u.Get(ctx, types.NamespacedName{Name: config.KodeName, Namespace: config.KodeNamespace}, kode); err != nil {
 	// 	log.Error(err, "Failed to fetch Kode for status check")
 	// } else if kode.Status.Phase == kodev1alpha1.KodePhaseCreating {
 	// 	conditions = append(conditions, metav1.Condition{
@@ -168,14 +155,11 @@ func (r *KodeReconciler) updateKodePhaseFailed(ctx context.Context, kode *kodev1
 	// Add additional conditions
 	conditions = append(conditions, additionalConditions...)
 
-	return r.StatusUpdater.UpdateKodeStatus(ctx, kode, phase, conditions, errorMessage, &now)
+	return r.StatusUpdater.UpdateStatusKode(ctx, kode, phase, conditions, errorMessage, &now)
 }
 
 // updateKodePhasePending updates the Kode status to indicate that the resources are pending.
 func (r *KodeReconciler) updateKodePhasePending(ctx context.Context, kode *kodev1alpha1.Kode) error {
-	// log := r.Log.WithValues("kode", common.ObjectKeyFromConfig(config))
-	// log.Info("Resource pending")
-
 	now := metav1.NewTime(time.Now())
 	phase := kodev1alpha1.KodePhasePending
 	conditions := []metav1.Condition{
@@ -202,14 +186,11 @@ func (r *KodeReconciler) updateKodePhasePending(ctx context.Context, kode *kodev
 		},
 	}
 
-	return r.StatusUpdater.UpdateKodeStatus(ctx, kode, phase, conditions, "", nil)
+	return r.StatusUpdater.UpdateStatusKode(ctx, kode, phase, conditions, "", nil)
 }
 
 // updateKodePhaseActive updates the Kode status to indicate that the resources are active.
 func (r *KodeReconciler) updateKodePhaseActive(ctx context.Context, kode *kodev1alpha1.Kode) error {
-	// log := r.Log.WithValues("kode", common.ObjectKeyFromConfig(config))
-	// log.Info("Resource active")
-
 	now := metav1.NewTime(time.Now())
 	phase := kodev1alpha1.KodePhaseActive
 	conditions := []metav1.Condition{
@@ -236,14 +217,11 @@ func (r *KodeReconciler) updateKodePhaseActive(ctx context.Context, kode *kodev1
 		},
 	}
 
-	return r.StatusUpdater.UpdateKodeStatus(ctx, kode, phase, conditions, "", nil)
+	return r.StatusUpdater.UpdateStatusKode(ctx, kode, phase, conditions, "", nil)
 }
 
 // updateKodePhaseInactive updates the Kode status to indicate that the resources are inactive.
 func (r *KodeReconciler) updateKodePhaseInactive(ctx context.Context, kode *kodev1alpha1.Kode) error {
-	// log := r.Log.WithValues("kode", common.ObjectKeyFromConfig(config))
-	// log.Info("Resource inactive")
-
 	now := metav1.NewTime(time.Now())
 	phase := kodev1alpha1.KodePhaseInactive
 	conditions := []metav1.Condition{
@@ -270,14 +248,11 @@ func (r *KodeReconciler) updateKodePhaseInactive(ctx context.Context, kode *kode
 		},
 	}
 
-	return r.StatusUpdater.UpdateKodeStatus(ctx, kode, phase, conditions, "", nil)
+	return r.StatusUpdater.UpdateStatusKode(ctx, kode, phase, conditions, "", nil)
 }
 
 // updateKodePhaseRecycling updates the Kode status to indicate that the resources are being recycled.
 func (r *KodeReconciler) updateKodePhaseRecycling(ctx context.Context, kode *kodev1alpha1.Kode) error {
-	// log := r.Log.WithValues("kode", common.ObjectKeyFromConfig(config))
-	// log.Info("Resource recycling")
-
 	now := metav1.NewTime(time.Now())
 	phase := kodev1alpha1.KodePhaseRecycling
 	conditions := []metav1.Condition{
@@ -304,13 +279,10 @@ func (r *KodeReconciler) updateKodePhaseRecycling(ctx context.Context, kode *kod
 		},
 	}
 
-	return r.StatusUpdater.UpdateKodeStatus(ctx, kode, phase, conditions, "", nil)
+	return r.StatusUpdater.UpdateStatusKode(ctx, kode, phase, conditions, "", nil)
 }
 
 func (r *KodeReconciler) updateKodePhaseRecycled(ctx context.Context, kode *kodev1alpha1.Kode) error {
-	// log := r.Log.WithValues("kode", common.ObjectKeyFromConfig(config))
-	// log.Info("Resource recycled")
-
 	now := metav1.NewTime(time.Now())
 	phase := kodev1alpha1.KodePhaseRecycled
 	conditions := []metav1.Condition{
@@ -330,5 +302,5 @@ func (r *KodeReconciler) updateKodePhaseRecycled(ctx context.Context, kode *kode
 		},
 	}
 
-	return r.StatusUpdater.UpdateKodeStatus(ctx, kode, phase, conditions, "", nil)
+	return r.StatusUpdater.UpdateStatusKode(ctx, kode, phase, conditions, "", nil)
 }

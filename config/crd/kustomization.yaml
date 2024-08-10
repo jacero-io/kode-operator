@@ -5,8 +5,6 @@ resources:
 - bases/kode.jacero.io_kodes.yaml
 - bases/kode.jacero.io_kodetemplates.yaml
 - bases/kode.jacero.io_kodeclustertemplates.yaml
-- bases/kode.jacero.io_envoyproxyconfigs.yaml
-- bases/kode.jacero.io_envoyproxyclusterconfigs.yaml
 - bases/kode.jacero.io_entrypoints.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 

@@ -138,6 +138,29 @@ tasks:
     deps:
       - docker-build
 
+  kind-load-images:
+    desc: Load internal and external Docker images into Kind cluster
+    vars:
+      INT_IMAGES_TO_LOAD: 
+        sh: echo {{.IMG}}
+      EXT_IMAGES_TO_LOAD: 
+        - envoyproxy/envoy:v1.31-latest
+        - linuxserver/code-server:latest
+        - linuxserver/webtop:debian-xfce
+    cmds:
+      - for img in {{.INT_IMAGES_TO_LOAD}}; do
+          echo "Loading $img";
+          kind load docker-image $img --name test;
+        done
+      - for img in {{.EXT_IMAGES_TO_LOAD}}; do
+          echo "Pulling $img";
+          {{.CONTAINER_TOOL}} pull $img;
+          echo "Loading $img";
+          kind load docker-image $img --name test;
+        done
+    deps:
+      - docker-build
+
   lint:
     desc: Run golangci-lint linter
     cmds:

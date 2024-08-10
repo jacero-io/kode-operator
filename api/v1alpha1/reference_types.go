@@ -16,7 +16,6 @@ limitations under the License.
 
 package v1alpha1
 
-
 type CrossNamespaceObjectReference struct {
 	// Kind is the resource kind.
 	// +kubebuilder:validation:Description="Resource kind"
@@ -36,5 +35,8 @@ type CrossNamespaceObjectReference struct {
 type KodeTemplateReference CrossNamespaceObjectReference
 
 // TODO: Add in code validation for the kind field
-// EnvoyConfigReference is a reference to an EnvoyProxyConfig or EnvoyProxyClusterConfig
+// EnvoyConfigReference is a reference to an EnvoyConfig or EnvoyProxyClusterConfig
 type EnvoyConfigReference CrossNamespaceObjectReference
+
+// EntryPointReference is a reference to an EntryPoint
+type EntryPointReference CrossNamespaceObjectReference

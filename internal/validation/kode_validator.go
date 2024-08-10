@@ -32,21 +32,21 @@ func (v *validator) validateKodeSpec(kode *kodev1alpha1.Kode) error {
 	}
 
 	// Validate User
-	if err := validateUser(kode.Spec.Username); err != nil {
+	if err := validateUser(kode.Spec.Credentials.Username); err != nil {
 		errors = append(errors, err.Error())
 	}
 
 	// Validate Password (if set)
-	if kode.Spec.Password != "" {
-		if err := validatePassword(kode.Spec.Password); err != nil {
+	if kode.Spec.Credentials.Password != "" {
+		if err := validatePassword(kode.Spec.Credentials.Password); err != nil {
 			errors = append(errors, err.Error())
 		}
 	}
 
 	// Validate ExistingSecret (if set)
-	if kode.Spec.ExistingSecret != "" {
+	if kode.Spec.Credentials.ExistingSecret != "" {
 		// Secret must contain both username and password in Data
-		if kode.Spec.Username == "" || kode.Spec.Password == "" {
+		if kode.Spec.Credentials.Username == "" || kode.Spec.Credentials.Password == "" {
 			errors = append(errors, "existingSecret is specified, but username and password are not set")
 		}
 	}
@@ -112,13 +112,13 @@ func validateTemplateRef(ref kodev1alpha1.KodeTemplateReference) error {
 }
 
 func validateKodeTemplateSpec(spec kodev1alpha1.KodeTemplateSpec) error {
-	if spec.Type != "code-server" && spec.Type != "webtop" {
-		return fmt.Errorf("invalid template type: %s, must be either code-server or webtop", spec.Type)
+	if spec.ContainerSpec.Type != "code-server" && spec.ContainerSpec.Type != "webtop" {
+		return fmt.Errorf("invalid template type: %s, must be either code-server or webtop", spec.ContainerSpec.Type)
 	}
-	if spec.DefaultHome == "" {
+	if spec.ContainerSpec.DefaultHome == "" {
 		return fmt.Errorf("defaultHome is required")
 	}
-	if spec.DefaultWorkspace == "" {
+	if spec.ContainerSpec.DefaultWorkspace == "" {
 		return fmt.Errorf("defaultWorkspace is required")
 	}
 

@@ -36,22 +36,6 @@ resources:
 - api:
     crdVersion: v1
     namespaced: true
-  domain: jacero.io
-  group: kode
-  kind: EnvoyProxyConfig
-  path: github.com/jacero-io/kode-operator/api/v1alpha1
-  version: v1alpha1
-- api:
-    crdVersion: v1
-    namespaced: true
-  domain: jacero.io
-  group: kode
-  kind: EnvoyProxyClusterConfig
-  path: github.com/jacero-io/kode-operator/api/v1alpha1
-  version: v1alpha1
-- api:
-    crdVersion: v1
-    namespaced: true
   controller: true
   domain: jacero.io
   group: kode

@@ -96,44 +96,44 @@ func (r *KodeReconciler) checkResourcesReady(ctx context.Context, config *common
 	}
 
 	// Check if Envoy sidecar is ready (if applicable)
-	if config.Templates.KodeTemplate != nil && config.Templates.KodeTemplate.EnvoyConfigRef.Name != "" {
-		ready, err := r.checkEnvoySidecarReady(ctx, config)
-		if err != nil {
-			return false, fmt.Errorf("failed to check Envoy sidecar readiness: %w", err)
-		}
-		if !ready {
-			log.V(1).Info("Envoy sidecar not ready")
-			return false, nil
-		}
-	}
+	// if config.Templates.KodeTemplate != nil && config.Templates.KodeTemplate.EnvoyConfigRef.Name != "" {
+	// 	ready, err := r.checkEnvoySidecarReady(ctx, config)
+	// 	if err != nil {
+	// 		return false, fmt.Errorf("failed to check Envoy sidecar readiness: %w", err)
+	// 	}
+	// 	if !ready {
+	// 		log.V(1).Info("Envoy sidecar not ready")
+	// 		return false, nil
+	// 	}
+	// }
 
 	log.V(1).Info("All resources are ready")
 	return true, nil
 }
 
-func (r *KodeReconciler) checkEnvoySidecarReady(ctx context.Context, config *common.KodeResourcesConfig) (bool, error) {
-	log := r.Log.WithName("EnvoySidecarReadyChecker").WithValues("kode", common.ObjectKeyFromConfig(config))
+// func (r *KodeReconciler) checkEnvoySidecarReady(ctx context.Context, config *common.KodeResourcesConfig) (bool, error) {
+// 	log := r.Log.WithName("EnvoySidecarReadyChecker").WithValues("kode", common.ObjectKeyFromConfig(config))
 
-	pod := &corev1.Pod{}
-	err := r.Client.Get(ctx, types.NamespacedName{Name: config.KodeName + "-0", Namespace: config.KodeNamespace}, pod)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			log.V(1).Info("Pod not found")
-			return false, nil
-		}
-		return false, fmt.Errorf("failed to get Pod: %w", err)
-	}
+// 	pod := &corev1.Pod{}
+// 	err := r.Client.Get(ctx, types.NamespacedName{Name: config.KodeName + "-0", Namespace: config.KodeNamespace}, pod)
+// 	if err != nil {
+// 		if errors.IsNotFound(err) {
+// 			log.V(1).Info("Pod not found")
+// 			return false, nil
+// 		}
+// 		return false, fmt.Errorf("failed to get Pod: %w", err)
+// 	}
 
-	for _, containerStatus := range pod.Status.ContainerStatuses {
-		if containerStatus.Name == "envoy-proxy" {
-			if !containerStatus.Ready {
-				log.V(1).Info("Envoy sidecar container not ready")
-				return false, nil
-			}
-			return true, nil
-		}
-	}
+// 	for _, containerStatus := range pod.Status.ContainerStatuses {
+// 		if containerStatus.Name == "envoy-proxy" {
+// 			if !containerStatus.Ready {
+// 				log.V(1).Info("Envoy sidecar container not ready")
+// 				return false, nil
+// 			}
+// 			return true, nil
+// 		}
+// 	}
 
-	log.V(1).Info("Envoy sidecar container not found in pod")
-	return false, nil
-}
+// 	log.V(1).Info("Envoy sidecar container not found in pod")
+// 	return false, nil
+// }

@@ -51,12 +51,12 @@ func (m *defaultTemplateManager) Fetch(ctx context.Context, ref kodev1alpha1.Kod
 		return nil, err
 	}
 
-	if templates.KodeTemplate.EnvoyConfigRef.Name != "" {
-		m.log.V(1).Info("Fetching EnvoyProxy config", "Name", templates.KodeTemplate.EnvoyConfigRef.Name, "Namespace", templates.KodeTemplate.EnvoyConfigRef.Namespace)
-		if err := m.fetchEnvoyProxyConfig(ctx, templates); err != nil {
-			return nil, err
-		}
-	}
+	// if templates.KodeTemplate.EnvoyConfigRef.Name != "" {
+	// 	m.log.V(1).Info("Fetching EnvoyProxy config", "Name", templates.KodeTemplate.EnvoyConfigRef.Name, "Namespace", templates.KodeTemplate.EnvoyConfigRef.Namespace)
+	// 	if err := m.fetchEnvoyProxyConfig(ctx, templates); err != nil {
+	// 		return nil, err
+	// 	}
+	// }
 
 	return templates, nil
 }
@@ -94,46 +94,46 @@ func (m *defaultTemplateManager) fetchKodeClusterTemplate(ctx context.Context, t
 	return m.fetchTemplate(ctx, templates, &kodev1alpha1.KodeClusterTemplate{}, "KodeClusterTemplate")
 }
 
-func (m *defaultTemplateManager) fetchEnvoyConfig(ctx context.Context, templates *common.Templates, obj client.Object, kind string) error {
-	namespacedName := types.NamespacedName{Name: templates.EnvoyProxyConfigName}
-	if kind == "EnvoyProxyConfig" {
-		namespacedName.Namespace = templates.EnvoyProxyConfigNamespace
-	}
+// func (m *defaultTemplateManager) fetchEnvoyConfig(ctx context.Context, templates *common.Templates, obj client.Object, kind string) error {
+// 	namespacedName := types.NamespacedName{Name: templates.EnvoyProxyConfigName}
+// 	if kind == "EnvoyProxyConfig" {
+// 		namespacedName.Namespace = templates.EnvoyProxyConfigNamespace
+// 	}
 
-	if err := m.client.Get(ctx, namespacedName, obj); err != nil {
-		if errors.IsNotFound(err) {
-			return &common.TemplateNotFoundError{NamespacedName: namespacedName, Kind: kind}
-		}
-		return err
-	}
+// 	if err := m.client.Get(ctx, namespacedName, obj); err != nil {
+// 		if errors.IsNotFound(err) {
+// 			return &common.TemplateNotFoundError{NamespacedName: namespacedName, Kind: kind}
+// 		}
+// 		return err
+// 	}
 
-	switch t := obj.(type) {
-	case *kodev1alpha1.EnvoyProxyConfig:
-		templates.EnvoyProxyConfig = &t.Spec.SharedEnvoyProxyConfigSpec
-	case *kodev1alpha1.EnvoyProxyClusterConfig:
-		templates.EnvoyProxyConfig = &t.Spec.SharedEnvoyProxyConfigSpec
-	default:
-		return fmt.Errorf("unsupported EnvoyProxy config type: %T", obj)
-	}
+// 	switch t := obj.(type) {
+// 	case *kodev1alpha1.EnvoyProxyConfig:
+// 		templates.EnvoyProxyConfig = &t.Spec.SharedEnvoyProxyConfigSpec
+// 	case *kodev1alpha1.EnvoyProxyClusterConfig:
+// 		templates.EnvoyProxyConfig = &t.Spec.SharedEnvoyProxyConfigSpec
+// 	default:
+// 		return fmt.Errorf("unsupported EnvoyProxy config type: %T", obj)
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
 
-func (m *defaultTemplateManager) fetchEnvoyProxyConfig(ctx context.Context, templates *common.Templates) error {
-	EnvoyConfigRef := templates.KodeTemplate.EnvoyConfigRef
-	templates.EnvoyProxyConfigName = EnvoyConfigRef.Name
-	templates.EnvoyProxyConfigNamespace = EnvoyConfigRef.Namespace
+// func (m *defaultTemplateManager) fetchEnvoyProxyConfig(ctx context.Context, templates *common.Templates) error {
+// 	EnvoyConfigRef := templates.KodeTemplate.EnvoyConfigRef
+// 	templates.EnvoyProxyConfigName = EnvoyConfigRef.Name
+// 	templates.EnvoyProxyConfigNamespace = EnvoyConfigRef.Namespace
 
-	if templates.EnvoyProxyConfigNamespace == "" {
-		templates.EnvoyProxyConfigNamespace = common.DefaultNamespace
-	}
+// 	if templates.EnvoyProxyConfigNamespace == "" {
+// 		templates.EnvoyProxyConfigNamespace = common.DefaultNamespace
+// 	}
 
-	switch EnvoyConfigRef.Kind {
-	case "EnvoyProxyConfig":
-		return m.fetchEnvoyConfig(ctx, templates, &kodev1alpha1.EnvoyProxyConfig{}, "EnvoyProxyConfig")
-	case "EnvoyProxyClusterConfig":
-		return m.fetchEnvoyConfig(ctx, templates, &kodev1alpha1.EnvoyProxyClusterConfig{}, "EnvoyProxyClusterConfig")
-	default:
-		return fmt.Errorf("invalid EnvoyProxy config kind: %s", EnvoyConfigRef.Kind)
-	}
-}
+// 	switch EnvoyConfigRef.Kind {
+// 	case "EnvoyProxyConfig":
+// 		return m.fetchEnvoyConfig(ctx, templates, &kodev1alpha1.EnvoyProxyConfig{}, "EnvoyProxyConfig")
+// 	case "EnvoyProxyClusterConfig":
+// 		return m.fetchEnvoyConfig(ctx, templates, &kodev1alpha1.EnvoyProxyClusterConfig{}, "EnvoyProxyClusterConfig")
+// 	default:
+// 		return fmt.Errorf("invalid EnvoyProxy config kind: %s", EnvoyConfigRef.Kind)
+// 	}
+// }

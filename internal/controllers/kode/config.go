@@ -35,20 +35,14 @@ func InitKodeResourcesConfig(
 	var secretName string
 
 	// If ExistingSecret is specified, use it
-	if kode.Spec.ExistingSecret != "" {
-		secretName = kode.Spec.ExistingSecret
+	if kode.Spec.Credentials.ExistingSecret != "" {
+		secretName = kode.Spec.Credentials.ExistingSecret
 	} else { // If ExistingSecret is not specified, use Kode.Name
 		secretName = fmt.Sprintf("%s-auth", kode.Name)
 	}
 
-	// If EnvoyProxyConfig is not specified, use KodeTemplate.Port
 	localServicePort = templates.KodeTemplate.Port
 	externalServicePort = templates.KodeTemplate.Port
-	// If EnvoyProxyConfig is specified, use the default local service port
-	if templates.EnvoyProxyConfigName != "" {
-		localServicePort = common.DefaultLocalServicePort
-		externalServicePort = templates.KodeTemplate.Port
-	}
 
 	pvcName := common.GetPVCName(kode)
 	serviceName := common.GetServiceName(kode)
@@ -56,19 +50,24 @@ func InitKodeResourcesConfig(
 	return &common.KodeResourcesConfig{
 		KodeSpec:            kode.Spec,
 		Labels:              createLabels(kode, templates),
+
 		KodeName:            kode.Name,
 		KodeNamespace:       kode.Namespace,
-		Secret:              corev1.Secret{},
+
+		Credentials:         kodev1alpha1.CredentialsSpec{},
+
 		SecretName:          secretName,
-		Credentials:         common.Credentials{},
 		StatefulSetName:     kode.Name,
 		PVCName:             pvcName,
 		ServiceName:         serviceName,
+
 		Templates:           *templates,
 		Containers:          []corev1.Container{},
 		InitContainers:      []corev1.Container{},
+
+		TemplateInitPlugins: templates.KodeTemplate.ContainerSpec.InitPlugins,
 		UserInitPlugins:     kode.Spec.InitPlugins,
-		TemplateInitPlugins: templates.KodeTemplate.InitPlugins,
+ 
 		LocalServicePort:    localServicePort,
 		ExternalServicePort: externalServicePort,
 	}
@@ -80,6 +79,5 @@ func createLabels(kode *kodev1alpha1.Kode, templates *common.Templates) map[stri
 		"app.kubernetes.io/managed-by":     "kode-operator",
 		"kode.jacero.io/name":              kode.Name,
 		"template.kode.jacero.io/name":     templates.KodeTemplateName,
-		"envoy-config.kode.jacero.io/name": templates.EnvoyProxyConfigName,
 	}
 }

@@ -18,26 +18,28 @@ package v1alpha1
 
 import runtime "k8s.io/apimachinery/pkg/runtime"
 
-// SharedEnvoyProxyStatus defines the observed state of EnvoyProxy
-type SharedEnvoyProxyStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-}
-
 // SharedEnvoyProxyConfigSpec defines the desired state of EnvoyProxy
-type SharedEnvoyProxyConfigSpec struct {
-	// Image is the Docker image for the Envoy proxy
-	// +kubebuilder:validation:Description="Docker image for the Envoy proxy"
+type EnvoyConfig struct {
+	// Image is the Docker image for the Envoy proxy. It will be used for the sidecar container.
+	// +kubebuilder:validation:Description="Docker image for the Envoy proxy. It will be used for the sidecar container."
 	// +kubebuilder:validation:MinLength=1
 	// +kubebuilder:validation:Required
 	// +kubebuilder:default="envoyproxy/envoy:v1.31-latest"
 	Image string `json:"image"`
 
-	// AuthConfig is custom authentication configuration. Can be used to configure basic auth, JWT, etc.
-	// +kubebuilder:validation:Description="Custom authentication configuration. Can be used to configure basic auth, JWT, etc."
+	// AuthConfig is custom authentication configuration. Can be used to configure basic auth, Oauth2, JWT, and x509
+	// +kubebuilder:validation:Description="Custom authentication configuration. Can be used to configure basic auth, Oauth2, JWT, and x509"
+	// +kubebuilder:validation:Enum=none;basic;oauth2;jwt;x509
 	// +kubebuilder:validation:Optional
-	AuthConfig AuthConfig `json:"authConfig"`
+	AuthMode string `json:"authMode,omitempty"`
 
+	// CustomEnvoyConfig is the custom Envoy configuration
+	// +kubebuilder:validation:Description="Custom Envoy configuration"
+	// +kubebuilder:validation:Optional
+	CustomEnvoyConfig CustomEnvoyConfig `json:"customEnvoyConfig,omitempty"`
+}
+
+type CustomEnvoyConfig struct {
 	// HTTPFilters is a list of Envoy HTTP filters to be applied
 	// +kubebuilder:validation:Description="HTTP filters to be applied"
 	// +kubebuilder:validation:Optional
@@ -47,14 +49,6 @@ type SharedEnvoyProxyConfigSpec struct {
 	// +kubebuilder:validation:Description="Envoy clusters"
 	// +kubebuilder:validation:Optional
 	Clusters []Cluster `json:"clusters,omitempty"`
-}
-
-type AuthConfig struct {
-	// AuthType is the type of authentication. Can be set to "basic" or "jwt"
-	// +kubebuilder:validation:Description="Type of authentication. Can be set to 'basic' or 'jwt'"
-	// +kubebuilder:validation:enum="basic";"jwt"
-	// +kubebuilder:validation:Required
-	AuthType string `json:"authType"`
 }
 
 type SocketAddress struct {

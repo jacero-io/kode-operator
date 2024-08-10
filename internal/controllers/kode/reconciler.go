@@ -107,7 +107,7 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		log.Error(err, "Failed to fetch templates")
 		if errors.IsNotFound(err) {
 			// Update the Kode status to reflect that the template is missing (ctx, kode, err, "TemplateMissing", "KodeTemplate not found"); updateErr != nil {)
-			if statusErr := r.updateKodeStatus(ctx, kode, kodev1alpha1.KodePhaseFailed, []metav1.Condition{}, err); statusErr != nil {
+			if statusErr := r.updateStatus(ctx, kode, kodev1alpha1.KodePhaseFailed, []metav1.Condition{}, err); statusErr != nil {
 				log.Error(statusErr, "Failed to update Kode status")
 			}
 
@@ -122,7 +122,7 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	// Ensure resources
 	if err := r.ensureResources(ctx, config); err != nil {
 		log.Error(err, "Failed to ensure resources")
-		if statusErr := r.updateKodeStatus(ctx, kode, kodev1alpha1.KodePhaseFailed, []metav1.Condition{}, err); statusErr != nil {
+		if statusErr := r.updateStatus(ctx, kode, kodev1alpha1.KodePhaseFailed, []metav1.Condition{}, err); statusErr != nil {
 			log.Error(statusErr, "Failed to update status to Failed")
 		}
 		return ctrl.Result{RequeueAfter: RequeueInterval}, err
@@ -138,7 +138,7 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	if !ready {
 		if kode.Status.Phase != kodev1alpha1.KodePhasePending {
 			log.Info("Resources not ready, updating status to Pending")
-			if err := r.updateKodeStatus(ctx, kode, kodev1alpha1.KodePhasePending, []metav1.Condition{}, nil); err != nil {
+			if err := r.updateStatus(ctx, kode, kodev1alpha1.KodePhasePending, []metav1.Condition{}, nil); err != nil {
 				log.Error(err, "Failed to update status to Pending")
 				return ctrl.Result{RequeueAfter: RequeueInterval}, err
 			}
@@ -149,7 +149,7 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	// Resources are ready, update status to Active if it's not already
 	if kode.Status.Phase != kodev1alpha1.KodePhaseActive {
 		log.Info("Resources ready, updating status to Active")
-		if err := r.updateKodeStatus(ctx, kode, kodev1alpha1.KodePhaseActive, []metav1.Condition{}, nil); err != nil {
+		if err := r.updateStatus(ctx, kode, kodev1alpha1.KodePhaseActive, []metav1.Condition{}, nil); err != nil {
 			log.Error(err, "Failed to update status to Active")
 			return ctrl.Result{RequeueAfter: RequeueInterval}, err
 		}

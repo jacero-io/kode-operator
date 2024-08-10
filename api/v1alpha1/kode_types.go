@@ -28,18 +28,9 @@ type KodeSpec struct {
 	// +kubebuilder:validation:Required
 	TemplateRef KodeTemplateReference `json:"templateRef"`
 
-	// Username is both the the HTTP Basic auth username (when used) and the user the container should run as, abc is default.
-	// +kubebuilder:validation:Description="Is both the the HTTP Basic auth username (when used) and the user the container should run as. Defaults to 'abc'."
-	// +kubebuilder:default="abc"
-	Username string `json:"username,omitempty"`
-
-	// Password HTTP Basic auth password. If unset there will be no auth.
-	// +kubebuilder:validation:Description="HTTP Basic auth password. If unset, there will be no authentication."
-	Password string `json:"password,omitempty"`
-
-	// ExistingSecret is a reference to an existing secret containing user and password.
-	// +kubebuilder:validation:Description="ExistingSecret is a reference to an existing secret containing user and password. If set, User and Password fields are ignored."
-	ExistingSecret string `json:"existingSecret,omitempty"`
+	// Credentials specifies the credentials for the service.
+	// +kubebuilder:validation:Description="Credentials for the service."
+	Credentials CredentialsSpec `json:"credentials,omitempty"`
 
 	// Home is the path to the directory for the user data
 	// +kubebuilder:validation:Description="Home is the path to the directory for the user data. Defaults to '/config'."
@@ -69,6 +60,21 @@ type KodeSpec struct {
 	// InitPlugins specifies the OCI containers to be run as InitContainers. These containers can be used to prepare the workspace or run some setup scripts. It is an ordered list.
 	// +kubebuilder:validation:Description="OCI containers to be run as InitContainers. These containers can be used to prepare the workspace or run some setup scripts. It is an ordered list."
 	InitPlugins []InitPluginSpec `json:"initPlugins,omitempty"`
+}
+
+type CredentialsSpec struct {
+	// Username is both the the HTTP Basic auth username (when used) and the user the container should run as, abc is default.
+	// +kubebuilder:validation:Description="Is both the the HTTP Basic auth username (when used) and the user the container should run as. Defaults to 'abc'."
+	// +kubebuilder:default="abc"
+	Username string `json:"username,omitempty"`
+
+	// Password HTTP Basic auth password. If unset there will be no auth.
+	// +kubebuilder:validation:Description="HTTP Basic auth password. If unset, there will be no authentication."
+	Password string `json:"password,omitempty"`
+
+	// ExistingSecret is a reference to an existing secret containing user and password.
+	// +kubebuilder:validation:Description="ExistingSecret is a reference to an existing secret containing user and password. If set, User and Password fields are ignored."
+	ExistingSecret string `json:"existingSecret,omitempty"`
 }
 
 // KodeStorageSpec defines the storage configuration
@@ -146,8 +152,11 @@ type KodeStatus struct {
 	// KodeUrl is the URL to access the Kode.
 	KodeUrl string `json:"kodeUrl,omitempty"`
 
-	// LogoUrl is the URL to the logo for the Kode.
-	LogoUrl string `json:"logoUrl,omitempty"`
+	// IconUrl is the URL to the icon for the Kode.
+	IconUrl string `json:"iconUrl,omitempty"`
+
+	// Runtime is the runtime for the kode. Can be one of 'container', 'virtual', 'tofu'.
+	Runtime string `json:"runtime,omitempty"`
 
 	// LastActivityTime is the timestamp when the last activity occurred.
 	LastActivityTime *metav1.Time `json:"lastActivityTime,omitempty"`

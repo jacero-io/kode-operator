@@ -39,32 +39,148 @@ spec:
           spec:
             description: EntryPointSpec defines the desired state of EntryPoint
             properties:
-              api:
-                description: Type is the type of the gateway. It could be ingress-api
-                  or gateway-api.
-                enum:
-                - ingress-api
-                - gateway-api
-                type: string
               envoyConfigRef:
                 description: EnvoyConfigRef is the reference to the EnvoyProxy configuration.
                 properties:
-                  kind:
-                    description: Kind is the resource kind
+                  authMode:
+                    description: AuthConfig is custom authentication configuration.
+                      Can be used to configure basic auth, Oauth2, JWT, and x509
                     enum:
-                    - EnvoyProxyConfig
-                    - EnvoyProxyClusterConfig
+                    - none
+                    - basic
+                    - oauth2
+                    - jwt
+                    - x509
                     type: string
-                  name:
-                    description: Name is the name of the EnvoyProxyConfig or EnvoyProxyClusterConfig
+                  customEnvoyConfig:
+                    description: CustomEnvoyConfig is the custom Envoy configuration
+                    properties:
+                      clusters:
+                        description: Clusters is a list of Envoy clusters
+                        items:
+                          properties:
+                            connect_timeout:
+                              description: ConnectTimeout is the timeout for connecting
+                                to the cluster
+                              type: string
+                            lb_policy:
+                              description: LbPolicy is the load balancing policy for
+                                the cluster
+                              type: string
+                            load_assignment:
+                              description: LoadAssignment is the load assignment for
+                                the cluster
+                              properties:
+                                cluster_name:
+                                  description: ClusterName is the name of the cluster
+                                  minLength: 1
+                                  type: string
+                                endpoints:
+                                  description: Endpoints is a list of endpoints
+                                  items:
+                                    properties:
+                                      lb_endpoints:
+                                        description: LbEndpoints is the load balancer
+                                          endpoints
+                                        items:
+                                          properties:
+                                            endpoint:
+                                              description: Endpoints is a list of
+                                                endpoints
+                                              properties:
+                                                address:
+                                                  description: Address is the address
+                                                    of the load balancer endpoint
+                                                  properties:
+                                                    socket_address:
+                                                      description: SocketAddress is
+                                                        the socket address
+                                                      properties:
+                                                        address:
+                                                          description: Address is
+                                                            the address of the socket
+                                                          type: string
+                                                        port_value:
+                                                          description: PortValue is
+                                                            the port of the socket
+                                                          type: integer
+                                                      required:
+                                                      - address
+                                                      - port_value
+                                                      type: object
+                                                  required:
+                                                  - socket_address
+                                                  type: object
+                                              required:
+                                              - address
+                                              type: object
+                                          required:
+                                          - endpoint
+                                          type: object
+                                        type: array
+                                    required:
+                                    - lb_endpoints
+                                    type: object
+                                  type: array
+                              required:
+                              - cluster_name
+                              - endpoints
+                              type: object
+                            name:
+                              description: Name is the name of the cluster
+                              minLength: 1
+                              type: string
+                            type:
+                              description: Type is the type of the cluster
+                              type: string
+                            typed_extension_protocol_options:
+                              description: TypedExtensionProtocolOptions is a map
+                                of typed extension protocol options
+                              type: object
+                              x-kubernetes-preserve-unknown-fields: true
+                          required:
+                          - connect_timeout
+                          - lb_policy
+                          - load_assignment
+                          - name
+                          - type
+                          type: object
+                        type: array
+                      httpFilters:
+                        description: HTTPFilters is a list of Envoy HTTP filters to
+                          be applied
+                        items:
+                          description: HTTPFilter represents an individual HTTP filter
+                            configuration
+                          properties:
+                            name:
+                              description: Name is the name of the HTTP filter
+                              minLength: 1
+                              type: string
+                            typed_config:
+                              description: |-
+                                TypedConfig is the typed configuration for the HTTP filter
+                                It is intentionally the same as the Envoy filter's typed_config field to make it easier to copy-paste
+                              type: object
+                              x-kubernetes-preserve-unknown-fields: true
+                          required:
+                          - name
+                          - typed_config
+                          type: object
+                        type: array
+                    type: object
+                  image:
+                    default: envoyproxy/envoy:v1.31-latest
+                    description: Image is the Docker image for the Envoy proxy. It
+                      will be used for the sidecar container.
+                    minLength: 1
                     type: string
-                  namespace:
-                    description: Namespace is the namespace of the EnvoyProxyConfig
-                      or EnvoyProxyClusterConfig
-                    type: string
+                required:
+                - image
                 type: object
               gatewaySpec:
                 description: GatewaySpec defines the GatewaySpec for the EntryPoint.
+                  Only one of GatewaySpec or IngressSpec can be set.
                 properties:
                   gatewayClassName:
                     description: GatewayClassName is the name of the GatewayClass
@@ -167,6 +283,11 @@ spec:
                 description: LastErrorTime is the timestamp when the last error occurred.
                 format: date-time
                 type: string
+              observedGeneration:
+                description: ObservedGeneration is the last observed generation of
+                  the Kode resource.
+                format: int64
+                type: integer
               phase:
                 description: Phase represents the current phase of the Kode resource.
                 type: string

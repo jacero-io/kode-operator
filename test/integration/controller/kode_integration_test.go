@@ -33,7 +33,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -46,14 +45,11 @@ const (
 	resourceNamespace     = "test-namespace"
 	kodeResourceName      = "kode"
 	kodeTemplateKind      = "KodeClusterTemplate"
-	envoyProxyConfigKind  = "EnvoyProxyClusterConfig"
-	envoyProxyConfigName  = "test-envoyproxyconfig"
-	envoyProxyConfigImage = "envoyproxy/envoy:v1.31-latest"
 	storageSize           = "1Gi"
 
-	kodeTemplateNameCodeServerWithoutEnvoy = "test-kodetemplate-codeserver-without-envoy"
+	kodeTemplateNameCodeServer = "test-kodetemplate-codeserver-without-envoy"
 	kodeTemplateNameCodeServerWithEnvoy    = "test-kodetemplate-codeserver-with-envoy"
-	kodeTemplateNameWebtopWithoutEnvoy     = "test-kodetemplate-webtop-without-envoy"
+	kodeTemplateNameWebtop     = "test-kodetemplate-webtop-without-envoy"
 	kodeTemplateNameWebtopWithEnvoy        = "test-kodetemplate-webtop-with-envoy"
 
 	kodeTemplateImageCodeServer = "linuxserver/code-server:latest"
@@ -65,10 +61,9 @@ var _ = Describe("Kode Controller Integration", Ordered, func() {
 	var (
 		ctx                                context.Context
 		namespace                          *corev1.Namespace
-		envoyProxyConfig                   *kodev1alpha1.EnvoyProxyClusterConfig
-		kodeTemplateCodeServerWithoutEnvoy *kodev1alpha1.KodeClusterTemplate
+		kodeTemplateCodeServer *kodev1alpha1.KodeClusterTemplate
 		kodeTemplateCodeServerWithEnvoy    *kodev1alpha1.KodeClusterTemplate
-		kodeTemplateWebtopWithoutEnvoy     *kodev1alpha1.KodeClusterTemplate
+		kodeTemplateWebtop     *kodev1alpha1.KodeClusterTemplate
 		kodeTemplateWebtopWithEnvoy        *kodev1alpha1.KodeClusterTemplate
 	)
 
@@ -79,51 +74,29 @@ var _ = Describe("Kode Controller Integration", Ordered, func() {
 		namespace = &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: resourceNamespace}}
 		Expect(k8sClient.Create(ctx, namespace)).To(Succeed())
 
-		// Create EnvoyProxyConfig
-		envoyProxyConfig = &kodev1alpha1.EnvoyProxyClusterConfig{
-			ObjectMeta: metav1.ObjectMeta{Name: envoyProxyConfigName},
-			Spec: kodev1alpha1.EnvoyProxyClusterConfigSpec{
-				SharedEnvoyProxyConfigSpec: kodev1alpha1.SharedEnvoyProxyConfigSpec{
-					Image: envoyProxyConfigImage,
-					HTTPFilters: []kodev1alpha1.HTTPFilter{{
-						Name: "filter1",
-						TypedConfig: runtime.RawExtension{Raw: []byte(`{
-                            "@type":"type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz",
-                            "with_request_body":{"max_request_bytes":8192,"allow_partial_message":true},
-                            "failure_mode_allow":false,
-                            "grpc_service":{"envoy_grpc":{"cluster_name":"ext_authz_server"},"timeout":"0.5s"},
-                            "transport_api_version":"v3"
-                        }`)},
-					}},
-				},
-			},
-		}
-		Expect(k8sClient.Create(ctx, envoyProxyConfig)).To(Succeed())
-
 		// Create KodeClusterTemplates
-		kodeTemplateCodeServerWithoutEnvoy = createKodeClusterTemplate(kodeTemplateNameCodeServerWithoutEnvoy, kodeTemplateImageCodeServer, "code-server", false)
+		kodeTemplateCodeServer = createKodeClusterTemplate(kodeTemplateNameCodeServer, kodeTemplateImageCodeServer, "code-server", false)
 		kodeTemplateCodeServerWithEnvoy = createKodeClusterTemplate(kodeTemplateNameCodeServerWithEnvoy, kodeTemplateImageCodeServer, "code-server", true)
-		kodeTemplateWebtopWithoutEnvoy = createKodeClusterTemplate(kodeTemplateNameWebtopWithoutEnvoy, kodeTemplateImageWebtop, "webtop", false)
+		kodeTemplateWebtop = createKodeClusterTemplate(kodeTemplateNameWebtop, kodeTemplateImageWebtop, "webtop", false)
 		kodeTemplateWebtopWithEnvoy = createKodeClusterTemplate(kodeTemplateNameWebtopWithEnvoy, kodeTemplateImageWebtop, "webtop", true)
 
-		Expect(k8sClient.Create(ctx, kodeTemplateCodeServerWithoutEnvoy)).To(Succeed())
+		Expect(k8sClient.Create(ctx, kodeTemplateCodeServer)).To(Succeed())
 		Expect(k8sClient.Create(ctx, kodeTemplateCodeServerWithEnvoy)).To(Succeed())
-		Expect(k8sClient.Create(ctx, kodeTemplateWebtopWithoutEnvoy)).To(Succeed())
+		Expect(k8sClient.Create(ctx, kodeTemplateWebtop)).To(Succeed())
 		Expect(k8sClient.Create(ctx, kodeTemplateWebtopWithEnvoy)).To(Succeed())
 	})
 
 	AfterAll(func() {
 		// Cleanup resources
 		Expect(k8sClient.Delete(ctx, namespace)).To(Succeed())
-		Expect(k8sClient.Delete(ctx, envoyProxyConfig)).To(Succeed())
-		Expect(k8sClient.Delete(ctx, kodeTemplateCodeServerWithoutEnvoy)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, kodeTemplateCodeServer)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, kodeTemplateCodeServerWithEnvoy)).To(Succeed())
-		Expect(k8sClient.Delete(ctx, kodeTemplateWebtopWithoutEnvoy)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, kodeTemplateWebtop)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, kodeTemplateWebtopWithEnvoy)).To(Succeed())
 	})
 
 	DescribeTable("Kode resource creation",
-		func(templateName string, templateType string, withEnvoy bool, expectedContainerCount int, exposePort int32, containerPort int32) {
+		func(templateName string, templateType string, withEnvoy bool, expectedContainerCount int, exposePort int32) {
 			kodeName := fmt.Sprintf("%s-%s", kodeResourceName, templateName)
 			statefulSetName := kodeName
 			storageClassName := "standard"
@@ -137,8 +110,10 @@ var _ = Describe("Kode Controller Integration", Ordered, func() {
 						Kind: kodeTemplateKind,
 						Name: templateName,
 					},
-					Username: "abc",
-					Password: "123",
+					Credentials: kodev1alpha1.CredentialsSpec{
+						Username: "abc",
+						Password: "123",
+					},
 					Storage: kodev1alpha1.KodeStorageSpec{
 						AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
 						Resources: corev1.VolumeResourceRequirements{
@@ -173,7 +148,6 @@ var _ = Describe("Kode Controller Integration", Ordered, func() {
 
 			Expect(createdStatefulSet.Name).To(Equal(kodeName))                                                         // Expect the name to be set to the kode name
 			Expect(createdStatefulSet.Spec.Template.Spec.Containers).To(HaveLen(expectedContainerCount))                // Except the container count to be 1 or 2 based on the template
-			Expect(createdStatefulSet.Spec.Template.Spec.Containers[0].Ports[0].ContainerPort).To(Equal(containerPort)) // Expect the container port to be set to 3000 with envoy and 8000 without envoy
 
 			if templateType == "code-server" {
 				Expect(createdStatefulSet.Spec.Template.Spec.Containers[0].Image).To(Equal(kodeTemplateImageCodeServer))                                                 // Expect the image to be set to the template image
@@ -277,10 +251,8 @@ var _ = Describe("Kode Controller Integration", Ordered, func() {
 				return nil
 			}, time.Minute*5, time.Second).Should(Succeed(), "Failed to clean up all resources")
 		},
-		Entry("code-server without Envoy Proxy", kodeTemplateNameCodeServerWithoutEnvoy, "code-server", false, 1, int32(8000), int32(8000)),
-		Entry("code-server with Envoy Proxy", kodeTemplateNameCodeServerWithEnvoy, "code-server", true, 2, int32(8000), int32(3000)),
-		Entry("webtop without Envoy Proxy", kodeTemplateNameWebtopWithoutEnvoy, "webtop", false, 1, int32(8000), int32(8000)),
-		Entry("webtop with Envoy Proxy", kodeTemplateNameWebtopWithEnvoy, "webtop", true, 2, int32(8000), int32(3000)),
+		Entry("code-server", kodeTemplateNameCodeServer, "code-server", false, 1, int32(8000), int32(8000)),
+		Entry("webtop", kodeTemplateNameWebtop, "webtop", false, 1, int32(8000), int32(8000)),
 	)
 
 	It("should not create a PersistentVolumeClaim when storage is not specified", func() {
@@ -293,7 +265,7 @@ var _ = Describe("Kode Controller Integration", Ordered, func() {
 			Spec: kodev1alpha1.KodeSpec{
 				TemplateRef: kodev1alpha1.KodeTemplateReference{
 					Kind: kodeTemplateKind,
-					Name: kodeTemplateNameCodeServerWithoutEnvoy,
+					Name: kodeTemplateNameCodeServer,
 				},
 				// No storage specification
 			},
@@ -336,18 +308,20 @@ func createKodeClusterTemplate(name, image, templateType string, withEnvoy bool)
 		},
 		Spec: kodev1alpha1.KodeClusterTemplateSpec{
 			SharedKodeTemplateSpec: kodev1alpha1.SharedKodeTemplateSpec{
-				Image: image,
-				Type:  templateType,
+				ContainerSpec: kodev1alpha1.ContainerSpec{
+					Image: image,
+					Type:  templateType,
+				},
 			},
 		},
 	}
 
-	if withEnvoy {
-		template.Spec.EnvoyConfigRef = kodev1alpha1.EnvoyConfigReference{
-			Kind: envoyProxyConfigKind,
-			Name: envoyProxyConfigName,
-		}
-	}
+	// if withEnvoy {
+	// 	template.Spec.EnvoyConfigRef = kodev1alpha1.EnvoyConfigReference{
+	// 		Kind: envoyProxyConfigKind,
+	// 		Name: envoyProxyConfigName,
+	// 	}
+	// }
 
 	return template
 }

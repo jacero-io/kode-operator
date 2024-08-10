@@ -79,26 +79,26 @@ func (r *KodeReconciler) constructStatefulSetSpec(config *common.KodeResourcesCo
 	var workspace string
 	var mountPath string
 
-	workspace = path.Join(templateSpec.DefaultHome, templateSpec.DefaultWorkspace)
-	mountPath = templateSpec.DefaultHome
+	workspace = path.Join(templateSpec.ContainerSpec.DefaultHome, templateSpec.ContainerSpec.DefaultWorkspace)
+	mountPath = templateSpec.ContainerSpec.DefaultHome
 	if config.KodeSpec.Workspace != "" {
 		if config.KodeSpec.Home != "" {
 			workspace = path.Join(config.KodeSpec.Home, config.KodeSpec.Workspace)
 			mountPath = config.KodeSpec.Home
 		} else {
-			workspace = path.Join(templateSpec.DefaultHome, config.KodeSpec.Workspace)
+			workspace = path.Join(templateSpec.ContainerSpec.DefaultHome, config.KodeSpec.Workspace)
 		}
 	}
 
 	var containers []corev1.Container
 	var initContainers []corev1.Container
 
-	if templateSpec.Type == "code-server" {
+	if templateSpec.ContainerSpec.Type == "code-server" {
 		containers = constructCodeServerContainers(config, workspace)
-	} else if templateSpec.Type == "webtop" {
+	} else if templateSpec.ContainerSpec.Type == "webtop" {
 		containers = constructWebtopContainers(config)
 	} else {
-		return nil, fmt.Errorf("unknown template type: %s", templateSpec.Type)
+		return nil, fmt.Errorf("unknown template type: %s", templateSpec.ContainerSpec.Type)
 	}
 
 	volumes, volumeMounts := constructVolumesAndMounts(mountPath, config)
@@ -167,13 +167,13 @@ func constructCodeServerContainers(config *common.KodeResourcesConfig,
 
 	return []corev1.Container{{
 		Name:  "code-server",
-		Image: config.Templates.KodeTemplate.Image,
+		Image: config.Templates.KodeTemplate.ContainerSpec.Image,
 		Env: []corev1.EnvVar{
-			{Name: "PUID", Value: fmt.Sprintf("%d", config.Templates.KodeTemplate.PUID)},
-			{Name: "PGID", Value: fmt.Sprintf("%d", config.Templates.KodeTemplate.PGID)},
-			{Name: "TZ", Value: config.Templates.KodeTemplate.TZ},
+			{Name: "PUID", Value: fmt.Sprintf("%d", config.Templates.KodeTemplate.ContainerSpec.PUID)},
+			{Name: "PGID", Value: fmt.Sprintf("%d", config.Templates.KodeTemplate.ContainerSpec.PGID)},
+			{Name: "TZ", Value: config.Templates.KodeTemplate.ContainerSpec.TZ},
 			{Name: "PORT", Value: fmt.Sprintf("%d", config.LocalServicePort)},
-			{Name: "USERNAME", Value: config.KodeSpec.Username},
+			{Name: "USERNAME", Value: config.KodeSpec.Credentials.Username},
 			// {Name: "PASSWORD", Value: config.Kode.Spec.Password},
 			{Name: "DEFAULT_WORKSPACE", Value: workspace},
 		},
@@ -188,13 +188,13 @@ func constructWebtopContainers(config *common.KodeResourcesConfig) []corev1.Cont
 
 	return []corev1.Container{{
 		Name:  "webtop",
-		Image: config.Templates.KodeTemplate.Image,
+		Image: config.Templates.KodeTemplate.ContainerSpec.Image,
 		Env: []corev1.EnvVar{
-			{Name: "PUID", Value: fmt.Sprintf("%d", config.Templates.KodeTemplate.PUID)},
-			{Name: "PGID", Value: fmt.Sprintf("%d", config.Templates.KodeTemplate.PGID)},
-			{Name: "TZ", Value: config.Templates.KodeTemplate.TZ},
+			{Name: "PUID", Value: fmt.Sprintf("%d", config.Templates.KodeTemplate.ContainerSpec.PUID)},
+			{Name: "PGID", Value: fmt.Sprintf("%d", config.Templates.KodeTemplate.ContainerSpec.PGID)},
+			{Name: "TZ", Value: config.Templates.KodeTemplate.ContainerSpec.TZ},
 			{Name: "CUSTOM_PORT", Value: fmt.Sprintf("%d", config.LocalServicePort)},
-			{Name: "CUSTOM_USER", Value: config.KodeSpec.Username},
+			{Name: "CUSTOM_USER", Value: config.KodeSpec.Credentials.Username},
 			// {Name: "PASSWORD", Value: config.Kode.Spec.Password},
 		},
 		Ports: []corev1.ContainerPort{{

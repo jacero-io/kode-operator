@@ -45,12 +45,12 @@ func (r *KodeReconciler) ensureResources(ctx context.Context, config *common.Kod
 		if kode.Status.Phase != kodev1alpha1.KodePhasePending {
 			// If the Kode is already Active, update the status to Pending
 			if kode.Status.Phase == kodev1alpha1.KodePhaseActive {
-				if err := r.updateKodeStatus(ctx, kode, kodev1alpha1.KodePhasePending, []metav1.Condition{}, nil); err != nil {
+				if err := r.updateStatus(ctx, kode, kodev1alpha1.KodePhasePending, []metav1.Condition{}, nil); err != nil {
 					log.Error(err, "Failed to update status to Pending")
 					return err
 				}
 			} else { // If the Kode is not Active, update the status to Creating
-				if err := r.updateKodeStatus(ctx, kode, kodev1alpha1.KodePhaseCreating, []metav1.Condition{}, nil); err != nil {
+				if err := r.updateStatus(ctx, kode, kodev1alpha1.KodePhaseCreating, []metav1.Condition{}, nil); err != nil {
 					log.Error(err, "Failed to update status to Creating")
 					return err
 				}
@@ -60,7 +60,7 @@ func (r *KodeReconciler) ensureResources(ctx context.Context, config *common.Kod
 		// Ensure Secret
 		if err := r.ensureSecret(ctx, config, kode); err != nil {
 			log.Error(err, "Failed to ensure Secret")
-			r.updateKodeStatus(ctx, kode, kodev1alpha1.KodePhaseFailed, []metav1.Condition{{
+			r.updateStatus(ctx, kode, kodev1alpha1.KodePhaseFailed, []metav1.Condition{{
 				Type:               "SecretCreationFailed",
 				Status:             metav1.ConditionTrue,
 				Reason:             "SecretCreationError",
@@ -73,7 +73,7 @@ func (r *KodeReconciler) ensureResources(ctx context.Context, config *common.Kod
 		// Ensure Credentials
 		if err := r.ensureCredentials(ctx, config); err != nil {
 			log.Error(err, "Failed to ensure Credentials")
-			r.updateKodeStatus(ctx, kode, kodev1alpha1.KodePhaseFailed, []metav1.Condition{{
+			r.updateStatus(ctx, kode, kodev1alpha1.KodePhaseFailed, []metav1.Condition{{
 				Type:               "CredentialsCreationFailed",
 				Status:             metav1.ConditionTrue,
 				Reason:             "CredentialsCreationError",
@@ -84,17 +84,17 @@ func (r *KodeReconciler) ensureResources(ctx context.Context, config *common.Kod
 		}
 
 		// If the KodeTemplate has an EnvoyConfigRef, ensure the EnvoyContainer
-		if config.Templates.EnvoyProxyConfig != nil {
-			if err := r.ensureSidecarContainers(ctx, config, kode); err != nil {
-				log.Error(err, "Failed to ensure sidecar containers")
-				return err
-			}
-		}
+		// if config.Templates.EnvoyProxyConfig != nil {
+		// 	if err := r.ensureSidecarContainers(ctx, config, kode); err != nil {
+		// 		log.Error(err, "Failed to ensure sidecar containers")
+		// 		return err
+		// 	}
+		// }
 
 		// Ensure StatefulSet
 		if err := r.ensureStatefulSet(ctx, config, kode); err != nil {
 			log.Error(err, "Failed to ensure StatefulSet")
-			r.updateKodeStatus(ctx, kode, kodev1alpha1.KodePhaseFailed, []metav1.Condition{{
+			r.updateStatus(ctx, kode, kodev1alpha1.KodePhaseFailed, []metav1.Condition{{
 				Type:               "StatefulSetCreationFailed",
 				Status:             metav1.ConditionTrue,
 				Reason:             "StatefulSetCreationError",
@@ -107,7 +107,7 @@ func (r *KodeReconciler) ensureResources(ctx context.Context, config *common.Kod
 		// Ensure Service
 		if err := r.ensureService(ctx, config, kode); err != nil {
 			log.Error(err, "Failed to ensure Service")
-			r.updateKodeStatus(ctx, kode, kodev1alpha1.KodePhaseFailed, []metav1.Condition{{
+			r.updateStatus(ctx, kode, kodev1alpha1.KodePhaseFailed, []metav1.Condition{{
 				Type:               "ServiceCreationFailed",
 				Status:             metav1.ConditionTrue,
 				Reason:             "ServiceCreationError",
@@ -121,7 +121,7 @@ func (r *KodeReconciler) ensureResources(ctx context.Context, config *common.Kod
 		if !kode.Spec.Storage.IsEmpty() {
 			if err := r.ensurePVC(ctx, config, kode); err != nil {
 				log.Error(err, "Failed to ensure PVC")
-				r.updateKodeStatus(ctx, kode, kodev1alpha1.KodePhaseFailed, []metav1.Condition{{
+				r.updateStatus(ctx, kode, kodev1alpha1.KodePhaseFailed, []metav1.Condition{{
 					Type:               "PVCCreationFailed",
 					Status:             metav1.ConditionTrue,
 					Reason:             "PVCCreationError",
@@ -136,12 +136,12 @@ func (r *KodeReconciler) ensureResources(ctx context.Context, config *common.Kod
 		if kode.Status.Phase != kodev1alpha1.KodePhasePending {
 			// If the Kode is Active, update the status to Pending
 			if kode.Status.Phase == kodev1alpha1.KodePhaseActive {
-				if err := r.updateKodeStatus(ctx, kode, kodev1alpha1.KodePhasePending, []metav1.Condition{}, nil); err != nil {
+				if err := r.updateStatus(ctx, kode, kodev1alpha1.KodePhasePending, []metav1.Condition{}, nil); err != nil {
 					log.Error(err, "Failed to update status to Pending")
 					return err
 				}
 			} else { // If the Kode is not Active, update the status to Created
-				if err := r.updateKodeStatus(ctx, kode, kodev1alpha1.KodePhaseCreating, []metav1.Condition{}, nil); err != nil {
+				if err := r.updateStatus(ctx, kode, kodev1alpha1.KodePhaseCreating, []metav1.Condition{}, nil); err != nil {
 					log.Error(err, "Failed to update status to Creating")
 					return err
 				}
@@ -155,10 +155,10 @@ func (r *KodeReconciler) ensureResources(ctx context.Context, config *common.Kod
 func (r *KodeReconciler) ensureCredentials(ctx context.Context, config *common.KodeResourcesConfig) error {
 	log := r.Log.WithName("CredentialsEnsurer").WithValues("kode", common.ObjectKeyFromConfig(config))
 
-	if config.KodeSpec.ExistingSecret != "" {
+	if config.KodeSpec.Credentials.ExistingSecret != "" {
 		// ExistingSecret is specified, fetch the secret
 		secret := &corev1.Secret{}
-		err := r.Client.Get(ctx, types.NamespacedName{Name: config.KodeSpec.ExistingSecret, Namespace: config.KodeNamespace}, secret)
+		err := r.Client.Get(ctx, types.NamespacedName{Name: config.KodeSpec.Credentials.ExistingSecret, Namespace: config.KodeNamespace}, secret)
 		if err != nil {
 			return fmt.Errorf("failed to get Secret: %w", err)
 		}
@@ -172,11 +172,11 @@ func (r *KodeReconciler) ensureCredentials(ctx context.Context, config *common.K
 		config.Credentials.Password = password
 
 		log.V(1).Info("Using existing secret", "Name", secret.Name, "Data", common.MaskSecretData(secret))
-	} else if config.KodeSpec.Password != "" {
-		config.Credentials.Username = config.KodeSpec.Username
-		config.Credentials.Password = config.KodeSpec.Password
+	} else if config.KodeSpec.Credentials.Password != "" {
+		config.Credentials.Username = config.KodeSpec.Credentials.Username
+		config.Credentials.Password = config.KodeSpec.Credentials.Password
 	} else {
-		config.Credentials.Username = config.KodeSpec.Username
+		config.Credentials.Username = config.KodeSpec.Credentials.Username
 		config.Credentials.Password = ""
 	}
 

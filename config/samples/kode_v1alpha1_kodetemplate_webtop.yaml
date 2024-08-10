@@ -8,10 +8,6 @@ metadata:
   name: kodetemplate-webtop-sample
   namespace: default
 spec:
-  envoyConfigRef:
-    kind: EnvoyProxyConfig
-    name: envoyproxyconfig-sample
-    namespace: default
   type: code-server
   image: linuxserver/webtop:debian-xfce
   tz: "Europe/Stockholm"

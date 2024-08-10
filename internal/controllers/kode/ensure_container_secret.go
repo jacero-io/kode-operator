@@ -46,7 +46,7 @@ func (r *KodeReconciler) ensureSecret(ctx context.Context, config *common.KodeRe
 		},
 	}
 
-	if config.KodeSpec.ExistingSecret != "" {
+	if config.KodeSpec.Credentials.ExistingSecret != "" {
 		// ExistingSecret is specified, fetch the secret
 		err := r.ResourceManager.Get(ctx, client.ObjectKeyFromObject(secret), secret)
 		if err != nil {
@@ -54,8 +54,6 @@ func (r *KodeReconciler) ensureSecret(ctx context.Context, config *common.KodeRe
 		}
 
 		log.V(1).Info("Using existing secret", "Name", secret.Name, "Data", common.MaskSecretData(secret))
-
-		config.Secret = *secret
 
 	} else {
 		// ExistingSecret is not specified, create or patch the secret
@@ -76,8 +74,6 @@ func (r *KodeReconciler) ensureSecret(ctx context.Context, config *common.KodeRe
 		if err != nil {
 			return fmt.Errorf("failed to create or patch Secret: %v", err)
 		}
-
-		config.Secret = *secret
 	}
 
 	return nil

@@ -42,7 +42,7 @@ func NewDefaultStatusUpdater(client client.Client, log logr.Logger) StatusUpdate
 	}
 }
 
-func (u *defaultStatusUpdater) UpdateKodeStatus(ctx context.Context,
+func (u *defaultStatusUpdater) UpdateStatusKode(ctx context.Context,
 	kode *kodev1alpha1.Kode,
 	phase kodev1alpha1.KodePhase,
 	newConditions []metav1.Condition,
@@ -83,7 +83,7 @@ func (u *defaultStatusUpdater) UpdateKodeStatus(ctx context.Context,
 	})
 }
 
-func (u *defaultStatusUpdater) UpdateEntryPointsStatus(ctx context.Context,
+func (u *defaultStatusUpdater) UpdateStatusEntryPoints(ctx context.Context,
 	config *common.EntryPointResourceConfig,
 	phase kodev1alpha1.EntryPointPhase,
 	conditions []metav1.Condition,

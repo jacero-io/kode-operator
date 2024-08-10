@@ -70,22 +70,6 @@ rules:
 - apiGroups:
   - kode.kode.jacero.io
   resources:
-  - envoyproxyclusterconfig
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - kode.kode.jacero.io
-  resources:
-  - envoyproxyconfig
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - kode.kode.jacero.io
-  resources:
   - kodeclustertemplates
   verbs:
   - get

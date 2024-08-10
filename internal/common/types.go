@@ -27,30 +27,32 @@ import (
 // Templates holds the fetched template configurations
 type Templates struct {
 	KodeTemplate              *kodev1alpha1.SharedKodeTemplateSpec
-	EnvoyProxyConfig          *kodev1alpha1.SharedEnvoyProxyConfigSpec
 	KodeTemplateName          string
 	KodeTemplateNamespace     string
-	EnvoyProxyConfigName      string
-	EnvoyProxyConfigNamespace string
 }
 
 // KodeResourcesConfig holds configuration for Kode resources
 type KodeResourcesConfig struct {
 	KodeSpec            kodev1alpha1.KodeSpec
 	Labels              map[string]string
+
 	KodeName            string
 	KodeNamespace       string
-	Secret              corev1.Secret
+
+	Credentials         kodev1alpha1.CredentialsSpec
+
 	SecretName          string
-	Credentials         Credentials
 	StatefulSetName     string
 	PVCName             string
 	ServiceName         string
+
 	Templates           Templates
 	Containers          []corev1.Container
 	InitContainers      []corev1.Container
-	UserInitPlugins     []kodev1alpha1.InitPluginSpec
+
 	TemplateInitPlugins []kodev1alpha1.InitPluginSpec
+	UserInitPlugins     []kodev1alpha1.InitPluginSpec
+
 	LocalServicePort    int32
 	ExternalServicePort int32
 }
@@ -65,20 +67,13 @@ type EntryPointResourceConfig struct {
 	EntryPointURL       string
 }
 
-// Credentials holds username and password
-type Credentials struct {
-	Username string
-	Password string
-}
-
 // BootstrapConfigOptions contains options for generating Envoy bootstrap config
 type BootstrapConfigOptions struct {
 	HTTPFilters  []kodev1alpha1.HTTPFilter
 	Clusters     []kodev1alpha1.Cluster
 	LocalPort    int32
 	ExternalPort int32
-	AuthConfig   kodev1alpha1.AuthConfig
-	Credentials  Credentials
+	Credentials  kodev1alpha1.CredentialsSpec
 }
 
 type TemplateNotFoundError struct {

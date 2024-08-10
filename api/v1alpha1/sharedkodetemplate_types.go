@@ -22,47 +22,39 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type Credentials struct {
-	// Username is both the the HTTP Basic auth username (when used) and the user the container should run as, abc is default.
-	// +kubebuilder:validation:Description="Is both the the HTTP Basic auth username (when used) and the user the container should run as. Defaults to 'abc'."
-	// +kubebuilder:default="abc"
-	Username string `json:"username,omitempty"`
-
-	// Password HTTP Basic auth password. If unset there will be no auth.
-	// +kubebuilder:validation:Description="HTTP Basic auth password. If unset, there will be no authentication."
-	Password string `json:"password,omitempty"`
-
-	// ExistingSecret is a reference to an existing secret containing user and password.
-	// +kubebuilder:validation:Description="ExistingSecret is a reference to an existing secret containing user and password. If set, User and Password fields are ignored."
-	ExistingSecret string `json:"existingSecret,omitempty"`
-}
-
 // SharedKodeTemplateSpec defines the desired state of KodeClusterTemplate
 type SharedKodeTemplateSpec struct {
 	// Credentials specifies the credentials for the service.
 	// +kubebuilder:validation:Description="Credentials for the service."
-	Credentials   Credentials   `json:"credentials,omitempty"`
+	Credentials CredentialsSpec `json:"credentials,omitempty"`
 
 	// EntryPointSpec defines the desired state of the entrypoint.
 	// +kubebuilder:validation:Description="Desired state of the entrypoint."
-	EntryPointSpec EntryPointSpec `json:"entryPointSpec,omitempty"`
+	EntryPointRef EntryPointReference `json:"entryPointRef,omitempty"`
 
-	// Runtime is the runtime for the service. Can be one of 'container', 'virtual', 'tofu'.
-	// +kubebuilder:validation:Description="Runtime for the service. Can be one of 'container', 'virtual', 'tofu'."
-	// +kubebuilder:validation:Enum=container;virtual;tofu
+	// Runtime is the runtime for the service. Can be one of 'container', 'virtualization', 'tofu'.
+	// +kubebuilder:validation:Description="Runtime for the service. Can be one of 'container', 'virtualization', 'tofu'."
+	// +kubebuilder:validation:Enum=container;virtualization;tofu
+	// +kubebuilder:default=container
 	Runtime string `json:"runtime,omitempty"`
 
-	// ContainerSpec is the container specification.
-	// +kubebuilder:validation:Description="Container specification."
+	// ContainerSpec is the container specification. Only used if runtime is 'container'.
+	// +kubebuilder:validation:Description="Container specification. Only used if runtime is 'container'."
 	ContainerSpec ContainerSpec `json:"containerSpec,omitempty"`
 
-	// VirtualMachineSpec is the virtual machine specification.
-	// +kubebuilder:validation:Description="Virtual machine specification."
+	// VirtualMachineSpec is the virtual machine specification. Only used if runtime is 'virtualization'.
+	// +kubebuilder:validation:Description="Virtual machine specification. Only used if runtime is 'virtualization'."
 	VirtualMachineSpec virtinkv1alpha1.VirtualMachineSpec `json:"virtualMachineSpec,omitempty"`
 
-	// TofuSpec is the terraform specification.
-	// +kubebuilder:validation:Description="Terraform specification."
+	// TofuSpec is the terraform specification. Only used if runtime is 'tofu'.
+	// +kubebuilder:validation:Description="Terraform specification. Only used if runtime is 'tofu'."
 	// TofuSpec tofuv1alpha2.TerraformSpec `json:"tofuSpec,omitempty"`
+
+	// Port is the port for the service process. Used by EnvoyProxy to expose the kode.
+	// +kubebuilder:validation:Description="Port for the service. Used by EnvoyProxy to expose the container. Defaults to '8000'."
+	// +kubebuilder:validation:Minimum=1
+	// +kubebuilder:default=8000
+	Port int32 `json:"port,omitempty"`
 
 	// Specifies the period before controller inactive the resource (delete all resources except volume).
 	// +kubebuilder:validation:Description="Period before controller inactive the resource (delete all resources except volume)."
@@ -73,30 +65,9 @@ type SharedKodeTemplateSpec struct {
 	// +kubebuilder:validation:Description="Period before controller recycle the resource (delete all resources)."
 	// +kubebuilder:default=28800
 	RecycleAfterSeconds *int64 `json:"recycleAfterSeconds,omitempty"`
-}
 
-type TerraformSpec struct {
-	// Module is the module for the service.
-	// +kubebuilder:validation:Description="Module for the service."
-	// +kubebuilder:validation:MinLength=1
-	Module string `json:"module,omitempty"`
-
-	SourceRef SourceReference `json:"sourceRef,omitempty"`
-}
-
-// SourceReference is a reference to a source
-type SourceReference struct {
-	// Kind is the kind of the source.
-	// +kubebuilder:validation:Description="Kind of the source."
-	Kind string `json:"kind,omitempty"`
-
-	// Name is the name of the source.
-	// +kubebuilder:validation:Description="Name of the source."
-	Name string `json:"name,omitempty"`
-
-	// Namespace is the namespace of the source.
-	// +kubebuilder:validation:Description="Namespace of the source."
-	Namespace string `json:"namespace,omitempty"`
+	// LogoUrl is the URL to the logo for the Kode.
+	IconUrl string `json:"logoUrl,omitempty"`
 }
 
 // SharedKodeTemplateStatus defines the observed state

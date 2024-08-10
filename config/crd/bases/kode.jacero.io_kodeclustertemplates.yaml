@@ -41,7 +41,8 @@ spec:
             description: KodeClusterTemplateSpec defines the desired state of KodeClusterTemplate
             properties:
               containerSpec:
-                description: ContainerSpec is the container specification.
+                description: ContainerSpec is the container specification. Only used
+                  if runtime is 'container'.
                 properties:
                   allowPrivileged:
                     default: false
@@ -527,13 +528,6 @@ spec:
                     description: PGID is the group ID for the service process.
                     format: int64
                     type: integer
-                  port:
-                    default: 8000
-                    description: Port is the port for the service process. Used by
-                      EnvoyProxy to expose the container.
-                    format: int32
-                    minimum: 1
-                    type: integer
                   puid:
                     default: 1000
                     description: PUID is the user ID for the service process.
@@ -569,61 +563,37 @@ spec:
                       default.
                     type: string
                 type: object
-              entryPointSpec:
+              entryPointRef:
                 description: EntryPointSpec defines the desired state of the entrypoint.
                 properties:
-                  api:
-                    description: Type is the type of the gateway. It could be ingress-api
-                      or gateway-api.
-                    enum:
-                    - ingress-api
-                    - gateway-api
+                  kind:
+                    description: Kind is the resource kind.
                     type: string
-                  envoyConfigRef:
-                    description: EnvoyConfigRef is the reference to the EnvoyProxy
-                      configuration.
-                    properties:
-                      kind:
-                        description: Kind is the resource kind
-                        enum:
-                        - EnvoyProxyConfig
-                        - EnvoyProxyClusterConfig
-                        type: string
-                      name:
-                        description: Name is the name of the EnvoyProxyConfig or EnvoyProxyClusterConfig
-                        type: string
-                      namespace:
-                        description: Namespace is the namespace of the EnvoyProxyConfig
-                          or EnvoyProxyClusterConfig
-                        type: string
-                    type: object
-                  gatewaySpec:
-                    description: GatewaySpec defines the GatewaySpec for the EntryPoint.
-                    properties:
-                      gatewayClassName:
-                        description: GatewayClassName is the name of the GatewayClass
-                          resource.
-                        type: string
-                    type: object
-                  routingType:
-                    description: Type is the way the Kode resource is accessed. It
-                      could be subdomain or path.
-                    enum:
-                    - domain
-                    - path
+                  name:
+                    description: Name is the name of the resource.
                     type: string
-                  url:
-                    description: |-
-                      URL is the domain name to use either as a suffix in the case of Type=domain or as a prefix/domain in the case of Type=path.
-                      When the type is domain, the controller will try to publish the Kode resource as a subdomain of the given domain (e.g <kode-resource>.kode.example.com).
-                      When the type is path, the controller will try to publish the Kode resource as a path of the given URL (e.g kode.example.com/<kode-resource>).
+                  namespace:
+                    description: Namespace is the namespace of the resource.
                     type: string
+                required:
+                - kind
+                - name
                 type: object
               inactiveAfterSeconds:
                 default: 600
                 description: Specifies the period before controller inactive the resource
                   (delete all resources except volume).
                 format: int64
+                type: integer
+              logoUrl:
+                description: LogoUrl is the URL to the logo for the Kode.
+                type: string
+              port:
+                default: 8000
+                description: Port is the port for the service process. Used by EnvoyProxy
+                  to expose the kode.
+                format: int32
+                minimum: 1
                 type: integer
               recycleAfterSeconds:
                 default: 28800
@@ -632,15 +602,17 @@ spec:
                 format: int64
                 type: integer
               runtime:
+                default: container
                 description: Runtime is the runtime for the service. Can be one of
-                  'container', 'virtual', 'tofu'.
+                  'container', 'virtualization', 'tofu'.
                 enum:
                 - container
-                - virtual
+                - virtualization
                 - tofu
                 type: string
               virtualMachineSpec:
                 description: VirtualMachineSpec is the virtual machine specification.
+                  Only used if runtime is 'virtualization'.
                 properties:
                   affinity:
                     description: Affinity is a group of affinity scheduling rules.
