@@ -36,7 +36,7 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
+	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/cleanup"
 	controller "github.com/jacero-io/kode-operator/internal/controllers/kode"
 	"github.com/jacero-io/kode-operator/internal/resource"
@@ -86,7 +86,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 
-	err = kodev1alpha1.AddToScheme(scheme.Scheme)
+	err = kodev1alpha2.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	k8sManager, err = ctrl.NewManager(cfg, ctrl.Options{

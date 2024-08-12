@@ -22,7 +22,7 @@ import (
 	"context"
 	"testing"
 
-	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
+	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -36,7 +36,7 @@ type MockCleanupManager struct {
 	mock.Mock
 }
 
-func (m *MockCleanupManager) Cleanup(ctx context.Context, kode *kodev1alpha1.Kode) error {
+func (m *MockCleanupManager) Cleanup(ctx context.Context, kode *kodev1alpha2.Kode) error {
 	args := m.Called(ctx, kode)
 	return args.Error(0)
 }
@@ -47,14 +47,14 @@ func TestCleanupManager_Cleanup(t *testing.T) {
 	mockCleanupManager := new(MockCleanupManager)
 
 	// Create a test Kode instance
-	kode := &kodev1alpha1.Kode{
+	kode := &kodev1alpha2.Kode{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       "test-kode",
 			Namespace:  "default",
 			Finalizers: []string{common.FinalizerName},
 		},
-		Spec: kodev1alpha1.KodeSpec{
-			Storage: kodev1alpha1.KodeStorageSpec{},
+		Spec: kodev1alpha2.KodeSpec{
+			Storage: kodev1alpha2.KodeStorageSpec{},
 		},
 	}
 
@@ -76,14 +76,14 @@ func TestCleanupManager_Cleanup_WithStorage(t *testing.T) {
 	mockCleanupManager := new(MockCleanupManager)
 
 	// Create a test Kode instance with storage
-	kode := &kodev1alpha1.Kode{
+	kode := &kodev1alpha2.Kode{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:       "test-kode",
 			Namespace:  "default",
 			Finalizers: []string{common.FinalizerName},
 		},
-		Spec: kodev1alpha1.KodeSpec{
-			Storage: kodev1alpha1.KodeStorageSpec{
+		Spec: kodev1alpha2.KodeSpec{
+			Storage: kodev1alpha2.KodeStorageSpec{
 				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
 				Resources: corev1.VolumeResourceRequirements{
 					Requests: corev1.ResourceList{

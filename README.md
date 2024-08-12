@@ -29,7 +29,7 @@ Kode-Operator simplifies the setup and management of development environments on
 The Kode instance contains a reference to a Kode template. It can also contain other user specific options. For example, a reference to a git repository with vscode settings and extensions.
 
 ```yaml
-apiVersion: kode.jacero.io/v1alpha1
+apiVersion: kode.jacero.io/v1alpha2
 kind: Kode
 metadata:
   name: my-kode-instance
@@ -58,7 +58,7 @@ These are cluster scoped and namespace scoped templates. A template contains an 
 **Example for KodeTemplate:**
 
 ```yaml
-apiVersion: kode.jacero.io/v1alpha1
+apiVersion: kode.jacero.io/v1alpha2
 kind: KodeTemplate
 metadata:
   name: my-kode-template
@@ -77,7 +77,7 @@ spec:
 **Example for KodeClusterTemplate:**
 
 ```yaml
-apiVersion: kode.jacero.io/v1alpha1
+apiVersion: kode.jacero.io/v1alpha2
 kind: KodeClusterTemplate
 metadata:
   name: my-kode-cluster-template
@@ -96,7 +96,7 @@ spec:
 These are cluster scoped and namespace scoped template for the Envoy Proxy sidecar. A way to define a standard Envoy Proxy configuration that a Kode template should use. This could be a HTTP filter to an Open Policy Agent (OPA) deployment within the cluster.
 
 ```yaml
-apiVersion: kode.jacero.io/v1alpha1
+apiVersion: kode.jacero.io/v1alpha2
 kind: EnvoyProxyConfig
 metadata:
   labels:
@@ -161,7 +161,7 @@ You want to set up a VSCode-like development environment using Code-server for y
 **1. Create a KodeTemplate for Code-server:**
 
 ```yaml
-apiVersion: v1alpha1
+apiVersion: v1alpha2
 kind: KodeTemplate
 metadata:
   name: code-server-template
@@ -175,7 +175,7 @@ spec:
 **2. Create a Kode Instance Using the Template:**
 
 ```yaml
-apiVersion: v1alpha1
+apiVersion: v1alpha2
 kind: Kode
 metadata:
   name: my-code-server
@@ -201,7 +201,7 @@ You want to secure your Code-server environment using Envoy Proxy with Basic Aut
 **1. Create an EnvoyProxyConfig:**
 
 ```yaml
-apiVersion: v1alpha1
+apiVersion: v1alpha2
 kind: EnvoyProxyClusterConfig
 metadata:
   name: basic-auth-proxy
@@ -212,7 +212,7 @@ spec:
 **2. Create a KodeTemplate with Envoy Proxy Configuration:**
 
 ```yaml
-apiVersion: v1alpha1
+apiVersion: v1alpha2
 kind: KodeTemplate
 metadata:
   name: secure-code-server-template
@@ -229,7 +229,7 @@ spec:
 **2. Create a Kode Instance Using the Template:**
 
 ```yaml
-apiVersion: v1alpha1
+apiVersion: v1alpha2
 kind: Kode
 metadata:
   name: secure-code-server

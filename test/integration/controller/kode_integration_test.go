@@ -23,7 +23,7 @@ import (
 	"fmt"
 	"time"
 
-	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
+	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -39,32 +39,29 @@ import (
 )
 
 const (
-	timeout  = time.Second * 120
+	timeout  = time.Second * 60
 	interval = time.Second * 1
 
 	resourceNamespace = "test-namespace"
 	kodeResourceName  = "kode"
-	kodeTemplateKind  = "KodeClusterTemplate"
+	podTemplateKind   = "PodTemplate"
 	storageSize       = "1Gi"
 
-	kodeTemplateNameCodeServer          = "test-kodetemplate-codeserver-without-envoy"
-	kodeTemplateNameCodeServerWithEnvoy = "test-kodetemplate-codeserver-with-envoy"
-	kodeTemplateNameWebtop              = "test-kodetemplate-webtop-without-envoy"
-	kodeTemplateNameWebtopWithEnvoy     = "test-kodetemplate-webtop-with-envoy"
+	podTemplateNameCodeServer = "test-podtemplate-codeserver"
+	podTemplateNameWebtop     = "test-podtemplate-webtop"
 
-	kodeTemplateImageCodeServer = "linuxserver/code-server:latest"
-	kodeTemplateImageWebtop     = "linuxserver/webtop:debian-xfce"
+	podTemplateImageCodeServer = "linuxserver/code-server:latest"
+	podTemplateImageWebtop     = "linuxserver/webtop:debian-xfce"
 )
 
 var _ = Describe("Kode Controller Integration", Ordered, func() {
 
 	var (
-		ctx                             context.Context
-		namespace                       *corev1.Namespace
-		kodeTemplateCodeServer          *kodev1alpha1.KodeClusterTemplate
-		kodeTemplateCodeServerWithEnvoy *kodev1alpha1.KodeClusterTemplate
-		kodeTemplateWebtop              *kodev1alpha1.KodeClusterTemplate
-		kodeTemplateWebtopWithEnvoy     *kodev1alpha1.KodeClusterTemplate
+		ctx                   context.Context
+		namespace             *corev1.Namespace
+		podTemplateCodeServer *kodev1alpha2.PodTemplate
+		podTemplateWebtop     *kodev1alpha2.PodTemplate
+		testEntryPoint        *kodev1alpha2.EntryPoint
 	)
 
 	BeforeAll(func() {
@@ -74,47 +71,57 @@ var _ = Describe("Kode Controller Integration", Ordered, func() {
 		namespace = &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: resourceNamespace}}
 		Expect(k8sClient.Create(ctx, namespace)).To(Succeed())
 
-		// Create KodeClusterTemplates
-		kodeTemplateCodeServer = createKodeClusterTemplate(kodeTemplateNameCodeServer, kodeTemplateImageCodeServer, "code-server", false)
-		kodeTemplateCodeServerWithEnvoy = createKodeClusterTemplate(kodeTemplateNameCodeServerWithEnvoy, kodeTemplateImageCodeServer, "code-server", true)
-		kodeTemplateWebtop = createKodeClusterTemplate(kodeTemplateNameWebtop, kodeTemplateImageWebtop, "webtop", false)
-		kodeTemplateWebtopWithEnvoy = createKodeClusterTemplate(kodeTemplateNameWebtopWithEnvoy, kodeTemplateImageWebtop, "webtop", true)
+		// Create EntryPoint
+		testEntryPoint = &kodev1alpha2.EntryPoint{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      "test-entrypoint",
+				Namespace: resourceNamespace,
+			},
+			Spec: kodev1alpha2.EntryPointSpec{
+				EntryPointSharedSpec: kodev1alpha2.EntryPointSharedSpec{
+					RoutingType: "domain",
+					URL:         "kode.example.com",
+				},
+			},
+		}
+		Expect(k8sClient.Create(ctx, testEntryPoint)).To(Succeed())
 
-		Expect(k8sClient.Create(ctx, kodeTemplateCodeServer)).To(Succeed())
-		Expect(k8sClient.Create(ctx, kodeTemplateCodeServerWithEnvoy)).To(Succeed())
-		Expect(k8sClient.Create(ctx, kodeTemplateWebtop)).To(Succeed())
-		Expect(k8sClient.Create(ctx, kodeTemplateWebtopWithEnvoy)).To(Succeed())
+		// Create PodTemplates
+		podTemplateCodeServer = createPodTemplate(podTemplateNameCodeServer, podTemplateImageCodeServer, "code-server")
+		podTemplateWebtop = createPodTemplate(podTemplateNameWebtop, podTemplateImageWebtop, "webtop")
+
+		Expect(k8sClient.Create(ctx, podTemplateCodeServer)).To(Succeed())
+		Expect(k8sClient.Create(ctx, podTemplateWebtop)).To(Succeed())
 	})
 
 	AfterAll(func() {
 		// Cleanup resources
 		Expect(k8sClient.Delete(ctx, namespace)).To(Succeed())
-		Expect(k8sClient.Delete(ctx, kodeTemplateCodeServer)).To(Succeed())
-		Expect(k8sClient.Delete(ctx, kodeTemplateCodeServerWithEnvoy)).To(Succeed())
-		Expect(k8sClient.Delete(ctx, kodeTemplateWebtop)).To(Succeed())
-		Expect(k8sClient.Delete(ctx, kodeTemplateWebtopWithEnvoy)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, podTemplateCodeServer)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, podTemplateWebtop)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, testEntryPoint)).To(Succeed())
 	})
 
 	DescribeTable("Kode resource creation",
-		func(templateName string, templateType string, withEnvoy bool, expectedContainerCount int, exposePort int32) {
+		func(templateName string, templateType string, expectedContainerCount int, exposePort int32) {
 			kodeName := fmt.Sprintf("%s-%s", kodeResourceName, templateName)
 			statefulSetName := kodeName
 			storageClassName := "standard"
-			kode := &kodev1alpha1.Kode{
+			kode := &kodev1alpha2.Kode{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      kodeName,
 					Namespace: namespace.Name,
 				},
-				Spec: kodev1alpha1.KodeSpec{
-					TemplateRef: kodev1alpha1.KodeTemplateReference{
-						Kind: kodeTemplateKind,
+				Spec: kodev1alpha2.KodeSpec{
+					TemplateRef: kodev1alpha2.KodeTemplateReference{
+						Kind: podTemplateKind,
 						Name: templateName,
 					},
-					Credentials: kodev1alpha1.CredentialsSpec{
+					Credentials: kodev1alpha2.CredentialsSpec{
 						Username: "abc",
 						Password: "123",
 					},
-					Storage: kodev1alpha1.KodeStorageSpec{
+					Storage: kodev1alpha2.KodeStorageSpec{
 						AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
 						Resources: corev1.VolumeResourceRequirements{
 							Requests: corev1.ResourceList{
@@ -127,17 +134,7 @@ var _ = Describe("Kode Controller Integration", Ordered, func() {
 			}
 
 			// Create Kode resource
-			// Ensure the Kode resource doesn't exist before creating
-			err := k8sClient.Get(ctx, types.NamespacedName{Name: kodeName, Namespace: namespace.Name}, &kodev1alpha1.Kode{})
-			if err == nil {
-				Expect(k8sClient.Delete(ctx, kode)).To(Succeed())
-				Eventually(func() error {
-					return k8sClient.Get(ctx, types.NamespacedName{Name: kodeName, Namespace: namespace.Name}, &kodev1alpha1.Kode{})
-				}, timeout, interval).ShouldNot(Succeed())
-			}
-
-			// Create Kode resource
-			Expect(k8sClient.Create(ctx, kode)).To(Succeed()) // Expect the creation to succeed
+			Expect(k8sClient.Create(ctx, kode)).To(Succeed())
 
 			// Check StatefulSet
 			statefulSetLookupKey := types.NamespacedName{Name: kodeName, Namespace: namespace.Name}
@@ -146,19 +143,15 @@ var _ = Describe("Kode Controller Integration", Ordered, func() {
 				return k8sClient.Get(ctx, statefulSetLookupKey, createdStatefulSet)
 			}, timeout, interval).Should(Succeed())
 
-			Expect(createdStatefulSet.Name).To(Equal(kodeName))                                          // Expect the name to be set to the kode name
-			Expect(createdStatefulSet.Spec.Template.Spec.Containers).To(HaveLen(expectedContainerCount)) // Except the container count to be 1 or 2 based on the template
+			Expect(createdStatefulSet.Name).To(Equal(kodeName))
+			Expect(createdStatefulSet.Spec.Template.Spec.Containers).To(HaveLen(expectedContainerCount))
 
 			if templateType == "code-server" {
-				Expect(createdStatefulSet.Spec.Template.Spec.Containers[0].Image).To(Equal(kodeTemplateImageCodeServer))                                                 // Expect the image to be set to the template image
-				Expect(createdStatefulSet.Spec.Template.Spec.Containers[0].Env).To(ContainElement(corev1.EnvVar{Name: "DEFAULT_WORKSPACE", Value: "/config/workspace"})) // Expect the default workspace to be set
+				Expect(createdStatefulSet.Spec.Template.Spec.Containers[0].Image).To(Equal(podTemplateImageCodeServer))
+				Expect(createdStatefulSet.Spec.Template.Spec.Containers[0].Env).To(ContainElement(corev1.EnvVar{Name: "DEFAULT_WORKSPACE", Value: "/config/workspace"}))
 			} else if templateType == "webtop" {
-				Expect(createdStatefulSet.Spec.Template.Spec.Containers[0].Image).To(Equal(kodeTemplateImageWebtop))                                 // Expect the image to be set to the template image
-				Expect(createdStatefulSet.Spec.Template.Spec.Containers[0].Env).To(ContainElement(corev1.EnvVar{Name: "CUSTOM_USER", Value: "abc"})) // Expect the custom user to be set
-			}
-
-			if withEnvoy {
-				Expect(createdStatefulSet.Spec.Template.Spec.Containers).To(ContainElement(HaveField("Name", "envoy-proxy"))) // Expect the envoy proxy container to be present
+				Expect(createdStatefulSet.Spec.Template.Spec.Containers[0].Image).To(Equal(podTemplateImageWebtop))
+				Expect(createdStatefulSet.Spec.Template.Spec.Containers[0].Env).To(ContainElement(corev1.EnvVar{Name: "CUSTOM_USER", Value: "abc"}))
 			}
 
 			// Check PersistentVolumeClaim
@@ -169,23 +162,18 @@ var _ = Describe("Kode Controller Integration", Ordered, func() {
 				return k8sClient.Get(ctx, pvcLookupKey, createdPVC)
 			}, timeout, interval).Should(Succeed())
 
-			// After creating the PVC, update its status to Bound
-			createdPVC.Status.Phase = corev1.ClaimBound
-			Expect(k8sClient.Status().Update(ctx, createdPVC)).To(Succeed())
-
-			Expect(createdPVC.Name).To(Equal(pvcName))                                                                    // Expect the name to be set to the kode name + "pvc"
-			Expect(createdPVC.Spec.AccessModes).To(ContainElement(corev1.ReadWriteOnce))                                  // Expect the access mode to be set to ReadWriteOnce
-			Expect(createdPVC.Spec.Resources.Requests[corev1.ResourceStorage]).To(Equal(resource.MustParse(storageSize))) // Expect the storage size to be set to 1Gi
-			Expect(createdPVC.Spec.StorageClassName).NotTo(BeNil())                                                       // Expect the storage class name to be set
-			Expect(*createdPVC.Spec.StorageClassName).To(Equal(storageClassName))                                         // Expect the storage class name to be set to the specified storage class name'
-			Expect(createdPVC.Status.Phase).To(Or(Equal(corev1.ClaimPending), Equal(corev1.ClaimBound)))                  // Expect the PVC to be in Pending or Bound phase
+			Expect(createdPVC.Name).To(Equal(pvcName))
+			Expect(createdPVC.Spec.AccessModes).To(ContainElement(corev1.ReadWriteOnce))
+			Expect(createdPVC.Spec.Resources.Requests[corev1.ResourceStorage]).To(Equal(resource.MustParse(storageSize)))
+			Expect(createdPVC.Spec.StorageClassName).NotTo(BeNil())
+			Expect(*createdPVC.Spec.StorageClassName).To(Equal(storageClassName))
 
 			// Check if the PVC is mounted in the StatefulSet
 			volumeMount := corev1.VolumeMount{
 				Name:      common.KodeVolumeStorageName,
-				MountPath: "/config", // Adjust this path if necessary
+				MountPath: "/config",
 			}
-			Expect(createdStatefulSet.Spec.Template.Spec.Containers[0].VolumeMounts).To(ContainElement(volumeMount)) // Expect the volume mount to be set to the PVC
+			Expect(createdStatefulSet.Spec.Template.Spec.Containers[0].VolumeMounts).To(ContainElement(volumeMount))
 
 			volume := corev1.Volume{
 				Name: common.KodeVolumeStorageName,
@@ -195,7 +183,7 @@ var _ = Describe("Kode Controller Integration", Ordered, func() {
 					},
 				},
 			}
-			Expect(createdStatefulSet.Spec.Template.Spec.Volumes).To(ContainElement(volume)) // Expect the volume to be set to the PVC
+			Expect(createdStatefulSet.Spec.Template.Spec.Volumes).To(ContainElement(volume))
 
 			// Check Service
 			serviceName := fmt.Sprintf("%s-svc", kodeName)
@@ -205,17 +193,17 @@ var _ = Describe("Kode Controller Integration", Ordered, func() {
 				return k8sClient.Get(ctx, serviceLookupKey, createdService)
 			}, timeout, interval).Should(Succeed())
 
-			Expect(createdService.Name).To(Equal(serviceName))              // Expect the name to be set to the kode name + "svc"
-			Expect(createdService.Spec.Ports).To(HaveLen(1))                // Expect the service to have 1 port
-			Expect(createdService.Spec.Ports[0].Port).To(Equal(exposePort)) // Expect the service port to be set to the template port. Defaults to 8000
+			Expect(createdService.Name).To(Equal(serviceName))
+			Expect(createdService.Spec.Ports).To(HaveLen(1))
+			Expect(createdService.Spec.Ports[0].Port).To(Equal(exposePort))
 
 			// Cleanup
 			By("Deleting the Kode resource")
-			Expect(k8sClient.Delete(ctx, kode)).To(Succeed()) // Expect the deletion to succeed
+			Expect(k8sClient.Delete(ctx, kode)).To(Succeed())
 
 			By("Waiting for Kode resource to be deleted")
 			Eventually(func() bool {
-				err := k8sClient.Get(ctx, types.NamespacedName{Name: kodeName, Namespace: namespace.Name}, &kodev1alpha1.Kode{})
+				err := k8sClient.Get(ctx, types.NamespacedName{Name: kodeName, Namespace: namespace.Name}, &kodev1alpha2.Kode{})
 				return errors.IsNotFound(err)
 			}, timeout, interval).Should(BeTrue(), "Failed to delete Kode resource")
 
@@ -251,21 +239,21 @@ var _ = Describe("Kode Controller Integration", Ordered, func() {
 				return nil
 			}, time.Minute*5, time.Second).Should(Succeed(), "Failed to clean up all resources")
 		},
-		Entry("code-server", kodeTemplateNameCodeServer, "code-server", false, 1, int32(8000), int32(8000)),
-		Entry("webtop", kodeTemplateNameWebtop, "webtop", false, 1, int32(8000), int32(8000)),
+		Entry("code-server", podTemplateNameCodeServer, "code-server", 1, int32(8000)),
+		Entry("webtop", podTemplateNameWebtop, "webtop", 1, int32(8000)),
 	)
 
 	It("should not create a PersistentVolumeClaim when storage is not specified", func() {
 		kodeName := "kode-no-storage"
-		kode := &kodev1alpha1.Kode{
+		kode := &kodev1alpha2.Kode{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      kodeName,
 				Namespace: namespace.Name,
 			},
-			Spec: kodev1alpha1.KodeSpec{
-				TemplateRef: kodev1alpha1.KodeTemplateReference{
-					Kind: kodeTemplateKind,
-					Name: kodeTemplateNameCodeServer,
+			Spec: kodev1alpha2.KodeSpec{
+				TemplateRef: kodev1alpha2.KodeTemplateReference{
+					Kind: podTemplateKind,
+					Name: podTemplateNameCodeServer,
 				},
 				// No storage specification
 			},
@@ -295,33 +283,28 @@ var _ = Describe("Kode Controller Integration", Ordered, func() {
 		// Cleanup
 		Expect(k8sClient.Delete(ctx, kode)).To(Succeed())
 		Eventually(func() bool {
-			err := k8sClient.Get(ctx, types.NamespacedName{Name: kodeName, Namespace: namespace.Name}, &kodev1alpha1.Kode{})
+			err := k8sClient.Get(ctx, types.NamespacedName{Name: kodeName, Namespace: namespace.Name}, &kodev1alpha2.Kode{})
 			return errors.IsNotFound(err)
 		}, timeout, interval).Should(BeTrue())
 	})
 })
 
-func createKodeClusterTemplate(name, image, templateType string, withEnvoy bool) *kodev1alpha1.KodeClusterTemplate {
-	template := &kodev1alpha1.KodeClusterTemplate{
+func createPodTemplate(name, image, templateType string) *kodev1alpha2.PodTemplate {
+	template := &kodev1alpha2.PodTemplate{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: name,
+			Name:      name,
+			Namespace: resourceNamespace,
 		},
-		Spec: kodev1alpha1.KodeClusterTemplateSpec{
-			SharedKodeTemplateSpec: kodev1alpha1.SharedKodeTemplateSpec{
-				ContainerSpec: kodev1alpha1.ContainerSpec{
-					Image: image,
-					Type:  templateType,
+		Spec: kodev1alpha2.PodTemplateSpec{
+			ContainerSharedSpec: kodev1alpha2.ContainerSharedSpec{
+				BaseSharedSpec: kodev1alpha2.BaseSharedSpec{
+					Port: 8000,
 				},
+				Type:  templateType,
+				Image: image,
 			},
 		},
 	}
-
-	// if withEnvoy {
-	// 	template.Spec.EnvoyConfigRef = kodev1alpha1.EnvoyConfigReference{
-	// 		Kind: envoyProxyConfigKind,
-	// 		Name: envoyProxyConfigName,
-	// 	}
-	// }
 
 	return template
 }

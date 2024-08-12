@@ -24,9 +24,9 @@ import (
 
 // Resource represents a generic Kubernetes resource
 type Resource struct {
+	Kind      string
 	Name      string
 	Namespace string
-	Kind      string
 	Object    client.Object
 }
 

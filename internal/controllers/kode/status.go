@@ -1,5 +1,3 @@
-// internal/controllers/kode/utils.go
-
 /*
 Copyright 2024 Emil Larsson.
 
@@ -23,42 +21,42 @@ import (
 	"fmt"
 	"time"
 
-	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
+	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (r *KodeReconciler) updateStatus(ctx context.Context, kode *kodev1alpha1.Kode, phase kodev1alpha1.KodePhase, conditions []metav1.Condition, err error) error {
+func (r *KodeReconciler) updateStatus(ctx context.Context, kode *kodev1alpha2.Kode, phase kodev1alpha2.KodePhase, conditions []metav1.Condition, err error) error {
 	switch phase {
-	case kodev1alpha1.KodePhaseCreating:
+	case kodev1alpha2.KodePhaseCreating:
 		if err := r.updatePhaseCreating(ctx, kode); err != nil {
 			return err
 		}
-	case kodev1alpha1.KodePhaseCreated:
+	case kodev1alpha2.KodePhaseCreated:
 		if err := r.updatePhaseCreated(ctx, kode); err != nil {
 			return err
 		}
-	case kodev1alpha1.KodePhaseFailed:
+	case kodev1alpha2.KodePhaseFailed:
 		if err := r.updatePhaseFailed(ctx, kode, err, conditions); err != nil {
 			return err
 		}
-	case kodev1alpha1.KodePhasePending:
+	case kodev1alpha2.KodePhasePending:
 		if err := r.updatePhasePending(ctx, kode); err != nil {
 			return err
 		}
-	case kodev1alpha1.KodePhaseActive:
+	case kodev1alpha2.KodePhaseActive:
 		if err := r.updatePhaseActive(ctx, kode); err != nil {
 			return err
 		}
-	case kodev1alpha1.KodePhaseInactive:
+	case kodev1alpha2.KodePhaseInactive:
 		if err := r.updatePhaseInactive(ctx, kode); err != nil {
 			return err
 		}
-	case kodev1alpha1.KodePhaseRecycling:
+	case kodev1alpha2.KodePhaseRecycling:
 		if err := r.updatePhaseRecycling(ctx, kode); err != nil {
 			return err
 		}
-	case kodev1alpha1.KodePhaseRecycled:
+	case kodev1alpha2.KodePhaseRecycled:
 		if err := r.updatePhaseRecycled(ctx, kode); err != nil {
 			return err
 		}
@@ -67,9 +65,9 @@ func (r *KodeReconciler) updateStatus(ctx context.Context, kode *kodev1alpha1.Ko
 }
 
 // updatePhaseCreating updates the Kode status to indicate that the resources are being created.
-func (r *KodeReconciler) updatePhaseCreating(ctx context.Context, kode *kodev1alpha1.Kode) error {
+func (r *KodeReconciler) updatePhaseCreating(ctx context.Context, kode *kodev1alpha2.Kode) error {
 	now := metav1.NewTime(time.Now())
-	phase := kodev1alpha1.KodePhaseCreating
+	phase := kodev1alpha2.KodePhaseCreating
 	conditions := []metav1.Condition{
 		{
 			Type:               string(common.ConditionTypeReady),
@@ -84,9 +82,9 @@ func (r *KodeReconciler) updatePhaseCreating(ctx context.Context, kode *kodev1al
 }
 
 // updatePhaseCreated updates the Kode status to indicate that the resources have been created.
-func (r *KodeReconciler) updatePhaseCreated(ctx context.Context, kode *kodev1alpha1.Kode) error {
+func (r *KodeReconciler) updatePhaseCreated(ctx context.Context, kode *kodev1alpha2.Kode) error {
 	now := metav1.NewTime(time.Now())
-	phase := kodev1alpha1.KodePhaseCreated
+	phase := kodev1alpha2.KodePhaseCreated
 	conditions := []metav1.Condition{
 		{
 			Type:               string(common.ConditionTypeReady),
@@ -101,9 +99,9 @@ func (r *KodeReconciler) updatePhaseCreated(ctx context.Context, kode *kodev1alp
 }
 
 // updatePhaseFailed updates the Kode status to indicate that the resource has failed.
-func (r *KodeReconciler) updatePhaseFailed(ctx context.Context, kode *kodev1alpha1.Kode, err error, additionalConditions []metav1.Condition) error {
+func (r *KodeReconciler) updatePhaseFailed(ctx context.Context, kode *kodev1alpha2.Kode, err error, additionalConditions []metav1.Condition) error {
 	now := metav1.NewTime(time.Now())
-	phase := kodev1alpha1.KodePhaseFailed
+	phase := kodev1alpha2.KodePhaseFailed
 	errorMessage := err.Error()
 
 	conditions := []metav1.Condition{
@@ -139,10 +137,10 @@ func (r *KodeReconciler) updatePhaseFailed(ctx context.Context, kode *kodev1alph
 
 	// // If the resource was in the process of being created when it failed
 	// // We need to fetch the current status to check this
-	// kode := &kodev1alpha1.Kode{}
+	// kode := &kodev1alpha2.Kode{}
 	// if err := u.Get(ctx, types.NamespacedName{Name: config.KodeName, Namespace: config.KodeNamespace}, kode); err != nil {
 	// 	log.Error(err, "Failed to fetch Kode for status check")
-	// } else if kode.Status.Phase == kodev1alpha1.KodePhaseCreating {
+	// } else if kode.Status.Phase == kodev1alpha2.KodePhaseCreating {
 	// 	conditions = append(conditions, metav1.Condition{
 	// 		Type:			   string(common.ConditionTypeReady),
 	// 		Status:			   metav1.ConditionFalse,
@@ -159,9 +157,9 @@ func (r *KodeReconciler) updatePhaseFailed(ctx context.Context, kode *kodev1alph
 }
 
 // updatePhasePending updates the Kode status to indicate that the resources are pending.
-func (r *KodeReconciler) updatePhasePending(ctx context.Context, kode *kodev1alpha1.Kode) error {
+func (r *KodeReconciler) updatePhasePending(ctx context.Context, kode *kodev1alpha2.Kode) error {
 	now := metav1.NewTime(time.Now())
-	phase := kodev1alpha1.KodePhasePending
+	phase := kodev1alpha2.KodePhasePending
 	conditions := []metav1.Condition{
 		{
 			Type:               string(common.ConditionTypeProgressing),
@@ -190,9 +188,9 @@ func (r *KodeReconciler) updatePhasePending(ctx context.Context, kode *kodev1alp
 }
 
 // updatePhaseActive updates the Kode status to indicate that the resources are active.
-func (r *KodeReconciler) updatePhaseActive(ctx context.Context, kode *kodev1alpha1.Kode) error {
+func (r *KodeReconciler) updatePhaseActive(ctx context.Context, kode *kodev1alpha2.Kode) error {
 	now := metav1.NewTime(time.Now())
-	phase := kodev1alpha1.KodePhaseActive
+	phase := kodev1alpha2.KodePhaseActive
 	conditions := []metav1.Condition{
 		{
 			Type:               string(common.ConditionTypeReady),
@@ -221,9 +219,9 @@ func (r *KodeReconciler) updatePhaseActive(ctx context.Context, kode *kodev1alph
 }
 
 // updatePhaseInactive updates the Kode status to indicate that the resources are inactive.
-func (r *KodeReconciler) updatePhaseInactive(ctx context.Context, kode *kodev1alpha1.Kode) error {
+func (r *KodeReconciler) updatePhaseInactive(ctx context.Context, kode *kodev1alpha2.Kode) error {
 	now := metav1.NewTime(time.Now())
-	phase := kodev1alpha1.KodePhaseInactive
+	phase := kodev1alpha2.KodePhaseInactive
 	conditions := []metav1.Condition{
 		{
 			Type:               string(common.ConditionTypeReady),
@@ -252,9 +250,9 @@ func (r *KodeReconciler) updatePhaseInactive(ctx context.Context, kode *kodev1al
 }
 
 // updatePhaseRecycling updates the Kode status to indicate that the resources are being recycled.
-func (r *KodeReconciler) updatePhaseRecycling(ctx context.Context, kode *kodev1alpha1.Kode) error {
+func (r *KodeReconciler) updatePhaseRecycling(ctx context.Context, kode *kodev1alpha2.Kode) error {
 	now := metav1.NewTime(time.Now())
-	phase := kodev1alpha1.KodePhaseRecycling
+	phase := kodev1alpha2.KodePhaseRecycling
 	conditions := []metav1.Condition{
 		{
 			Type:               string(common.ConditionTypeProgressing),
@@ -282,9 +280,9 @@ func (r *KodeReconciler) updatePhaseRecycling(ctx context.Context, kode *kodev1a
 	return r.StatusUpdater.UpdateStatusKode(ctx, kode, phase, conditions, "", nil)
 }
 
-func (r *KodeReconciler) updatePhaseRecycled(ctx context.Context, kode *kodev1alpha1.Kode) error {
+func (r *KodeReconciler) updatePhaseRecycled(ctx context.Context, kode *kodev1alpha2.Kode) error {
 	now := metav1.NewTime(time.Now())
-	phase := kodev1alpha1.KodePhaseRecycled
+	phase := kodev1alpha2.KodePhaseRecycled
 	conditions := []metav1.Condition{
 		{
 			Type:               string(common.ConditionTypeReady),

@@ -20,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
+	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -38,15 +38,15 @@ func (r *EntryPointReconciler) ensureResources(ctx context.Context, config *comm
 	if entry.Generation != entry.Status.ObservedGeneration {
 		log.Info("Resource has changed, ensuring all resources", "Generation", entry.Generation, "ObservedGeneration", entry.Status.ObservedGeneration)
 		// Update status depending on the current phase
-		if entry.Status.Phase != kodev1alpha1.EntryPointPhasePending {
+		if entry.Status.Phase != kodev1alpha2.EntryPointPhasePending {
 			// If the EntryPoint is already Active, update the status to Pending
-			if entry.Status.Phase == kodev1alpha1.EntryPointPhaseActive {
-				if err := r.updateStatus(ctx, entry, kodev1alpha1.EntryPointPhasePending, []metav1.Condition{}, nil); err != nil {
+			if entry.Status.Phase == kodev1alpha2.EntryPointPhaseActive {
+				if err := r.updateStatus(ctx, entry, kodev1alpha2.EntryPointPhasePending, []metav1.Condition{}, nil); err != nil {
 					log.Error(err, "Failed to update status to Pending")
 					return err
 				}
 			} else { // If the EntryPoint is not Active, update the status to Creating
-				if err := r.updateStatus(ctx, entry, kodev1alpha1.EntryPointPhaseCreating, []metav1.Condition{}, nil); err != nil {
+				if err := r.updateStatus(ctx, entry, kodev1alpha2.EntryPointPhaseCreating, []metav1.Condition{}, nil); err != nil {
 					log.Error(err, "Failed to update status to Creating")
 					return err
 				}
@@ -54,15 +54,15 @@ func (r *EntryPointReconciler) ensureResources(ctx context.Context, config *comm
 		}
 
 		// Update status depending on the current phase
-		if entry.Status.Phase != kodev1alpha1.EntryPointPhasePending {
+		if entry.Status.Phase != kodev1alpha2.EntryPointPhasePending {
 			// If the EntryPoint is Active, update the status to Pending
-			if entry.Status.Phase == kodev1alpha1.EntryPointPhaseActive {
-				if err := r.updateStatus(ctx, entry, kodev1alpha1.EntryPointPhasePending, []metav1.Condition{}, nil); err != nil {
+			if entry.Status.Phase == kodev1alpha2.EntryPointPhaseActive {
+				if err := r.updateStatus(ctx, entry, kodev1alpha2.EntryPointPhasePending, []metav1.Condition{}, nil); err != nil {
 					log.Error(err, "Failed to update status to Pending")
 					return err
 				}
 			} else { // If the EntryPoint is not Active, update the status to Created
-				if err := r.updateStatus(ctx, entry, kodev1alpha1.EntryPointPhaseCreating, []metav1.Condition{}, nil); err != nil {
+				if err := r.updateStatus(ctx, entry, kodev1alpha2.EntryPointPhaseCreating, []metav1.Condition{}, nil); err != nil {
 					log.Error(err, "Failed to update status to Creating")
 					return err
 				}

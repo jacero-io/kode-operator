@@ -19,7 +19,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
 
 	"github.com/go-logr/zapr"
-	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
+
+	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/cleanup"
 	entrypointcontroller "github.com/jacero-io/kode-operator/internal/controllers/entrypoint"
 	kodecontroller "github.com/jacero-io/kode-operator/internal/controllers/kode"
@@ -38,7 +39,8 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 
-	utilruntime.Must(kodev1alpha1.AddToScheme(scheme))
+	utilruntime.Must(kodev1alpha2.AddToScheme(scheme))
+	utilruntime.Must(kodev1alpha2.AddToScheme(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 

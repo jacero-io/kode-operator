@@ -1,5 +1,3 @@
-// internal/controllers/kode/ensure_service.go
-
 /*
 Copyright 2024 Emil Larsson.
 
@@ -22,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
+	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,7 +29,7 @@ import (
 )
 
 // ensureService ensures that the Service exists for the Kode instance
-func (r *KodeReconciler) ensureService(ctx context.Context, config *common.KodeResourceConfig, kode *kodev1alpha1.Kode) error {
+func (r *KodeReconciler) ensureService(ctx context.Context, config *common.KodeResourceConfig, kode *kodev1alpha2.Kode) error {
 	log := r.Log.WithName("ServiceEnsurer").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	ctx, cancel := common.ContextWithTimeout(ctx, 30) // 30 seconds timeout
@@ -78,8 +76,8 @@ func (r *KodeReconciler) constructServiceSpec(config *common.KodeResourceConfig)
 			Selector: config.CommonConfig.Labels,
 			Ports: []corev1.ServicePort{{
 				Protocol:   corev1.ProtocolTCP,
-				Port:       config.ExternalServicePort,
-				TargetPort: intstr.FromInt(int(config.ExternalServicePort)),
+				Port:       config.Port,
+				TargetPort: intstr.FromInt(int(config.Port)),
 			}},
 		},
 	}

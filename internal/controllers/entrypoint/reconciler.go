@@ -25,7 +25,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/go-logr/logr"
-	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
+	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/cleanup"
 	"github.com/jacero-io/kode-operator/internal/resource"
 	"github.com/jacero-io/kode-operator/internal/status"
@@ -58,7 +58,7 @@ func (r *EntryPointReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	log := r.Log.WithValues("kode", req.NamespacedName)
 
 	// Fetch the EntryPoint instance
-	entryPoint := &kodev1alpha1.EntryPoint{}
+	entryPoint := &kodev1alpha2.EntryPoint{}
 	err := r.Client.Get(ctx, req.NamespacedName, entryPoint)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -75,6 +75,6 @@ func (r *EntryPointReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 // SetupWithManager sets up the controller with the Manager.
 func (r *EntryPointReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&kodev1alpha1.EntryPoint{}).
+		For(&kodev1alpha2.EntryPoint{}).
 		Complete(r)
 }

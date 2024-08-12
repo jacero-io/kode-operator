@@ -1,5 +1,3 @@
-// internal/controllers/kode/utils.go
-
 /*
 Copyright 2024 Emil Larsson.
 
@@ -19,15 +17,15 @@ limitations under the License.
 package kode
 
 import (
-	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
+	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 )
 
 // returns the name of the PersistentVolumeClaim for the Kode instance
-func GetPVCName(kode *kodev1alpha1.Kode) string {
+func GetPVCName(kode *kodev1alpha2.Kode) string {
 	return kode.Name + "-pvc"
 }
 
 // returns the name of the Kode service
-func GetServiceName(kode *kodev1alpha1.Kode) string {
+func GetServiceName(kode *kodev1alpha2.Kode) string {
 	return kode.Name + "-svc"
 }

@@ -1,5 +1,3 @@
-// internal/controllers/kode/ensure_secret.go
-
 /*
 Copyright 2024 Emil Larsson.
 
@@ -22,7 +20,7 @@ import (
 	"context"
 	"fmt"
 
-	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
+	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,7 +29,7 @@ import (
 )
 
 // ensureSecret ensures that the Secret exists for the Kode instance
-func (r *KodeReconciler) ensureSecret(ctx context.Context, config *common.KodeResourceConfig, kode *kodev1alpha1.Kode) error {
+func (r *KodeReconciler) ensureSecret(ctx context.Context, config *common.KodeResourceConfig, kode *kodev1alpha2.Kode) error {
 	log := r.Log.WithName("SecretEnsurer").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	ctx, cancel := common.ContextWithTimeout(ctx, 30) // 30 seconds timeout

@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
+	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,14 +34,14 @@ func GetCurrentTime() metav1.Time {
 	return metav1.NewTime(time.Now())
 }
 
-func GetLatestKode(ctx context.Context, client client.Client, name, namespace string) (*kodev1alpha1.Kode, error) {
-	kode := &kodev1alpha1.Kode{}
+func GetLatestKode(ctx context.Context, client client.Client, name, namespace string) (*kodev1alpha2.Kode, error) {
+	kode := &kodev1alpha2.Kode{}
 	err := client.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, kode)
 	return kode, err
 }
 
-func GetLatestEntryPoint(ctx context.Context, client client.Client, name, namespace string) (*kodev1alpha1.EntryPoint, error) {
-	entryPoint := &kodev1alpha1.EntryPoint{}
+func GetLatestEntryPoint(ctx context.Context, client client.Client, name, namespace string) (*kodev1alpha2.EntryPoint, error) {
+	entryPoint := &kodev1alpha2.EntryPoint{}
 	err := client.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, entryPoint)
 	return entryPoint, err
 }

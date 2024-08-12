@@ -70,7 +70,7 @@ tasks:
       - rm -rf coverage
       - mkdir -p coverage
       - |
-        KUBEBUILDER_ASSETS="$({{.LOCALBIN}}/setup-envtest use {{.ENVTEST_K8S_VERSION}} --bin-dir {{.LOCALBIN}} -p path)" \
+        KUBEBUILDER_ASSETS="$({{.LOCALBIN}}/setup-envtest-{{.ENVTEST_VERSION}} use {{.ENVTEST_K8S_VERSION}} --bin-dir {{.LOCALBIN}} -p path)" \
         go test {{.TEST_VERBOSITY}} ./test/integration/...
     deps:
       - manifests
@@ -187,15 +187,20 @@ tasks:
 
   run:
     desc: Run a controller from your host
+    vars:
+      LOG_LEVEL: 'debug'
     cmds:
       - '{{.LOCALBIN}}/controller-gen rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases'
-      - ENV={{.ENV}} go run ./cmd/main.go --log-level {{.LOG_LEVEL}}
+      - |
+        LOG_LEVEL_ARG="{{if .LOG_LEVEL}}{{.LOG_LEVEL}}{{else}}debug{{end}}"
+        ENV={{.ENV}} go run ./cmd/main.go --log-level $LOG_LEVEL_ARG {{.CLI_ARGS}}
     deps:
       - controller-gen
       - manifests
       - generate
       - fmt
       - vet
+      - install
 
   docker-build:
     desc: Build docker image with the manager

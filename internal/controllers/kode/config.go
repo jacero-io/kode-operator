@@ -1,5 +1,3 @@
-// internal/controllers/kode/config.go
-
 /*
 Copyright 2024 Emil Larsson.
 
@@ -21,17 +19,16 @@ package kode
 import (
 	"fmt"
 
-	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
+	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
 	corev1 "k8s.io/api/core/v1"
 )
 
 func InitKodeResourcesConfig(
-	kode *kodev1alpha1.Kode,
-	templates *common.Templates) *common.KodeResourceConfig {
+	kode *kodev1alpha2.Kode,
+	template *kodev1alpha2.Template) *common.KodeResourceConfig {
 
-	var localServicePort int32
-	var externalServicePort int32
+	var kodePort int32
 	var secretName string
 
 	// If ExistingSecret is specified, use it
@@ -41,43 +38,39 @@ func InitKodeResourcesConfig(
 		secretName = fmt.Sprintf("%s-auth", kode.Name)
 	}
 
-	localServicePort = templates.KodeTemplate.Port
-	externalServicePort = templates.KodeTemplate.Port
+	kodePort = template.Port
 
 	pvcName := GetPVCName(kode)
 	serviceName := GetServiceName(kode)
 
 	return &common.KodeResourceConfig{
 		CommonConfig: common.CommonConfig{
-			Labels:    createLabels(kode, templates),
+			Labels:    createLabels(kode, template),
 			Name:      kode.Name,
 			Namespace: kode.Namespace,
 		},
-
-		KodeSpec:            kode.Spec,
-		Credentials:         kodev1alpha1.CredentialsSpec{},
-		TemplateInitPlugins: templates.KodeTemplate.ContainerSpec.InitPlugins,
-		UserInitPlugins:     kode.Spec.InitPlugins,
+		KodeSpec:    kode.Spec,
+		Credentials: kodev1alpha2.CredentialsSpec{},
+		Port:        kodePort,
 
 		SecretName:      secretName,
 		StatefulSetName: kode.Name,
 		PVCName:         pvcName,
 		ServiceName:     serviceName,
 
-		Templates:      *templates,
-		Containers:     []corev1.Container{},
-		InitContainers: []corev1.Container{},
+		UserInitPlugins: kode.Spec.InitPlugins,
+		Containers:      []corev1.Container{},
+		InitContainers:  []corev1.Container{},
 
-		LocalServicePort:    localServicePort,
-		ExternalServicePort: externalServicePort,
+		Template: template,
 	}
 }
 
-func createLabels(kode *kodev1alpha1.Kode, templates *common.Templates) map[string]string {
+func createLabels(kode *kodev1alpha2.Kode, template *kodev1alpha2.Template) map[string]string {
 	return map[string]string{
 		"app.kubernetes.io/name":       kode.Name,
 		"app.kubernetes.io/managed-by": "kode-operator",
 		"kode.jacero.io/name":          kode.Name,
-		"template.kode.jacero.io/name": templates.KodeTemplateName,
+		"template.kode.jacero.io/name": template.Name,
 	}
 }

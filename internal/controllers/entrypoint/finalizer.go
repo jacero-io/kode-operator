@@ -24,18 +24,18 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
+	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
 )
 
-func (r *EntryPointReconciler) handleFinalizer(ctx context.Context, entry *kodev1alpha1.EntryPoint) (ctrl.Result, error) {
+func (r *EntryPointReconciler) handleFinalizer(ctx context.Context, entry *kodev1alpha2.EntryPoint) (ctrl.Result, error) {
 	log := r.Log.WithValues("entry", client.ObjectKeyFromObject(entry))
 
 	if entry.ObjectMeta.DeletionTimestamp.IsZero() {
 		// Object is not being deleted, so ensure the finalizer is present
-		if !entry.HasFinalizer() {
-			entry.AddFinalizer()
-			log.Info("Adding finalizer", "finalizer", entry.GetFinalizer())
+		if !controllerutil.ContainsFinalizer(entry, common.FinalizerName) {
+			controllerutil.AddFinalizer(entry, common.FinalizerName)
+			log.Info("Adding finalizer", "finalizer", common.FinalizerName)
 			if err := r.Client.Update(ctx, entry); err != nil {
 				log.Error(err, "Failed to add finalizer")
 				return ctrl.Result{}, err
@@ -73,23 +73,17 @@ func (r *EntryPointReconciler) handleFinalizer(ctx context.Context, entry *kodev
 			return ctrl.Result{}, err
 		}
 	}
+
+	return ctrl.Result{}, nil
 }
 
-func (r *EntryPointReconciler) finalize(ctx context.Context, entry *kodev1alpha1.EntryPoint) error {
-	log := r.Log.WithValues("kode", client.ObjectKeyFromObject(entry))
+func (r *EntryPointReconciler) finalize(ctx context.Context, entry *kodev1alpha2.EntryPoint) error {
+	log := r.Log.WithValues("entrypoint", client.ObjectKeyFromObject(entry))
 
-	// Initialize Kode resources config without templates
-	config := &common.EntryPointResourceConfig{
-		CommonConfig:    common.CommonConfig{
-			Name:      entry.Name,
-			Namespace: entry.Namespace,
-			Labels:    entry.Labels,
-		},
-		EntryPointSpec: entry.Spec,
-	}
+	cleanupResource := NewEntryPointCleanupResource(entry)
 
 	// Perform cleanup
-	err := r.CleanupManager.Cleanup(ctx, config)
+	err := r.CleanupManager.Cleanup(ctx, cleanupResource)
 	if err != nil {
 		log.Error(err, "Failed to cleanup resources")
 		return err
@@ -98,4 +92,3 @@ func (r *EntryPointReconciler) finalize(ctx context.Context, entry *kodev1alpha1
 	log.Info("Finalization completed successfully")
 	return nil
 }
-

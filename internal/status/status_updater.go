@@ -22,7 +22,7 @@ import (
 	"context"
 
 	"github.com/go-logr/logr"
-	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
+	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
@@ -42,8 +42,8 @@ func NewDefaultStatusUpdater(client client.Client, log logr.Logger) StatusUpdate
 }
 
 func (u *defaultStatusUpdater) UpdateStatusKode(ctx context.Context,
-	kode *kodev1alpha1.Kode,
-	phase kodev1alpha1.KodePhase,
+	kode *kodev1alpha2.Kode,
+	phase kodev1alpha2.KodePhase,
 	newConditions []metav1.Condition,
 	lastError string,
 	lastErrorTime *metav1.Time) error {
@@ -83,8 +83,8 @@ func (u *defaultStatusUpdater) UpdateStatusKode(ctx context.Context,
 }
 
 func (u *defaultStatusUpdater) UpdateStatusEntryPoint(ctx context.Context,
-	entry *kodev1alpha1.EntryPoint,
-	phase kodev1alpha1.EntryPointPhase,
+	entry *kodev1alpha2.EntryPoint,
+	phase kodev1alpha2.EntryPointPhase,
 	conditions []metav1.Condition,
 	lastError string,
 	lastErrorTime *metav1.Time) error {

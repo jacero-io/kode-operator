@@ -19,11 +19,11 @@ limitations under the License.
 package entrypoint
 
 import (
-	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
+	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
 )
 
-func InitEntryPointResourcesConfig(entryPoint *kodev1alpha1.EntryPoint) *common.EntryPointResourceConfig {
+func InitEntryPointResourcesConfig(entryPoint *kodev1alpha2.EntryPoint) *common.EntryPointResourceConfig {
 	return &common.EntryPointResourceConfig{
 		EntryPointSpec: entryPoint.Spec,
 		CommonConfig: common.CommonConfig{
@@ -34,7 +34,7 @@ func InitEntryPointResourcesConfig(entryPoint *kodev1alpha1.EntryPoint) *common.
 	}
 }
 
-func createLabels(entrypoint *kodev1alpha1.EntryPoint) map[string]string {
+func createLabels(entrypoint *kodev1alpha2.EntryPoint) map[string]string {
 	return map[string]string{
 		"app.kubernetes.io/name":       entrypoint.Name,
 		"app.kubernetes.io/managed-by": "kode-operator",

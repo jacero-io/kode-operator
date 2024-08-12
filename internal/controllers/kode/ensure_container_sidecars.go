@@ -1,5 +1,3 @@
-// internal/controllers/kode/ensure_envoy.go
-
 /*
 Copyright 2024 Emil Larsson.
 
@@ -21,13 +19,13 @@ package kode
 import (
 	"context"
 
-	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
+	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
 	// "github.com/jacero-io/kode-operator/internal/envoy"
 )
 
 // ensureSidecarContainers ensures that the Envoy container exists for the Kode instance
-func (r *KodeReconciler) ensureSidecarContainers(ctx context.Context, config *common.KodeResourceConfig, kode *kodev1alpha1.Kode) error {
+func (r *KodeReconciler) ensureSidecarContainers(ctx context.Context, config *common.KodeResourceConfig, kode *kodev1alpha2.Kode) error {
 	log := r.Log.WithName("SidecarContainerEnsurer").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	log.V(1).Info("Ensuring sidecar containers")
@@ -65,11 +63,11 @@ func (r *KodeReconciler) ensureSidecarContainers(ctx context.Context, config *co
 	// 				LastTransitionTime: now,
 	// 			}
 	// 		}
-	// 		return r.updateStatus(ctx, kode, kodev1alpha1.KodePhaseFailed, []metav1.Condition{condition}, err)
+	// 		return r.updateStatus(ctx, kode, kodev1alpha2.KodePhaseFailed, []metav1.Condition{condition}, err)
 	// 	}
 
 	// 	// Handle other sidecar container errors
-	// 	return r.updateStatus(ctx, kode, kodev1alpha1.KodePhaseFailed, []metav1.Condition{{
+	// 	return r.updateStatus(ctx, kode, kodev1alpha2.KodePhaseFailed, []metav1.Condition{{
 	// 		Type:               "SidecarContainerCreationFailed",
 	// 		Status:             metav1.ConditionTrue,
 	// 		Reason:             "SidecarContainerCreationError",

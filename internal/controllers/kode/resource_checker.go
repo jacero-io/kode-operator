@@ -1,5 +1,3 @@
-// internal/controllers/kode/resource_checker.go
-
 /*
 Copyright 2024 Emil Larsson.
 

@@ -69,6 +69,22 @@ rules:
 - apiGroups:
   - kode.kode.jacero.io
   resources:
+  - clusterpodtemplates
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - kode.kode.jacero.io
+  resources:
+  - clustertofutemplates
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - kode.kode.jacero.io
+  resources:
   - kodeclustertemplates
   verbs:
   - get
@@ -104,6 +120,22 @@ rules:
   - kode.kode.jacero.io
   resources:
   - kodetemplates
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - kode.kode.jacero.io
+  resources:
+  - podtemplates
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
+  - kode.kode.jacero.io
+  resources:
+  - tofutemplates
   verbs:
   - get
   - list

@@ -19,11 +19,10 @@ package template
 import (
 	"context"
 
-	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
-	"github.com/jacero-io/kode-operator/internal/common"
+	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 )
 
 // TemplateManager defines the interface for managing Kode templates
 type TemplateManager interface {
-	Fetch(ctx context.Context, ref kodev1alpha1.KodeTemplateReference) (*common.Templates, error)
+	Fetch(ctx context.Context, ref kodev1alpha2.KodeTemplateReference) (*kodev1alpha2.Template, error)
 }

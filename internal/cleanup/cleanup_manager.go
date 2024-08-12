@@ -24,7 +24,6 @@ import (
 
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -32,14 +31,12 @@ import (
 type defaultCleanupManager struct {
 	client client.Client
 	log    logr.Logger
-	scheme *runtime.Scheme
 }
 
-func NewDefaultCleanupManager(client client.Client, log logr.Logger, scheme *runtime.Scheme) CleanupManager {
+func NewDefaultCleanupManager(client client.Client, log logr.Logger) CleanupManager {
 	return &defaultCleanupManager{
 		client: client,
 		log:    log,
-		scheme: scheme,
 	}
 }
 

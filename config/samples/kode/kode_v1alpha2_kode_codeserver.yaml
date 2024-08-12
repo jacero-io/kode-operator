@@ -1,0 +1,23 @@
+apiVersion: kode.jacero.io/v1alpha2
+kind: Kode
+metadata:
+  labels:
+    app.kubernetes.io/name: kode-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: kode-codeserver-sample
+  namespace: default
+spec:
+  credentials:
+    username: user1
+    password: password1
+  templateRef:
+    kind: PodTemplate
+    name: podtemplate-codeserver-sample
+    namespace: default
+  storage:
+    accessModes:
+      - ReadWriteOnce
+    resources:
+      requests:
+        storage: 1Gi
+    storageClassName: standard

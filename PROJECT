@@ -15,31 +15,52 @@ resources:
   domain: jacero.io
   group: kode
   kind: Kode
-  path: github.com/jacero-io/kode-operator/api/v1alpha1
-  version: v1alpha1
+  path: github.com/jacero-io/kode-operator/api/v1alpha2
+  version: v1alpha2
 - api:
     crdVersion: v1
     namespaced: true
-  domain: jacero.io
-  group: kode
-  kind: KodeTemplate
-  path: github.com/jacero-io/kode-operator/api/v1alpha1
-  version: v1alpha1
-- api:
-    crdVersion: v1
-    namespaced: true
-  domain: jacero.io
-  group: kode
-  kind: KodeClusterTemplate
-  path: github.com/jacero-io/kode-operator/api/v1alpha1
-  version: v1alpha1
-- api:
-    crdVersion: v1
-    namespaced: true
-  controller: true
   domain: jacero.io
   group: kode
   kind: EntryPoint
-  path: github.com/jacero-io/kode-operator/api/v1alpha1
-  version: v1alpha1
+  path: github.com/jacero-io/kode-operator/api/v1alpha2
+  version: v1alpha2
+- api:
+    crdVersion: v1
+  domain: jacero.io
+  group: kode
+  kind: ClusterEntryPoint
+  path: github.com/jacero-io/kode-operator/api/v1alpha2
+  version: v1alpha2
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: jacero.io
+  group: kode
+  kind: TofuTemplate
+  path: github.com/jacero-io/kode-operator/api/v1alpha2
+  version: v1alpha2
+- api:
+    crdVersion: v1
+  domain: jacero.io
+  group: kode
+  kind: ClusterTofuTemplate
+  path: github.com/jacero-io/kode-operator/api/v1alpha2
+  version: v1alpha2
+- api:
+    crdVersion: v1
+    namespaced: true
+  domain: jacero.io
+  group: kode
+  kind: PodTemplate
+  path: github.com/jacero-io/kode-operator/api/v1alpha2
+  version: v1alpha2
+- api:
+    crdVersion: v1
+    namespaced: false
+  domain: jacero.io
+  group: kode
+  kind: ClusterPodTemplate
+  path: github.com/jacero-io/kode-operator/api/v1alpha2
+  version: v1alpha2
 version: "3"
