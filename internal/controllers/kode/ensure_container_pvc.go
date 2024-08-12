@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package kode
 
 import (
 	"context"
@@ -32,8 +32,8 @@ import (
 )
 
 // ensurePVC ensures that the PersistentVolumeClaim exists for the Kode instance
-func (r *KodeReconciler) ensurePVC(ctx context.Context, config *common.KodeResourcesConfig, kode *kodev1alpha1.Kode) error {
-	log := r.Log.WithName("PVCEnsurer").WithValues("kode", common.ObjectKeyFromConfig(config))
+func (r *KodeReconciler) ensurePVC(ctx context.Context, config *common.KodeResourceConfig, kode *kodev1alpha1.Kode) error {
+	log := r.Log.WithName("PVCEnsurer").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	ctx, cancel := common.ContextWithTimeout(ctx, 30) // 30 seconds timeout
 	defer cancel()
@@ -49,7 +49,7 @@ func (r *KodeReconciler) ensurePVC(ctx context.Context, config *common.KodeResou
 	pvc := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      config.PVCName,
-			Namespace: config.KodeNamespace,
+			Namespace: config.CommonConfig.Namespace,
 		},
 	}
 
@@ -110,14 +110,14 @@ func (r *KodeReconciler) ensurePVC(ctx context.Context, config *common.KodeResou
 // }
 
 // constructPVCSpec constructs a PersistentVolumeClaim for the Kode instance
-func (r *KodeReconciler) constructPVCSpec(config *common.KodeResourcesConfig) (*corev1.PersistentVolumeClaim, error) {
-	log := r.Log.WithName("PvcConstructor").WithValues("kode", common.ObjectKeyFromConfig(config))
+func (r *KodeReconciler) constructPVCSpec(config *common.KodeResourceConfig) (*corev1.PersistentVolumeClaim, error) {
+	log := r.Log.WithName("PvcConstructor").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	pvc := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      config.PVCName,
-			Namespace: config.KodeNamespace,
-			Labels:    config.Labels,
+			Namespace: config.CommonConfig.Namespace,
+			Labels:    config.CommonConfig.Labels,
 			// Finalizers: []string{common.PVCFinalizerName},
 		},
 		Spec: corev1.PersistentVolumeClaimSpec{

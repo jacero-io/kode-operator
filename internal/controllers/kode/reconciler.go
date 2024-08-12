@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package kode
 
 import (
 	"context"
@@ -61,8 +61,6 @@ const (
 // +kubebuilder:rbac:groups=kode.kode.jacero.io,resources=kodes/finalizers,verbs=update
 // +kubebuilder:rbac:groups=kode.kode.jacero.io,resources=kodetemplates,verbs=get;list;watch
 // +kubebuilder:rbac:groups=kode.kode.jacero.io,resources=kodeclustertemplates,verbs=get;list;watch
-// +kubebuilder:rbac:groups=kode.kode.jacero.io,resources=envoyproxyconfig,verbs=get;list;watch
-// +kubebuilder:rbac:groups=kode.kode.jacero.io,resources=envoyproxyclusterconfig,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
@@ -74,7 +72,7 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	kode, err := common.GetLatestKode(ctx, r.Client, req.Name, req.Namespace)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			log.Info("Kode resource not found. Ignoring since object must be deleted.")
+			log.V(1).Info("Kode resource not found. Ignoring since object must be deleted.")
 			return ctrl.Result{}, nil
 		}
 		log.Error(err, "Failed to get Kode")

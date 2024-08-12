@@ -87,6 +87,7 @@ func (in *ContainerSpec) DeepCopyInto(out *ContainerSpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	in.Resources.DeepCopyInto(&out.Resources)
 	if in.AllowPrivileged != nil {
 		in, out := &in.AllowPrivileged, &out.AllowPrivileged
 		*out = new(bool)
@@ -866,6 +867,7 @@ func (in *SharedKodeTemplateSpec) DeepCopyInto(out *SharedKodeTemplateSpec) {
 	out.EntryPointRef = in.EntryPointRef
 	in.ContainerSpec.DeepCopyInto(&out.ContainerSpec)
 	in.VirtualMachineSpec.DeepCopyInto(&out.VirtualMachineSpec)
+	in.TofuSpec.DeepCopyInto(&out.TofuSpec)
 	if in.InactiveAfterSeconds != nil {
 		in, out := &in.InactiveAfterSeconds, &out.InactiveAfterSeconds
 		*out = new(int64)

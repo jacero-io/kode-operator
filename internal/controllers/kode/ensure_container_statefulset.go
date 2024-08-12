@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package kode
 
 import (
 	"context"
@@ -32,8 +32,8 @@ import (
 )
 
 // ensureStatefulSet ensures that the StatefulSet exists for the Kode instance
-func (r *KodeReconciler) ensureStatefulSet(ctx context.Context, config *common.KodeResourcesConfig, kode *kodev1alpha1.Kode) error {
-	log := r.Log.WithName("StatefulSetEnsurer").WithValues("kode", common.ObjectKeyFromConfig(config))
+func (r *KodeReconciler) ensureStatefulSet(ctx context.Context, config *common.KodeResourceConfig, kode *kodev1alpha1.Kode) error {
+	log := r.Log.WithName("StatefulSetEnsurer").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	ctx, cancel := common.ContextWithTimeout(ctx, 30) // 30 seconds timeout
 	defer cancel()
@@ -42,8 +42,8 @@ func (r *KodeReconciler) ensureStatefulSet(ctx context.Context, config *common.K
 
 	statefulSet := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      config.KodeName,
-			Namespace: config.KodeNamespace,
+			Name:      config.CommonConfig.Name,
+			Namespace: config.CommonConfig.Namespace,
 		},
 	}
 
@@ -70,8 +70,8 @@ func (r *KodeReconciler) ensureStatefulSet(ctx context.Context, config *common.K
 }
 
 // constructStatefulSetSpec constructs a StatefulSet for the Kode instance
-func (r *KodeReconciler) constructStatefulSetSpec(config *common.KodeResourcesConfig) (*appsv1.StatefulSet, error) {
-	log := r.Log.WithName("SatefulSetConstructor").WithValues("kode", common.ObjectKeyFromConfig(config))
+func (r *KodeReconciler) constructStatefulSetSpec(config *common.KodeResourceConfig) (*appsv1.StatefulSet, error) {
+	log := r.Log.WithName("SatefulSetConstructor").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	replicas := int32(1)
 	templateSpec := config.Templates.KodeTemplate
@@ -105,7 +105,7 @@ func (r *KodeReconciler) constructStatefulSetSpec(config *common.KodeResourcesCo
 	log.V(1).Info("Constructed volumes and mounts", "volumes", volumes, "volumeMounts", volumeMounts)
 	containers[0].VolumeMounts = volumeMounts
 
-	// If KodeResourcesConfig has initContainers, append to initContainers
+	// If KodeResourceConfig has initContainers, append to initContainers
 	if config.InitContainers != nil {
 		initContainers = append(initContainers, config.InitContainers...)
 		for _, container := range config.Containers {
@@ -114,7 +114,7 @@ func (r *KodeReconciler) constructStatefulSetSpec(config *common.KodeResourcesCo
 		}
 	}
 
-	// If KodeResourcesConfig has containers, append to containers
+	// If KodeResourceConfig has containers, append to containers
 	if config.Containers != nil {
 		containers = append(containers, config.Containers...)
 		for _, container := range config.Containers {
@@ -136,18 +136,18 @@ func (r *KodeReconciler) constructStatefulSetSpec(config *common.KodeResourcesCo
 	statefulSet := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      config.StatefulSetName,
-			Namespace: config.KodeNamespace,
-			Labels:    config.Labels,
+			Namespace: config.CommonConfig.Namespace,
+			Labels:    config.CommonConfig.Labels,
 		},
 		Spec: appsv1.StatefulSetSpec{
 			Replicas: &replicas,
 			Selector: &metav1.LabelSelector{
-				MatchLabels: config.Labels,
+				MatchLabels: config.CommonConfig.Labels,
 			},
 			ServiceName: config.ServiceName,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels:            config.Labels,
+					Labels:            config.CommonConfig.Labels,
 					CreationTimestamp: metav1.Time{},
 				},
 				Spec: corev1.PodSpec{
@@ -162,7 +162,7 @@ func (r *KodeReconciler) constructStatefulSetSpec(config *common.KodeResourcesCo
 	return statefulSet, nil
 }
 
-func constructCodeServerContainers(config *common.KodeResourcesConfig,
+func constructCodeServerContainers(config *common.KodeResourceConfig,
 	workspace string) []corev1.Container {
 
 	return []corev1.Container{{
@@ -184,7 +184,7 @@ func constructCodeServerContainers(config *common.KodeResourcesConfig,
 	}}
 }
 
-func constructWebtopContainers(config *common.KodeResourcesConfig) []corev1.Container {
+func constructWebtopContainers(config *common.KodeResourceConfig) []corev1.Container {
 
 	return []corev1.Container{{
 		Name:  "webtop",
@@ -204,7 +204,7 @@ func constructWebtopContainers(config *common.KodeResourcesConfig) []corev1.Cont
 	}}
 }
 
-func constructVolumesAndMounts(mountPath string, config *common.KodeResourcesConfig) ([]corev1.Volume, []corev1.VolumeMount) {
+func constructVolumesAndMounts(mountPath string, config *common.KodeResourceConfig) ([]corev1.Volume, []corev1.VolumeMount) {
 	volumes := []corev1.Volume{}
 	volumeMounts := []corev1.VolumeMount{}
 

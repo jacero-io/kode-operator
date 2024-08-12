@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package kode
 
 import (
 	"context"
@@ -31,8 +31,8 @@ import (
 )
 
 // ensureService ensures that the Service exists for the Kode instance
-func (r *KodeReconciler) ensureService(ctx context.Context, config *common.KodeResourcesConfig, kode *kodev1alpha1.Kode) error {
-	log := r.Log.WithName("ServiceEnsurer").WithValues("kode", common.ObjectKeyFromConfig(config))
+func (r *KodeReconciler) ensureService(ctx context.Context, config *common.KodeResourceConfig, kode *kodev1alpha1.Kode) error {
+	log := r.Log.WithName("ServiceEnsurer").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	ctx, cancel := common.ContextWithTimeout(ctx, 30) // 30 seconds timeout
 	defer cancel()
@@ -42,7 +42,7 @@ func (r *KodeReconciler) ensureService(ctx context.Context, config *common.KodeR
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      config.ServiceName,
-			Namespace: config.KodeNamespace,
+			Namespace: config.CommonConfig.Namespace,
 		},
 	}
 
@@ -66,16 +66,16 @@ func (r *KodeReconciler) ensureService(ctx context.Context, config *common.KodeR
 }
 
 // constructService constructs a Service for the Kode instance
-func (r *KodeReconciler) constructServiceSpec(config *common.KodeResourcesConfig) (*corev1.Service, error) {
-	log := r.Log.WithName("ServiceConstructor").WithValues("kode", common.ObjectKeyFromConfig(config))
+func (r *KodeReconciler) constructServiceSpec(config *common.KodeResourceConfig) (*corev1.Service, error) {
+	log := r.Log.WithName("ServiceConstructor").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      config.ServiceName,
-			Namespace: config.KodeNamespace,
+			Namespace: config.CommonConfig.Namespace,
 		},
 		Spec: corev1.ServiceSpec{
-			Selector: config.Labels,
+			Selector: config.CommonConfig.Labels,
 			Ports: []corev1.ServicePort{{
 				Protocol:   corev1.ProtocolTCP,
 				Port:       config.ExternalServicePort,

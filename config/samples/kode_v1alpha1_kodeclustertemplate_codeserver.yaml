@@ -7,13 +7,12 @@ metadata:
     app.kubernetes.io/managed-by: kustomize
   name: kodeclustertemplate-codeserver-sample
 spec:
-  EnvoyConfigRef:
-    kind: EnvoyProxyClusterConfig
-    name: envoyproxyclusterconfig-sample
-  type: code-server
-  image: linuxserver/code-server:latest
-  tz: "Europe/Stockholm"
-  puid: 1000
-  pgid: 1000
-  defaultHome: /config
-  defaultWorkspace: workspace
+  runtime: container
+  containerSpec:
+    type: code-server
+    image: linuxserver/code-server:latest
+    tz: "Europe/Stockholm"
+    puid: 1000
+    pgid: 1000
+    defaultHome: /config
+    defaultWorkspace: workspace

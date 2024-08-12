@@ -8,10 +8,12 @@ metadata:
   name: kodetemplate-webtop-sample
   namespace: default
 spec:
-  type: code-server
-  image: linuxserver/webtop:debian-xfce
-  tz: "Europe/Stockholm"
-  puid: 1000
-  pgid: 1000
-  defaultHome: /config
-  defaultWorkspace: workspace
+  runtime: container
+  containerSpec:
+    type: code-server
+    image: linuxserver/webtop:debian-xfce
+    tz: "Europe/Stockholm"
+    puid: 1000
+    pgid: 1000
+    defaultHome: /config
+    defaultWorkspace: workspace

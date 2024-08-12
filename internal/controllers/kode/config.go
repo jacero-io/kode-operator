@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package kode
 
 import (
 	"fmt"
@@ -28,7 +28,7 @@ import (
 
 func InitKodeResourcesConfig(
 	kode *kodev1alpha1.Kode,
-	templates *common.Templates) *common.KodeResourcesConfig {
+	templates *common.Templates) *common.KodeResourceConfig {
 
 	var localServicePort int32
 	var externalServicePort int32
@@ -44,30 +44,30 @@ func InitKodeResourcesConfig(
 	localServicePort = templates.KodeTemplate.Port
 	externalServicePort = templates.KodeTemplate.Port
 
-	pvcName := common.GetPVCName(kode)
-	serviceName := common.GetServiceName(kode)
+	pvcName := GetPVCName(kode)
+	serviceName := GetServiceName(kode)
 
-	return &common.KodeResourcesConfig{
+	return &common.KodeResourceConfig{
+		CommonConfig: common.CommonConfig{
+			Labels:    createLabels(kode, templates),
+			Name:      kode.Name,
+			Namespace: kode.Namespace,
+		},
+
 		KodeSpec:            kode.Spec,
-		Labels:              createLabels(kode, templates),
-
-		KodeName:            kode.Name,
-		KodeNamespace:       kode.Namespace,
-
 		Credentials:         kodev1alpha1.CredentialsSpec{},
-
-		SecretName:          secretName,
-		StatefulSetName:     kode.Name,
-		PVCName:             pvcName,
-		ServiceName:         serviceName,
-
-		Templates:           *templates,
-		Containers:          []corev1.Container{},
-		InitContainers:      []corev1.Container{},
-
 		TemplateInitPlugins: templates.KodeTemplate.ContainerSpec.InitPlugins,
 		UserInitPlugins:     kode.Spec.InitPlugins,
- 
+
+		SecretName:      secretName,
+		StatefulSetName: kode.Name,
+		PVCName:         pvcName,
+		ServiceName:     serviceName,
+
+		Templates:      *templates,
+		Containers:     []corev1.Container{},
+		InitContainers: []corev1.Container{},
+
 		LocalServicePort:    localServicePort,
 		ExternalServicePort: externalServicePort,
 	}
@@ -75,9 +75,9 @@ func InitKodeResourcesConfig(
 
 func createLabels(kode *kodev1alpha1.Kode, templates *common.Templates) map[string]string {
 	return map[string]string{
-		"app.kubernetes.io/name":           kode.Name,
-		"app.kubernetes.io/managed-by":     "kode-operator",
-		"kode.jacero.io/name":              kode.Name,
-		"template.kode.jacero.io/name":     templates.KodeTemplateName,
+		"app.kubernetes.io/name":       kode.Name,
+		"app.kubernetes.io/managed-by": "kode-operator",
+		"kode.jacero.io/name":          kode.Name,
+		"template.kode.jacero.io/name": templates.KodeTemplateName,
 	}
 }

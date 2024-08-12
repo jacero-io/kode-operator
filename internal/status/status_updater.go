@@ -25,7 +25,6 @@ import (
 	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
 	"github.com/jacero-io/kode-operator/internal/common"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
@@ -83,37 +82,43 @@ func (u *defaultStatusUpdater) UpdateStatusKode(ctx context.Context,
 	})
 }
 
-func (u *defaultStatusUpdater) UpdateStatusEntryPoints(ctx context.Context,
-	config *common.EntryPointResourceConfig,
+func (u *defaultStatusUpdater) UpdateStatusEntryPoint(ctx context.Context,
+	entry *kodev1alpha1.EntryPoint,
 	phase kodev1alpha1.EntryPointPhase,
 	conditions []metav1.Condition,
 	lastError string,
 	lastErrorTime *metav1.Time) error {
-	log := u.log.WithValues("entryPoint", client.ObjectKeyFromObject(&config.EntryPoint))
+
+	log := u.log.WithValues("entrypoint", client.ObjectKeyFromObject(entry))
+
+	log.V(1).Info("Updating EntryPoint status", "Phase", phase)
 
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		// Fetch the latest version of EntryPoint
-		var latestEntryPoint kodev1alpha1.EntryPoint
-		if err := u.client.Get(ctx, types.NamespacedName{Name: config.EntryPoint.Name, Namespace: config.EntryPoint.Namespace}, &latestEntryPoint); err != nil {
-			log.Error(err, "Failed to get latest version of EntryPoint")
+		latestEntry, err := common.GetLatestEntryPoint(ctx, u.client, entry.Name, entry.Namespace)
+		if err != nil {
 			return err
 		}
 
-		// Update the status
-		latestEntryPoint.Status.Phase = phase
-		latestEntryPoint.Status.Conditions = conditions
-		latestEntryPoint.Status.LastError = lastError
-		latestEntryPoint.Status.LastErrorTime = lastErrorTime
+		// Create a copy of the latest status
+		updatedStatus := latestEntry.Status.DeepCopy()
 
-		// Try to update
-		if err := u.client.Status().Update(ctx, &latestEntryPoint); err != nil {
+		// Update only the fields we want to change
+		updatedStatus.Phase = phase
+		updatedStatus.Conditions = mergeConditions(updatedStatus.Conditions, conditions)
+		updatedStatus.LastError = lastError
+		updatedStatus.LastErrorTime = lastErrorTime
+		updatedStatus.ObservedGeneration = latestEntry.Generation
+
+		// Create a patch
+		patch := client.MergeFrom(latestEntry.DeepCopy())
+		latestEntry.Status = *updatedStatus
+
+		// Apply the patch
+		if err := u.client.Status().Patch(ctx, latestEntry, patch); err != nil {
 			log.Error(err, "Failed to update EntryPoint status")
 			return err
 		}
-
-		// Update was successful, update the config's EntryPoint with the latest version
-		config.EntryPoint = latestEntryPoint
-
 		return nil
 	})
 }

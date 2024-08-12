@@ -17,7 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
-	// tofuv1alpha2 "github.com/flux-iac/tofu-controller/api/v1alpha2"
+	tofuv1alpha2 "github.com/flux-iac/tofu-controller/api/v1alpha2"
 	virtinkv1alpha1 "github.com/smartxworks/virtink/pkg/apis/virt/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
@@ -48,7 +48,7 @@ type SharedKodeTemplateSpec struct {
 
 	// TofuSpec is the terraform specification. Only used if runtime is 'tofu'.
 	// +kubebuilder:validation:Description="Terraform specification. Only used if runtime is 'tofu'."
-	// TofuSpec tofuv1alpha2.TerraformSpec `json:"tofuSpec,omitempty"`
+	TofuSpec tofuv1alpha2.TerraformSpec `json:"tofuSpec,omitempty"`
 
 	// Port is the port for the service process. Used by EnvoyProxy to expose the kode.
 	// +kubebuilder:validation:Description="Port for the service. Used by EnvoyProxy to expose the container. Defaults to '8000'."

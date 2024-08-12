@@ -130,8 +130,14 @@ func main() {
 	}
 
 	if err = (&entrypointcontroller.EntryPointReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:          mgr.GetClient(),
+		Scheme:          mgr.GetScheme(),
+		Log:             ctrl.Log.WithName("EntryPoint").WithName("Reconcile"),
+		ResourceManager: resource.NewDefaultResourceManager(mgr.GetClient(), ctrl.Log.WithName("EntryPoint").WithName("ResourceManager")),
+		TemplateManager: template.NewDefaultTemplateManager(mgr.GetClient(), ctrl.Log.WithName("EntryPoint").WithName("TemplateManager")),
+		CleanupManager:  cleanup.NewDefaultCleanupManager(mgr.GetClient(), ctrl.Log.WithName("EntryPoint").WithName("CleanupManager")),
+		StatusUpdater:   status.NewDefaultStatusUpdater(mgr.GetClient(), ctrl.Log.WithName("EntryPoint").WithName("StatusUpdater")),
+		Validator:       validation.NewDefaultValidator(),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "EntryPoint")
 		os.Exit(1)

@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package kode
 
 import (
 	"context"
@@ -27,8 +27,8 @@ import (
 )
 
 // ensureSidecarContainers ensures that the Envoy container exists for the Kode instance
-func (r *KodeReconciler) ensureSidecarContainers(ctx context.Context, config *common.KodeResourcesConfig, kode *kodev1alpha1.Kode) error {
-	log := r.Log.WithName("SidecarContainerEnsurer").WithValues("kode", common.ObjectKeyFromConfig(config))
+func (r *KodeReconciler) ensureSidecarContainers(ctx context.Context, config *common.KodeResourceConfig, kode *kodev1alpha1.Kode) error {
+	log := r.Log.WithName("SidecarContainerEnsurer").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	log.V(1).Info("Ensuring sidecar containers")
 
@@ -81,10 +81,10 @@ func (r *KodeReconciler) ensureSidecarContainers(ctx context.Context, config *co
 	return nil
 }
 
-// func ensureEnvoySidecar(config *common.KodeResourcesConfig, log logr.Logger) error {
-// 	configGenerator := envoy.NewBootstrapConfigGenerator(log.WithName("EnvoyConfigGenerator").WithValues("kode", common.ObjectKeyFromConfig(config)))
+// func ensureEnvoySidecar(config *common.KodeResourceConfig, log logr.Logger) error {
+// 	configGenerator := envoy.NewBootstrapConfigGenerator(log.WithName("EnvoyConfigGenerator").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig)))
 // 	envoyContainers, envoyInitContainers, err := envoy.NewContainerConstructor(
-// 		log.WithName("EnvoyContainerConstructor").WithValues("kode", common.ObjectKeyFromConfig(config)),
+// 		log.WithName("EnvoyContainerConstructor").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig)),
 // 		configGenerator).ConstructEnvoyContainers(config)
 // 	if err != nil {
 // 		if strings.Contains(err.Error(), "configuration") {

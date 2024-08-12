@@ -42,15 +42,15 @@ const (
 	timeout  = time.Second * 120
 	interval = time.Second * 1
 
-	resourceNamespace     = "test-namespace"
-	kodeResourceName      = "kode"
-	kodeTemplateKind      = "KodeClusterTemplate"
-	storageSize           = "1Gi"
+	resourceNamespace = "test-namespace"
+	kodeResourceName  = "kode"
+	kodeTemplateKind  = "KodeClusterTemplate"
+	storageSize       = "1Gi"
 
-	kodeTemplateNameCodeServer = "test-kodetemplate-codeserver-without-envoy"
-	kodeTemplateNameCodeServerWithEnvoy    = "test-kodetemplate-codeserver-with-envoy"
-	kodeTemplateNameWebtop     = "test-kodetemplate-webtop-without-envoy"
-	kodeTemplateNameWebtopWithEnvoy        = "test-kodetemplate-webtop-with-envoy"
+	kodeTemplateNameCodeServer          = "test-kodetemplate-codeserver-without-envoy"
+	kodeTemplateNameCodeServerWithEnvoy = "test-kodetemplate-codeserver-with-envoy"
+	kodeTemplateNameWebtop              = "test-kodetemplate-webtop-without-envoy"
+	kodeTemplateNameWebtopWithEnvoy     = "test-kodetemplate-webtop-with-envoy"
 
 	kodeTemplateImageCodeServer = "linuxserver/code-server:latest"
 	kodeTemplateImageWebtop     = "linuxserver/webtop:debian-xfce"
@@ -59,12 +59,12 @@ const (
 var _ = Describe("Kode Controller Integration", Ordered, func() {
 
 	var (
-		ctx                                context.Context
-		namespace                          *corev1.Namespace
-		kodeTemplateCodeServer *kodev1alpha1.KodeClusterTemplate
-		kodeTemplateCodeServerWithEnvoy    *kodev1alpha1.KodeClusterTemplate
-		kodeTemplateWebtop     *kodev1alpha1.KodeClusterTemplate
-		kodeTemplateWebtopWithEnvoy        *kodev1alpha1.KodeClusterTemplate
+		ctx                             context.Context
+		namespace                       *corev1.Namespace
+		kodeTemplateCodeServer          *kodev1alpha1.KodeClusterTemplate
+		kodeTemplateCodeServerWithEnvoy *kodev1alpha1.KodeClusterTemplate
+		kodeTemplateWebtop              *kodev1alpha1.KodeClusterTemplate
+		kodeTemplateWebtopWithEnvoy     *kodev1alpha1.KodeClusterTemplate
 	)
 
 	BeforeAll(func() {
@@ -146,8 +146,8 @@ var _ = Describe("Kode Controller Integration", Ordered, func() {
 				return k8sClient.Get(ctx, statefulSetLookupKey, createdStatefulSet)
 			}, timeout, interval).Should(Succeed())
 
-			Expect(createdStatefulSet.Name).To(Equal(kodeName))                                                         // Expect the name to be set to the kode name
-			Expect(createdStatefulSet.Spec.Template.Spec.Containers).To(HaveLen(expectedContainerCount))                // Except the container count to be 1 or 2 based on the template
+			Expect(createdStatefulSet.Name).To(Equal(kodeName))                                          // Expect the name to be set to the kode name
+			Expect(createdStatefulSet.Spec.Template.Spec.Containers).To(HaveLen(expectedContainerCount)) // Except the container count to be 1 or 2 based on the template
 
 			if templateType == "code-server" {
 				Expect(createdStatefulSet.Spec.Template.Spec.Containers[0].Image).To(Equal(kodeTemplateImageCodeServer))                                                 // Expect the image to be set to the template image

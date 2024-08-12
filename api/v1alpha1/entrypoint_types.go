@@ -97,7 +97,7 @@ type EntryPointStatus struct {
 	// ObservedGeneration is the last observed generation of the Kode resource.
 	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
 
-	// Phase represents the current phase of the Kode resource.
+	// Phase represents the current phase of the EntryPointPhase resource.
 	Phase EntryPointPhase `json:"phase"`
 
 	// Conditions represent the latest available observations of a Kode's state.

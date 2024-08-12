@@ -1,0 +1,39 @@
+---
+apiVersion: kode.jacero.io/v1alpha1
+kind: KodeClusterTemplate
+metadata:
+  labels:
+    app.kubernetes.io/name: kode-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: kodeclustertemplate-openstack-vm-sample
+spec:
+  runtime: tofu
+  tofuSpec:
+    sourceRef:
+      kind: GitRepository
+      name: openstack-vm-terraform-module
+      namespace: kode-system # Must be in the same namespace as the Kode Controller
+    variables:
+      - name: "flavor"
+        value: "m1.small"
+      - name: "image"
+        value: "Ubuntu 20.04"
+      - name: "keypair"
+        value: "my-keypair"
+      - name: "network"
+        value: "my-network"
+      - name: "security_group"
+        value: "my-security-group"
+      - name: "floating_ip_pool"
+        value: "my-floating-ip-pool"
+      - name: "availability_zone"
+        value: "nova"
+      - name: "name"
+        value: "my-vm"
+      - name: "user_data"
+        value: |
+          #cloud-config
+          users:
+            - name: my-user
+              ssh-authorized-keys:
+                - ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDfZ

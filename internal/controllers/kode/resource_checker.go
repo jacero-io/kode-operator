@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package kode
 
 import (
 	"context"
@@ -30,14 +30,14 @@ import (
 )
 
 // TODO: Add inactivity check
-func (r *KodeReconciler) checkResourcesReady(ctx context.Context, config *common.KodeResourcesConfig) (bool, error) {
-	log := r.Log.WithName("ResourceReadyChecker").WithValues("kode", common.ObjectKeyFromConfig(config))
+func (r *KodeReconciler) checkResourcesReady(ctx context.Context, config *common.KodeResourceConfig) (bool, error) {
+	log := r.Log.WithName("ResourceReadyChecker").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 	ctx, cancel := common.ContextWithTimeout(ctx, 20) // 20 seconds timeout
 	defer cancel()
 
 	// Check Secret
 	secret := &corev1.Secret{}
-	err := r.Client.Get(ctx, types.NamespacedName{Name: config.SecretName, Namespace: config.KodeNamespace}, secret)
+	err := r.Client.Get(ctx, types.NamespacedName{Name: config.SecretName, Namespace: config.CommonConfig.Namespace}, secret)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			log.V(1).Info("Secret not found")
@@ -52,7 +52,7 @@ func (r *KodeReconciler) checkResourcesReady(ctx context.Context, config *common
 	// - Image pull timeout
 	// Check StatefulSet
 	statefulSet := &appsv1.StatefulSet{}
-	err = r.Client.Get(ctx, types.NamespacedName{Name: config.KodeName, Namespace: config.KodeNamespace}, statefulSet)
+	err = r.Client.Get(ctx, types.NamespacedName{Name: config.CommonConfig.Name, Namespace: config.CommonConfig.Namespace}, statefulSet)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			log.V(1).Info("StatefulSet not found")
@@ -68,7 +68,7 @@ func (r *KodeReconciler) checkResourcesReady(ctx context.Context, config *common
 
 	// Check Service
 	service := &corev1.Service{}
-	err = r.Client.Get(ctx, types.NamespacedName{Name: config.ServiceName, Namespace: config.KodeNamespace}, service)
+	err = r.Client.Get(ctx, types.NamespacedName{Name: config.ServiceName, Namespace: config.CommonConfig.Namespace}, service)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			log.V(1).Info("Service not found")
@@ -80,7 +80,7 @@ func (r *KodeReconciler) checkResourcesReady(ctx context.Context, config *common
 	// Check PersistentVolumeClaim if storage is specified
 	if !config.KodeSpec.Storage.IsEmpty() {
 		pvc := &corev1.PersistentVolumeClaim{}
-		err = r.Client.Get(ctx, types.NamespacedName{Name: config.PVCName, Namespace: config.KodeNamespace}, pvc)
+		err = r.Client.Get(ctx, types.NamespacedName{Name: config.PVCName, Namespace: config.CommonConfig.Namespace}, pvc)
 		if err != nil {
 			if errors.IsNotFound(err) {
 				log.V(1).Info("PersistentVolumeClaim not found")
@@ -111,8 +111,8 @@ func (r *KodeReconciler) checkResourcesReady(ctx context.Context, config *common
 	return true, nil
 }
 
-// func (r *KodeReconciler) checkEnvoySidecarReady(ctx context.Context, config *common.KodeResourcesConfig) (bool, error) {
-// 	log := r.Log.WithName("EnvoySidecarReadyChecker").WithValues("kode", common.ObjectKeyFromConfig(config))
+// func (r *KodeReconciler) checkEnvoySidecarReady(ctx context.Context, config *common.KodeResourceConfig) (bool, error) {
+// 	log := r.Log.WithName("EnvoySidecarReadyChecker").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 
 // 	pod := &corev1.Pod{}
 // 	err := r.Client.Get(ctx, types.NamespacedName{Name: config.KodeName + "-0", Namespace: config.KodeNamespace}, pod)

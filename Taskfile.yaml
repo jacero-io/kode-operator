@@ -188,8 +188,10 @@ tasks:
   run:
     desc: Run a controller from your host
     cmds:
+      - '{{.LOCALBIN}}/controller-gen rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases'
       - ENV={{.ENV}} go run ./cmd/main.go --log-level {{.LOG_LEVEL}}
     deps:
+      - controller-gen
       - manifests
       - generate
       - fmt
@@ -305,10 +307,16 @@ tasks:
       - mv {{.GOBIN}}/kustomize {{.LOCALBIN}}/kustomize-{{.KUSTOMIZE_VERSION}}
 
   controller-gen:
-    desc: Download controller-gen locally if necessary
+    desc: Download controller-gen locally if necessary and create/update symlink
     cmds:
-      - go install sigs.k8s.io/controller-tools/cmd/controller-gen@{{.CONTROLLER_TOOLS_VERSION}}
-      - mv {{.GOBIN}}/controller-gen {{.LOCALBIN}}/controller-gen-{{.CONTROLLER_TOOLS_VERSION}}
+      - |
+        if [ ! -f {{.LOCALBIN}}/controller-gen-{{.CONTROLLER_TOOLS_VERSION}} ]; then
+          echo "Downloading controller-gen {{.CONTROLLER_TOOLS_VERSION}}..."
+          go install sigs.k8s.io/controller-tools/cmd/controller-gen@{{.CONTROLLER_TOOLS_VERSION}}
+          mkdir -p {{.LOCALBIN}}
+          mv $(go env GOPATH)/bin/controller-gen {{.LOCALBIN}}/controller-gen-{{.CONTROLLER_TOOLS_VERSION}}
+        fi
+      - ln -sf {{.LOCALBIN}}/controller-gen-{{.CONTROLLER_TOOLS_VERSION}} {{.LOCALBIN}}/controller-gen
 
   envtest:
     desc: Download setup-envtest locally if necessary

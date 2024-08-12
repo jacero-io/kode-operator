@@ -16,7 +16,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package kode
 
 import (
 	"context"
@@ -29,11 +29,11 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-func (r *KodeReconciler) ensureResources(ctx context.Context, config *common.KodeResourcesConfig) error {
-	log := r.Log.WithName("ResoruceEnsurer").WithValues("kode", common.ObjectKeyFromConfig(config))
+func (r *KodeReconciler) ensureResources(ctx context.Context, config *common.KodeResourceConfig) error {
+	log := r.Log.WithName("ResoruceEnsurer").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	// Fetch the latest Kode object
-	kode, err := common.GetLatestKode(ctx, r.Client, config.KodeName, config.KodeNamespace)
+	kode, err := common.GetLatestKode(ctx, r.Client, config.CommonConfig.Name, config.CommonConfig.Namespace)
 	if err != nil {
 		return fmt.Errorf("failed to get Kode: %w", err)
 	}
@@ -152,13 +152,13 @@ func (r *KodeReconciler) ensureResources(ctx context.Context, config *common.Kod
 	return nil
 }
 
-func (r *KodeReconciler) ensureCredentials(ctx context.Context, config *common.KodeResourcesConfig) error {
-	log := r.Log.WithName("CredentialsEnsurer").WithValues("kode", common.ObjectKeyFromConfig(config))
+func (r *KodeReconciler) ensureCredentials(ctx context.Context, config *common.KodeResourceConfig) error {
+	log := r.Log.WithName("CredentialsEnsurer").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	if config.KodeSpec.Credentials.ExistingSecret != "" {
 		// ExistingSecret is specified, fetch the secret
 		secret := &corev1.Secret{}
-		err := r.Client.Get(ctx, types.NamespacedName{Name: config.KodeSpec.Credentials.ExistingSecret, Namespace: config.KodeNamespace}, secret)
+		err := r.Client.Get(ctx, types.NamespacedName{Name: config.KodeSpec.Credentials.ExistingSecret, Namespace: config.CommonConfig.Namespace}, secret)
 		if err != nil {
 			return fmt.Errorf("failed to get Secret: %w", err)
 		}

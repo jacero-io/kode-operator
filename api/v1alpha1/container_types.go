@@ -47,6 +47,10 @@ type ContainerSpec struct {
 	// +kubebuilder:validation:Description="Arguments for the container."
 	Args []string `json:"args,omitempty"`
 
+	// Specifies the resources.
+	// +kubebuilder:validation:Description="Resources for the container."
+	Resources corev1.ResourceRequirements `json:"resources,omitempty"`
+
 	// TZ is the timezone for the service process.
 	// +kubebuilder:validation:Description="Timezone for the service process. Defaults to 'UTC'."
 	// +kubebuilder:default="UTC"

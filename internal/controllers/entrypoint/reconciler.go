@@ -14,42 +14,60 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package entrypoint
 
 import (
 	"context"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 
+	"github.com/go-logr/logr"
 	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
+	"github.com/jacero-io/kode-operator/internal/cleanup"
+	"github.com/jacero-io/kode-operator/internal/resource"
+	"github.com/jacero-io/kode-operator/internal/status"
+	"github.com/jacero-io/kode-operator/internal/template"
+	"github.com/jacero-io/kode-operator/internal/validation"
 )
 
 // EntryPointReconciler reconciles a EntryPoint object
 type EntryPointReconciler struct {
-	client.Client
-	Scheme *runtime.Scheme
+	Client          client.Client
+	Scheme          *runtime.Scheme
+	Log             logr.Logger
+	ResourceManager resource.ResourceManager
+	TemplateManager template.TemplateManager
+	CleanupManager  cleanup.CleanupManager
+	StatusUpdater   status.StatusUpdater
+	Validator       validation.Validator
 }
 
 // +kubebuilder:rbac:groups=kode.jacero.io,resources=entrypoints,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=kode.jacero.io,resources=entrypoints/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=kode.jacero.io,resources=entrypoints/finalizers,verbs=update
+// +kubebuilder:rbac:groups=kode.kode.jacero.io,resources=kodes,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=kode.kode.jacero.io,resources=kodes/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=kode.kode.jacero.io,resources=kodes/finalizers,verbs=update
+// +kubebuilder:rbac:groups=kode.kode.jacero.io,resources=kodetemplates,verbs=get;list;watch
+// +kubebuilder:rbac:groups=kode.kode.jacero.io,resources=kodeclustertemplates,verbs=get;list;watch
 
-// Reconcile is part of the main kubernetes reconciliation loop which aims to
-// move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the EntryPoint object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
-//
-// For more details, check Reconcile and its Result here:
-// - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.18.2/pkg/reconcile
 func (r *EntryPointReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	log := r.Log.WithValues("kode", req.NamespacedName)
 
-	// TODO(user): your logic here
+	// Fetch the EntryPoint instance
+	entryPoint := &kodev1alpha1.EntryPoint{}
+	err := r.Client.Get(ctx, req.NamespacedName, entryPoint)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			log.V(1).Info("EntryPoint resource not found. Ignoring since object must be deleted.")
+			return ctrl.Result{}, nil
+		}
+		log.Error(err, "Failed to get EntryPoint")
+		return ctrl.Result{}, err
+	}
 
 	return ctrl.Result{}, nil
 }

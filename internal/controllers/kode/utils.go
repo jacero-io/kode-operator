@@ -1,3 +1,5 @@
+// internal/controllers/kode/utils.go
+
 /*
 Copyright 2024 Emil Larsson.
 
@@ -14,29 +16,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package cleanup
+package kode
 
 import (
-	"context"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
 )
 
-// Resource represents a generic Kubernetes resource
-type Resource struct {
-	Name      string
-	Namespace string
-	Kind      string
-	Object    client.Object
+// returns the name of the PersistentVolumeClaim for the Kode instance
+func GetPVCName(kode *kodev1alpha1.Kode) string {
+	return kode.Name + "-pvc"
 }
 
-// CleanupableResource defines the interface for resources that can be cleaned up
-type CleanupableResource interface {
-	GetResources() []Resource
-	ShouldDelete(resource Resource) bool
-}
-
-// CleanupManager defines the interface for cleaning up resources
-type CleanupManager interface {
-	Cleanup(ctx context.Context, resource CleanupableResource) error
+// returns the name of the Kode service
+func GetServiceName(kode *kodev1alpha1.Kode) string {
+	return kode.Name + "-svc"
 }

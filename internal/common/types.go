@@ -26,32 +26,34 @@ import (
 
 // Templates holds the fetched template configurations
 type Templates struct {
-	KodeTemplate              *kodev1alpha1.SharedKodeTemplateSpec
-	KodeTemplateName          string
-	KodeTemplateNamespace     string
+	KodeTemplate          *kodev1alpha1.SharedKodeTemplateSpec
+	KodeTemplateName      string
+	KodeTemplateNamespace string
 }
 
-// KodeResourcesConfig holds configuration for Kode resources
-type KodeResourcesConfig struct {
+type CommonConfig struct {
+	Labels    map[string]string
+	Name      string
+	Namespace string
+}
+
+// KodeResourceConfig holds configuration for Kode resources
+type KodeResourceConfig struct {
+	CommonConfig CommonConfig
+
 	KodeSpec            kodev1alpha1.KodeSpec
-	Labels              map[string]string
-
-	KodeName            string
-	KodeNamespace       string
-
 	Credentials         kodev1alpha1.CredentialsSpec
-
-	SecretName          string
-	StatefulSetName     string
-	PVCName             string
-	ServiceName         string
-
-	Templates           Templates
-	Containers          []corev1.Container
-	InitContainers      []corev1.Container
-
 	TemplateInitPlugins []kodev1alpha1.InitPluginSpec
 	UserInitPlugins     []kodev1alpha1.InitPluginSpec
+
+	SecretName      string
+	StatefulSetName string
+	PVCName         string
+	ServiceName     string
+
+	Templates      Templates
+	Containers     []corev1.Container
+	InitContainers []corev1.Container
 
 	LocalServicePort    int32
 	ExternalServicePort int32
@@ -59,12 +61,9 @@ type KodeResourcesConfig struct {
 
 // EntryPointResourceConfig holds configuration for EntryPoint resources
 type EntryPointResourceConfig struct {
-	EntryPoint          kodev1alpha1.EntryPoint
-	Labels              map[string]string
-	EntryPointName      string
-	EntryPointNamespace string
-	EntryPointService   string
-	EntryPointURL       string
+	CommonConfig CommonConfig
+
+	EntryPointSpec kodev1alpha1.EntryPointSpec
 }
 
 // BootstrapConfigOptions contains options for generating Envoy bootstrap config

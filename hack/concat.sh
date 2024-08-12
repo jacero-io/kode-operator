@@ -21,10 +21,10 @@ output_file="concatenated_output.txt"
 > "$output_file"
 
 # Exclude patterns
-exclude_patterns=( '*envoy.go' '*pvc.go' '*secret.go' '*service.go' )
+exclude_patterns=(  )
 
 # Include patterns (initially empty)
-include_patterns=( 'kode_types.go' 'sharedkodetemplate_types.go' 'kodetemplate_types.go' 'kodeclustertemplate_types.go' 'controllers/kode/*' 'common/*' )
+include_patterns=( 'v1alpha1/entrypoint*' 'v1alpha1/kode*' 'cleanup/*' 'common/*' 'controllers/entrypoint/*' 'controllers/kode/finalizer*' 'controllers/kode/reconciler*' )
 
 # Function to process files
 process_files() {

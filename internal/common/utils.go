@@ -19,7 +19,6 @@ package common
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
@@ -41,21 +40,17 @@ func GetLatestKode(ctx context.Context, client client.Client, name, namespace st
 	return kode, err
 }
 
-func ObjectKeyFromConfig(config *KodeResourcesConfig) types.NamespacedName {
+func GetLatestEntryPoint(ctx context.Context, client client.Client, name, namespace string) (*kodev1alpha1.EntryPoint, error) {
+	entryPoint := &kodev1alpha1.EntryPoint{}
+	err := client.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, entryPoint)
+	return entryPoint, err
+}
+
+func ObjectKeyFromConfig(config CommonConfig) types.NamespacedName {
 	return types.NamespacedName{
-		Name:      config.KodeName,
-		Namespace: config.KodeNamespace,
+		Name:      config.Name,
+		Namespace: config.Namespace,
 	}
-}
-
-// returns the name of the PersistentVolumeClaim for the Kode instance
-func GetPVCName(kode *kodev1alpha1.Kode) string {
-	return kode.Name + "-pvc"
-}
-
-// returns the name of the Kode service
-func GetServiceName(kode *kodev1alpha1.Kode) string {
-	return kode.Name + "-svc"
 }
 
 // masks sensitive string values
@@ -109,20 +104,6 @@ func GetUsernameAndPasswordFromSecret(secret *corev1.Secret) (string, string, er
 		return username, password, err
 	}
 	return username, password, nil
-}
-
-// joins multiple errors into a single error
-func JoinErrors(errs ...error) error {
-	var errStrings []string
-	for _, err := range errs {
-		if err != nil {
-			errStrings = append(errStrings, err.Error())
-		}
-	}
-	if len(errStrings) == 0 {
-		return nil
-	}
-	return fmt.Errorf(strings.Join(errStrings, "; "))
 }
 
 // wraps a context with a timeout
