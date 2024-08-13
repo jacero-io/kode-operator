@@ -30,27 +30,17 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
-	timeout  = time.Second * 60
-	interval = time.Second * 1
-
-	resourceNamespace = "test-namespace"
-	kodeResourceName  = "kode"
-	podTemplateKind   = "ClusterPodTemplate"
-	storageSize       = "1Gi"
+	podTemplateKind = "ClusterPodTemplate"
+	storageSize     = "1Gi"
 
 	podTemplateNameCodeServer = "podtemplate-codeserver"
 	podTemplateNameWebtop     = "podtemplate-webtop"
-
-	entryPointName = "entrypoint"
 
 	podTemplateImageCodeServer = "linuxserver/code-server:latest"
 	podTemplateImageWebtop     = "linuxserver/webtop:debian-xfce"
@@ -75,20 +65,7 @@ func createPodTemplate(name, image, templateType string) *kodev1alpha2.ClusterPo
 	return template
 }
 
-func waitForResourceDeletion(ctx context.Context, c *mockClient, obj client.Object, timeout time.Duration) error {
-	return wait.PollUntilContextTimeout(ctx, time.Second, timeout, true, func(ctx context.Context) (bool, error) {
-		err := c.Get(ctx, client.ObjectKeyFromObject(obj), obj)
-		if apierrors.IsNotFound(err) {
-			return true, nil
-		}
-		if err != nil {
-			return false, err
-		}
-		return false, nil
-	})
-}
-
-var _ = Describe("Kode Controller Integration", Ordered, func() {
+var _ = Describe("Kode Controller PodTemplate Integration", Ordered, func() {
 
 	var (
 		ctx                   context.Context

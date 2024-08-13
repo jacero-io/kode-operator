@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -45,11 +46,22 @@ import (
 	"github.com/jacero-io/kode-operator/internal/validation"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
 	//+kubebuilder:scaffold:imports
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
+
+const (
+	timeout  = time.Second * 60
+	interval = time.Second * 1
+
+	resourceNamespace = "test-namespace"
+	kodeResourceName  = "kode"
+
+	entryPointName = "entrypoint"
+)
 
 var (
 	cfg           *rest.Config
@@ -130,6 +142,19 @@ var _ = AfterSuite(func() {
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
 })
+
+func waitForResourceDeletion(ctx context.Context, c *mockClient, obj client.Object, timeout time.Duration) error {
+	return wait.PollUntilContextTimeout(ctx, time.Second, timeout, true, func(ctx context.Context) (bool, error) {
+		err := c.Get(ctx, client.ObjectKeyFromObject(obj), obj)
+		if apierrors.IsNotFound(err) {
+			return true, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		return false, nil
+	})
+}
 
 func (m *mockClient) Delete(ctx context.Context, obj client.Object, opts ...client.DeleteOption) error {
 	key := fmt.Sprintf("%T/%s/%s", obj, obj.GetNamespace(), obj.GetName())
