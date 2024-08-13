@@ -44,24 +44,58 @@ const (
 
 	resourceNamespace = "test-namespace"
 	kodeResourceName  = "kode"
-	podTemplateKind   = "PodTemplate"
+	podTemplateKind   = "ClusterPodTemplate"
 	storageSize       = "1Gi"
 
-	podTemplateNameCodeServer = "test-podtemplate-codeserver"
-	podTemplateNameWebtop     = "test-podtemplate-webtop"
+	podTemplateNameCodeServer = "podtemplate-codeserver"
+	podTemplateNameWebtop     = "podtemplate-webtop"
+
+	entryPointName = "entrypoint"
 
 	podTemplateImageCodeServer = "linuxserver/code-server:latest"
 	podTemplateImageWebtop     = "linuxserver/webtop:debian-xfce"
 )
+
+func createPodTemplate(name, image, templateType string) *kodev1alpha2.ClusterPodTemplate {
+	template := &kodev1alpha2.ClusterPodTemplate{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: kodev1alpha2.ClusterPodTemplateSpec{
+			PodTemplateSharedSpec: kodev1alpha2.PodTemplateSharedSpec{
+				BaseSharedSpec: kodev1alpha2.BaseSharedSpec{
+					Port: 8000,
+				},
+				Type:  templateType,
+				Image: image,
+			},
+		},
+	}
+
+	return template
+}
+
+func waitForResourceDeletion(ctx context.Context, c *mockClient, obj client.Object, timeout time.Duration) error {
+	return wait.PollUntilContextTimeout(ctx, time.Second, timeout, true, func(ctx context.Context) (bool, error) {
+		err := c.Get(ctx, client.ObjectKeyFromObject(obj), obj)
+		if apierrors.IsNotFound(err) {
+			return true, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		return false, nil
+	})
+}
 
 var _ = Describe("Kode Controller Integration", Ordered, func() {
 
 	var (
 		ctx                   context.Context
 		namespace             *corev1.Namespace
-		podTemplateCodeServer *kodev1alpha2.PodTemplate
-		podTemplateWebtop     *kodev1alpha2.PodTemplate
-		testEntryPoint        *kodev1alpha2.EntryPoint
+		podTemplateCodeServer *kodev1alpha2.ClusterPodTemplate
+		podTemplateWebtop     *kodev1alpha2.ClusterPodTemplate
+		entryPoint            *kodev1alpha2.EntryPoint
 	)
 
 	BeforeAll(func() {
@@ -72,9 +106,9 @@ var _ = Describe("Kode Controller Integration", Ordered, func() {
 		Expect(k8sClient.Create(ctx, namespace)).To(Succeed())
 
 		// Create EntryPoint
-		testEntryPoint = &kodev1alpha2.EntryPoint{
+		entryPoint = &kodev1alpha2.EntryPoint{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      "test-entrypoint",
+				Name:      entryPointName,
 				Namespace: resourceNamespace,
 			},
 			Spec: kodev1alpha2.EntryPointSpec{
@@ -84,7 +118,7 @@ var _ = Describe("Kode Controller Integration", Ordered, func() {
 				},
 			},
 		}
-		Expect(k8sClient.Create(ctx, testEntryPoint)).To(Succeed())
+		Expect(k8sClient.Create(ctx, entryPoint)).To(Succeed())
 
 		// Create PodTemplates
 		podTemplateCodeServer = createPodTemplate(podTemplateNameCodeServer, podTemplateImageCodeServer, "code-server")
@@ -99,7 +133,7 @@ var _ = Describe("Kode Controller Integration", Ordered, func() {
 		Expect(k8sClient.Delete(ctx, namespace)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, podTemplateCodeServer)).To(Succeed())
 		Expect(k8sClient.Delete(ctx, podTemplateWebtop)).To(Succeed())
-		Expect(k8sClient.Delete(ctx, testEntryPoint)).To(Succeed())
+		Expect(k8sClient.Delete(ctx, entryPoint)).To(Succeed())
 	})
 
 	DescribeTable("Kode resource creation",
@@ -288,36 +322,3 @@ var _ = Describe("Kode Controller Integration", Ordered, func() {
 		}, timeout, interval).Should(BeTrue())
 	})
 })
-
-func createPodTemplate(name, image, templateType string) *kodev1alpha2.PodTemplate {
-	template := &kodev1alpha2.PodTemplate{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: resourceNamespace,
-		},
-		Spec: kodev1alpha2.PodTemplateSpec{
-			ContainerSharedSpec: kodev1alpha2.ContainerSharedSpec{
-				BaseSharedSpec: kodev1alpha2.BaseSharedSpec{
-					Port: 8000,
-				},
-				Type:  templateType,
-				Image: image,
-			},
-		},
-	}
-
-	return template
-}
-
-func waitForResourceDeletion(ctx context.Context, c *mockClient, obj client.Object, timeout time.Duration) error {
-	return wait.PollUntilContextTimeout(ctx, time.Second, timeout, true, func(ctx context.Context) (bool, error) {
-		err := c.Get(ctx, client.ObjectKeyFromObject(obj), obj)
-		if apierrors.IsNotFound(err) {
-			return true, nil
-		}
-		if err != nil {
-			return false, err
-		}
-		return false, nil
-	})
-}

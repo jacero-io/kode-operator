@@ -22,12 +22,12 @@ import (
 
 // ClusterPodTemplateSpec defines the desired state of ClusterKodeContainer
 type ClusterPodTemplateSpec struct {
-	ContainerSharedSpec `json:",inline"`
+	PodTemplateSharedSpec `json:",inline" yaml:",inline"`
 }
 
 // ClusterPodTemplateStatus defines the observed state of ClusterKodeContainer
 type ClusterPodTemplateStatus struct {
-	ContainerSharedStatus `json:",inline"`
+	PodTemplateSharedStatus `json:",inline" yaml:",inline"`
 }
 
 // +kubebuilder:object:root=true

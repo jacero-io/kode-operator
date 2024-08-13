@@ -42,22 +42,22 @@ func (m *DefaultTemplateManager) fetchTemplate(ctx context.Context, ref kodev1al
 
 	switch ref.Kind {
 	case "PodTemplate", "ClusterPodTemplate":
-		var podTemplateSpec *kodev1alpha2.ContainerSharedSpec
+		var podTemplateSpec *kodev1alpha2.PodTemplateSharedSpec
 		var port int32
 		if ref.Kind == "ClusterPodTemplate" {
-			clusterKodeContainer := &kodev1alpha2.ClusterPodTemplate{}
-			if err := m.client.Get(ctx, types.NamespacedName{Name: ref.Name}, clusterKodeContainer); err != nil {
+			clusterPodTemplate := &kodev1alpha2.ClusterPodTemplate{}
+			if err := m.client.Get(ctx, types.NamespacedName{Name: ref.Name}, clusterPodTemplate); err != nil {
 				return nil, handleNotFoundError(err, ref)
 			}
-			podTemplateSpec = &clusterKodeContainer.Spec.ContainerSharedSpec
-			port = clusterKodeContainer.Spec.Port
+			podTemplateSpec = &clusterPodTemplate.Spec.PodTemplateSharedSpec
+			port = clusterPodTemplate.Spec.Port
 		} else {
-			kodeContainer := &kodev1alpha2.PodTemplate{}
-			if err := m.client.Get(ctx, types.NamespacedName{Name: ref.Name, Namespace: ref.Namespace}, kodeContainer); err != nil {
+			podTemplate := &kodev1alpha2.PodTemplate{}
+			if err := m.client.Get(ctx, types.NamespacedName{Name: ref.Name, Namespace: ref.Namespace}, podTemplate); err != nil {
 				return nil, handleNotFoundError(err, ref)
 			}
-			podTemplateSpec = &kodeContainer.Spec.ContainerSharedSpec
-			port = kodeContainer.Spec.Port
+			podTemplateSpec = &podTemplate.Spec.PodTemplateSharedSpec
+			port = podTemplate.Spec.Port
 		}
 		template.PodTemplateSpec = podTemplateSpec
 		template.Port = port

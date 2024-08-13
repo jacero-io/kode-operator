@@ -89,7 +89,7 @@ type Template struct {
 	Port int32 `json:"port,omitempty" yaml:"port,omitempty"`
 
 	// PodTemplateSpec is a reference to a PodTemplate or ClusterPodTemplate
-	PodTemplateSpec *ContainerSharedSpec `json:"container,omitempty" yaml:"container,omitempty"`
+	PodTemplateSpec *PodTemplateSharedSpec `json:"container,omitempty" yaml:"container,omitempty"`
 
 	// TofuTemplateSpec is a reference to a TofuTemplate or ClusterTofuTemplate
 	TofuTemplateSpec *TofuSharedSpec `json:"tofu,omitempty" yaml:"tofu,omitempty"`

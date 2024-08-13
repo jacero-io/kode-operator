@@ -16,7 +16,13 @@ limitations under the License.
 
 package v1alpha2
 
-type CrossNamespaceObjectReference struct {
+// TODO: Add in code validation for the kind field
+// KodeTemplateReference is a reference to a KodeContainer or KodeTofu
+type KodeTemplateReference struct {
+	// API version of the referent.
+	// +kubebuilder:validation:Description="API version of the referent."
+	APIVersion string `json:"apiVersion,omitempty"`
+
 	// Kind is the resource kind.
 	// +kubebuilder:validation:Description="Resource kind"
 	Kind string `json:"kind"`
@@ -30,9 +36,21 @@ type CrossNamespaceObjectReference struct {
 	Namespace string `json:"namespace,omitempty"`
 }
 
-// TODO: Add in code validation for the kind field
-// KodeTemplateReference is a reference to a KodeContainer or KodeTofu
-type KodeTemplateReference CrossNamespaceObjectReference
-
 // EntryPointReference is a reference to an EntryPoint
-type EntryPointReference CrossNamespaceObjectReference
+type EntryPointReference struct {
+	// API version of the referent.
+	// +kubebuilder:validation:Description="API version of the referent."
+	APIVersion string `json:"apiVersion,omitempty"`
+
+	// Kind is the resource kind.
+	// +kubebuilder:validation:Description="Resource kind"
+	Kind string `json:"kind"`
+
+	// Name is the name of the resource.
+	// +kubebuilder:validation:Description="Name of the resource"
+	Name string `json:"name"`
+
+	// Namespace is the namespace of the resource.
+	// +kubebuilder:validation:Description="Namespace of the resource"
+	Namespace string `json:"namespace,omitempty"`
+}
