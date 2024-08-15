@@ -29,5 +29,5 @@ import (
 // config *common.KodeResourceConfig,
 type StatusUpdater interface {
 	UpdateStatusKode(ctx context.Context, kode *kodev1alpha2.Kode, phase kodev1alpha2.KodePhase, conditions []metav1.Condition, lastError string, lastErrorTime *metav1.Time) error
-	UpdateStatusEntryPoint(ctx context.Context, entry *kodev1alpha2.EntryPoint, phase kodev1alpha2.EntryPointPhase, conditions []metav1.Condition, lastError string, lastErrorTime *metav1.Time) error
+	UpdateStatusEntryPoint(ctx context.Context, entry *kodev1alpha2.ClusterEntryPoint, phase kodev1alpha2.EntryPointPhase, conditions []metav1.Condition, lastError string, lastErrorTime *metav1.Time) error
 }

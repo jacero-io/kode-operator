@@ -83,7 +83,7 @@ func (u *defaultStatusUpdater) UpdateStatusKode(ctx context.Context,
 }
 
 func (u *defaultStatusUpdater) UpdateStatusEntryPoint(ctx context.Context,
-	entry *kodev1alpha2.EntryPoint,
+	entry *kodev1alpha2.ClusterEntryPoint,
 	phase kodev1alpha2.EntryPointPhase,
 	conditions []metav1.Condition,
 	lastError string,
@@ -95,7 +95,7 @@ func (u *defaultStatusUpdater) UpdateStatusEntryPoint(ctx context.Context,
 
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		// Fetch the latest version of EntryPoint
-		latestEntry, err := common.GetLatestEntryPoint(ctx, u.client, entry.Name, entry.Namespace)
+		latestEntry, err := common.GetLatestEntryPoint(ctx, u.client, entry.Name)
 		if err != nil {
 			return err
 		}

@@ -28,7 +28,7 @@ import (
 	"github.com/jacero-io/kode-operator/internal/common"
 )
 
-func (r *EntryPointReconciler) handleFinalizer(ctx context.Context, entry *kodev1alpha2.EntryPoint) (ctrl.Result, error) {
+func (r *EntryPointReconciler) handleFinalizer(ctx context.Context, entry *kodev1alpha2.ClusterEntryPoint) (ctrl.Result, error) {
 	log := r.Log.WithValues("entry", client.ObjectKeyFromObject(entry))
 
 	if entry.ObjectMeta.DeletionTimestamp.IsZero() {
@@ -55,7 +55,7 @@ func (r *EntryPointReconciler) handleFinalizer(ctx context.Context, entry *kodev
 		// Remove finalizer
 		err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			// Fetch the latest version of EntryPoint
-			latestEntrypoint, err := common.GetLatestEntryPoint(ctx, r.Client, entry.Name, entry.Namespace)
+			latestEntrypoint, err := common.GetLatestEntryPoint(ctx, r.Client, entry.Name)
 			if err != nil {
 				return err
 			}
@@ -77,7 +77,7 @@ func (r *EntryPointReconciler) handleFinalizer(ctx context.Context, entry *kodev
 	return ctrl.Result{}, nil
 }
 
-func (r *EntryPointReconciler) finalize(ctx context.Context, entry *kodev1alpha2.EntryPoint) error {
+func (r *EntryPointReconciler) finalize(ctx context.Context, entry *kodev1alpha2.ClusterEntryPoint) error {
 	log := r.Log.WithValues("entrypoint", client.ObjectKeyFromObject(entry))
 
 	cleanupResource := NewEntryPointCleanupResource(entry)

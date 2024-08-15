@@ -16,59 +16,58 @@ limitations under the License.
 
 package entrypoint
 
-import (
-	"context"
-	"fmt"
+// import (
+// 	"context"
+// 	"fmt"
 
-	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
-	"github.com/jacero-io/kode-operator/internal/common"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-)
+// 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
+// 	"github.com/jacero-io/kode-operator/internal/common"
+// 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+// )
 
-func (r *EntryPointReconciler) ensureResources(ctx context.Context, config *common.EntryPointResourceConfig) error {
-	log := r.Log.WithName("ResoruceEnsurer").WithValues("entry", common.ObjectKeyFromConfig(config.CommonConfig))
+// func (r *EntryPointReconciler) ensureResources(ctx context.Context, config *common.EntryPointResourceConfig) error {
+// 	log := r.Log.WithName("ResourceEnsurer").WithValues("entry", common.ObjectKeyFromConfig(config.CommonConfig))
 
-	// Fetch the latest EntryPoint object
-	entry, err := common.GetLatestEntryPoint(ctx, r.Client, config.CommonConfig.Name, config.CommonConfig.Namespace)
-	if err != nil {
-		return fmt.Errorf("failed to get EntryPoint: %w", err)
-	}
+// 	// Fetch the latest EntryPoint object
+// 	entry, err := common.GetLatestEntryPoint(ctx, r.Client, config.CommonConfig.Name)
+// 	if err != nil {
+// 		return fmt.Errorf("failed to get EntryPoint: %w", err)
+// 	}
 
-	// Check if the resource has changed since last reconciliation
-	if entry.Generation != entry.Status.ObservedGeneration {
-		log.Info("Resource has changed, ensuring all resources", "Generation", entry.Generation, "ObservedGeneration", entry.Status.ObservedGeneration)
-		// Update status depending on the current phase
-		if entry.Status.Phase != kodev1alpha2.EntryPointPhasePending {
-			// If the EntryPoint is already Active, update the status to Pending
-			if entry.Status.Phase == kodev1alpha2.EntryPointPhaseActive {
-				if err := r.updateStatus(ctx, entry, kodev1alpha2.EntryPointPhasePending, []metav1.Condition{}, nil); err != nil {
-					log.Error(err, "Failed to update status to Pending")
-					return err
-				}
-			} else { // If the EntryPoint is not Active, update the status to Creating
-				if err := r.updateStatus(ctx, entry, kodev1alpha2.EntryPointPhaseCreating, []metav1.Condition{}, nil); err != nil {
-					log.Error(err, "Failed to update status to Creating")
-					return err
-				}
-			}
-		}
+// 	// Check if the resource has changed since last reconciliation
+// 	if entry.Generation != entry.Status.ObservedGeneration {
+// 		log.Info("Resource has changed, ensuring all resources", "Generation", entry.Generation, "ObservedGeneration", entry.Status.ObservedGeneration)
 
-		// Update status depending on the current phase
-		if entry.Status.Phase != kodev1alpha2.EntryPointPhasePending {
-			// If the EntryPoint is Active, update the status to Pending
-			if entry.Status.Phase == kodev1alpha2.EntryPointPhaseActive {
-				if err := r.updateStatus(ctx, entry, kodev1alpha2.EntryPointPhasePending, []metav1.Condition{}, nil); err != nil {
-					log.Error(err, "Failed to update status to Pending")
-					return err
-				}
-			} else { // If the EntryPoint is not Active, update the status to Created
-				if err := r.updateStatus(ctx, entry, kodev1alpha2.EntryPointPhaseCreating, []metav1.Condition{}, nil); err != nil {
-					log.Error(err, "Failed to update status to Creating")
-					return err
-				}
-			}
-		}
-	}
+// 		// Update status to Pending or Creating
+// 		if err := r.updateStatusForReconciliation(ctx, entry); err != nil {
+// 			return err
+// 		}
 
-	return nil
-}
+// 		// Ensure HTTPRoute
+
+// 		// Update status to Active
+// 		if err := r.updateStatus(ctx, entry, kodev1alpha2.EntryPointPhaseActive, []metav1.Condition{}, nil); err != nil {
+// 			log.Error(err, "Failed to update status to Active")
+// 			return err
+// 		}
+// 	}
+
+// 	return nil
+// }
+
+// func (r *EntryPointReconciler) updateStatusForReconciliation(ctx context.Context, entry *kodev1alpha2.ClusterEntryPoint) error {
+// 	if entry.Status.Phase != kodev1alpha2.EntryPointPhasePending {
+// 		if entry.Status.Phase == kodev1alpha2.EntryPointPhaseActive {
+// 			if err := r.updateStatus(ctx, entry, kodev1alpha2.EntryPointPhasePending, []metav1.Condition{}, nil); err != nil {
+// 				r.Log.Error(err, "Failed to update status to Pending")
+// 				return err
+// 			}
+// 		} else {
+// 			if err := r.updateStatus(ctx, entry, kodev1alpha2.EntryPointPhaseCreating, []metav1.Condition{}, nil); err != nil {
+// 				r.Log.Error(err, "Failed to update status to Creating")
+// 				return err
+// 			}
+// 		}
+// 	}
+// 	return nil
+// }

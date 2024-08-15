@@ -20,17 +20,6 @@ rules:
   - ""
   resources:
   - persistentvolumeclaims
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - ""
-  resources:
   - services
   verbs:
   - create
@@ -43,7 +32,7 @@ rules:
 - apiGroups:
   - kode.jacero.io
   resources:
-  - entrypoints
+  - clusterentrypoints
   verbs:
   - create
   - delete
@@ -55,13 +44,13 @@ rules:
 - apiGroups:
   - kode.jacero.io
   resources:
-  - entrypoints/finalizers
+  - clusterentrypoints/finalizers
   verbs:
   - update
 - apiGroups:
   - kode.jacero.io
   resources:
-  - entrypoints/status
+  - clusterentrypoints/status
   verbs:
   - get
   - patch
@@ -70,22 +59,9 @@ rules:
   - kode.kode.jacero.io
   resources:
   - clusterpodtemplates
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - kode.kode.jacero.io
-  resources:
   - clustertofutemplates
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - kode.kode.jacero.io
-  resources:
-  - kodeclustertemplates
+  - podtemplates
+  - tofutemplates
   verbs:
   - get
   - list
@@ -116,27 +92,3 @@ rules:
   - get
   - patch
   - update
-- apiGroups:
-  - kode.kode.jacero.io
-  resources:
-  - kodetemplates
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - kode.kode.jacero.io
-  resources:
-  - podtemplates
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - kode.kode.jacero.io
-  resources:
-  - tofutemplates
-  verbs:
-  - get
-  - list
-  - watch

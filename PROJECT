@@ -19,14 +19,7 @@ resources:
   version: v1alpha2
 - api:
     crdVersion: v1
-    namespaced: true
-  domain: jacero.io
-  group: kode
-  kind: EntryPoint
-  path: github.com/jacero-io/kode-operator/api/v1alpha2
-  version: v1alpha2
-- api:
-    crdVersion: v1
+  controller: true
   domain: jacero.io
   group: kode
   kind: ClusterEntryPoint

@@ -72,7 +72,7 @@ var _ = Describe("Kode Controller PodTemplate Integration", Ordered, func() {
 		namespace             *corev1.Namespace
 		podTemplateCodeServer *kodev1alpha2.ClusterPodTemplate
 		podTemplateWebtop     *kodev1alpha2.ClusterPodTemplate
-		entryPoint            *kodev1alpha2.EntryPoint
+		entryPoint            *kodev1alpha2.ClusterEntryPoint
 	)
 
 	BeforeAll(func() {
@@ -83,16 +83,13 @@ var _ = Describe("Kode Controller PodTemplate Integration", Ordered, func() {
 		Expect(k8sClient.Create(ctx, namespace)).To(Succeed())
 
 		// Create EntryPoint
-		entryPoint = &kodev1alpha2.EntryPoint{
+		entryPoint = &kodev1alpha2.ClusterEntryPoint{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      entryPointName,
-				Namespace: resourceNamespace,
 			},
-			Spec: kodev1alpha2.EntryPointSpec{
-				EntryPointSharedSpec: kodev1alpha2.EntryPointSharedSpec{
-					RoutingType: "domain",
-					URL:         "kode.example.com",
-				},
+			Spec: kodev1alpha2.ClusterEntryPointSpec{
+				RoutingType: "domain",
+				URL:         "kode.example.com",
 			},
 		}
 		Expect(k8sClient.Create(ctx, entryPoint)).To(Succeed())

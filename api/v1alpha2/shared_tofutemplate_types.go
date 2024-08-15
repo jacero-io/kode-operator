@@ -16,10 +16,6 @@ limitations under the License.
 
 package v1alpha2
 
-import (
-	tofuv1alpha2 "github.com/flux-iac/tofu-controller/api/v1alpha2"
-)
-
 // TofuSharedSpec defines the desired state of KodeTofu
 type TofuSharedSpec struct {
 
@@ -32,7 +28,7 @@ type TofuSharedSpec struct {
 
 	// TofuSpec is the terraform specification.
 	// +kubebuilder:validation:Description="Terraform specification."
-	TofuSpec tofuv1alpha2.TerraformSpec `json:"tofuSpec,omitempty" yaml:"tofuSpec,omitempty"`
+	// TofuSpec tofuv1alpha2.TerraformSpec `json:"tofuSpec,omitempty" yaml:"tofuSpec,omitempty"`
 }
 
 // TofuSharedStatus defines the observed state for Tofu

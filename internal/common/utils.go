@@ -40,9 +40,9 @@ func GetLatestKode(ctx context.Context, client client.Client, name, namespace st
 	return kode, err
 }
 
-func GetLatestEntryPoint(ctx context.Context, client client.Client, name, namespace string) (*kodev1alpha2.EntryPoint, error) {
-	entryPoint := &kodev1alpha2.EntryPoint{}
-	err := client.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, entryPoint)
+func GetLatestEntryPoint(ctx context.Context, client client.Client, name string) (*kodev1alpha2.ClusterEntryPoint, error) {
+	entryPoint := &kodev1alpha2.ClusterEntryPoint{}
+	err := client.Get(ctx, types.NamespacedName{Name: name, Namespace: metav1.NamespaceAll}, entryPoint)
 	return entryPoint, err
 }
 

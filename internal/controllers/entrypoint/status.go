@@ -26,7 +26,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (r EntryPointReconciler) updateStatus(ctx context.Context, entry *kodev1alpha2.EntryPoint, phase kodev1alpha2.EntryPointPhase, conditions []metav1.Condition, err error) error {
+func (r EntryPointReconciler) updateStatus(ctx context.Context, entry *kodev1alpha2.ClusterEntryPoint, phase kodev1alpha2.EntryPointPhase, conditions []metav1.Condition, err error) error {
 	switch phase {
 	case kodev1alpha2.EntryPointPhaseCreating:
 		if err := r.updatePhaseCreating(ctx, entry); err != nil {
@@ -53,7 +53,7 @@ func (r EntryPointReconciler) updateStatus(ctx context.Context, entry *kodev1alp
 }
 
 // updatePhaseCreating updates the Kode status to indicate that the resources are being created.
-func (r EntryPointReconciler) updatePhaseCreating(ctx context.Context, entry *kodev1alpha2.EntryPoint) error {
+func (r EntryPointReconciler) updatePhaseCreating(ctx context.Context, entry *kodev1alpha2.ClusterEntryPoint) error {
 	now := metav1.NewTime(time.Now())
 	phase := kodev1alpha2.EntryPointPhaseCreating
 	conditions := []metav1.Condition{
@@ -70,7 +70,7 @@ func (r EntryPointReconciler) updatePhaseCreating(ctx context.Context, entry *ko
 }
 
 // updatePhaseCreated updates the Kode status to indicate that the resources have been created.
-func (r EntryPointReconciler) updatePhaseCreated(ctx context.Context, entry *kodev1alpha2.EntryPoint) error {
+func (r EntryPointReconciler) updatePhaseCreated(ctx context.Context, entry *kodev1alpha2.ClusterEntryPoint) error {
 	now := metav1.NewTime(time.Now())
 	phase := kodev1alpha2.EntryPointPhaseCreated
 	conditions := []metav1.Condition{
@@ -87,7 +87,7 @@ func (r EntryPointReconciler) updatePhaseCreated(ctx context.Context, entry *kod
 }
 
 // updatePhaseFailed updates the Kode status to indicate that the resource has failed.
-func (r EntryPointReconciler) updatePhaseFailed(ctx context.Context, entry *kodev1alpha2.EntryPoint, err error, additionalConditions []metav1.Condition) error {
+func (r EntryPointReconciler) updatePhaseFailed(ctx context.Context, entry *kodev1alpha2.ClusterEntryPoint, err error, additionalConditions []metav1.Condition) error {
 	now := metav1.NewTime(time.Now())
 	phase := kodev1alpha2.EntryPointPhaseFailed
 	errorMessage := err.Error()
@@ -130,7 +130,7 @@ func (r EntryPointReconciler) updatePhaseFailed(ctx context.Context, entry *kode
 }
 
 // updatePhasePending updates the Kode status to indicate that the resources are pending.
-func (r EntryPointReconciler) updatePhasePending(ctx context.Context, entry *kodev1alpha2.EntryPoint) error {
+func (r EntryPointReconciler) updatePhasePending(ctx context.Context, entry *kodev1alpha2.ClusterEntryPoint) error {
 	now := metav1.NewTime(time.Now())
 	phase := kodev1alpha2.EntryPointPhasePending
 	conditions := []metav1.Condition{
@@ -161,7 +161,7 @@ func (r EntryPointReconciler) updatePhasePending(ctx context.Context, entry *kod
 }
 
 // updatePhaseActive updates the Kode status to indicate that the resources are active.
-func (r EntryPointReconciler) updatePhaseActive(ctx context.Context, entry *kodev1alpha2.EntryPoint) error {
+func (r EntryPointReconciler) updatePhaseActive(ctx context.Context, entry *kodev1alpha2.ClusterEntryPoint) error {
 	now := metav1.NewTime(time.Now())
 	phase := kodev1alpha2.EntryPointPhaseActive
 	conditions := []metav1.Condition{

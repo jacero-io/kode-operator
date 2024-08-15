@@ -23,18 +23,22 @@ import (
 	"github.com/jacero-io/kode-operator/internal/common"
 )
 
-func InitEntryPointResourcesConfig(entryPoint *kodev1alpha2.EntryPoint) *common.EntryPointResourceConfig {
+func InitEntryPointResourcesConfig(entryPoint *kodev1alpha2.ClusterEntryPoint) *common.EntryPointResourceConfig {
 	return &common.EntryPointResourceConfig{
-		EntryPointSpec: entryPoint.Spec,
 		CommonConfig: common.CommonConfig{
 			Labels:    createLabels(entryPoint),
 			Name:      entryPoint.Name,
 			Namespace: entryPoint.Namespace,
 		},
+
+		EntryPointSpec: entryPoint.Spec,
+		GatewayClassName: entryPoint.Spec.GatewaySpec.GatewayClassName,
+		EnvoyPatchPolicySpec: entryPoint.Spec.GatewaySpec.EnvoyPatchPolicySpec,
+		SecurityPolicies: entryPoint.Spec.GatewaySpec.SecurityPolicies,
 	}
 }
 
-func createLabels(entrypoint *kodev1alpha2.EntryPoint) map[string]string {
+func createLabels(entrypoint *kodev1alpha2.ClusterEntryPoint) map[string]string {
 	return map[string]string{
 		"app.kubernetes.io/name":       entrypoint.Name,
 		"app.kubernetes.io/managed-by": "kode-operator",
