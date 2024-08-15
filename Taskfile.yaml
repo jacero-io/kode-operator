@@ -304,6 +304,26 @@ tasks:
       - kustomize
     vars:
       IGNORE_NOT_FOUND: '{{default "false" .IGNORE_NOT_FOUND}}'
+  
+  install-flux:
+    desc: Install Flux
+    cmds:
+      - timoni bundle apply -f ./hack/bundle.cue
+
+  uninstall-flux:
+    desc: Uninstall Flux
+    cmds:
+      - timoni bundle delete -f ./hack/bundle.cue
+
+  install-tf-controller:
+    desc: Install the tf-controller
+    cmds:
+      - kubectl apply -f ./hack/tf-controller.yaml
+
+  uninstall-tf-controller:
+    desc: Uninstall the tf-controller
+    cmds:
+      - kubectl delete -f ./hack/tf-controller.yaml
 
   kustomize:
     desc: Download kustomize locally if necessary
