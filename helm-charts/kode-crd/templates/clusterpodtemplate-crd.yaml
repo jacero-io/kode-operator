@@ -1,7 +1,7 @@
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: kodes.kode.jacero.io
+  name: clusterpodtemplates.kode.jacero.io
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.0
   labels:
@@ -9,16 +9,16 @@ metadata:
 spec:
   group: kode.jacero.io
   names:
-    kind: Kode
-    listKind: KodeList
-    plural: kodes
-    singular: kode
-  scope: Namespaced
+    kind: ClusterPodTemplate
+    listKind: ClusterPodTemplateList
+    plural: clusterpodtemplates
+    singular: clusterpodtemplate
+  scope: Cluster
   versions:
   - name: v1alpha2
     schema:
       openAPIV3Schema:
-        description: Kode is the Schema for the kodes API
+        description: ClusterPodTemplate is the Schema for the clusterpodtemplates API
         properties:
           apiVersion:
             description: |-
@@ -38,8 +38,23 @@ spec:
           metadata:
             type: object
           spec:
-            description: KodeSpec defines the desired state of Kode
+            description: ClusterPodTemplateSpec defines the desired state of ClusterKodeContainer
             properties:
+              allowPrivileged:
+                default: false
+                description: AllowPrivileged is a flag to allow privileged execution
+                  of the container.
+                type: boolean
+              args:
+                description: Specifies the args.
+                items:
+                  type: string
+                type: array
+              command:
+                description: Command is the command to run in the container.
+                items:
+                  type: string
+                type: array
               credentials:
                 description: Credentials specifies the credentials for the service.
                 properties:
@@ -62,15 +77,214 @@ spec:
                       used) and the user the container should run as, abc is default.
                     type: string
                 type: object
-              home:
+              defaultHome:
                 default: /config
-                description: Home is the path to the directory for the user data
+                description: DefaultHome is the path to the directory for the user data.
                 minLength: 3
                 type: string
+              defaultWorkspace:
+                default: workspace
+                description: DefaultWorkspace is the default directory for the kode
+                  instance on first launch. Defaults to 'workspace'.
+                minLength: 3
+                pattern: ^[^/].*$
+                type: string
+              entryPointRef:
+                description: EntryPointSpec defines the desired state of the entrypoint.
+                properties:
+                  apiVersion:
+                    description: API version of the referent.
+                    type: string
+                  kind:
+                    description: Kind is the resource kind.
+                    type: string
+                  name:
+                    description: Name is the name of the resource.
+                    type: string
+                  namespace:
+                    description: Namespace is the namespace of the resource.
+                    type: string
+                required:
+                - kind
+                - name
+                type: object
+              envFrom:
+                description: EnvFrom are the environment variables taken from a Secret
+                  or ConfigMap.
+                items:
+                  description: EnvFromSource represents the source of a set of ConfigMaps
+                  properties:
+                    configMapRef:
+                      description: The ConfigMap to select from
+                      properties:
+                        name:
+                          default: ""
+                          description: |-
+                            Name of the referent.
+                            This field is effectively required, but due to backwards compatibility is
+                            allowed to be empty. Instances of this type with an empty value here are
+                            almost certainly wrong.
+                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                          type: string
+                        optional:
+                          description: Specify whether the ConfigMap must be defined
+                          type: boolean
+                      type: object
+                      x-kubernetes-map-type: atomic
+                    prefix:
+                      description: An optional identifier to prepend to each key in
+                        the ConfigMap. Must be a C_IDENTIFIER.
+                      type: string
+                    secretRef:
+                      description: The Secret to select from
+                      properties:
+                        name:
+                          default: ""
+                          description: |-
+                            Name of the referent.
+                            This field is effectively required, but due to backwards compatibility is
+                            allowed to be empty. Instances of this type with an empty value here are
+                            almost certainly wrong.
+                            More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                          type: string
+                        optional:
+                          description: Specify whether the Secret must be defined
+                          type: boolean
+                      type: object
+                      x-kubernetes-map-type: atomic
+                  type: object
+                type: array
+              envs:
+                description: Specifies the environment variables.
+                items:
+                  description: EnvVar represents an environment variable present in
+                    a Container.
+                  properties:
+                    name:
+                      description: Name of the environment variable. Must be a C_IDENTIFIER.
+                      type: string
+                    value:
+                      description: |-
+                        Variable references $(VAR_NAME) are expanded
+                        using the previously defined environment variables in the container and
+                        any service environment variables. If a variable cannot be resolved,
+                        the reference in the input string will be unchanged. Double $$ are reduced
+                        to a single $, which allows for escaping the $(VAR_NAME) syntax: i.e.
+                        "$$(VAR_NAME)" will produce the string literal "$(VAR_NAME)".
+                        Escaped references will never be expanded, regardless of whether the variable
+                        exists or not.
+                        Defaults to "".
+                      type: string
+                    valueFrom:
+                      description: Source for the environment variable's value. Cannot
+                        be used if value is not empty.
+                      properties:
+                        configMapKeyRef:
+                          description: Selects a key of a ConfigMap.
+                          properties:
+                            key:
+                              description: The key to select.
+                              type: string
+                            name:
+                              default: ""
+                              description: |-
+                                Name of the referent.
+                                This field is effectively required, but due to backwards compatibility is
+                                allowed to be empty. Instances of this type with an empty value here are
+                                almost certainly wrong.
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                              type: string
+                            optional:
+                              description: Specify whether the ConfigMap or its key
+                                must be defined
+                              type: boolean
+                          required:
+                          - key
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        fieldRef:
+                          description: |-
+                            Selects a field of the pod: supports metadata.name, metadata.namespace, `metadata.labels['<KEY>']`, `metadata.annotations['<KEY>']`,
+                            spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP, status.podIPs.
+                          properties:
+                            apiVersion:
+                              description: Version of the schema the FieldPath is written
+                                in terms of, defaults to "v1".
+                              type: string
+                            fieldPath:
+                              description: Path of the field to select in the specified
+                                API version.
+                              type: string
+                          required:
+                          - fieldPath
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        resourceFieldRef:
+                          description: |-
+                            Selects a resource of the container: only resources limits and requests
+                            (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported.
+                          properties:
+                            containerName:
+                              description: 'Container name: required for volumes, optional
+                                for env vars'
+                              type: string
+                            divisor:
+                              anyOf:
+                              - type: integer
+                              - type: string
+                              description: Specifies the output format of the exposed
+                                resources, defaults to "1"
+                              pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                              x-kubernetes-int-or-string: true
+                            resource:
+                              description: 'Required: resource to select'
+                              type: string
+                          required:
+                          - resource
+                          type: object
+                          x-kubernetes-map-type: atomic
+                        secretKeyRef:
+                          description: Selects a key of a secret in the pod's namespace
+                          properties:
+                            key:
+                              description: The key of the secret to select from.  Must
+                                be a valid secret key.
+                              type: string
+                            name:
+                              default: ""
+                              description: |-
+                                Name of the referent.
+                                This field is effectively required, but due to backwards compatibility is
+                                allowed to be empty. Instances of this type with an empty value here are
+                                almost certainly wrong.
+                                More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
+                              type: string
+                            optional:
+                              description: Specify whether the Secret or its key must
+                                be defined
+                              type: boolean
+                          required:
+                          - key
+                          type: object
+                          x-kubernetes-map-type: atomic
+                      type: object
+                  required:
+                  - name
+                  type: object
+                type: array
+              image:
+                description: Image is the container image for the service.
+                minLength: 1
+                type: string
+              inactiveAfterSeconds:
+                default: 600
+                description: Specifies the period before controller inactive the resource
+                  (delete all resources except volume).
+                format: int64
+                type: integer
               initPlugins:
-                description: InitPlugins specifies the OCI containers to be run as InitContainers.
-                  These containers can be used to prepare the workspace or run some
-                  setup scripts. It is an ordered list.
+                description: InitPlugins specifies the OCI containers to be run before
+                  the main container. It is an ordered list.
                 items:
                   properties:
                     args:
@@ -326,102 +540,105 @@ spec:
                   - name
                   type: object
                 type: array
-              privileged:
-                default: false
-                description: Privileged specifies if the container should run in privileged
-                  mode. Will only work if the KodeTemplate allows it. Only set to true
-                  if you know what you are doing.
-                type: boolean
-              storage:
-                description: Storage specifies the storage configuration.
+              pgid:
+                default: 1000
+                description: PGID is the group ID for the service process.
+                format: int64
+                type: integer
+              port:
+                default: 8000
+                description: Port is the port for the service process. Used by EnvoyProxy
+                  to expose the kode.
+                format: int32
+                minimum: 1
+                type: integer
+              puid:
+                default: 1000
+                description: PUID is the user ID for the service process.
+                format: int64
+                type: integer
+              recycleAfterSeconds:
+                default: 28800
+                description: Specifies the period before controller recycle the resource
+                  (delete all resources).
+                format: int64
+                type: integer
+              resources:
+                description: Specifies the resources.
                 properties:
-                  accessModes:
-                    description: AccessModes specifies the access modes for the persistent
-                      volume.
+                  claims:
+                    description: |-
+                      Claims lists the names of resources, defined in spec.resourceClaims,
+                      that are used by this container.
+  
+                      This is an alpha field and requires enabling the
+                      DynamicResourceAllocation feature gate.
+  
+                      This field is immutable. It can only be set for containers.
                     items:
-                      type: string
+                      description: ResourceClaim references one entry in PodSpec.ResourceClaims.
+                      properties:
+                        name:
+                          description: |-
+                            Name must match the name of one entry in pod.spec.resourceClaims of
+                            the Pod where this field is used. It makes that resource available
+                            inside a container.
+                          type: string
+                        request:
+                          description: |-
+                            Request is the name chosen for a request in the referenced claim.
+                            If empty, everything from the claim is made available, otherwise
+                            only the result of this request.
+                          type: string
+                      required:
+                      - name
+                      type: object
                     type: array
-                  existingVolumeClaim:
-                    description: ExistingVolumeClaim specifies an existing PersistentVolumeClaim
-                      to use.
-                    type: string
-                  keepVolume:
-                    default: false
-                    description: KeepVolume specifies if the volume should be kept when
-                      the kode is recycled. Defaults to false.
-                    type: boolean
-                  resources:
-                    description: Resources specifies the resource requirements for the
-                      persistent volume.
-                    properties:
-                      limits:
-                        additionalProperties:
-                          anyOf:
-                          - type: integer
-                          - type: string
-                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                          x-kubernetes-int-or-string: true
-                        description: |-
-                          Limits describes the maximum amount of compute resources allowed.
-                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
-                        type: object
-                      requests:
-                        additionalProperties:
-                          anyOf:
-                          - type: integer
-                          - type: string
-                          pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
-                          x-kubernetes-int-or-string: true
-                        description: |-
-                          Requests describes the minimum amount of compute resources required.
-                          If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
-                          otherwise to an implementation-defined value. Requests cannot exceed Limits.
-                          More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
-                        type: object
+                    x-kubernetes-list-map-keys:
+                    - name
+                    x-kubernetes-list-type: map
+                  limits:
+                    additionalProperties:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
+                    description: |-
+                      Limits describes the maximum amount of compute resources allowed.
+                      More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                     type: object
-                  storageClassName:
-                    description: StorageClassName specifies the storage class name for
-                      the persistent volume.
-                    type: string
+                  requests:
+                    additionalProperties:
+                      anyOf:
+                      - type: integer
+                      - type: string
+                      pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                      x-kubernetes-int-or-string: true
+                    description: |-
+                      Requests describes the minimum amount of compute resources required.
+                      If Requests is omitted for a container, it defaults to Limits if that is explicitly specified,
+                      otherwise to an implementation-defined value. Requests cannot exceed Limits.
+                      More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+                    type: object
                 type: object
-              templateRef:
-                description: TemplateRef is the reference to the KodeTemplate configuration.
-                properties:
-                  apiVersion:
-                    description: API version of the referent.
-                    type: string
-                  kind:
-                    description: Kind is the resource kind.
-                    type: string
-                  name:
-                    description: Name is the name of the resource.
-                    type: string
-                  namespace:
-                    description: Namespace is the namespace of the resource.
-                    type: string
-                required:
-                - kind
-                - name
-                type: object
-              userConfig:
-                description: UserConfig specifies a git repository URL to get user configuration
-                  from.
+              type:
+                description: Type is the type of container to use. Can be one of 'code-server',
+                  'webtop', 'devcontainers', 'jupyter'.
+                enum:
+                - code-server
+                - webtop
                 type: string
-              workspace:
-                description: Workspace is the user specified workspace directory (e.g.
-                  my-workspace).
-                minLength: 3
-                pattern: ^[^/].*$
+              tz:
+                default: UTC
+                description: TZ is the timezone for the service process.
                 type: string
-            required:
-            - templateRef
             type: object
           status:
-            description: KodeStatus defines the observed state of Kode
+            description: ClusterPodTemplateStatus defines the observed state of ClusterKodeContainer
             properties:
               conditions:
-                description: Conditions represent the latest available observations
-                  of a Kode's state.
+                description: Conditions reflect the current state of the template
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -477,39 +694,11 @@ spec:
                   - type
                   type: object
                 type: array
-              iconUrl:
-                description: IconUrl is the URL to the icon for the Kode.
-                type: string
-              kodeUrl:
-                description: KodeUrl is the URL to access the Kode.
-                type: string
-              lastActivityTime:
-                description: LastActivityTime is the timestamp when the last activity
-                  occurred.
-                format: date-time
-                type: string
-              lastError:
-                description: LastError contains the last error message encountered during
-                  reconciliation.
-                type: string
-              lastErrorTime:
-                description: LastErrorTime is the timestamp when the last error occurred.
-                format: date-time
-                type: string
               observedGeneration:
                 description: ObservedGeneration is the last observed generation of the
                   Kode resource.
                 format: int64
                 type: integer
-              phase:
-                description: Phase represents the current phase of the Kode resource.
-                type: string
-              runtime:
-                description: Runtime is the runtime for the kode. Can be one of 'container',
-                  'virtual', 'tofu'.
-                type: string
-            required:
-            - phase
             type: object
         type: object
     served: true

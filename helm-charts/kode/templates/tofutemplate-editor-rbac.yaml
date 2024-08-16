@@ -1,21 +1,25 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "kode.fullname" . }}-entrypoint-viewer-role
+  name: {{ include "kode.fullname" . }}-tofutemplate-editor-role
   labels:
   {{- include "kode.labels" . | nindent 4 }}
 rules:
 - apiGroups:
   - kode.jacero.io
   resources:
-  - entrypoints
+  - tofutemplates
   verbs:
+  - create
+  - delete
   - get
   - list
+  - patch
+  - update
   - watch
 - apiGroups:
   - kode.jacero.io
   resources:
-  - entrypoints/status
+  - tofutemplates/status
   verbs:
   - get

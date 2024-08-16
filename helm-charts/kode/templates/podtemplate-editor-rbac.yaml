@@ -1,14 +1,14 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "kode.fullname" . }}-kodeclustertemplate-editor-role
+  name: {{ include "kode.fullname" . }}-podtemplate-editor-role
   labels:
   {{- include "kode.labels" . | nindent 4 }}
 rules:
 - apiGroups:
   - kode.jacero.io
   resources:
-  - kodeclustertemplates
+  - podtemplates
   verbs:
   - create
   - delete
@@ -20,6 +20,6 @@ rules:
 - apiGroups:
   - kode.jacero.io
   resources:
-  - kodeclustertemplates/status
+  - podtemplates/status
   verbs:
   - get
