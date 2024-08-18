@@ -1,0 +1,17 @@
+---
+apiVersion: kode.jacero.io/v1alpha2
+kind: EntryPoint
+metadata:
+  labels:
+    app.kubernetes.io/name: kode-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: entrypoint-sample
+  namespace: default
+spec:
+  routingType: "subdomain"
+  baseDomain: "kode.example.com"
+  gatewaySpec:
+    existingGatewayRef:
+      kind: Gateway
+      name: eg
+      namespace: default

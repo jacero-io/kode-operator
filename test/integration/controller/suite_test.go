@@ -118,7 +118,7 @@ var _ = BeforeSuite(func() {
 		Client:          mockK8sClient, // Use mockK8sClient instead of k8sClient
 		Scheme:          k8sManager.GetScheme(),
 		Log:             ctrl.Log.WithName("controllers").WithName("Kode").WithName("Reconcile"),
-		ResourceManager: resource.NewDefaultResourceManager(mockK8sClient, ctrl.Log.WithName("controllers").WithName("Kode").WithName("ResourceManager")),
+		ResourceManager: resource.NewDefaultResourceManager(mockK8sClient, ctrl.Log.WithName("controllers").WithName("Kode").WithName("ResourceManager"), k8sManager.GetScheme()),
 		TemplateManager: template.NewDefaultTemplateManager(mockK8sClient, ctrl.Log.WithName("controllers").WithName("Kode").WithName("TemplateManager")),
 		CleanupManager:  cleanup.NewDefaultCleanupManager(mockK8sClient, ctrl.Log.WithName("controllers").WithName("Kode").WithName("CleanupManager")),
 		StatusUpdater:   status.NewDefaultStatusUpdater(mockK8sClient, ctrl.Log.WithName("controllers").WithName("Kode").WithName("StatusUpdater")),

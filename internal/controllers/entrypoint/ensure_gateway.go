@@ -26,61 +26,75 @@ import (
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 // ensureGateway ensures that the Gateway exists for the EntryPoint instance
-func (r *EntryPointReconciler) ensureGateway(ctx context.Context, config *common.EntryPointResourceConfig, entrypoint *kodev1alpha2.ClusterEntryPoint) error {
-    log := r.Log.WithName("GatewayEnsurer").WithValues("entrypoint", common.ObjectKeyFromConfig(config.CommonConfig))
+func (r *EntryPointReconciler) ensureGateway(ctx context.Context, entryPoint *kodev1alpha2.EntryPoint, config *common.EntryPointResourceConfig) error {
+	log := r.Log.WithName("GatewayEnsurer").WithValues("entrypoint", common.ObjectKeyFromConfig(config.CommonConfig))
 
-    ctx, cancel := common.ContextWithTimeout(ctx, 30) // 30 seconds timeout
-    defer cancel()
+	ctx, cancel := common.ContextWithTimeout(ctx, 30) // 30 seconds timeout
+	defer cancel()
 
-    log.V(1).Info("Ensuring Gateway")
+	log.V(1).Info("Ensuring Gateway")
 
-    gateway := &gwapiv1.Gateway{
-        ObjectMeta: metav1.ObjectMeta{
-            Name:      config.CommonConfig.Name,
-            Namespace: config.CommonConfig.Namespace,
-            Labels:   config.CommonConfig.Labels,
-        },
-    }
+	if entryPoint.Spec.GatewaySpec.ExistingGatewayRef.Name != "" {
+		log.V(1).Info("Gateway already exists", "gateway", entryPoint.Spec.GatewaySpec.ExistingGatewayRef)
+		return nil
+	}
 
-    err := r.ResourceManager.CreateOrPatch(ctx, gateway, func() error {
-        constructedGateway, err := r.constructGatewaySpec(config)
-        if err != nil {
-            return fmt.Errorf("failed to construct Gateway spec: %v", err)
-        }
+	gateway := &gwapiv1.Gateway{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      config.GatewayName,
+			Namespace: config.CommonConfig.Namespace,
+			Labels:    config.CommonConfig.Labels,
+		},
+	}
 
-        gateway.Spec = constructedGateway.Spec
-        gateway.ObjectMeta.Labels = constructedGateway.ObjectMeta.Labels
+	err := r.ResourceManager.CreateOrPatch(ctx, gateway, func() error {
+		constructedGateway, err := r.constructGatewaySpec(entryPoint)
+		if err != nil {
+			return fmt.Errorf("failed to construct Gateway spec: %w", err)
+		}
 
-        return controllerutil.SetControllerReference(entrypoint, gateway, r.Scheme)
-    })
+		gateway.Spec = constructedGateway.Spec
+		gateway.ObjectMeta.Labels = constructedGateway.ObjectMeta.Labels
 
-    if err != nil {
-        return fmt.Errorf("failed to create or patch Gateway: %v", err)
-    }
+		return controllerutil.SetControllerReference(entryPoint, gateway, r.Scheme)
+	})
 
-    return nil
+	if err != nil {
+		return fmt.Errorf("failed to create or patch Gateway: %w", err)
+	}
+
+	return nil
 }
 
 // constructGateway constructs a Gateway for the EntryPoint instance
-func (r *EntryPointReconciler) constructGatewaySpec(config *common.EntryPointResourceConfig) (*gwapiv1.Gateway, error) {
-    log := r.Log.WithName("GatewayConstructor").WithValues("entrypoint", common.ObjectKeyFromConfig(config.CommonConfig))
+func (r *EntryPointReconciler) constructGatewaySpec(entryPoint *kodev1alpha2.EntryPoint) (*gwapiv1.Gateway, error) {
+	log := r.Log.WithName("GatewayConstructor").WithValues("entrypoint", types.NamespacedName{Name: entryPoint.Name, Namespace: entryPoint.Namespace})
 
-    gateway := &gwapiv1.Gateway{
-        ObjectMeta: metav1.ObjectMeta{
-            Name:      config.CommonConfig.Name,
-            Namespace: config.CommonConfig.Namespace,
-            Labels:   config.CommonConfig.Labels,
-        },
-        Spec: gwapiv1.GatewaySpec{
-            GatewayClassName: config.GatewayClassName,
-        },
-    }
+	gateway := &gwapiv1.Gateway{
+		Spec: gwapiv1.GatewaySpec{
+			GatewayClassName: entryPoint.Spec.GatewaySpec.GatewayClassName,
+			Listeners: []gwapiv1.Listener{
+				{
+					Name:     gwapiv1.SectionName("http"),
+					Port:     80,
+					Protocol: "HTTP",
+				},
+				{
+					Name:     gwapiv1.SectionName("https"),
+					Port:     443,
+					Protocol: "HTTP",
+					TLS:      &gwapiv1.GatewayTLSConfig{},
+				},
+			},
+		},
+	}
 
-    log.V(1).Info("Constructed Gateway", "gateway", gateway)
+	log.V(1).Info("Constructed Gateway", "gateway", gateway)
 
-    return gateway, nil
+	return gateway, nil
 }

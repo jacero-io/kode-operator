@@ -40,7 +40,7 @@ func (k *KodeCleanupResource) GetResources() []cleanup.Resource {
 			Object:    &appsv1.StatefulSet{},
 		},
 		{
-			Name:      GetServiceName(k.Kode),
+			Name:      k.Kode.GetServiceName(),
 			Namespace: k.Kode.Namespace,
 			Kind:      "Service",
 			Object:    &corev1.Service{},
@@ -50,7 +50,7 @@ func (k *KodeCleanupResource) GetResources() []cleanup.Resource {
 	// Add PVC to resources only if it's not using an existing claim
 	if k.Kode.Spec.Storage.ExistingVolumeClaim == "" {
 		resources = append(resources, cleanup.Resource{
-			Name:      GetPVCName(k.Kode),
+			Name:      k.Kode.GetPVCName(),
 			Namespace: k.Kode.Namespace,
 			Kind:      "PersistentVolumeClaim",
 			Object:    &corev1.PersistentVolumeClaim{},

@@ -55,6 +55,11 @@ func createPodTemplate(name, image, templateType string) *kodev1alpha2.ClusterPo
 			PodTemplateSharedSpec: kodev1alpha2.PodTemplateSharedSpec{
 				BaseSharedSpec: kodev1alpha2.BaseSharedSpec{
 					Port: 8000,
+					EntryPointRef: kodev1alpha2.CrossNamespaceObjectReference{
+						Kind:      "EntryPoint",
+						Name:      entryPointName,
+						Namespace: resourceNamespace,
+					},
 				},
 				Type:  templateType,
 				Image: image,
@@ -72,7 +77,7 @@ var _ = Describe("Kode Controller PodTemplate Integration", Ordered, func() {
 		namespace             *corev1.Namespace
 		podTemplateCodeServer *kodev1alpha2.ClusterPodTemplate
 		podTemplateWebtop     *kodev1alpha2.ClusterPodTemplate
-		entryPoint            *kodev1alpha2.ClusterEntryPoint
+		entryPoint            *kodev1alpha2.EntryPoint
 	)
 
 	BeforeAll(func() {
@@ -83,13 +88,14 @@ var _ = Describe("Kode Controller PodTemplate Integration", Ordered, func() {
 		Expect(k8sClient.Create(ctx, namespace)).To(Succeed())
 
 		// Create EntryPoint
-		entryPoint = &kodev1alpha2.ClusterEntryPoint{
+		entryPoint = &kodev1alpha2.EntryPoint{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      entryPointName,
+				Namespace: namespace.Name,
 			},
-			Spec: kodev1alpha2.ClusterEntryPointSpec{
-				RoutingType: "domain",
-				URL:         "kode.example.com",
+			Spec: kodev1alpha2.EntryPointSpec{
+				RoutingType: "subdomain",
+				BaseDomain:  "kode.example.com",
 			},
 		}
 		Expect(k8sClient.Create(ctx, entryPoint)).To(Succeed())
@@ -121,9 +127,9 @@ var _ = Describe("Kode Controller PodTemplate Integration", Ordered, func() {
 					Namespace: namespace.Name,
 				},
 				Spec: kodev1alpha2.KodeSpec{
-					TemplateRef: kodev1alpha2.KodeTemplateReference{
+					TemplateRef: kodev1alpha2.CrossNamespaceObjectReference{
 						Kind: podTemplateKind,
-						Name: templateName,
+						Name: kodev1alpha2.ObjectName(templateName),
 					},
 					Credentials: kodev1alpha2.CredentialsSpec{
 						Username: "abc",
@@ -259,7 +265,7 @@ var _ = Describe("Kode Controller PodTemplate Integration", Ordered, func() {
 				Namespace: namespace.Name,
 			},
 			Spec: kodev1alpha2.KodeSpec{
-				TemplateRef: kodev1alpha2.KodeTemplateReference{
+				TemplateRef: kodev1alpha2.CrossNamespaceObjectReference{
 					Kind: podTemplateKind,
 					Name: podTemplateNameCodeServer,
 				},

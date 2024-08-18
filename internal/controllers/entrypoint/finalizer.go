@@ -28,15 +28,15 @@ import (
 	"github.com/jacero-io/kode-operator/internal/common"
 )
 
-func (r *EntryPointReconciler) handleFinalizer(ctx context.Context, entry *kodev1alpha2.ClusterEntryPoint) (ctrl.Result, error) {
-	log := r.Log.WithValues("entry", client.ObjectKeyFromObject(entry))
+func (r *EntryPointReconciler) handleFinalizer(ctx context.Context, entryPoint *kodev1alpha2.EntryPoint) (ctrl.Result, error) {
+	log := r.Log.WithValues("entryPoint", client.ObjectKeyFromObject(entryPoint))
 
-	if entry.ObjectMeta.DeletionTimestamp.IsZero() {
+	if entryPoint.ObjectMeta.DeletionTimestamp.IsZero() {
 		// Object is not being deleted, so ensure the finalizer is present
-		if !controllerutil.ContainsFinalizer(entry, common.FinalizerName) {
-			controllerutil.AddFinalizer(entry, common.FinalizerName)
+		if !controllerutil.ContainsFinalizer(entryPoint, common.FinalizerName) {
+			controllerutil.AddFinalizer(entryPoint, common.FinalizerName)
 			log.Info("Adding finalizer", "finalizer", common.FinalizerName)
-			if err := r.Client.Update(ctx, entry); err != nil {
+			if err := r.Client.Update(ctx, entryPoint); err != nil {
 				log.Error(err, "Failed to add finalizer")
 				return ctrl.Result{}, err
 			}
@@ -45,9 +45,9 @@ func (r *EntryPointReconciler) handleFinalizer(ctx context.Context, entry *kodev
 	}
 
 	// Object is being deleted
-	if controllerutil.ContainsFinalizer(entry, common.FinalizerName) {
+	if controllerutil.ContainsFinalizer(entryPoint, common.FinalizerName) {
 		// Run finalization logic
-		if err := r.finalize(ctx, entry); err != nil {
+		if err := r.finalize(ctx, entryPoint); err != nil {
 			log.Error(err, "Failed to run finalizer")
 			return ctrl.Result{}, err
 		}
@@ -55,7 +55,7 @@ func (r *EntryPointReconciler) handleFinalizer(ctx context.Context, entry *kodev
 		// Remove finalizer
 		err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 			// Fetch the latest version of EntryPoint
-			latestEntrypoint, err := common.GetLatestEntryPoint(ctx, r.Client, entry.Name)
+			latestEntrypoint, err := common.GetLatestEntryPoint(ctx, r.Client, entryPoint.Name, entryPoint.Namespace)
 			if err != nil {
 				return err
 			}
@@ -77,10 +77,10 @@ func (r *EntryPointReconciler) handleFinalizer(ctx context.Context, entry *kodev
 	return ctrl.Result{}, nil
 }
 
-func (r *EntryPointReconciler) finalize(ctx context.Context, entry *kodev1alpha2.ClusterEntryPoint) error {
-	log := r.Log.WithValues("entrypoint", client.ObjectKeyFromObject(entry))
+func (r *EntryPointReconciler) finalize(ctx context.Context, entryPoint *kodev1alpha2.EntryPoint) error {
+	log := r.Log.WithValues("entrypoint", client.ObjectKeyFromObject(entryPoint))
 
-	cleanupResource := NewEntryPointCleanupResource(entry)
+	cleanupResource := NewEntryPointCleanupResource(entryPoint)
 
 	// Perform cleanup
 	err := r.CleanupManager.Cleanup(ctx, cleanupResource)

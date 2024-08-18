@@ -22,6 +22,7 @@ import (
 
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
+	"github.com/jacero-io/kode-operator/internal/events"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -43,12 +44,12 @@ func (r *KodeReconciler) ensureResources(ctx context.Context, config *common.Kod
 		if kode.Status.Phase != kodev1alpha2.KodePhasePending {
 			// If the Kode is already Active, update the status to Pending
 			if kode.Status.Phase == kodev1alpha2.KodePhaseActive {
-				if err := r.updateStatus(ctx, kode, kodev1alpha2.KodePhasePending, []metav1.Condition{}, nil); err != nil {
+				if err := r.updatePhasePending(ctx, kode); err != nil {
 					log.Error(err, "Failed to update status to Pending")
 					return err
 				}
 			} else { // If the Kode is not Active, update the status to Creating
-				if err := r.updateStatus(ctx, kode, kodev1alpha2.KodePhaseCreating, []metav1.Condition{}, nil); err != nil {
+				if err := r.updatePhaseCreating(ctx, kode); err != nil {
 					log.Error(err, "Failed to update status to Creating")
 					return err
 				}
@@ -58,52 +59,120 @@ func (r *KodeReconciler) ensureResources(ctx context.Context, config *common.Kod
 		// Ensure Secret
 		if err := r.ensureSecret(ctx, config, kode); err != nil {
 			log.Error(err, "Failed to ensure Secret")
-			r.updateStatus(ctx, kode, kodev1alpha2.KodePhaseFailed, []metav1.Condition{{
-				Type:               "SecretCreationFailed",
-				Status:             metav1.ConditionTrue,
-				Reason:             "SecretCreationError",
-				Message:            fmt.Sprintf("Failed to create Secret: %s", err.Error()),
-				LastTransitionTime: metav1.Now(),
-			}}, err)
+			r.updatePhaseFailed(ctx, kode, err, []metav1.Condition{
+				{
+					Type:    string(common.ConditionTypeError),
+					Status:  metav1.ConditionTrue,
+					Reason:  "SecretCreation",
+					Message: fmt.Sprintf("Failed to create secret: %s", err.Error()),
+				},
+				{
+					Type:    string(common.ConditionTypeReady),
+					Status:  metav1.ConditionFalse,
+					Reason:  "ResourceNotReady",
+					Message: "Kode resource is not ready due to failed secret creation",
+				},
+				{
+					Type:    string(common.ConditionTypeAvailable),
+					Status:  metav1.ConditionFalse,
+					Reason:  "ResourceUnavailable",
+					Message: "Kode resource is not available due to failed secret creation",
+				},
+				{
+					Type:    string(common.ConditionTypeProgressing),
+					Status:  metav1.ConditionFalse,
+					Reason:  "ProgressHalted",
+					Message: "Progress halted due to failed failed secret creation",
+				},
+			})
+
+			err = r.EventManager.Record(ctx, kode, events.EventTypeWarning, events.ReasonFailed, fmt.Sprintf("Failed to reconcile Kode: %v", err))
+			if err != nil {
+				log.Error(err, "Failed to record event")
+			}
+
 			return err
 		}
 
 		// Ensure Credentials
 		if err := r.ensureCredentials(ctx, config); err != nil {
 			log.Error(err, "Failed to ensure Credentials")
-			r.updateStatus(ctx, kode, kodev1alpha2.KodePhaseFailed, []metav1.Condition{{
-				Type:               "CredentialsCreationFailed",
-				Status:             metav1.ConditionTrue,
-				Reason:             "CredentialsCreationError",
-				Message:            fmt.Sprintf("Failed to create Credentials: %s", err.Error()),
-				LastTransitionTime: metav1.Now(),
-			}}, err)
 			return err
 		}
 
 		// Ensure StatefulSet
 		if err := r.ensureStatefulSet(ctx, config, kode); err != nil {
 			log.Error(err, "Failed to ensure StatefulSet")
-			r.updateStatus(ctx, kode, kodev1alpha2.KodePhaseFailed, []metav1.Condition{{
-				Type:               "StatefulSetCreationFailed",
-				Status:             metav1.ConditionTrue,
-				Reason:             "StatefulSetCreationError",
-				Message:            fmt.Sprintf("Failed to create StatefulSet: %s", err.Error()),
-				LastTransitionTime: metav1.Now(),
-			}}, err)
+			r.updatePhaseFailed(ctx, kode, err, []metav1.Condition{
+				{
+					Type:    string(common.ConditionTypeError),
+					Status:  metav1.ConditionTrue,
+					Reason:  "StatefulSetCreation",
+					Message: fmt.Sprintf("Failed to create statefulset: %s", err.Error()),
+				},
+				{
+					Type:    string(common.ConditionTypeReady),
+					Status:  metav1.ConditionFalse,
+					Reason:  "ResourceNotReady",
+					Message: "Kode resource is not ready due to failed statefulset creation",
+				},
+				{
+					Type:    string(common.ConditionTypeAvailable),
+					Status:  metav1.ConditionFalse,
+					Reason:  "ResourceUnavailable",
+					Message: "Kode resource is not available due to failed statefulset creation",
+				},
+				{
+					Type:    string(common.ConditionTypeProgressing),
+					Status:  metav1.ConditionFalse,
+					Reason:  "ProgressHalted",
+					Message: "Progress halted due to failed failed statefulset creation",
+				},
+			})
+
+			err = r.EventManager.Record(ctx, kode, events.EventTypeWarning, events.ReasonFailed, fmt.Sprintf("Failed to reconcile Kode: %v", err))
+			if err != nil {
+				log.Error(err, "Failed to record event")
+			}
+
 			return err
 		}
 
 		// Ensure Service
 		if err := r.ensureService(ctx, config, kode); err != nil {
 			log.Error(err, "Failed to ensure Service")
-			r.updateStatus(ctx, kode, kodev1alpha2.KodePhaseFailed, []metav1.Condition{{
-				Type:               "ServiceCreationFailed",
-				Status:             metav1.ConditionTrue,
-				Reason:             "ServiceCreationError",
-				Message:            fmt.Sprintf("Failed to create Service: %s", err.Error()),
-				LastTransitionTime: metav1.Now(),
-			}}, err)
+			r.updatePhaseFailed(ctx, kode, err, []metav1.Condition{
+				{
+					Type:    string(common.ConditionTypeError),
+					Status:  metav1.ConditionTrue,
+					Reason:  "ServiceCreation",
+					Message: fmt.Sprintf("Failed to create service: %s", err.Error()),
+				},
+				{
+					Type:    string(common.ConditionTypeReady),
+					Status:  metav1.ConditionFalse,
+					Reason:  "ResourceNotReady",
+					Message: "Kode resource is not ready due to failed service creation",
+				},
+				{
+					Type:    string(common.ConditionTypeAvailable),
+					Status:  metav1.ConditionFalse,
+					Reason:  "ResourceUnavailable",
+					Message: "Kode resource is not available due to failed service creation",
+				},
+				{
+					Type:    string(common.ConditionTypeProgressing),
+					Status:  metav1.ConditionFalse,
+					Reason:  "ProgressHalted",
+					Message: "Progress halted due to failed failed service creation",
+				},
+			})
+
+			err = r.EventManager.Record(ctx, kode, events.EventTypeWarning, events.ReasonFailed, fmt.Sprintf("Failed to reconcile Kode: %v", err))
+			if err != nil {
+				log.Error(err, "Failed to record event")
+			}
+
 			return err
 		}
 
@@ -111,13 +180,38 @@ func (r *KodeReconciler) ensureResources(ctx context.Context, config *common.Kod
 		if !kode.Spec.Storage.IsEmpty() {
 			if err := r.ensurePVC(ctx, config, kode); err != nil {
 				log.Error(err, "Failed to ensure PVC")
-				r.updateStatus(ctx, kode, kodev1alpha2.KodePhaseFailed, []metav1.Condition{{
-					Type:               "PVCCreationFailed",
-					Status:             metav1.ConditionTrue,
-					Reason:             "PVCCreationError",
-					Message:            fmt.Sprintf("Failed to create PersistentVolumeClaim: %s", err.Error()),
-					LastTransitionTime: metav1.Now(),
-				}}, err)
+				r.updatePhaseFailed(ctx, kode, err, []metav1.Condition{
+					{
+						Type:    string(common.ConditionTypeError),
+						Status:  metav1.ConditionTrue,
+						Reason:  "PvcCreation",
+						Message: fmt.Sprintf("Failed to create pvc: %s", err.Error()),
+					},
+					{
+						Type:    string(common.ConditionTypeReady),
+						Status:  metav1.ConditionFalse,
+						Reason:  "ResourceNotReady",
+						Message: "Kode resource is not ready due to failed pvc creation",
+					},
+					{
+						Type:    string(common.ConditionTypeAvailable),
+						Status:  metav1.ConditionFalse,
+						Reason:  "ResourceUnavailable",
+						Message: "Kode resource is not available due to failed pvc creation",
+					},
+					{
+						Type:    string(common.ConditionTypeProgressing),
+						Status:  metav1.ConditionFalse,
+						Reason:  "ProgressHalted",
+						Message: "Progress halted due to failed failed pvc creation",
+					},
+				})
+
+				err = r.EventManager.Record(ctx, kode, events.EventTypeWarning, events.ReasonFailed, fmt.Sprintf("Failed to reconcile Kode: %v", err))
+				if err != nil {
+					log.Error(err, "Failed to record event")
+				}
+
 				return err
 			}
 		}
@@ -126,13 +220,13 @@ func (r *KodeReconciler) ensureResources(ctx context.Context, config *common.Kod
 		if kode.Status.Phase != kodev1alpha2.KodePhasePending {
 			// If the Kode is Active, update the status to Pending
 			if kode.Status.Phase == kodev1alpha2.KodePhaseActive {
-				if err := r.updateStatus(ctx, kode, kodev1alpha2.KodePhasePending, []metav1.Condition{}, nil); err != nil {
+				if err := r.updatePhasePending(ctx, kode); err != nil {
 					log.Error(err, "Failed to update status to Pending")
 					return err
 				}
 			} else { // If the Kode is not Active, update the status to Created
-				if err := r.updateStatus(ctx, kode, kodev1alpha2.KodePhaseCreating, []metav1.Condition{}, nil); err != nil {
-					log.Error(err, "Failed to update status to Creating")
+				if err := r.updatePhaseCreated(ctx, kode); err != nil {
+					log.Error(err, "Failed to update status to Created")
 					return err
 				}
 			}

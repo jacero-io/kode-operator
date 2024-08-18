@@ -33,7 +33,7 @@ rules:
 - apiGroups:
   - kode.jacero.io
   resources:
-  - clusterentrypoints
+  - entrypoints
   verbs:
   - create
   - delete
@@ -45,13 +45,13 @@ rules:
 - apiGroups:
   - kode.jacero.io
   resources:
-  - clusterentrypoints/finalizers
+  - entrypoints/finalizers
   verbs:
   - update
 - apiGroups:
   - kode.jacero.io
   resources:
-  - clusterentrypoints/status
+  - entrypoints/status
   verbs:
   - get
   - patch

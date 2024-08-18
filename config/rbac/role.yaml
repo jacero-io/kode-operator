@@ -30,9 +30,10 @@ rules:
   - update
   - watch
 - apiGroups:
-  - kode.jacero.io
+  - gateway.networking.k8s.io
   resources:
-  - clusterentrypoints
+  - gateways
+  - httproutes
   verbs:
   - create
   - delete
@@ -43,20 +44,6 @@ rules:
   - watch
 - apiGroups:
   - kode.jacero.io
-  resources:
-  - clusterentrypoints/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - kode.jacero.io
-  resources:
-  - clusterentrypoints/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - kode.kode.jacero.io
   resources:
   - clusterpodtemplates
   - clustertofutemplates
@@ -67,8 +54,9 @@ rules:
   - list
   - watch
 - apiGroups:
-  - kode.kode.jacero.io
+  - kode.jacero.io
   resources:
+  - entrypoints
   - kodes
   verbs:
   - create
@@ -79,14 +67,16 @@ rules:
   - update
   - watch
 - apiGroups:
-  - kode.kode.jacero.io
+  - kode.jacero.io
   resources:
+  - entrypoints/finalizers
   - kodes/finalizers
   verbs:
   - update
 - apiGroups:
-  - kode.kode.jacero.io
+  - kode.jacero.io
   resources:
+  - entrypoints/status
   - kodes/status
   verbs:
   - get

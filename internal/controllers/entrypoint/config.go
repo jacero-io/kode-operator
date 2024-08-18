@@ -19,11 +19,14 @@ limitations under the License.
 package entrypoint
 
 import (
+	"fmt"
+
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
 )
 
-func InitEntryPointResourcesConfig(entryPoint *kodev1alpha2.ClusterEntryPoint) *common.EntryPointResourceConfig {
+func InitEntryPointResourcesConfig(entryPoint *kodev1alpha2.EntryPoint) *common.EntryPointResourceConfig {
+
 	return &common.EntryPointResourceConfig{
 		CommonConfig: common.CommonConfig{
 			Labels:    createLabels(entryPoint),
@@ -31,14 +34,16 @@ func InitEntryPointResourcesConfig(entryPoint *kodev1alpha2.ClusterEntryPoint) *
 			Namespace: entryPoint.Namespace,
 		},
 
-		EntryPointSpec: entryPoint.Spec,
-		GatewayClassName: entryPoint.Spec.GatewaySpec.GatewayClassName,
-		EnvoyPatchPolicySpec: entryPoint.Spec.GatewaySpec.EnvoyPatchPolicySpec,
-		SecurityPolicies: entryPoint.Spec.GatewaySpec.SecurityPolicies,
+		HTTPName:  fmt.Sprintf("%s-tls-redirect", entryPoint.Name),
+		HTTPSName: entryPoint.Name,
+		Protocol:  "https",
+
+		GatewayName:      fmt.Sprintf("%s-gateway", entryPoint.Name),
+		GatewayNamespace: entryPoint.Namespace,
 	}
 }
 
-func createLabels(entrypoint *kodev1alpha2.ClusterEntryPoint) map[string]string {
+func createLabels(entrypoint *kodev1alpha2.EntryPoint) map[string]string {
 	return map[string]string{
 		"app.kubernetes.io/name":       entrypoint.Name,
 		"app.kubernetes.io/managed-by": "kode-operator",

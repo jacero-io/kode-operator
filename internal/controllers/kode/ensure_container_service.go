@@ -41,6 +41,7 @@ func (r *KodeReconciler) ensureService(ctx context.Context, config *common.KodeR
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      config.ServiceName,
 			Namespace: config.CommonConfig.Namespace,
+			Labels:    config.CommonConfig.Labels,
 		},
 	}
 
@@ -68,15 +69,11 @@ func (r *KodeReconciler) constructServiceSpec(config *common.KodeResourceConfig)
 	log := r.Log.WithName("ServiceConstructor").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	service := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      config.ServiceName,
-			Namespace: config.CommonConfig.Namespace,
-		},
 		Spec: corev1.ServiceSpec{
 			Selector: config.CommonConfig.Labels,
 			Ports: []corev1.ServicePort{{
 				Protocol:   corev1.ProtocolTCP,
-				Port:       config.Port,
+				Port:       int32(config.Port),
 				TargetPort: intstr.FromInt(int(config.Port)),
 			}},
 		},

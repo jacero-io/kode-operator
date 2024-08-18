@@ -69,13 +69,30 @@ spec:
                     description: API version of the referent.
                     type: string
                   kind:
+                    allOf:
+                    - maxLength: 63
+                      minLength: 1
+                    - maxLength: 63
+                      minLength: 1
                     description: Kind is the resource kind.
+                    pattern: ^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$
                     type: string
                   name:
+                    allOf:
+                    - maxLength: 253
+                      minLength: 1
+                    - maxLength: 253
+                      minLength: 1
                     description: Name is the name of the resource.
                     type: string
                   namespace:
+                    allOf:
+                    - maxLength: 63
+                      minLength: 1
+                    - maxLength: 63
+                      minLength: 1
                     description: Namespace is the namespace of the resource.
+                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
                     type: string
                 required:
                 - kind

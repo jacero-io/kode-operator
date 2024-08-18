@@ -87,7 +87,7 @@ spec:
   defaultWorkspace: workspace
 ```
 
-### EntryPoint & ClusterEntryPoint
+### EntryPoint & EntryPoint
 
 
 ```yaml

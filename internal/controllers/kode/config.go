@@ -28,7 +28,7 @@ func InitKodeResourcesConfig(
 	kode *kodev1alpha2.Kode,
 	template *kodev1alpha2.Template) *common.KodeResourceConfig {
 
-	var kodePort int32
+	var kodePort kodev1alpha2.Port
 	var secretName string
 
 	// If ExistingSecret is specified, use it
@@ -40,8 +40,8 @@ func InitKodeResourcesConfig(
 
 	kodePort = template.Port
 
-	pvcName := GetPVCName(kode)
-	serviceName := GetServiceName(kode)
+	pvcName := kode.GetPVCName()
+	serviceName := kode.GetServiceName()
 
 	return &common.KodeResourceConfig{
 		CommonConfig: common.CommonConfig{
@@ -71,6 +71,6 @@ func createLabels(kode *kodev1alpha2.Kode, template *kodev1alpha2.Template) map[
 		"app.kubernetes.io/name":       kode.Name,
 		"app.kubernetes.io/managed-by": "kode-operator",
 		"kode.jacero.io/name":          kode.Name,
-		"template.kode.jacero.io/name": template.Name,
+		"template.kode.jacero.io/name": string(template.Name),
 	}
 }

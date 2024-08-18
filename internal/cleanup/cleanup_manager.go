@@ -48,8 +48,9 @@ func (m *defaultCleanupManager) Cleanup(ctx context.Context, resource Cleanupabl
 	var wg sync.WaitGroup
 
 	for _, res := range resources {
+		// Check if the resource should be deleted
 		if resource.ShouldDelete(res) {
-			wg.Add(1)
+			wg.Add(1) // Increment the wait group counter
 			go func(res Resource) {
 				defer wg.Done()
 				if err := m.deleteResourceAsync(ctx, res); err != nil {

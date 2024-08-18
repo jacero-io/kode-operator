@@ -23,7 +23,7 @@ import (
 )
 
 type EntryPointCleanupResource struct {
-	EntryPoint *kodev1alpha2.ClusterEntryPoint
+	EntryPoint *kodev1alpha2.EntryPoint
 }
 
 func (e *EntryPointCleanupResource) GetResources() []cleanup.Resource {
@@ -55,6 +55,6 @@ func (e *EntryPointCleanupResource) ShouldDelete(resource cleanup.Resource) bool
 	return true
 }
 
-func NewEntryPointCleanupResource(entryPoint *kodev1alpha2.ClusterEntryPoint) cleanup.CleanupableResource {
+func NewEntryPointCleanupResource(entryPoint *kodev1alpha2.EntryPoint) cleanup.CleanupableResource {
 	return &EntryPointCleanupResource{EntryPoint: entryPoint}
 }

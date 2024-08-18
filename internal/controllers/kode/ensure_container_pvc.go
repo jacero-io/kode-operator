@@ -48,6 +48,7 @@ func (r *KodeReconciler) ensurePVC(ctx context.Context, config *common.KodeResou
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      config.PVCName,
 			Namespace: config.CommonConfig.Namespace,
+			Labels:    config.CommonConfig.Labels,
 		},
 	}
 
@@ -112,12 +113,6 @@ func (r *KodeReconciler) constructPVCSpec(config *common.KodeResourceConfig) (*c
 	log := r.Log.WithName("PvcConstructor").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	pvc := &corev1.PersistentVolumeClaim{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      config.PVCName,
-			Namespace: config.CommonConfig.Namespace,
-			Labels:    config.CommonConfig.Labels,
-			// Finalizers: []string{common.PVCFinalizerName},
-		},
 		Spec: corev1.PersistentVolumeClaimSpec{
 			AccessModes: config.KodeSpec.Storage.AccessModes,
 			Resources:   config.KodeSpec.Storage.Resources,

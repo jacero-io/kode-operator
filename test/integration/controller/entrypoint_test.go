@@ -52,13 +52,13 @@ var _ = Describe("EntryPoint Controller", func() {
 			Name:      resourceName,
 			Namespace: "default",
 		}
-		entrypoint := &kodev1alpha2.ClusterEntryPoint{}
+		entrypoint := &kodev1alpha2.EntryPoint{}
 
 		BeforeEach(func() {
 			By("creating the custom resource for the Kind EntryPoint")
 			err := k8sClient.Get(ctx, typeNamespacedName, entrypoint)
 			if err != nil && errors.IsNotFound(err) {
-				resource := &kodev1alpha2.ClusterEntryPoint{
+				resource := &kodev1alpha2.EntryPoint{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      resourceName,
 						Namespace: "default",
@@ -69,7 +69,7 @@ var _ = Describe("EntryPoint Controller", func() {
 		})
 
 		AfterEach(func() {
-			resource := &kodev1alpha2.ClusterEntryPoint{}
+			resource := &kodev1alpha2.EntryPoint{}
 			err := k8sClient.Get(ctx, typeNamespacedName, resource)
 			Expect(err).NotTo(HaveOccurred())
 

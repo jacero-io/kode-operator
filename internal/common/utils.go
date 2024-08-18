@@ -26,7 +26,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -34,15 +33,15 @@ func GetCurrentTime() metav1.Time {
 	return metav1.NewTime(time.Now())
 }
 
-func GetLatestKode(ctx context.Context, client client.Client, name, namespace string) (*kodev1alpha2.Kode, error) {
+func GetLatestKode(ctx context.Context, client client.Client, name string, namespace string) (*kodev1alpha2.Kode, error) {
 	kode := &kodev1alpha2.Kode{}
 	err := client.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, kode)
 	return kode, err
 }
 
-func GetLatestEntryPoint(ctx context.Context, client client.Client, name string) (*kodev1alpha2.ClusterEntryPoint, error) {
-	entryPoint := &kodev1alpha2.ClusterEntryPoint{}
-	err := client.Get(ctx, types.NamespacedName{Name: name, Namespace: metav1.NamespaceAll}, entryPoint)
+func GetLatestEntryPoint(ctx context.Context, client client.Client, name string, namespace string) (*kodev1alpha2.EntryPoint, error) {
+	entryPoint := &kodev1alpha2.EntryPoint{}
+	err := client.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, entryPoint)
 	return entryPoint, err
 }
 
@@ -144,22 +143,38 @@ func MergeLabels(labelsSlice ...map[string]string) map[string]string {
 
 // addTypeInformationToObject adds TypeMeta information to a runtime.Object based upon the loaded scheme.Scheme
 // taken from: https://github.com/kubernetes/kubernetes/issues/3030#issuecomment-700099699
-func AddTypeInformationToObject(obj runtime.Object) error {
-	gvks, _, err := scheme.Scheme.ObjectKinds(obj)
-	if err != nil {
-		return fmt.Errorf("missing apiVersion or kind and cannot assign it; %w", err)
+func AddTypeInformationToObject(scheme *runtime.Scheme, obj runtime.Object) error {
+	// Check if the object already has type information
+	gvk := obj.GetObjectKind().GroupVersionKind()
+	if gvk.Kind == "" || gvk.Version == "" {
+		// If type information is missing, try to add it
+		gvks, _, err := scheme.ObjectKinds(obj)
+		if err != nil {
+			return fmt.Errorf("failed to get object kinds: %w", err)
+		}
+		if len(gvks) > 0 {
+			gvk := gvks[0]
+			obj.GetObjectKind().SetGroupVersionKind(gvk)
+		} else {
+			return fmt.Errorf("no valid GroupVersionKind found for object of type %T", obj)
+		}
 	}
 
-	for _, gvk := range gvks {
-		if len(gvk.Kind) == 0 {
-			continue
-		}
-		if len(gvk.Version) == 0 || gvk.Version == runtime.APIVersionInternal {
-			continue
-		}
-		obj.GetObjectKind().SetGroupVersionKind(gvk)
-		break
-	}
+	// gvks, _, err := scheme.ObjectKinds(obj)
+	// if err != nil {
+	// 	return fmt.Errorf("missing apiVersion or kind and cannot assign it; %w", err)
+	// }
+
+	// for _, gvk := range gvks {
+	// 	if len(gvk.Kind) == 0 {
+	// 		continue
+	// 	}
+	// 	if len(gvk.Version) == 0 || gvk.Version == runtime.APIVersionInternal {
+	// 		continue
+	// 	}
+	// 	obj.GetObjectKind().SetGroupVersionKind(gvk)
+	// 	break
+	// }
 
 	return nil
 }

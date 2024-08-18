@@ -22,8 +22,8 @@ resources:
 - clustertofutemplate_viewer_role.yaml
 - tofutemplate_editor_role.yaml
 - tofutemplate_viewer_role.yaml
-- clusterentrypoint_editor_role.yaml
-- clusterentrypoint_viewer_role.yaml
+- entrypoint_editor_role.yaml
+- entrypoint_viewer_role.yaml
 - kode_editor_role.yaml
 - kode_viewer_role.yaml
 

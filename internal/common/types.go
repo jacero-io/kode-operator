@@ -19,11 +19,9 @@ package common
 import (
 	"fmt"
 
-	egv1alpha1 "github.com/envoyproxy/gateway/api/v1alpha1"
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
-	gwapiv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
 type CommonConfig struct {
@@ -37,7 +35,7 @@ type KodeResourceConfig struct {
 	CommonConfig CommonConfig
 	KodeSpec     kodev1alpha2.KodeSpec
 	Credentials  kodev1alpha2.CredentialsSpec
-	Port         int32
+	Port         kodev1alpha2.Port
 
 	SecretName      string
 	StatefulSetName string
@@ -55,10 +53,12 @@ type KodeResourceConfig struct {
 type EntryPointResourceConfig struct {
 	CommonConfig CommonConfig
 
-	EntryPointSpec kodev1alpha2.ClusterEntryPointSpec
-	GatewayClassName gwapiv1.ObjectName
-	EnvoyPatchPolicySpec *egv1alpha1.EnvoyPatchPolicySpec
-	SecurityPolicies []egv1alpha1.SecurityPolicy
+	HTTPName  string
+	HTTPSName string
+	Protocol  string
+
+	GatewayName      string
+	GatewayNamespace string
 }
 
 type TemplateNotFoundError struct {

@@ -1,3 +1,4 @@
+---
 apiVersion: kode.jacero.io/v1alpha2
 kind: Kode
 metadata:
@@ -14,10 +15,10 @@ spec:
     kind: PodTemplate
     name: podtemplate-codeserver-sample
     namespace: default
-  storage:
-    accessModes:
-      - ReadWriteOnce
-    resources:
-      requests:
-        storage: 1Gi
-    storageClassName: standard
+  # storage:
+  #   accessModes:
+  #     - ReadWriteOnce
+  #   resources:
+  #     requests:
+  #       storage: 1Gi
+  #   storageClassName: standard

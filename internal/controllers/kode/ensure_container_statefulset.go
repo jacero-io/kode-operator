@@ -132,11 +132,6 @@ func (r *KodeReconciler) constructStatefulSetSpec(config *common.KodeResourceCon
 	}
 
 	statefulSet := &appsv1.StatefulSet{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      config.StatefulSetName,
-			Namespace: config.CommonConfig.Namespace,
-			Labels:    config.CommonConfig.Labels,
-		},
 		Spec: appsv1.StatefulSetSpec{
 			Replicas: &replicas,
 			Selector: &metav1.LabelSelector{
@@ -177,7 +172,7 @@ func constructCodeServerContainers(config *common.KodeResourceConfig,
 		},
 		Ports: []corev1.ContainerPort{{
 			Name:          "http",
-			ContainerPort: config.Port,
+			ContainerPort: int32(config.Port),
 		}},
 	}}
 }
@@ -197,7 +192,7 @@ func constructWebtopContainers(config *common.KodeResourceConfig) []corev1.Conta
 		},
 		Ports: []corev1.ContainerPort{{
 			Name:          "http",
-			ContainerPort: config.Port,
+			ContainerPort: int32(config.Port),
 		}},
 	}}
 }

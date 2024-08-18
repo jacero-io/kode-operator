@@ -1,16 +1,16 @@
-# permissions for end users to edit clusterentrypoints.
+# permissions for end users to edit entrypoints.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
     app.kubernetes.io/name: kode-operator
     app.kubernetes.io/managed-by: kustomize
-  name: clusterentrypoint-editor-role
+  name: entrypoint-editor-role
 rules:
 - apiGroups:
   - kode.jacero.io
   resources:
-  - clusterentrypoints
+  - entrypoints
   verbs:
   - create
   - delete
@@ -22,6 +22,6 @@ rules:
 - apiGroups:
   - kode.jacero.io
   resources:
-  - clusterentrypoints/status
+  - entrypoints/status
   verbs:
   - get

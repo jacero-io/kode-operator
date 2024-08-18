@@ -46,7 +46,7 @@ type BaseSharedSpec struct {
 
 	// EntryPointSpec defines the desired state of the entrypoint.
 	// +kubebuilder:validation:Description="Desired state of the entrypoint."
-	EntryPointRef EntryPointReference `json:"entryPointRef,omitempty" yaml:"entryPointRef,omitempty"`
+	EntryPointRef CrossNamespaceObjectReference `json:"entryPointRef,omitempty" yaml:"entryPointRef,omitempty"`
 
 	// Specifies the period before controller inactive the resource (delete all resources except volume).
 	// +kubebuilder:validation:Description="Period before controller inactive the resource (delete all resources except volume)."
@@ -60,9 +60,8 @@ type BaseSharedSpec struct {
 
 	// Port is the port for the service process. Used by EnvoyProxy to expose the kode.
 	// +kubebuilder:validation:Description="Port for the service. Used by EnvoyProxy to expose the container. Defaults to '8000'."
-	// +kubebuilder:validation:Minimum=1
 	// +kubebuilder:default=8000
-	Port int32 `json:"port,omitempty" yaml:"port,omitempty"`
+	Port Port `json:"port,omitempty" yaml:"port,omitempty"`
 }
 
 // SharedStatus defines the common observed state
@@ -76,17 +75,17 @@ type BaseSharedStatus struct {
 
 // Template represents a unified structure for different types of Kode templates
 type Template struct {
-	// Kind specifies the type of template (e.g., "KodeContainer", "ClusterKodeContainer", "KodeTofu", "ClusterKodeTofu")
-	Kind string `json:"kind" yaml:"kind"`
+	// Kind specifies the type of template (e.g., "PodTemplate", "ClusterPodTemplate", "TofuTemplate", "ClusterTofuTemplate")
+	Kind Kind `json:"kind" yaml:"kind"`
 
 	// Name is the name of the template resource
-	Name string `json:"name" yaml:"name"`
+	Name ObjectName `json:"name" yaml:"name"`
 
 	// Namespace is the namespace of the template resource
-	Namespace string `json:"namespace,omitempty" yaml:"namespace,omitempty"`
+	Namespace Namespace `json:"namespace,omitempty" yaml:"namespace,omitempty"`
 
 	// Port is the port to expose the kode instance
-	Port int32 `json:"port,omitempty" yaml:"port,omitempty"`
+	Port Port `json:"port,omitempty" yaml:"port,omitempty"`
 
 	// PodTemplateSpec is a reference to a PodTemplate or ClusterPodTemplate
 	PodTemplateSpec *PodTemplateSharedSpec `json:"container,omitempty" yaml:"container,omitempty"`
@@ -94,3 +93,74 @@ type Template struct {
 	// TofuTemplateSpec is a reference to a TofuTemplate or ClusterTofuTemplate
 	TofuTemplateSpec *TofuSharedSpec `json:"tofu,omitempty" yaml:"tofu,omitempty"`
 }
+
+// Port is the port for the service process. Used by EnvoyProxy to expose the kode.
+// +kubebuilder:validation:Description="Port for the service. Used by EnvoyProxy to expose the container. Defaults to '8000'."
+// +kubebuilder:validation:Minimum=1
+// +kubebuilder:default=8000
+type Port int32
+
+// Group refers to a Kubernetes Group. It must either be an empty string or a
+// RFC 1123 subdomain.
+//
+// This validation is based off of the corresponding Kubernetes validation:
+// https://github.com/kubernetes/apimachinery/blob/02cfb53916346d085a6c6c7c66f882e3c6b0eca6/pkg/util/validation/validation.go#L208
+//
+// Valid values include:
+//
+// * "" - empty string implies core Kubernetes API group
+// * "gateway.networking.k8s.io"
+// * "foo.example.com"
+//
+// Invalid values include:
+//
+// * "example.com/bar" - "/" is an invalid character
+//
+// +kubebuilder:validation:MaxLength=253
+// +kubebuilder:validation:Pattern=`^$|^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$`
+type Group string
+
+// Kind refers to a Kubernetes Kind.
+//
+// Valid values include:
+//
+// * "Service"
+// * "HTTPRoute"
+//
+// Invalid values include:
+//
+// * "invalid/kind" - "/" is an invalid character
+//
+// +kubebuilder:validation:MinLength=1
+// +kubebuilder:validation:MaxLength=63
+// +kubebuilder:validation:Pattern=`^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$`
+type Kind string
+
+// ObjectName refers to the name of a Kubernetes object.
+// Object names can have a variety of forms, including RFC 1123 subdomains,
+// RFC 1123 labels, or RFC 1035 labels.
+//
+// +kubebuilder:validation:MinLength=1
+// +kubebuilder:validation:MaxLength=253
+type ObjectName string
+
+// Namespace refers to a Kubernetes namespace. It must be a RFC 1123 label.
+//
+// This validation is based off of the corresponding Kubernetes validation:
+// https://github.com/kubernetes/apimachinery/blob/02cfb53916346d085a6c6c7c66f882e3c6b0eca6/pkg/util/validation/validation.go#L187
+//
+// This is used for Namespace name validation here:
+// https://github.com/kubernetes/apimachinery/blob/02cfb53916346d085a6c6c7c66f882e3c6b0eca6/pkg/api/validation/generic.go#L63
+//
+// Valid values include:
+//
+// * "example"
+//
+// Invalid values include:
+//
+// * "example.com" - "." is an invalid character
+//
+// +kubebuilder:validation:Pattern=`^[a-z0-9]([-a-z0-9]*[a-z0-9])?$`
+// +kubebuilder:validation:MinLength=1
+// +kubebuilder:validation:MaxLength=63
+type Namespace string

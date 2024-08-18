@@ -24,7 +24,7 @@ type TofuSharedSpec struct {
 
 	// EntryPointSpec defines the desired state of the entrypoint.
 	// +kubebuilder:validation:Description="Desired state of the entrypoint."
-	EntryPointRef EntryPointReference `json:"entryPointRef,omitempty" yaml:"entryPointRef,omitempty"`
+	EntryPointRef CrossNamespaceObjectReference `json:"entryPointRef,omitempty" yaml:"entryPointRef,omitempty"`
 
 	// TofuSpec is the terraform specification.
 	// +kubebuilder:validation:Description="Terraform specification."

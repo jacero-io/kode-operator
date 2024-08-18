@@ -41,6 +41,7 @@ func (r *KodeReconciler) ensureSecret(ctx context.Context, config *common.KodeRe
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      config.SecretName,
 			Namespace: config.CommonConfig.Namespace,
+			Labels:    config.CommonConfig.Labels,
 		},
 	}
 
@@ -82,11 +83,6 @@ func (r *KodeReconciler) constructSecretSpec(config *common.KodeResourceConfig) 
 	log := r.Log.WithName("SecretConstructor").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      config.SecretName,
-			Namespace: config.CommonConfig.Namespace,
-			Labels:    config.CommonConfig.Labels,
-		},
 		Data: map[string][]byte{
 			"username": []byte(config.Credentials.Username),
 			"password": []byte(config.Credentials.Password),
