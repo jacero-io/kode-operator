@@ -31,9 +31,34 @@ rules:
   - update
   - watch
 - apiGroups:
+  - gateway.networking.k8s.io
+  resources:
+  - gateways
+  - httproutes
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - kode.jacero.io
+  resources:
+  - clusterpodtemplates
+  - clustertofutemplates
+  - podtemplates
+  - tofutemplates
+  verbs:
+  - get
+  - list
+  - watch
+- apiGroups:
   - kode.jacero.io
   resources:
   - entrypoints
+  - kodes
   verbs:
   - create
   - delete
@@ -46,48 +71,13 @@ rules:
   - kode.jacero.io
   resources:
   - entrypoints/finalizers
+  - kodes/finalizers
   verbs:
   - update
 - apiGroups:
   - kode.jacero.io
   resources:
   - entrypoints/status
-  verbs:
-  - get
-  - patch
-  - update
-- apiGroups:
-  - kode.kode.jacero.io
-  resources:
-  - clusterpodtemplates
-  - clustertofutemplates
-  - podtemplates
-  - tofutemplates
-  verbs:
-  - get
-  - list
-  - watch
-- apiGroups:
-  - kode.kode.jacero.io
-  resources:
-  - kodes
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
-  - kode.kode.jacero.io
-  resources:
-  - kodes/finalizers
-  verbs:
-  - update
-- apiGroups:
-  - kode.kode.jacero.io
-  resources:
   - kodes/status
   verbs:
   - get

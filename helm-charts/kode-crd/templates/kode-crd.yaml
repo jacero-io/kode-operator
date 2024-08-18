@@ -392,12 +392,20 @@ spec:
                     type: string
                   kind:
                     description: Kind is the resource kind.
+                    maxLength: 63
+                    minLength: 1
+                    pattern: ^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$
                     type: string
                   name:
                     description: Name is the name of the resource.
+                    maxLength: 253
+                    minLength: 1
                     type: string
                   namespace:
                     description: Namespace is the namespace of the resource.
+                    maxLength: 63
+                    minLength: 1
+                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
                     type: string
                 required:
                 - kind
@@ -480,6 +488,11 @@ spec:
               iconUrl:
                 description: IconUrl is the URL to the icon for the Kode.
                 type: string
+              kodePort:
+                description: KodePort is the port to access the Kode.
+                format: int32
+                minimum: 1
+                type: integer
               kodeUrl:
                 description: KodeUrl is the URL to access the Kode.
                 type: string
@@ -505,7 +518,7 @@ spec:
                 description: Phase represents the current phase of the Kode resource.
                 type: string
               runtime:
-                description: Runtime is the runtime for the kode. Can be one of 'container',
+                description: Runtime is the runtime for the kode. Can be one of 'pod',
                   'virtual', 'tofu'.
                 type: string
             required:
