@@ -23,8 +23,6 @@ import (
 
 	"github.com/go-logr/logr"
 
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -315,10 +313,10 @@ func (r *KodeReconciler) updateObservedGeneration(ctx context.Context, kode *kod
 func (r *KodeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&kodev1alpha2.Kode{}).
-		Owns(&corev1.Service{}).
-		Owns(&corev1.Secret{}).
-		Owns(&corev1.PersistentVolumeClaim{}).
-		Owns(&appsv1.StatefulSet{}).
+		// Owns(&corev1.Service{}).
+		// Owns(&corev1.Secret{}).
+		// Owns(&corev1.PersistentVolumeClaim{}).
+		// Owns(&appsv1.StatefulSet{}).
 		Watches(&kodev1alpha2.PodTemplate{}, &handler.EnqueueRequestForObject{}).
 		Watches(&kodev1alpha2.ClusterPodTemplate{}, &handler.EnqueueRequestForObject{}).
 		Watches(&kodev1alpha2.TofuTemplate{}, &handler.EnqueueRequestForObject{}).
