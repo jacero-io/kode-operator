@@ -6,23 +6,12 @@ metadata:
   {{- include "kode.labels" . | nindent 4 }}
 rules:
 - apiGroups:
-  - apps
-  resources:
-  - secrets
-  - statefulsets
-  verbs:
-  - create
-  - delete
-  - get
-  - list
-  - patch
-  - update
-  - watch
-- apiGroups:
   - ""
   resources:
   - persistentvolumeclaims
+  - secrets
   - services
+  - statefulsets
   verbs:
   - create
   - delete

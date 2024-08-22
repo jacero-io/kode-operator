@@ -79,17 +79,32 @@ func (e *defaultEventManager) Record(ctx context.Context, object runtime.Object,
 	log := e.Log.WithValues(
 		"kind", object.GetObjectKind().GroupVersionKind().Kind,
 		"name", metaObj.GetName(),
-		"namespace", metaObj.GetNamespace(),
 	)
+
+	// Handle cluster-scoped resources
+	if metaObj.GetNamespace() != "" {
+		log = log.WithValues("namespace", metaObj.GetNamespace())
+	} else {
+		log = log.WithValues("scope", "cluster")
+	}
 
 	e.EventRecorder.Event(object, string(eventtype), string(reason), message)
 
-	log.V(1).Info("Successfully created event",
+	logInfo := []interface{}{
 		"object", object.GetObjectKind().GroupVersionKind().Kind,
-		"namespace", metaObj.GetNamespace(),
 		"name", metaObj.GetName(),
 		"type", eventtype,
-		"reason", reason)
+		"reason", reason,
+	}
+
+	// Add namespace to log info only if it's not empty
+	if metaObj.GetNamespace() != "" {
+		logInfo = append(logInfo, "namespace", metaObj.GetNamespace())
+	} else {
+		logInfo = append(logInfo, "scope", "cluster")
+	}
+
+	log.V(1).Info("Successfully created event", logInfo...)
 
 	return nil
 }

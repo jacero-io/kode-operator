@@ -5,4 +5,4 @@ kind: Kustomization
 images:
 - name: controller
   newName: ghcr.io/jacero-io/kode-operator
-  newTag: PLACEHOLDER_VERSION # This is automatically set by the GitHub Actions workflow
+  newTag: "v0.0.0-latest" # This is automatically set by the GitHub Actions workflow

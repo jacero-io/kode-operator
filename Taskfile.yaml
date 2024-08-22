@@ -14,9 +14,12 @@ vars:
   CONTROLLER_TOOLS_VERSION: v0.16.0
   ENVTEST_VERSION: release-0.18
   GOLANGCI_LINT_VERSION: v1.57.2
+  HELMIFY_VERSION: v0.4.13
   TEST_VERBOSITY: -v
   ENV: development
   LOG_LEVEL: info
+  KIND_CLUSTER_NAME: test
+  KIND_CONTEXT: kind-{{.KIND_CLUSTER_NAME}}
 
 tasks:
   default:
@@ -73,7 +76,8 @@ tasks:
     desc: Download helmify locally if necessary
     deps: [ensure-dir]
     cmds:
-      - test -s {{.LOCALBIN}}/helmify || GOBIN={{.LOCALBIN}} go install github.com/arttor/helmify/cmd/helmify@latest
+      - go install github.com/arttor/helmify/cmd/helmify@{{.HELMIFY_VERSION}}
+      - mv {{.GOBIN}}/helmify {{.LOCALBIN}}/helmify-{{.HELMIFY_VERSION}}
 
   #### LINT ####
   fmt:
@@ -164,26 +168,33 @@ tasks:
       - test-integration
 
   #### CLUSTER ####
+  use-kind-context:
+    internal: true
+    cmds:
+      - kubectl config use-context {{.KIND_CONTEXT}}
+
   kind-ensure:
     desc: Ensure a Kind cluster exists, creating it if necessary
     cmds:
       - |
-        if ! kind get clusters | grep -q '^test$'; then
-          echo "Creating Kind cluster 'test'..."
-          kind create cluster --name test --image kindest/node:v{{.ENVTEST_K8S_VERSION}}
+        if ! kind get clusters | grep -q '^{{.KIND_CLUSTER_NAME}}$'; then
+          echo "Creating Kind cluster '{{.KIND_CLUSTER_NAME}}'..."
+          kind create cluster --name {{.KIND_CLUSTER_NAME}} --image kindest/node:v{{.ENVTEST_K8S_VERSION}}
         else
-          echo "Kind cluster 'test' already exists."
+          echo "Kind cluster '{{.KIND_CLUSTER_NAME}}' already exists."
         fi
+      - task: use-kind-context
 
   kind-create:
     desc: Create a Kind cluster
     cmds:
-      - kind create cluster --name test --image kindest/node:v{{.ENVTEST_K8S_VERSION}}
+      - kind create cluster --name {{.KIND_CLUSTER_NAME}} --image kindest/node:v{{.ENVTEST_K8S_VERSION}}
+      - task: use-kind-context
 
   kind-delete:
     desc: Delete the Kind cluster
     cmds:
-      - kind delete cluster --name test
+      - kind delete cluster --name {{.KIND_CLUSTER_NAME}}
 
   kind-stop:
     desc: Stop the Kind cluster
@@ -284,10 +295,10 @@ tasks:
   #### HELM BUILD ####
   helm-build-kode-crd:
     desc: Package kode-crd Helm chart
-    deps: [manifests, generate]
+    deps: [manifests, generate, helmify]
     cmds:
       - echo "Building kode-crd chart from config/crd..."
-      - kustomize build config/crd | helmify helm-charts/kode-crd
+      - '{{.LOCALBIN}}/kustomize-{{.KUSTOMIZE_VERSION}} build config/crd | {{.LOCALBIN}}/helmify-{{.HELMIFY_VERSION}} helm-charts/kode-crd'
 
   helm-package-kode-crd:
     desc: Package kode-crd Helm chart
@@ -307,10 +318,10 @@ tasks:
 
   helm-build-kode:
     desc: Build kode Helm chart
-    deps: [manifests, generate]
+    deps: [manifests, generate, helmify]
     cmds:
       - echo "Building kode chart from config/crd..."
-      - kustomize build config/default | helmify -cert-manager-as-subchart -cert-manager-version 1.15.3 -generate-defaults -image-pull-secrets helm-charts/kode
+      - '{{.LOCALBIN}}/kustomize-{{.KUSTOMIZE_VERSION}} build config/default | {{.LOCALBIN}}/helmify-{{.HELMIFY_VERSION}}  -generate-defaults -image-pull-secrets helm-charts/kode'
 
   helm-package-kode:
     desc: Package kode Helm chart
@@ -329,13 +340,13 @@ tasks:
       - mv /tmp/kode-{{.VERSION}}.tgz ./kode-{{.VERSION}}.tgz
       - rm -rf /tmp/helm-charts/kode
 
-  helm-build-all:
+  helm-build:
     desc: Package all Helm charts
     cmds:
       - task: helm-build-kode-crd
       - task: helm-build-kode
 
-  helm-package-all:
+  helm-package:
     desc: Package all Helm charts
     vars:
       VERSION: '{{.CLI_ARGS | default "v0.0.0-latest"}}'
@@ -344,6 +355,98 @@ tasks:
         vars: { VERSION: '{{.VERSION}}' }
       - task: helm-package-kode
         vars: { VERSION: '{{.VERSION}}' }
+
+  helm-install-kode:
+    desc: Install locally packaged kode Helm chart onto the cluster
+    vars:
+      RELEASE_NAME: 'kode'
+      NAMESPACE: 'kode-system'
+      VERSION: '{{.VERSION | default "v0.0.0-latest"}}'
+      CONTROLLER_IMAGE_TAG: 'latest'
+    cmds:
+      - echo "Installing kode chart version {{.VERSION}} onto the cluster..."
+      - |
+        helm upgrade --install {{.RELEASE_NAME}} ./kode-{{.VERSION}}.tgz \
+          --namespace {{.NAMESPACE}} \
+          --create-namespace \
+          --set controllerManager.manager.image.tag={{.CONTROLLER_IMAGE_TAG}} \
+          --wait \
+          --timeout 5m
+      - echo "kode chart version {{.VERSION}} installed successfully as release {{.RELEASE_NAME}} in namespace {{.NAMESPACE}} with controller image tag {{.CONTROLLER_IMAGE_TAG}}"
+    preconditions:
+      - sh: test -f ./kode-{{.VERSION}}.tgz
+        msg: "Chart package kode-{{.VERSION}}.tgz not found. Please run 'task helm-package-kode' first."
+
+  helm-install-kode-crd:
+    desc: Install locally packaged kode-crd Helm chart onto the cluster
+    vars:
+      RELEASE_NAME: 'kode-crd'
+      NAMESPACE: 'kode-system'
+      VERSION: '{{.VERSION | default "v0.0.0-latest"}}'
+    cmds:
+      - echo "Installing kode-crd chart version {{.VERSION}} onto the cluster..."
+      - echo "Chart file ./kode-crd-{{.VERSION}}.tgz"
+      - ls -l ./kode-crd-{{.VERSION}}.tgz || echo "Chart file not found!"
+      - |
+        helm upgrade --install {{.RELEASE_NAME}} ./kode-crd-{{.VERSION}}.tgz \
+          --namespace {{.NAMESPACE}} \
+          --create-namespace \
+          --wait \
+          --timeout 5m
+      - echo "kode-crd chart version {{.VERSION}} installed successfully as release {{.RELEASE_NAME}} in namespace {{.NAMESPACE}}"
+    preconditions:
+      - sh: test -f ./kode-crd-{{.VERSION}}.tgz
+        msg: "Chart package kode-crd-{{.VERSION}}.tgz not found. Please run 'task helm-package-kode-crd' first."
+
+  helm-install:
+    desc: Install locally packaged Helm chart onto the cluster
+    vars:
+      NAMESPACE: '{{.CHART_NAME}}-system'
+      VERSION: '{{.VERSION | default "v0.0.0-latest"}}'
+      CONTROLLER_IMAGE_TAG: 'latest'
+    cmds:
+      - task: helm-install-kode-crd
+        vars:
+          VERSION: '{{.VERSION}}'
+          NAMESPACE: '{{.NAMESPACE}}'
+          CONTROLLER_IMAGE_TAG : '{{.CONTROLLER_IMAGE_TAG}}'
+      - task: helm-install-kode
+        vars:
+          NAMESPACE: '{{.NAMESPACE}}'
+          VERSION: '{{.VERSION}}'
+
+  helm-uninstall-kode:
+    desc: Uninstall kode Helm chart from the cluster
+    vars:
+      RELEASE_NAME: 'kode'
+      NAMESPACE: 'kode-system'
+    cmds:
+      - echo "Uninstalling kode chart release {{.RELEASE_NAME}} from namespace {{.NAMESPACE}}..."
+      - helm uninstall {{.RELEASE_NAME}} --namespace {{.NAMESPACE}}
+      - echo "kode chart release {{.RELEASE_NAME}} uninstalled successfully from namespace {{.NAMESPACE}}"
+
+  helm-uninstall-kode-crd:
+    desc: Uninstall kode-crd Helm chart from the cluster
+    vars:
+      RELEASE_NAME: 'kode-crd'
+      NAMESPACE: 'kode-system'
+    cmds:
+      - echo "Uninstalling kode-crd chart release {{.RELEASE_NAME}} from namespace {{.NAMESPACE}}..."
+      - helm uninstall {{.RELEASE_NAME}} --namespace {{.NAMESPACE}}
+      - echo "kode-crd chart release {{.RELEASE_NAME}} uninstalled successfully from namespace {{.NAMESPACE}}"
+
+  helm-uninstall:
+    desc: Uninstall all kode Helm charts from the cluster
+    vars:
+      NAMESPACE: 'kode-system'
+    cmds:
+      - task: helm-uninstall-kode
+        vars:
+          NAMESPACE: '{{.NAMESPACE}}'
+      - task: helm-uninstall-kode-crd
+        vars:
+          NAMESPACE: '{{.NAMESPACE}}'
+      - echo "All kode charts uninstalled successfully from namespace {{.NAMESPACE}}"
 
   #### DEVELOPMENT ####
   deploy-flux:
@@ -452,38 +555,42 @@ tasks:
       - install
 
   install:
-    desc: Install CRDs into the K8s cluster specified in ~/.kube/config
+    desc: Install CRDs into the Kind cluster
     deps:
       - manifests
       - kustomize
+      - use-kind-context
     cmds:
       - '{{.LOCALBIN}}/kustomize-{{.KUSTOMIZE_VERSION}} build config/crd | {{.KUBECTL}} apply -f -'
 
   uninstall:
-    desc: Uninstall CRDs from the K8s cluster specified in ~/.kube/config
-    cmds:
-      - '{{.LOCALBIN}}/kustomize-{{.KUSTOMIZE_VERSION}} build config/crd | {{.KUBECTL}} delete --ignore-not-found={{.IGNORE_NOT_FOUND}} -f -'
+    desc: Uninstall CRDs from the Kind cluster
     deps:
       - manifests
       - kustomize
+      - use-kind-context
+    cmds:
+      - '{{.LOCALBIN}}/kustomize-{{.KUSTOMIZE_VERSION}} build config/crd | {{.KUBECTL}} delete --ignore-not-found={{.IGNORE_NOT_FOUND}} -f -'
     vars:
       IGNORE_NOT_FOUND: '{{default "false" .IGNORE_NOT_FOUND}}'
 
   deploy:
-    desc: Deploy controller to the K8s cluster specified in ~/.kube/config
-    cmds:
-      - cd config/manager && {{.LOCALBIN}}/kustomize-{{.KUSTOMIZE_VERSION}} edit set image controller={{.IMG}}
-      - '{{.LOCALBIN}}/kustomize-{{.KUSTOMIZE_VERSION}} build config/default | {{.KUBECTL}} apply -f -'
+    desc: Deploy controller to the Kind cluster
     deps:
       - manifests
       - kustomize
+      - use-kind-context
+    cmds:
+      - cd config/manager && {{.LOCALBIN}}/kustomize-{{.KUSTOMIZE_VERSION}} edit set image controller={{.IMG}}
+      - '{{.LOCALBIN}}/kustomize-{{.KUSTOMIZE_VERSION}} build config/default | {{.KUBECTL}} apply -f -'
 
   undeploy:
-    desc: Undeploy controller from the K8s cluster specified in ~/.kube/config
-    cmds:
-      - '{{.LOCALBIN}}/kustomize-{{.KUSTOMIZE_VERSION}} build config/default | {{.KUBECTL}} delete --ignore-not-found={{.IGNORE_NOT_FOUND}} -f -'
+    desc: Undeploy controller from the Kind cluster
     deps:
       - kustomize
+      - use-kind-context
+    cmds:
+      - '{{.LOCALBIN}}/kustomize-{{.KUSTOMIZE_VERSION}} build config/default | {{.KUBECTL}} delete --ignore-not-found={{.IGNORE_NOT_FOUND}} -f -'
     vars:
       IGNORE_NOT_FOUND: '{{default "false" .IGNORE_NOT_FOUND}}'
 
@@ -504,14 +611,18 @@ tasks:
       - echo "Development environment has been torn down."
 
   apply-samples:
-    desc: Apply Kubernetes resources defined in config/samples/
+    desc: Apply Kubernetes resources defined in config/samples/ to the Kind cluster
+    deps:
+      - use-kind-context
     cmds:
       - kubectl apply -k config/samples/podtemplate/
       - kubectl apply -k config/samples/entrypoint/
       - kubectl apply -k config/samples/kode/
 
   delete-samples:
-    desc: Delete Kubernetes resources defined in config/samples/
+    desc: Delete Kubernetes resources defined in config/samples/ from the Kind cluster
+    deps:
+      - use-kind-context
     cmds:
       - kubectl delete -k config/samples/kode/
       - kubectl delete -k config/samples/entrypoint/
