@@ -186,6 +186,11 @@ func (r *EntryPointReconciler) reconcileKode(ctx context.Context, kode *kodev1al
 		return r.handleReconcileError(ctx, kode, entryPoint, err, "Failed to ensure HTTPRoute")
 	}
 
+	// Update kode URL
+	if kodeUrl != "" {
+		kode.UpdateKodeUrl(ctx, r.Client, kodeUrl)
+	}
+
 	log.Info("HTTPRoute configuration successful", "created", created, "kodeUrl", kodeUrl)
 	return ctrl.Result{}, nil
 }
