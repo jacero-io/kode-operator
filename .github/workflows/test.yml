@@ -1,4 +1,4 @@
-name: Test
+name: Integration Tests
 
 on:
   push:
@@ -27,6 +27,12 @@ jobs:
           **/go.sum
           **/go.mod
 
+    - name: Install Task
+      uses: arduino/setup-task@v1
+      with:
+        version: '3.x'
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
+
     - name: Install dependencies
       run: |
         task kustomize
@@ -34,7 +40,8 @@ jobs:
         task envtest
         task golangci-lint
 
-    - name: Run integration tests
+    - name: Run tests
       env:
         TEST_VERBOSITY: ""
-      run: task test-integration
+      run: |
+        task test-integration
