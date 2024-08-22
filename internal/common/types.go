@@ -34,8 +34,8 @@ type CommonConfig struct {
 type KodeResourceConfig struct {
 	CommonConfig CommonConfig
 	KodeSpec     kodev1alpha2.KodeSpec
-	Credentials  kodev1alpha2.CredentialsSpec
-	Port         kodev1alpha2.Port
+	Credentials  *kodev1alpha2.CredentialsSpec
+	Port         *kodev1alpha2.Port
 
 	SecretName      string
 	StatefulSetName string

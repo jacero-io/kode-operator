@@ -72,7 +72,7 @@ func (u *defaultStatusUpdater) UpdateStatusKode(ctx context.Context,
 		// Update only the fields we want to change
 		updatedStatus.Phase = phase
 		updatedStatus.Conditions = mergeAndRemoveConditions(updatedStatus.Conditions, conditions, conditionsToRemove)
-		updatedStatus.LastError = lastError
+		updatedStatus.LastError = &lastError
 		updatedStatus.LastErrorTime = lastErrorTime
 		updatedStatus.ObservedGeneration = latestKode.Generation
 		updatedStatus.Runtime = kode.SetRuntime()
@@ -115,7 +115,7 @@ func (u *defaultStatusUpdater) UpdateStatusEntryPoint(ctx context.Context,
 		// Update only the fields we want to change
 		updatedStatus.Phase = phase
 		updatedStatus.Conditions = mergeAndRemoveConditions(updatedStatus.Conditions, conditions, conditionsToRemove)
-		updatedStatus.LastError = lastError
+		updatedStatus.LastError = &lastError
 		updatedStatus.LastErrorTime = lastErrorTime
 		updatedStatus.ObservedGeneration = latestEntry.Generation
 

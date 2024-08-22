@@ -77,7 +77,7 @@ func (r *EntryPointReconciler) constructGatewaySpec(entryPoint *kodev1alpha2.Ent
 
 	gateway := &gwapiv1.Gateway{
 		Spec: gwapiv1.GatewaySpec{
-			GatewayClassName: entryPoint.Spec.GatewaySpec.GatewayClassName,
+			GatewayClassName: *entryPoint.Spec.GatewaySpec.GatewayClassName,
 			Listeners: []gwapiv1.Listener{
 				{
 					Name:     gwapiv1.SectionName("http"),

@@ -39,7 +39,7 @@ func (r *KodeReconciler) ensurePVC(ctx context.Context, config *common.KodeResou
 	log.V(1).Info("Ensuring PVC")
 
 	// If ExistingVolumeClaim is specified, return nil
-	if config.KodeSpec.Storage.ExistingVolumeClaim != "" {
+	if config.KodeSpec.Storage.ExistingVolumeClaim != nil {
 		log.V(1).Info("ExistingVolumeClaim specified, skipping PVC creation", "ExistingVolumeClaim", config.KodeSpec.Storage.ExistingVolumeClaim)
 		return nil
 	}
@@ -115,7 +115,7 @@ func (r *KodeReconciler) constructPVCSpec(config *common.KodeResourceConfig) (*c
 	pvc := &corev1.PersistentVolumeClaim{
 		Spec: corev1.PersistentVolumeClaimSpec{
 			AccessModes: config.KodeSpec.Storage.AccessModes,
-			Resources:   config.KodeSpec.Storage.Resources,
+			Resources:   *config.KodeSpec.Storage.Resources,
 		},
 	}
 

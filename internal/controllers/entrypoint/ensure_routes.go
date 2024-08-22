@@ -106,6 +106,9 @@ func (r *EntryPointReconciler) constructHTTPRoute(
 
 	var routeName string
 	var rules []gwapiv1.HTTPRouteRule
+	if kode.GetPort() == 0 {
+		return nil, fmt.Errorf("kode port is not set")
+	}
 	kodePort := gwapiv1.PortNumber(kode.GetPort())
 
 	if isHTTPS {

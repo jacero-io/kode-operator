@@ -48,7 +48,7 @@ func (k *KodeCleanupResource) GetResources() []cleanup.Resource {
 	}
 
 	// Add PVC to resources only if it's not using an existing claim
-	if k.Kode.Spec.Storage.ExistingVolumeClaim == "" {
+	if k.Kode.Spec.Storage != nil && k.Kode.Spec.Storage.ExistingVolumeClaim == nil {
 		resources = append(resources, cleanup.Resource{
 			Name:      k.Kode.GetPVCName(),
 			Namespace: k.Kode.Namespace,
@@ -61,6 +61,12 @@ func (k *KodeCleanupResource) GetResources() []cleanup.Resource {
 }
 
 func (k *KodeCleanupResource) ShouldDelete(resource cleanup.Resource) bool {
+	if k == nil || k.Kode == nil || k.Kode.Spec.Storage == nil {
+		// If any of these are nil, we can't safely check the KeepVolume flag
+		// So we'll return true to delete everything
+		return true
+	}
+
 	// Delete all resources except PVC if KeepVolume is true
 	if k.Kode.Spec.Storage.KeepVolume != nil && *k.Kode.Spec.Storage.KeepVolume {
 		return resource.Kind != "PersistentVolumeClaim"

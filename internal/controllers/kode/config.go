@@ -28,17 +28,17 @@ func InitKodeResourcesConfig(
 	kode *kodev1alpha2.Kode,
 	template *kodev1alpha2.Template) *common.KodeResourceConfig {
 
-	var kodePort kodev1alpha2.Port
+	var kodePort *kodev1alpha2.Port
 	var secretName string
 
 	// If ExistingSecret is specified, use it
-	if kode.Spec.Credentials.ExistingSecret != "" {
-		secretName = kode.Spec.Credentials.ExistingSecret
+	if kode.Spec.Credentials.ExistingSecret != nil {
+		secretName = *kode.Spec.Credentials.ExistingSecret
 	} else { // If ExistingSecret is not specified, use Kode.Name
 		secretName = fmt.Sprintf("%s-auth", kode.Name)
 	}
 
-	kodePort = template.Port
+	kodePort = &template.Port
 
 	pvcName := kode.GetPVCName()
 	serviceName := kode.GetServiceName()
@@ -50,7 +50,7 @@ func InitKodeResourcesConfig(
 			Namespace: kode.Namespace,
 		},
 		KodeSpec:    kode.Spec,
-		Credentials: kodev1alpha2.CredentialsSpec{},
+		Credentials: kode.Spec.Credentials,
 		Port:        kodePort,
 
 		SecretName:      secretName,

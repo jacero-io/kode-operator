@@ -73,8 +73,8 @@ func (r *KodeReconciler) constructServiceSpec(config *common.KodeResourceConfig)
 			Selector: config.CommonConfig.Labels,
 			Ports: []corev1.ServicePort{{
 				Protocol:   corev1.ProtocolTCP,
-				Port:       int32(config.Port),
-				TargetPort: intstr.FromInt(int(config.Port)),
+				Port:       int32(*config.Port),
+				TargetPort: intstr.FromInt(int(*config.Port)),
 			}},
 		},
 	}

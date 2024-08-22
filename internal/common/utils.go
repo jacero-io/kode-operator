@@ -53,7 +53,7 @@ func ObjectKeyFromConfig(config CommonConfig) types.NamespacedName {
 }
 
 // masks sensitive string values
-func maskSensitiveValue(s string) string {
+func MaskString(s string) string {
 	masked := ""
 	for range s {
 		masked += "*"
@@ -68,7 +68,7 @@ func MaskSecretData(secret *corev1.Secret) map[string]string {
 	secret = secret.DeepCopy()
 	for k, v := range secret.Data {
 		if k == "password" || k == "secret" {
-			maskedData[k] = maskSensitiveValue(string(v))
+			maskedData[k] = MaskString(string(v))
 		} else {
 			maskedData[k] = string(v)
 		}
@@ -81,7 +81,7 @@ func MaskEnvVars(envs []corev1.EnvVar) []corev1.EnvVar {
 	maskedEnvs := make([]corev1.EnvVar, len(envs))
 	for i, env := range envs {
 		if env.Name == "PASSWORD" || env.Name == "SECRET" {
-			env.Value = maskSensitiveValue(env.Value)
+			env.Value = MaskString(env.Value)
 		}
 		maskedEnvs[i] = env
 	}
@@ -96,12 +96,11 @@ func MaskSpec(spec corev1.Container) corev1.Container {
 
 func GetUsernameAndPasswordFromSecret(secret *corev1.Secret) (string, string, error) {
 	username := string(secret.Data["username"])
-	password := string(secret.Data["password"])
-	if password == "" {
-		password = ""
-		err := fmt.Errorf("password not found in secret")
-		return username, password, err
+	if username == "" {
+		return "", "", fmt.Errorf("username not found in secret")
 	}
+	// Password can be empty
+	password := string(secret.Data["password"])
 	return username, password, nil
 }
 
@@ -159,22 +158,6 @@ func AddTypeInformationToObject(scheme *runtime.Scheme, obj runtime.Object) erro
 			return fmt.Errorf("no valid GroupVersionKind found for object of type %T", obj)
 		}
 	}
-
-	// gvks, _, err := scheme.ObjectKinds(obj)
-	// if err != nil {
-	// 	return fmt.Errorf("missing apiVersion or kind and cannot assign it; %w", err)
-	// }
-
-	// for _, gvk := range gvks {
-	// 	if len(gvk.Kind) == 0 {
-	// 		continue
-	// 	}
-	// 	if len(gvk.Version) == 0 || gvk.Version == runtime.APIVersionInternal {
-	// 		continue
-	// 	}
-	// 	obj.GetObjectKind().SetGroupVersionKind(gvk)
-	// 	break
-	// }
 
 	return nil
 }

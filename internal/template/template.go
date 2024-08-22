@@ -44,59 +44,84 @@ func (m *DefaultTemplateManager) fetchTemplate(ctx context.Context, ref kodev1al
 	log.V(1).Info("Fetching template", "kind", ref.Kind, "name", ref.Name, "namespace", ref.Namespace)
 
 	template := &kodev1alpha2.Template{
-		Kind:      ref.Kind,
-		Name:      ref.Name,
-		Namespace: ref.Namespace,
+		Kind: ref.Kind,
+		Name: ref.Name,
 	}
+
+	// Only set Namespace if it's not nil
+	if ref.Namespace != nil {
+		template.Namespace = *ref.Namespace
+	}
+
 	var podTemplateSpec *kodev1alpha2.PodTemplateSharedSpec
 	var tofuTemplateSpec *kodev1alpha2.TofuSharedSpec
 	var port kodev1alpha2.Port
 
 	switch ref.Kind {
 	case kodev1alpha2.Kind(kodev1alpha2.TemplateKindPodTemplate), kodev1alpha2.Kind(kodev1alpha2.TemplateKindClusterPodTemplate):
+
 		log.V(1).Info("Fetching PodTemplate", "kind", ref.Kind)
+
 		if ref.Kind == kodev1alpha2.Kind(kodev1alpha2.TemplateKindClusterPodTemplate) {
 			clusterPodTemplate := &kodev1alpha2.ClusterPodTemplate{}
+
 			if err := m.Client.Get(ctx, types.NamespacedName{Name: string(ref.Name)}, clusterPodTemplate); err != nil {
 				log.Error(err, "Failed to get ClusterPodTemplate")
 				return nil, handleNotFoundError(err, ref)
 			}
+
 			log.V(1).Info("ClusterPodTemplate fetched successfully")
 			podTemplateSpec = &clusterPodTemplate.Spec.PodTemplateSharedSpec
-			port = clusterPodTemplate.Spec.Port
+			port = *clusterPodTemplate.Spec.Port
+
 		} else {
+
 			podTemplate := &kodev1alpha2.PodTemplate{}
-			if err := m.Client.Get(ctx, types.NamespacedName{Name: string(ref.Name), Namespace: string(ref.Namespace)}, podTemplate); err != nil {
+
+			if err := m.Client.Get(ctx, types.NamespacedName{Name: string(ref.Name), Namespace: string(template.Namespace)}, podTemplate); err != nil {
 				log.Error(err, "Failed to get PodTemplate")
 				return nil, handleNotFoundError(err, ref)
 			}
+
 			log.V(1).Info("PodTemplate fetched successfully")
 			podTemplateSpec = &podTemplate.Spec.PodTemplateSharedSpec
-			port = podTemplate.Spec.Port
+			port = *podTemplate.Spec.Port
+
 		}
+
 		template.PodTemplateSpec = podTemplateSpec
 		template.Port = port
 
 	case kodev1alpha2.Kind(kodev1alpha2.TemplateKindTofuTemplate), kodev1alpha2.Kind(kodev1alpha2.TemplateKindClusterTofuTemplate):
+
 		log.V(1).Info("Fetching TofuTemplate", "kind", ref.Kind)
+
 		if ref.Kind == kodev1alpha2.Kind(kodev1alpha2.TemplateKindClusterTofuTemplate) {
+
 			clusterKodeTofu := &kodev1alpha2.ClusterTofuTemplate{}
+
 			if err := m.Client.Get(ctx, types.NamespacedName{Name: string(ref.Name)}, clusterKodeTofu); err != nil {
 				log.Error(err, "Failed to get ClusterTofuTemplate")
 				return nil, handleNotFoundError(err, ref)
 			}
+
 			log.V(1).Info("ClusterTofuTemplate fetched successfully")
 			tofuTemplateSpec = &clusterKodeTofu.Spec.TofuSharedSpec
-			port = clusterKodeTofu.Spec.Port
+			port = *clusterKodeTofu.Spec.Port
+
 		} else {
+
 			kodeTofu := &kodev1alpha2.TofuTemplate{}
-			if err := m.Client.Get(ctx, types.NamespacedName{Name: string(ref.Name), Namespace: string(ref.Namespace)}, kodeTofu); err != nil {
+
+			if err := m.Client.Get(ctx, types.NamespacedName{Name: string(ref.Name), Namespace: string(template.Namespace)}, kodeTofu); err != nil {
 				log.Error(err, "Failed to get TofuTemplate")
 				return nil, handleNotFoundError(err, ref)
 			}
+
 			log.V(1).Info("TofuTemplate fetched successfully")
 			tofuTemplateSpec = &kodeTofu.Spec.TofuSharedSpec
-			port = kodeTofu.Spec.Port
+			port = *kodeTofu.Spec.Port
+
 		}
 		template.TofuTemplateSpec = tofuTemplateSpec
 		template.Port = port
@@ -114,7 +139,7 @@ func (m *DefaultTemplateManager) fetchTemplate(ctx context.Context, ref kodev1al
 func handleNotFoundError(err error, ref kodev1alpha2.CrossNamespaceObjectReference) error {
 	if errors.IsNotFound(err) {
 		return &common.TemplateNotFoundError{
-			NamespacedName: types.NamespacedName{Name: string(ref.Name), Namespace: string(ref.Namespace)},
+			NamespacedName: types.NamespacedName{Name: string(ref.Name), Namespace: string(*ref.Namespace)},
 			Kind:           string(ref.Kind),
 		}
 	}

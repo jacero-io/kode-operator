@@ -80,6 +80,11 @@ func (r *KodeReconciler) handleFinalizer(ctx context.Context, kode *kodev1alpha2
 func (r *KodeReconciler) finalize(ctx context.Context, kode *kodev1alpha2.Kode) error {
 	log := r.Log.WithValues("kode", client.ObjectKeyFromObject(kode))
 
+	if kode == nil {
+		log.Info("Kode is nil, skipping finalization")
+		return nil
+	}
+
 	cleanupResource := NewKodeCleanupResource(kode)
 
 	// Perform cleanup

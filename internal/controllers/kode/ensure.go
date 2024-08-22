@@ -23,9 +23,7 @@ import (
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
 	"github.com/jacero-io/kode-operator/internal/events"
-	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 func (r *KodeReconciler) ensureResources(ctx context.Context, config *common.KodeResourceConfig) error {
@@ -57,6 +55,7 @@ func (r *KodeReconciler) ensureResources(ctx context.Context, config *common.Kod
 		}
 
 		// Ensure Secret
+		log.V(1).Info("Ensuring Secret", "ConfigNil", config == nil, "CredentialsNil", config.Credentials == nil)
 		if err := r.ensureSecret(ctx, config, kode); err != nil {
 			log.Error(err, "Failed to ensure Secret")
 			r.updatePhaseFailed(ctx, kode, err, []metav1.Condition{
@@ -91,12 +90,6 @@ func (r *KodeReconciler) ensureResources(ctx context.Context, config *common.Kod
 				log.Error(err, "Failed to record event")
 			}
 
-			return err
-		}
-
-		// Ensure Credentials
-		if err := r.ensureCredentials(ctx, config); err != nil {
-			log.Error(err, "Failed to ensure Credentials")
 			return err
 		}
 
@@ -233,37 +226,5 @@ func (r *KodeReconciler) ensureResources(ctx context.Context, config *common.Kod
 		}
 	}
 
-	return nil
-}
-
-func (r *KodeReconciler) ensureCredentials(ctx context.Context, config *common.KodeResourceConfig) error {
-	log := r.Log.WithName("CredentialsEnsurer").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
-
-	if config.KodeSpec.Credentials.ExistingSecret != "" {
-		// ExistingSecret is specified, fetch the secret
-		secret := &corev1.Secret{}
-		err := r.Client.Get(ctx, types.NamespacedName{Name: config.KodeSpec.Credentials.ExistingSecret, Namespace: config.CommonConfig.Namespace}, secret)
-		if err != nil {
-			return fmt.Errorf("failed to get Secret: %w", err)
-		}
-
-		username, password, err := common.GetUsernameAndPasswordFromSecret(secret)
-		if err != nil {
-			return fmt.Errorf("failed to get username and password from Secret: %w", err)
-		}
-
-		config.Credentials.Username = username
-		config.Credentials.Password = password
-
-		log.V(1).Info("Using existing secret", "Name", secret.Name, "Data", common.MaskSecretData(secret))
-	} else if config.KodeSpec.Credentials.Password != "" {
-		config.Credentials.Username = config.KodeSpec.Credentials.Username
-		config.Credentials.Password = config.KodeSpec.Credentials.Password
-	} else {
-		config.Credentials.Username = config.KodeSpec.Credentials.Username
-		config.Credentials.Password = ""
-	}
-
-	log.V(1).Info("Credentials ensured successfully")
 	return nil
 }
