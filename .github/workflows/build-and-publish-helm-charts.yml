@@ -38,6 +38,8 @@ jobs:
       - name: Update Chart.yaml for kode-crd
         run: |
           sed -i "s/v0.0.0-latest/${{ env.VERSION }}/g" /tmp/helm-charts/kode-crd/Chart.yaml
+          sed -i "s/v0.0.0-latest/${{ env.VERSION }}/g" /tmp/helm-charts/kode/README.md
+          sed -i "s/v0.0.0--latest/${{ env.VERSION }}/g" /tmp/helm-charts/kode/README.md # Special case for the img.shields.io bagde
           helm package /tmp/helm-charts/kode-crd --version ${{ env.VERSION }} --destination /tmp/helm-packages
 
       - name: Push kode-crd chart
@@ -53,6 +55,8 @@ jobs:
         run: |
           sed -i "s/v0.0.0-latest/${{ env.VERSION }}/g" /tmp/helm-charts/kode/Chart.yaml
           sed -i "s/v0.0.0-latest/${{ env.VERSION }}/g" /tmp/helm-charts/kode/values.yaml
+          sed -i "s/v0.0.0-latest/${{ env.VERSION }}/g" /tmp/helm-charts/kode/README.md
+          sed -i "s/v0.0.0--latest/${{ env.VERSION }}/g" /tmp/helm-charts/kode/README.md # Special case for the img.shields.io bagde
           helm dependency update /tmp/helm-charts/kode
           helm package /tmp/helm-charts/kode --version ${{ env.VERSION }} --destination /tmp/helm-packages
 
