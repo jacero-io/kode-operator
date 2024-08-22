@@ -403,7 +403,7 @@ tasks:
     vars:
       NAMESPACE: '{{.CHART_NAME}}-system'
       VERSION: '{{.VERSION | default "v0.0.0-latest"}}'
-      CONTROLLER_IMAGE_TAG: 'latest'
+      CONTROLLER_IMAGE_TAG: 'sha-94f7ae3'
     cmds:
       - task: helm-install-kode-crd
         vars:
