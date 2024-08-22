@@ -205,15 +205,21 @@ func (r *EntryPointReconciler) findEntryPointForKode(ctx context.Context, kode *
 	var entryPointRef kodev1alpha2.CrossNamespaceObjectReference
 	switch template.Kind {
 	case kodev1alpha2.Kind(kodev1alpha2.TemplateKindPodTemplate), kodev1alpha2.Kind(kodev1alpha2.TemplateKindClusterPodTemplate):
-		entryPointRef = template.PodTemplateSpec.BaseSharedSpec.EntryPointRef
+		if template.PodTemplateSpec == nil || template.PodTemplateSpec.BaseSharedSpec.EntryPointRef == nil {
+			return nil, fmt.Errorf("invalid PodTemplate: missing EntryPointRef")
+		}
+		entryPointRef = *template.PodTemplateSpec.BaseSharedSpec.EntryPointRef
 	case kodev1alpha2.Kind(kodev1alpha2.TemplateKindTofuTemplate), kodev1alpha2.Kind(kodev1alpha2.TemplateKindClusterTofuTemplate):
-		entryPointRef = template.TofuTemplateSpec.BaseSharedSpec.EntryPointRef
+		if template.TofuTemplateSpec == nil || template.TofuTemplateSpec.BaseSharedSpec.EntryPointRef == nil {
+			return nil, fmt.Errorf("invalid TofuTemplate: missing EntryPointRef")
+		}
+		entryPointRef = *template.TofuTemplateSpec.BaseSharedSpec.EntryPointRef
 	default:
 		return nil, fmt.Errorf("unknown template kind: %s", template.Kind)
 	}
 
 	// Fetch the latest EntryPoint object
-	latestEntryPoint, err := common.GetLatestEntryPoint(ctx, r.Client, string(entryPointRef.Name), string(entryPointRef.Namespace))
+	latestEntryPoint, err := common.GetLatestEntryPoint(ctx, r.Client, string(entryPointRef.Name), string(*entryPointRef.Namespace))
 	if err != nil {
 		return nil, fmt.Errorf("failed to get EntryPoint: %w", err)
 	}
@@ -262,7 +268,7 @@ func (r *EntryPointReconciler) handleReconcileError(ctx context.Context, kode *k
 			// Continue to update the Kode status even if EntryPoint update fails
 		}
 	} else {
-		log.Info("EntryPoint is nil, skipping EntryPoint status update")
+		log.V(1).Info("EntryPoint is nil, skipping EntryPoint status update")
 	}
 
 	err = r.EventManager.Record(ctx, entryPoint, events.EventTypeWarning, events.ReasonFailed, fmt.Sprintf("Failed to reconcile Entrypoint: %v", err))

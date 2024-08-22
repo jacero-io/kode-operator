@@ -36,8 +36,14 @@ import (
 )
 
 const (
+	EntryPointsKind = "EntryPoint"
 	podTemplateKind = "ClusterPodTemplate"
-	storageSize     = "1Gi"
+
+	resourceNamespace = "test-namespace"
+	kodeResourceName  = "kode"
+	entryPointName    = "entrypoint"
+
+	storageSize = "1Gi"
 
 	podTemplateNameCodeServer = "podtemplate-codeserver"
 	podTemplateNameWebtop     = "podtemplate-webtop"
@@ -47,6 +53,9 @@ const (
 )
 
 func createPodTemplate(name, image, templateType string) *kodev1alpha2.ClusterPodTemplate {
+	port := kodev1alpha2.Port(8000)
+	namespace := kodev1alpha2.Namespace(resourceNamespace)
+
 	template := &kodev1alpha2.ClusterPodTemplate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
@@ -54,11 +63,11 @@ func createPodTemplate(name, image, templateType string) *kodev1alpha2.ClusterPo
 		Spec: kodev1alpha2.ClusterPodTemplateSpec{
 			PodTemplateSharedSpec: kodev1alpha2.PodTemplateSharedSpec{
 				BaseSharedSpec: kodev1alpha2.BaseSharedSpec{
-					Port: 8000,
-					EntryPointRef: kodev1alpha2.CrossNamespaceObjectReference{
-						Kind:      "EntryPoint",
+					Port: &port,
+					EntryPointRef: &kodev1alpha2.CrossNamespaceObjectReference{
+						Kind:      EntryPointsKind,
 						Name:      entryPointName,
-						Namespace: resourceNamespace,
+						Namespace: &namespace,
 					},
 				},
 				Type:  templateType,
@@ -118,6 +127,9 @@ var _ = Describe("Kode Controller PodTemplate Integration", Ordered, func() {
 
 	DescribeTable("Kode resource creation",
 		func(templateName string, templateType string, expectedContainerCount int, exposePort int32) {
+			username := "abc"
+			password := "123"
+
 			kodeName := fmt.Sprintf("%s-%s", kodeResourceName, templateName)
 			statefulSetName := kodeName
 			storageClassName := "standard"
@@ -131,13 +143,13 @@ var _ = Describe("Kode Controller PodTemplate Integration", Ordered, func() {
 						Kind: podTemplateKind,
 						Name: kodev1alpha2.ObjectName(templateName),
 					},
-					Credentials: kodev1alpha2.CredentialsSpec{
-						Username: "abc",
-						Password: "123",
+					Credentials: &kodev1alpha2.CredentialsSpec{
+						Username: username,
+						Password: password,
 					},
-					Storage: kodev1alpha2.KodeStorageSpec{
+					Storage: &kodev1alpha2.KodeStorageSpec{
 						AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-						Resources: corev1.VolumeResourceRequirements{
+						Resources: &corev1.VolumeResourceRequirements{
 							Requests: corev1.ResourceList{
 								corev1.ResourceStorage: resource.MustParse(storageSize),
 							},
@@ -258,7 +270,11 @@ var _ = Describe("Kode Controller PodTemplate Integration", Ordered, func() {
 	)
 
 	It("should not create a PersistentVolumeClaim when storage is not specified", func() {
+
+		username := "abc"
+		password := "123"
 		kodeName := "kode-no-storage"
+
 		kode := &kodev1alpha2.Kode{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      kodeName,
@@ -267,7 +283,11 @@ var _ = Describe("Kode Controller PodTemplate Integration", Ordered, func() {
 			Spec: kodev1alpha2.KodeSpec{
 				TemplateRef: kodev1alpha2.CrossNamespaceObjectReference{
 					Kind: podTemplateKind,
-					Name: podTemplateNameCodeServer,
+					Name: kodev1alpha2.ObjectName(podTemplateNameCodeServer),
+				},
+				Credentials: &kodev1alpha2.CredentialsSpec{
+					Username: username,
+					Password: password,
 				},
 				// No storage specification
 			},

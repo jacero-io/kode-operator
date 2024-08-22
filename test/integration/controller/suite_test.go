@@ -40,6 +40,7 @@ import (
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/cleanup"
 	controller "github.com/jacero-io/kode-operator/internal/controllers/kode"
+	"github.com/jacero-io/kode-operator/internal/events"
 	"github.com/jacero-io/kode-operator/internal/resource"
 	"github.com/jacero-io/kode-operator/internal/status"
 	"github.com/jacero-io/kode-operator/internal/template"
@@ -56,11 +57,6 @@ import (
 const (
 	timeout  = time.Second * 60
 	interval = time.Second * 1
-
-	resourceNamespace = "test-namespace"
-	kodeResourceName  = "kode"
-
-	entryPointName = "entrypoint"
 )
 
 var (
@@ -115,14 +111,15 @@ var _ = BeforeSuite(func() {
 	}
 
 	reconciler = &controller.KodeReconciler{
-		Client:          mockK8sClient, // Use mockK8sClient instead of k8sClient
+		Client:          mockK8sClient,
 		Scheme:          k8sManager.GetScheme(),
-		Log:             ctrl.Log.WithName("controllers").WithName("Kode").WithName("Reconcile"),
-		ResourceManager: resource.NewDefaultResourceManager(mockK8sClient, ctrl.Log.WithName("controllers").WithName("Kode").WithName("ResourceManager"), k8sManager.GetScheme()),
-		TemplateManager: template.NewDefaultTemplateManager(mockK8sClient, ctrl.Log.WithName("controllers").WithName("Kode").WithName("TemplateManager")),
-		CleanupManager:  cleanup.NewDefaultCleanupManager(mockK8sClient, ctrl.Log.WithName("controllers").WithName("Kode").WithName("CleanupManager")),
-		StatusUpdater:   status.NewDefaultStatusUpdater(mockK8sClient, ctrl.Log.WithName("controllers").WithName("Kode").WithName("StatusUpdater")),
+		Log:             ctrl.Log.WithName("Kode").WithName("Reconcile"),
+		ResourceManager: resource.NewDefaultResourceManager(k8sClient, ctrl.Log.WithName("Kode").WithName("ResourceManager"), k8sManager.GetScheme()),
+		TemplateManager: template.NewDefaultTemplateManager(k8sClient, ctrl.Log.WithName("Kode").WithName("TemplateManager")),
+		CleanupManager:  cleanup.NewDefaultCleanupManager(mockK8sClient, ctrl.Log.WithName("Kode").WithName("CleanupManager")),
+		StatusUpdater:   status.NewDefaultStatusUpdater(k8sClient, ctrl.Log.WithName("Kode").WithName("StatusUpdater")),
 		Validator:       validation.NewDefaultValidator(),
+		EventManager:    events.NewEventManager(k8sClient, ctrl.Log.WithName("Kode").WithName("EventManager"), k8sManager.GetScheme(), k8sManager.GetEventRecorderFor("kode-controller")),
 	}
 
 	// Set up the controller with the manager

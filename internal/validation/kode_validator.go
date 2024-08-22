@@ -24,14 +24,6 @@ func (v *validator) ValidateKode(ctx context.Context, kode *kodev1alpha2.Kode) e
 func (v *validator) validateKodeSpec(kode *kodev1alpha2.Kode) error {
 	var errors []string
 
-	// Validate ExistingSecret (if set)
-	if kode.Spec.Credentials.ExistingSecret != "" {
-		// Secret must contain both username and password in Data
-		if kode.Spec.Credentials.Username == "" || kode.Spec.Credentials.Password == "" {
-			errors = append(errors, "existingSecret is specified, but username and password are not set")
-		}
-	}
-
 	// Validate InitPlugins (if any)
 	for i, plugin := range kode.Spec.InitPlugins {
 		if err := validateInitPlugin(plugin, i); err != nil {
