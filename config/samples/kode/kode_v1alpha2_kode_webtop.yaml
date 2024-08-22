@@ -10,6 +10,7 @@ spec:
   credentials:
     username: user1
     password: password1
+    enableBuiltinAuth: true
   templateRef:
     kind: PodTemplate
     name: podtemplate-webtop-sample

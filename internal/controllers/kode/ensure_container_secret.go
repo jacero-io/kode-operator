@@ -45,12 +45,21 @@ func (r *KodeReconciler) ensureSecret(ctx context.Context, config *common.KodeRe
 		},
 	}
 
-	if config.KodeSpec.Credentials.ExistingSecret != "" {
+	if config.KodeSpec.Credentials.ExistingSecret != nil {
 		// ExistingSecret is specified, fetch the secret
 		err := r.ResourceManager.Get(ctx, client.ObjectKeyFromObject(secret), secret)
 		if err != nil {
-			return fmt.Errorf("failed to get Secret: %v", err)
+			return fmt.Errorf("failed to get Secret: %w", err)
 		}
+
+		username, password, err := common.GetUsernameAndPasswordFromSecret(secret)
+		if err != nil {
+			return fmt.Errorf("failed to get username and password from Secret: %w", err)
+		}
+
+		config.Credentials.Username = username
+		config.Credentials.Password = password
+		log.V(1).Info("Updated config.Credentials with", "Username", username, "Password", common.MaskString(password))
 
 		log.V(1).Info("Using existing secret", "Name", secret.Name, "Data", common.MaskSecretData(secret))
 
@@ -64,8 +73,7 @@ func (r *KodeReconciler) ensureSecret(ctx context.Context, config *common.KodeRe
 
 			// Update metadata for the secret
 			secret.Data = constructedSecret.Data
-			secret.ObjectMeta.Labels = constructedSecret.ObjectMeta.Labels
-			secret.ObjectMeta.Annotations = constructedSecret.ObjectMeta.Annotations
+			secret.Labels = constructedSecret.Labels
 
 			return controllerutil.SetControllerReference(kode, secret, r.Scheme)
 		})
@@ -83,6 +91,9 @@ func (r *KodeReconciler) constructSecretSpec(config *common.KodeResourceConfig) 
 	log := r.Log.WithName("SecretConstructor").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Labels: config.CommonConfig.Labels,
+		},
 		Data: map[string][]byte{
 			"username": []byte(config.Credentials.Username),
 			"password": []byte(config.Credentials.Password),

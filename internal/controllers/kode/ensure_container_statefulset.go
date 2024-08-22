@@ -79,12 +79,12 @@ func (r *KodeReconciler) constructStatefulSetSpec(config *common.KodeResourceCon
 
 	workspace = path.Join(templateSpec.DefaultHome, templateSpec.DefaultWorkspace)
 	mountPath = templateSpec.DefaultHome
-	if config.KodeSpec.Workspace != "" {
-		if config.KodeSpec.Home != "" {
-			workspace = path.Join(config.KodeSpec.Home, config.KodeSpec.Workspace)
-			mountPath = config.KodeSpec.Home
+	if config.KodeSpec.Workspace != nil {
+		if config.KodeSpec.Home != nil {
+			workspace = path.Join(*config.KodeSpec.Home, *config.KodeSpec.Workspace)
+			mountPath = *config.KodeSpec.Home
 		} else {
-			workspace = path.Join(templateSpec.DefaultHome, config.KodeSpec.Workspace)
+			workspace = path.Join(templateSpec.DefaultHome, *config.KodeSpec.Workspace)
 		}
 	}
 
@@ -155,44 +155,71 @@ func (r *KodeReconciler) constructStatefulSetSpec(config *common.KodeResourceCon
 	return statefulSet, nil
 }
 
-func constructCodeServerContainers(config *common.KodeResourceConfig,
-	workspace string) []corev1.Container {
+func constructCodeServerContainers(config *common.KodeResourceConfig, workspace string) []corev1.Container {
+	env := []corev1.EnvVar{
+		{Name: "PUID", Value: fmt.Sprintf("%d", config.Template.PodTemplateSpec.PUID)},
+		{Name: "PGID", Value: fmt.Sprintf("%d", config.Template.PodTemplateSpec.PGID)},
+		{Name: "TZ", Value: config.Template.PodTemplateSpec.TZ},
+		{Name: "PORT", Value: fmt.Sprintf("%d", config.Port)},
+		{Name: "USERNAME", Value: config.KodeSpec.Credentials.Username},
+		{Name: "DEFAULT_WORKSPACE", Value: workspace},
+	}
+
+	if config.Credentials.EnableBuiltinAuth != false && config.Credentials.Password != "" {
+		env = append(env, corev1.EnvVar{
+			Name: "PASSWORD",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: config.SecretName,
+					},
+					Key: "password",
+				},
+			},
+		})
+	}
 
 	return []corev1.Container{{
 		Name:  "code-server",
 		Image: config.Template.PodTemplateSpec.Image,
-		Env: []corev1.EnvVar{
-			{Name: "PUID", Value: fmt.Sprintf("%d", config.Template.PodTemplateSpec.PUID)},
-			{Name: "PGID", Value: fmt.Sprintf("%d", config.Template.PodTemplateSpec.PGID)},
-			{Name: "TZ", Value: config.Template.PodTemplateSpec.TZ},
-			{Name: "PORT", Value: fmt.Sprintf("%d", config.Port)},
-			{Name: "USERNAME", Value: config.KodeSpec.Credentials.Username},
-			// {Name: "PASSWORD", Value: config.Kode.Spec.Password},
-			{Name: "DEFAULT_WORKSPACE", Value: workspace},
-		},
+		Env:   env,
 		Ports: []corev1.ContainerPort{{
 			Name:          "http",
-			ContainerPort: int32(config.Port),
+			ContainerPort: int32(*config.Port),
 		}},
 	}}
 }
 
 func constructWebtopContainers(config *common.KodeResourceConfig) []corev1.Container {
+	env := []corev1.EnvVar{
+		{Name: "PUID", Value: fmt.Sprintf("%d", config.Template.PodTemplateSpec.PUID)},
+		{Name: "PGID", Value: fmt.Sprintf("%d", config.Template.PodTemplateSpec.PGID)},
+		{Name: "TZ", Value: config.Template.PodTemplateSpec.TZ},
+		{Name: "CUSTOM_PORT", Value: fmt.Sprintf("%d", config.Port)},
+		{Name: "CUSTOM_USER", Value: config.KodeSpec.Credentials.Username},
+	}
+
+	if config.Credentials.EnableBuiltinAuth != false && config.Credentials.Password != "" {
+		env = append(env, corev1.EnvVar{
+			Name: "PASSWORD",
+			ValueFrom: &corev1.EnvVarSource{
+				SecretKeyRef: &corev1.SecretKeySelector{
+					LocalObjectReference: corev1.LocalObjectReference{
+						Name: config.SecretName,
+					},
+					Key: "password",
+				},
+			},
+		})
+	}
 
 	return []corev1.Container{{
 		Name:  "webtop",
 		Image: config.Template.PodTemplateSpec.Image,
-		Env: []corev1.EnvVar{
-			{Name: "PUID", Value: fmt.Sprintf("%d", config.Template.PodTemplateSpec.PUID)},
-			{Name: "PGID", Value: fmt.Sprintf("%d", config.Template.PodTemplateSpec.PGID)},
-			{Name: "TZ", Value: config.Template.PodTemplateSpec.TZ},
-			{Name: "CUSTOM_PORT", Value: fmt.Sprintf("%d", config.Port)},
-			{Name: "CUSTOM_USER", Value: config.KodeSpec.Credentials.Username},
-			// {Name: "PASSWORD", Value: config.Kode.Spec.Password},
-		},
+		Env:   env,
 		Ports: []corev1.ContainerPort{{
 			Name:          "http",
-			ContainerPort: int32(config.Port),
+			ContainerPort: int32(*config.Port),
 		}},
 	}}
 }
@@ -205,10 +232,10 @@ func constructVolumesAndMounts(mountPath string, config *common.KodeResourceConf
 	if !config.KodeSpec.Storage.IsEmpty() {
 		var volumeSource corev1.VolumeSource
 
-		if config.KodeSpec.Storage.ExistingVolumeClaim != "" {
+		if config.KodeSpec.Storage.ExistingVolumeClaim != nil {
 			volumeSource = corev1.VolumeSource{
 				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: config.KodeSpec.Storage.ExistingVolumeClaim,
+					ClaimName: *config.KodeSpec.Storage.ExistingVolumeClaim,
 				},
 			}
 		} else {
