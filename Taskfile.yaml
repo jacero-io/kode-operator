@@ -282,36 +282,63 @@ tasks:
       - kustomize
 
   #### HELM BUILD ####
+  helm-build-kode-crd:
+    desc: Package kode-crd Helm chart
+    deps: [manifests, generate]
+    cmds:
+      - echo "Building kode-crd chart from config/crd..."
+      - kustomize build config/crd | helmify helm-charts/kode-crd
+
   helm-package-kode-crd:
     desc: Package kode-crd Helm chart
+    deps: [helm-build-kode-crd]
     vars:
-      VERSION: '{{.CLI_ARGS | default "0.1.0"}}'
+      VERSION: '{{.CLI_ARGS | default "v0.0.0-latest"}}'
     cmds:
       - echo "Packaging kode-crd chart version {{.VERSION}}..."
       - mkdir -p /tmp/helm-charts/kode-crd
       - cp -r helm-charts/kode-crd/* /tmp/helm-charts/kode-crd/
-      - sed -i "s/PLACEHOLDER_VERSION/{{.VERSION}}/g" /tmp/helm-charts/kode-crd/Chart.yaml
+      - sed -i "s/v0.0.0-latest/{{.VERSION}}/g" /tmp/helm-charts/kode-crd/Chart.yaml
+      - sed -i "s/v0.0.0-latest/{{.VERSION}}/g" /tmp/helm-charts/kode-crd/README.md
+      - sed -i "s/v0.0.0--latest/{{.VERSION}}/g" /tmp/helm-charts/kode-crd/README.md # Special case for the img.shields.io badge
       - helm package /tmp/helm-charts/kode-crd --version {{.VERSION}} --destination /tmp
       - mv /tmp/kode-crd-{{.VERSION}}.tgz ./kode-crd-{{.VERSION}}.tgz
       - rm -rf /tmp/helm-charts/kode-crd
 
+  helm-build-kode:
+    desc: Build kode Helm chart
+    deps: [manifests, generate]
+    cmds:
+      - echo "Building kode chart from config/crd..."
+      - kustomize build config/default | helmify -cert-manager-as-subchart -cert-manager-version 1.15.3 -generate-defaults -image-pull-secrets helm-charts/kode
+
   helm-package-kode:
     desc: Package kode Helm chart
+    deps: [helm-build-kode]
     vars:
-      VERSION: '{{.CLI_ARGS | default "0.1.0"}}'
+      VERSION: '{{.CLI_ARGS | default "v0.0.0-latest"}}'
     cmds:
       - echo "Packaging kode chart version {{.VERSION}}..."
       - mkdir -p /tmp/helm-charts/kode
       - cp -r helm-charts/kode/* /tmp/helm-charts/kode/
-      - sed -i "s/PLACEHOLDER_VERSION/{{.VERSION}}/g" /tmp/helm-charts/kode/Chart.yaml
+      - sed -i "s/v0.0.0-latest/{{.VERSION}}/g" /tmp/helm-charts/kode/Chart.yaml
+      - sed -i "s/v0.0.0-latest/{{.VERSION}}/g" /tmp/helm-charts/kode/values.yaml
+      - sed -i "s/v0.0.0-latest/{{.VERSION}}/g" /tmp/helm-charts/kode/README.md
+      - sed -i "s/v0.0.0--latest/{{.VERSION}}/g" /tmp/helm-charts/kode/README.md # Special case for the img.shields.io bagde
       - helm package /tmp/helm-charts/kode --version {{.VERSION}} --destination /tmp
       - mv /tmp/kode-{{.VERSION}}.tgz ./kode-{{.VERSION}}.tgz
       - rm -rf /tmp/helm-charts/kode
 
+  helm-build-all:
+    desc: Package all Helm charts
+    cmds:
+      - task: helm-build-kode-crd
+      - task: helm-build-kode
+
   helm-package-all:
     desc: Package all Helm charts
     vars:
-      VERSION: '{{.CLI_ARGS | default "0.1.0"}}'
+      VERSION: '{{.CLI_ARGS | default "v0.0.0-latest"}}'
     cmds:
       - task: helm-package-kode-crd
         vars: { VERSION: '{{.VERSION}}' }

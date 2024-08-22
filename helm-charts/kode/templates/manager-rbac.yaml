@@ -8,6 +8,7 @@ rules:
 - apiGroups:
   - apps
   resources:
+  - secrets
   - statefulsets
   verbs:
   - create
