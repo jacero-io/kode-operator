@@ -1,6 +1,6 @@
 certmanager:
-  enabled: true
-  installCRDs: true
+  enabled: false
+  installCRDs: false
 controllerManager:
   manager:
     args:
@@ -12,7 +12,7 @@ controllerManager:
         - ALL
     image:
       repository: ghcr.io/jacero-io/kode-operator
-      tag: PLACEHOLDER_VERSION
+      tag: v0.0.0-latest
     resources:
       limits:
         cpu: 500m
