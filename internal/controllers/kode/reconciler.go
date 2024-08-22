@@ -31,6 +31,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	client "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
 
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/cleanup"
@@ -310,6 +311,10 @@ func (r *KodeReconciler) updateObservedGeneration(ctx context.Context, kode *kod
 func (r *KodeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&kodev1alpha2.Kode{}).
+		Watches(&kodev1alpha2.PodTemplate{}, &handler.EnqueueRequestForObject{}).
+		Watches(&kodev1alpha2.ClusterPodTemplate{}, &handler.EnqueueRequestForObject{}).
+		Watches(&kodev1alpha2.TofuTemplate{}, &handler.EnqueueRequestForObject{}).
+		Watches(&kodev1alpha2.ClusterTofuTemplate{}, &handler.EnqueueRequestForObject{}).
 		WithOptions(controller.Options{MaxConcurrentReconciles: 2}).
 		Complete(r)
 }
