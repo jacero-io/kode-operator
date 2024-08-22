@@ -19,15 +19,13 @@ package common
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
-	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
+	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -35,31 +33,27 @@ func GetCurrentTime() metav1.Time {
 	return metav1.NewTime(time.Now())
 }
 
-func GetLatestKode(ctx context.Context, client client.Client, name, namespace string) (*kodev1alpha1.Kode, error) {
-	kode := &kodev1alpha1.Kode{}
+func GetLatestKode(ctx context.Context, client client.Client, name string, namespace string) (*kodev1alpha2.Kode, error) {
+	kode := &kodev1alpha2.Kode{}
 	err := client.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, kode)
 	return kode, err
 }
 
-func ObjectKeyFromConfig(config *KodeResourcesConfig) types.NamespacedName {
+func GetLatestEntryPoint(ctx context.Context, client client.Client, name string, namespace string) (*kodev1alpha2.EntryPoint, error) {
+	entryPoint := &kodev1alpha2.EntryPoint{}
+	err := client.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, entryPoint)
+	return entryPoint, err
+}
+
+func ObjectKeyFromConfig(config CommonConfig) types.NamespacedName {
 	return types.NamespacedName{
-		Name:      config.KodeName,
-		Namespace: config.KodeNamespace,
+		Name:      config.Name,
+		Namespace: config.Namespace,
 	}
 }
 
-// returns the name of the PersistentVolumeClaim for the Kode instance
-func GetPVCName(kode *kodev1alpha1.Kode) string {
-	return kode.Name + "-pvc"
-}
-
-// returns the name of the Kode service
-func GetServiceName(kode *kodev1alpha1.Kode) string {
-	return kode.Name + "-svc"
-}
-
 // masks sensitive string values
-func maskSensitiveValue(s string) string {
+func MaskString(s string) string {
 	masked := ""
 	for range s {
 		masked += "*"
@@ -74,7 +68,7 @@ func MaskSecretData(secret *corev1.Secret) map[string]string {
 	secret = secret.DeepCopy()
 	for k, v := range secret.Data {
 		if k == "password" || k == "secret" {
-			maskedData[k] = maskSensitiveValue(string(v))
+			maskedData[k] = MaskString(string(v))
 		} else {
 			maskedData[k] = string(v)
 		}
@@ -87,7 +81,7 @@ func MaskEnvVars(envs []corev1.EnvVar) []corev1.EnvVar {
 	maskedEnvs := make([]corev1.EnvVar, len(envs))
 	for i, env := range envs {
 		if env.Name == "PASSWORD" || env.Name == "SECRET" {
-			env.Value = maskSensitiveValue(env.Value)
+			env.Value = MaskString(env.Value)
 		}
 		maskedEnvs[i] = env
 	}
@@ -102,27 +96,12 @@ func MaskSpec(spec corev1.Container) corev1.Container {
 
 func GetUsernameAndPasswordFromSecret(secret *corev1.Secret) (string, string, error) {
 	username := string(secret.Data["username"])
+	if username == "" {
+		return "", "", fmt.Errorf("username not found in secret")
+	}
+	// Password can be empty
 	password := string(secret.Data["password"])
-	if password == "" {
-		password = ""
-		err := fmt.Errorf("password not found in secret")
-		return username, password, err
-	}
 	return username, password, nil
-}
-
-// joins multiple errors into a single error
-func JoinErrors(errs ...error) error {
-	var errStrings []string
-	for _, err := range errs {
-		if err != nil {
-			errStrings = append(errStrings, err.Error())
-		}
-	}
-	if len(errStrings) == 0 {
-		return nil
-	}
-	return fmt.Errorf(strings.Join(errStrings, "; "))
 }
 
 // wraps a context with a timeout
@@ -163,21 +142,21 @@ func MergeLabels(labelsSlice ...map[string]string) map[string]string {
 
 // addTypeInformationToObject adds TypeMeta information to a runtime.Object based upon the loaded scheme.Scheme
 // taken from: https://github.com/kubernetes/kubernetes/issues/3030#issuecomment-700099699
-func AddTypeInformationToObject(obj runtime.Object) error {
-	gvks, _, err := scheme.Scheme.ObjectKinds(obj)
-	if err != nil {
-		return fmt.Errorf("missing apiVersion or kind and cannot assign it; %w", err)
-	}
-
-	for _, gvk := range gvks {
-		if len(gvk.Kind) == 0 {
-			continue
+func AddTypeInformationToObject(scheme *runtime.Scheme, obj runtime.Object) error {
+	// Check if the object already has type information
+	gvk := obj.GetObjectKind().GroupVersionKind()
+	if gvk.Kind == "" || gvk.Version == "" {
+		// If type information is missing, try to add it
+		gvks, _, err := scheme.ObjectKinds(obj)
+		if err != nil {
+			return fmt.Errorf("failed to get object kinds: %w", err)
 		}
-		if len(gvk.Version) == 0 || gvk.Version == runtime.APIVersionInternal {
-			continue
+		if len(gvks) > 0 {
+			gvk := gvks[0]
+			obj.GetObjectKind().SetGroupVersionKind(gvk)
+		} else {
+			return fmt.Errorf("no valid GroupVersionKind found for object of type %T", obj)
 		}
-		obj.GetObjectKind().SetGroupVersionKind(gvk)
-		break
 	}
 
 	return nil

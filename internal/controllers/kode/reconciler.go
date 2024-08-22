@@ -1,5 +1,3 @@
-// internal/controllers/kode/reconciler.go
-
 /*
 Copyright 2024 Emil Larsson.
 
@@ -16,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package kode
 
 import (
 	"context"
@@ -24,13 +22,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
-	"github.com/jacero-io/kode-operator/internal/cleanup"
-	"github.com/jacero-io/kode-operator/internal/common"
-	"github.com/jacero-io/kode-operator/internal/resource"
-	"github.com/jacero-io/kode-operator/internal/status"
-	"github.com/jacero-io/kode-operator/internal/template"
-	"github.com/jacero-io/kode-operator/internal/validation"
+
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -39,6 +31,15 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	client "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+
+	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
+	"github.com/jacero-io/kode-operator/internal/cleanup"
+	"github.com/jacero-io/kode-operator/internal/common"
+	"github.com/jacero-io/kode-operator/internal/events"
+	"github.com/jacero-io/kode-operator/internal/resource"
+	"github.com/jacero-io/kode-operator/internal/status"
+	"github.com/jacero-io/kode-operator/internal/template"
+	"github.com/jacero-io/kode-operator/internal/validation"
 )
 
 type KodeReconciler struct {
@@ -50,19 +51,20 @@ type KodeReconciler struct {
 	CleanupManager  cleanup.CleanupManager
 	StatusUpdater   status.StatusUpdater
 	Validator       validation.Validator
+	EventManager    events.EventManager
 }
 
 const (
 	RequeueInterval = 250 * time.Millisecond
 )
 
-// +kubebuilder:rbac:groups=kode.kode.jacero.io,resources=kodes,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=kode.kode.jacero.io,resources=kodes/status,verbs=get;update;patch
-// +kubebuilder:rbac:groups=kode.kode.jacero.io,resources=kodes/finalizers,verbs=update
-// +kubebuilder:rbac:groups=kode.kode.jacero.io,resources=kodetemplates,verbs=get;list;watch
-// +kubebuilder:rbac:groups=kode.kode.jacero.io,resources=kodeclustertemplates,verbs=get;list;watch
-// +kubebuilder:rbac:groups=kode.kode.jacero.io,resources=envoyproxyconfig,verbs=get;list;watch
-// +kubebuilder:rbac:groups=kode.kode.jacero.io,resources=envoyproxyclusterconfig,verbs=get;list;watch
+// +kubebuilder:rbac:groups=kode.jacero.io,resources=kodes,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=kode.jacero.io,resources=kodes/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=kode.jacero.io,resources=kodes/finalizers,verbs=update
+// +kubebuilder:rbac:groups=kode.jacero.io,resources=podtemplates,verbs=get;list;watch
+// +kubebuilder:rbac:groups=kode.jacero.io,resources=clusterpodtemplates,verbs=get;list;watch
+// +kubebuilder:rbac:groups=kode.jacero.io,resources=tofutemplates,verbs=get;list;watch
+// +kubebuilder:rbac:groups=kode.jacero.io,resources=clustertofutemplates,verbs=get;list;watch
 // +kubebuilder:rbac:groups=apps,resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=services,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
@@ -74,7 +76,7 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	kode, err := common.GetLatestKode(ctx, r.Client, req.Name, req.Namespace)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			log.Info("Kode resource not found. Ignoring since object must be deleted.")
+			log.V(1).Info("Kode resource not found. Ignoring since object must be deleted.")
 			return ctrl.Result{}, nil
 		}
 		log.Error(err, "Failed to get Kode")
@@ -96,35 +98,61 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	}
 
 	// Check if reconciliation is needed
-	if kode.Generation == kode.Status.ObservedGeneration && kode.Status.Phase == kodev1alpha1.KodePhaseActive {
+	if kode.Generation == kode.Status.ObservedGeneration && kode.Status.Phase == kodev1alpha2.KodePhaseActive {
 		log.V(1).Info("Resource is stable and active, no reconciliation needed")
 		return ctrl.Result{}, nil // No requeue, controller will be triggered by changes
 	}
 
 	// Fetch templates and initialize config
-	templates, err := r.fetchTemplatesWithRetry(ctx, kode)
+	template, err := r.fetchTemplatesWithRetry(ctx, kode)
 	if err != nil {
 		log.Error(err, "Failed to fetch templates")
 		if errors.IsNotFound(err) {
-			// Update the Kode status to reflect that the template is missing (ctx, kode, err, "TemplateMissing", "KodeTemplate not found"); updateErr != nil {)
-			if statusErr := r.updateKodeStatus(ctx, kode, kodev1alpha1.KodePhaseFailed, []metav1.Condition{}, err); statusErr != nil {
+			if statusErr := r.updatePhaseFailed(ctx, kode, err, []metav1.Condition{
+				{
+					Type:    string(common.ConditionTypeError),
+					Status:  metav1.ConditionTrue,
+					Reason:  "TemplateMissing",
+					Message: fmt.Sprintf("Failed to fetch templates: %s", err.Error()),
+				},
+				{
+					Type:    string(common.ConditionTypeReady),
+					Status:  metav1.ConditionFalse,
+					Reason:  "ResourceNotReady",
+					Message: "Kode resource is not ready due to Template was not found",
+				},
+				{
+					Type:    string(common.ConditionTypeAvailable),
+					Status:  metav1.ConditionFalse,
+					Reason:  "ResourceUnavailable",
+					Message: "Kode resource is not available due to Template was not found",
+				},
+				{
+					Type:    string(common.ConditionTypeProgressing),
+					Status:  metav1.ConditionFalse,
+					Reason:  "ProgressHalted",
+					Message: "Progress halted due to Template was not found",
+				},
+			}); statusErr != nil {
 				log.Error(statusErr, "Failed to update Kode status")
+				return ctrl.Result{RequeueAfter: RequeueInterval}, err
 			}
 
-			// Requeue after a longer interval as the template is missing
+			err = r.EventManager.Record(ctx, kode, events.EventTypeWarning, events.ReasonFailed, fmt.Sprintf("Failed to reconcile Kode: %v", err))
+			if err != nil {
+				log.Error(err, "Failed to record event")
+			}
+
 			return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil
 		}
 		// For other errors, requeue after a shorter interval
 		return ctrl.Result{RequeueAfter: RequeueInterval}, err
 	}
-	config := InitKodeResourcesConfig(kode, templates)
+	config := InitKodeResourcesConfig(kode, template)
 
 	// Ensure resources
 	if err := r.ensureResources(ctx, config); err != nil {
 		log.Error(err, "Failed to ensure resources")
-		if statusErr := r.updateKodeStatus(ctx, kode, kodev1alpha1.KodePhaseFailed, []metav1.Condition{}, err); statusErr != nil {
-			log.Error(statusErr, "Failed to update status to Failed")
-		}
 		return ctrl.Result{RequeueAfter: RequeueInterval}, err
 	}
 
@@ -132,25 +160,73 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	ready, err := r.checkResourcesReady(ctx, config)
 	if err != nil {
 		log.Error(err, "Failed to check resource readiness")
-		return ctrl.Result{RequeueAfter: RequeueInterval}, err
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, err
 	}
 
 	if !ready {
-		if kode.Status.Phase != kodev1alpha1.KodePhasePending {
+		if kode.Status.Phase != kodev1alpha2.KodePhasePending {
 			log.Info("Resources not ready, updating status to Pending")
-			if err := r.updateKodeStatus(ctx, kode, kodev1alpha1.KodePhasePending, []metav1.Condition{}, nil); err != nil {
-				log.Error(err, "Failed to update status to Pending")
-				return ctrl.Result{RequeueAfter: RequeueInterval}, err
+			if statusErr := r.updatePhasePending(ctx, kode); statusErr != nil {
+				log.Error(statusErr, "Failed to update Kode status to Pending")
+				return ctrl.Result{RequeueAfter: RequeueInterval}, statusErr
 			}
 		}
 		return ctrl.Result{RequeueAfter: RequeueInterval}, nil // Requeue while not ready
 	}
 
+	// Update Port Status
+	if err := r.updatePortStatus(ctx, kode, config.Template); err != nil {
+		log.Error(err, "Failed to update Port status")
+		if statusErr := r.updatePhaseFailed(ctx, kode, err, []metav1.Condition{
+			{
+				Type:    string(common.ConditionTypeError),
+				Status:  metav1.ConditionTrue,
+				Reason:  "PortUpdate",
+				Message: fmt.Sprintf("Failed to update Port status: %s", err.Error()),
+			},
+			{
+				Type:    string(common.ConditionTypeReady),
+				Status:  metav1.ConditionFalse,
+				Reason:  "ResourceNotReady",
+				Message: "Kode resource is not ready due to failed port update",
+			},
+			{
+				Type:    string(common.ConditionTypeAvailable),
+				Status:  metav1.ConditionFalse,
+				Reason:  "ResourceUnavailable",
+				Message: "Kode resource is not available due to failed port update",
+			},
+			{
+				Type:    string(common.ConditionTypeProgressing),
+				Status:  metav1.ConditionFalse,
+				Reason:  "ProgressHalted",
+				Message: "Progress halted due to failed port update",
+			},
+		}); statusErr != nil {
+			log.Error(statusErr, "Failed to update Kode status")
+			return ctrl.Result{RequeueAfter: RequeueInterval}, err
+		}
+
+		err := r.EventManager.Record(ctx, kode, events.EventTypeWarning, events.ReasonFailed, fmt.Sprintf("Failed to reconcile Kode: %v", err))
+		if err != nil {
+			log.Error(err, "Failed to record event")
+			return ctrl.Result{RequeueAfter: RequeueInterval}, err
+		}
+
+		return ctrl.Result{RequeueAfter: RequeueInterval}, err
+	}
+
 	// Resources are ready, update status to Active if it's not already
-	if kode.Status.Phase != kodev1alpha1.KodePhaseActive {
+	if kode.Status.Phase != kodev1alpha2.KodePhaseActive {
 		log.Info("Resources ready, updating status to Active")
-		if err := r.updateKodeStatus(ctx, kode, kodev1alpha1.KodePhaseActive, []metav1.Condition{}, nil); err != nil {
-			log.Error(err, "Failed to update status to Active")
+		if statusErr := r.updatePhaseActive(ctx, kode); statusErr != nil {
+			log.Error(statusErr, "Failed to update Kode status to Active")
+			return ctrl.Result{RequeueAfter: RequeueInterval}, statusErr
+		}
+
+		err := r.EventManager.Record(ctx, kode, events.EventTypeNormal, events.ReasonReconciled, "Kode resource reconciled successfully")
+		if err != nil {
+			log.Error(err, "Failed to record event")
 			return ctrl.Result{RequeueAfter: RequeueInterval}, err
 		}
 	}
@@ -162,13 +238,12 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 			return ctrl.Result{RequeueAfter: RequeueInterval}, err
 		}
 	}
-
 	log.Info("Kode reconciliation successful")
 	return ctrl.Result{}, nil
 }
 
-func (r *KodeReconciler) fetchTemplatesWithRetry(ctx context.Context, kode *kodev1alpha1.Kode) (*common.Templates, error) {
-	var templates *common.Templates
+func (r *KodeReconciler) fetchTemplatesWithRetry(ctx context.Context, kode *kodev1alpha2.Kode) (*kodev1alpha2.Template, error) {
+	var template *kodev1alpha2.Template
 	var lastErr error
 
 	backoff := wait.Backoff{
@@ -180,7 +255,7 @@ func (r *KodeReconciler) fetchTemplatesWithRetry(ctx context.Context, kode *kode
 
 	retryErr := wait.ExponentialBackoff(backoff, func() (bool, error) {
 		var err error
-		templates, err = r.TemplateManager.Fetch(ctx, kode.Spec.TemplateRef)
+		template, err = r.TemplateManager.Fetch(ctx, kode.Spec.TemplateRef)
 		if err == nil {
 			return true, nil // Success
 		}
@@ -203,10 +278,10 @@ func (r *KodeReconciler) fetchTemplatesWithRetry(ctx context.Context, kode *kode
 		return nil, fmt.Errorf("failed to fetch template after retries: %w", lastErr)
 	}
 
-	return templates, nil
+	return template, nil
 }
 
-func (r *KodeReconciler) updateObservedGeneration(ctx context.Context, kode *kodev1alpha1.Kode) error {
+func (r *KodeReconciler) updateObservedGeneration(ctx context.Context, kode *kodev1alpha2.Kode) error {
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		latest, err := common.GetLatestKode(ctx, r.Client, kode.Name, kode.Namespace)
 		if err != nil {
@@ -234,7 +309,7 @@ func (r *KodeReconciler) updateObservedGeneration(ctx context.Context, kode *kod
 
 func (r *KodeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&kodev1alpha1.Kode{}).
+		For(&kodev1alpha2.Kode{}).
 		WithOptions(controller.Options{MaxConcurrentReconciles: 2}).
 		Complete(r)
 }

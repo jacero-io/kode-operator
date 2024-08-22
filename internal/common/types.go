@@ -19,66 +19,46 @@ package common
 import (
 	"fmt"
 
-	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
+	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
-// Templates holds the fetched template configurations
-type Templates struct {
-	KodeTemplate              *kodev1alpha1.SharedKodeTemplateSpec
-	EnvoyProxyConfig          *kodev1alpha1.SharedEnvoyProxyConfigSpec
-	KodeTemplateName          string
-	KodeTemplateNamespace     string
-	EnvoyProxyConfigName      string
-	EnvoyProxyConfigNamespace string
+type CommonConfig struct {
+	Labels    map[string]string
+	Name      string
+	Namespace string
 }
 
-// KodeResourcesConfig holds configuration for Kode resources
-type KodeResourcesConfig struct {
-	KodeSpec            kodev1alpha1.KodeSpec
-	Labels              map[string]string
-	KodeName            string
-	KodeNamespace       string
-	Secret              corev1.Secret
-	SecretName          string
-	Credentials         Credentials
-	StatefulSetName     string
-	PVCName             string
-	ServiceName         string
-	Templates           Templates
-	Containers          []corev1.Container
-	InitContainers      []corev1.Container
-	UserInitPlugins     []kodev1alpha1.InitPluginSpec
-	TemplateInitPlugins []kodev1alpha1.InitPluginSpec
-	LocalServicePort    int32
-	ExternalServicePort int32
+// KodeResourceConfig holds configuration for Kode resources
+type KodeResourceConfig struct {
+	CommonConfig CommonConfig
+	KodeSpec     kodev1alpha2.KodeSpec
+	Credentials  *kodev1alpha2.CredentialsSpec
+	Port         *kodev1alpha2.Port
+
+	SecretName      string
+	StatefulSetName string
+	PVCName         string
+	ServiceName     string
+
+	UserInitPlugins []kodev1alpha2.InitPluginSpec
+	Containers      []corev1.Container
+	InitContainers  []corev1.Container
+
+	Template *kodev1alpha2.Template
 }
 
 // EntryPointResourceConfig holds configuration for EntryPoint resources
 type EntryPointResourceConfig struct {
-	EntryPoint          kodev1alpha1.EntryPoint
-	Labels              map[string]string
-	EntryPointName      string
-	EntryPointNamespace string
-	EntryPointService   string
-	EntryPointURL       string
-}
+	CommonConfig CommonConfig
 
-// Credentials holds username and password
-type Credentials struct {
-	Username string
-	Password string
-}
+	HTTPName  string
+	HTTPSName string
+	Protocol  string
 
-// BootstrapConfigOptions contains options for generating Envoy bootstrap config
-type BootstrapConfigOptions struct {
-	HTTPFilters  []kodev1alpha1.HTTPFilter
-	Clusters     []kodev1alpha1.Cluster
-	LocalPort    int32
-	ExternalPort int32
-	AuthConfig   kodev1alpha1.AuthConfig
-	Credentials  Credentials
+	GatewayName      string
+	GatewayNamespace string
 }
 
 type TemplateNotFoundError struct {

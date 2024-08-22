@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -36,20 +37,27 @@ import (
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
-	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
+	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/cleanup"
 	controller "github.com/jacero-io/kode-operator/internal/controllers/kode"
+	"github.com/jacero-io/kode-operator/internal/events"
 	"github.com/jacero-io/kode-operator/internal/resource"
 	"github.com/jacero-io/kode-operator/internal/status"
 	"github.com/jacero-io/kode-operator/internal/template"
 	"github.com/jacero-io/kode-operator/internal/validation"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
 	//+kubebuilder:scaffold:imports
 )
 
 // These tests use Ginkgo (BDD-style Go testing framework). Refer to
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
+
+const (
+	timeout  = time.Second * 60
+	interval = time.Second * 1
+)
 
 var (
 	cfg           *rest.Config
@@ -86,7 +94,7 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	Expect(cfg).NotTo(BeNil())
 
-	err = kodev1alpha1.AddToScheme(scheme.Scheme)
+	err = kodev1alpha2.AddToScheme(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	k8sManager, err = ctrl.NewManager(cfg, ctrl.Options{
@@ -103,14 +111,15 @@ var _ = BeforeSuite(func() {
 	}
 
 	reconciler = &controller.KodeReconciler{
-		Client:          mockK8sClient, // Use mockK8sClient instead of k8sClient
+		Client:          mockK8sClient,
 		Scheme:          k8sManager.GetScheme(),
-		Log:             ctrl.Log.WithName("controllers").WithName("Kode").WithName("Reconcile"),
-		ResourceManager: resource.NewDefaultResourceManager(mockK8sClient, ctrl.Log.WithName("controllers").WithName("Kode").WithName("ResourceManager")),
-		TemplateManager: template.NewDefaultTemplateManager(mockK8sClient, ctrl.Log.WithName("controllers").WithName("Kode").WithName("TemplateManager")),
-		CleanupManager:  cleanup.NewDefaultCleanupManager(mockK8sClient, ctrl.Log.WithName("controllers").WithName("Kode").WithName("CleanupManager")),
-		StatusUpdater:   status.NewDefaultStatusUpdater(mockK8sClient, ctrl.Log.WithName("controllers").WithName("Kode").WithName("StatusUpdater")),
+		Log:             ctrl.Log.WithName("Kode").WithName("Reconcile"),
+		ResourceManager: resource.NewDefaultResourceManager(k8sClient, ctrl.Log.WithName("Kode").WithName("ResourceManager"), k8sManager.GetScheme()),
+		TemplateManager: template.NewDefaultTemplateManager(k8sClient, ctrl.Log.WithName("Kode").WithName("TemplateManager")),
+		CleanupManager:  cleanup.NewDefaultCleanupManager(mockK8sClient, ctrl.Log.WithName("Kode").WithName("CleanupManager")),
+		StatusUpdater:   status.NewDefaultStatusUpdater(k8sClient, ctrl.Log.WithName("Kode").WithName("StatusUpdater")),
 		Validator:       validation.NewDefaultValidator(),
+		EventManager:    events.NewEventManager(k8sClient, ctrl.Log.WithName("Kode").WithName("EventManager"), k8sManager.GetScheme(), k8sManager.GetEventRecorderFor("kode-controller")),
 	}
 
 	// Set up the controller with the manager
@@ -130,6 +139,19 @@ var _ = AfterSuite(func() {
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
 })
+
+func waitForResourceDeletion(ctx context.Context, c *mockClient, obj client.Object, timeout time.Duration) error {
+	return wait.PollUntilContextTimeout(ctx, time.Second, timeout, true, func(ctx context.Context) (bool, error) {
+		err := c.Get(ctx, client.ObjectKeyFromObject(obj), obj)
+		if apierrors.IsNotFound(err) {
+			return true, nil
+		}
+		if err != nil {
+			return false, err
+		}
+		return false, nil
+	})
+}
 
 func (m *mockClient) Delete(ctx context.Context, obj client.Object, opts ...client.DeleteOption) error {
 	key := fmt.Sprintf("%T/%s/%s", obj, obj.GetNamespace(), obj.GetName())

@@ -11,7 +11,7 @@ vars:
   LOCALBIN: '{{.ROOT_DIR}}/bin'
   KUBECTL: kubectl
   KUSTOMIZE_VERSION: v5.4.2
-  CONTROLLER_TOOLS_VERSION: v0.15.0
+  CONTROLLER_TOOLS_VERSION: v0.16.0
   ENVTEST_VERSION: release-0.18
   GOLANGCI_LINT_VERSION: v1.57.2
   TEST_VERBOSITY: -v
@@ -28,20 +28,54 @@ tasks:
     cmds:
       - task --list
 
-  manifests:
-    desc: Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects
+  #### TOOLS ####
+  ensure-dir:
+    internal: true
+    desc: Ensure the local bin directory exists
     cmds:
-      - '{{.LOCALBIN}}/controller-gen-{{.CONTROLLER_TOOLS_VERSION}} rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases'
-    deps:
-      - controller-gen
+      - mkdir -p {{.LOCALBIN}}
 
-  generate:
-    desc: Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations
+  kustomize:
+    desc: Download kustomize locally if necessary
+    deps: [ensure-dir]
     cmds:
-      - '{{.LOCALBIN}}/controller-gen-{{.CONTROLLER_TOOLS_VERSION}} object:headerFile="hack/boilerplate.go.txt" paths="./..."'
-    deps:
-      - controller-gen
+      - go install sigs.k8s.io/kustomize/kustomize/v5@{{.KUSTOMIZE_VERSION}}
+      - mv {{.GOBIN}}/kustomize {{.LOCALBIN}}/kustomize-{{.KUSTOMIZE_VERSION}}
 
+  controller-gen:
+    desc: Download controller-gen locally if necessary and create/update symlink
+    deps: [ensure-dir]
+    cmds:
+      - |
+        if [ ! -f {{.LOCALBIN}}/controller-gen-{{.CONTROLLER_TOOLS_VERSION}} ]; then
+          echo "Downloading controller-gen {{.CONTROLLER_TOOLS_VERSION}}..."
+          go install sigs.k8s.io/controller-tools/cmd/controller-gen@{{.CONTROLLER_TOOLS_VERSION}}
+          mkdir -p {{.LOCALBIN}}
+          mv $(go env GOPATH)/bin/controller-gen {{.LOCALBIN}}/controller-gen-{{.CONTROLLER_TOOLS_VERSION}}
+        fi
+      - ln -sf {{.LOCALBIN}}/controller-gen-{{.CONTROLLER_TOOLS_VERSION}} {{.LOCALBIN}}/controller-gen
+
+  envtest:
+    desc: Download setup-envtest locally if necessary
+    deps: [ensure-dir]
+    cmds:
+      - go install sigs.k8s.io/controller-runtime/tools/setup-envtest@{{.ENVTEST_VERSION}}
+      - mv {{.GOBIN}}/setup-envtest {{.LOCALBIN}}/setup-envtest-{{.ENVTEST_VERSION}}
+
+  golangci-lint:
+    desc: Download golangci-lint locally if necessary
+    deps: [ensure-dir]
+    cmds:
+      - go install github.com/golangci/golangci-lint/cmd/golangci-lint@{{.GOLANGCI_LINT_VERSION}}
+      - mv {{.GOBIN}}/golangci-lint {{.LOCALBIN}}/golangci-lint-{{.GOLANGCI_LINT_VERSION}}
+
+  helmify:
+    desc: Download helmify locally if necessary
+    deps: [ensure-dir]
+    cmds:
+      - test -s {{.LOCALBIN}}/helmify || GOBIN={{.LOCALBIN}} go install github.com/arttor/helmify/cmd/helmify@latest
+
+  #### LINT ####
   fmt:
     desc: Run go fmt against code
     cmds:
@@ -52,6 +86,21 @@ tasks:
     cmds:
       - go vet ./...
 
+  lint:
+    desc: Run golangci-lint linter
+    cmds:
+      - '{{.LOCALBIN}}/golangci-lint run'
+    deps:
+      - golangci-lint
+
+  lint-fix:
+    desc: Run golangci-lint linter and perform fixes
+    cmds:
+      - '{{.LOCALBIN}}/golangci-lint run --fix'
+    deps:
+      - golangci-lint
+
+  #### TESTS ####
   test-unit:
     desc: Run unit tests with coverage
     cmds:
@@ -70,7 +119,7 @@ tasks:
       - rm -rf coverage
       - mkdir -p coverage
       - |
-        KUBEBUILDER_ASSETS="$({{.LOCALBIN}}/setup-envtest use {{.ENVTEST_K8S_VERSION}} --bin-dir {{.LOCALBIN}} -p path)" \
+        KUBEBUILDER_ASSETS="$({{.LOCALBIN}}/setup-envtest-{{.ENVTEST_VERSION}} use {{.ENVTEST_K8S_VERSION}} --bin-dir {{.LOCALBIN}} -p path)" \
         go test {{.TEST_VERBOSITY}} ./test/integration/...
     deps:
       - manifests
@@ -114,11 +163,25 @@ tasks:
       - test-unit
       - test-integration
 
+  #### CLUSTER ####
+  kind-ensure:
+    desc: Ensure a Kind cluster exists, creating it if necessary
+    cmds:
+      - |
+        if ! kind get clusters | grep -q '^test$'; then
+          echo "Creating Kind cluster 'test'..."
+          kind create cluster --name test --image kindest/node:v{{.ENVTEST_K8S_VERSION}}
+        else
+          echo "Kind cluster 'test' already exists."
+        fi
+
   kind-create:
+    desc: Create a Kind cluster
     cmds:
       - kind create cluster --name test --image kindest/node:v{{.ENVTEST_K8S_VERSION}}
 
   kind-delete:
+    desc: Delete the Kind cluster
     cmds:
       - kind delete cluster --name test
 
@@ -138,34 +201,49 @@ tasks:
     deps:
       - docker-build
 
-  lint:
-    desc: Run golangci-lint linter
+  kind-load-images:
+    desc: Load internal and external Docker images into Kind cluster
+    vars:
+      INT_IMAGES_TO_LOAD: 
+        sh: echo {{.IMG}}
+      EXT_IMAGES_TO_LOAD: 
+        - envoyproxy/envoy:v1.31-latest
+        - linuxserver/code-server:latest
+        - linuxserver/webtop:debian-xfce
     cmds:
-      - '{{.LOCALBIN}}/golangci-lint run'
+      - for img in {{.INT_IMAGES_TO_LOAD}}; do
+          echo "Loading $img";
+          kind load docker-image $img --name test;
+        done
+      - |
+        for img in {{range .EXT_IMAGES_TO_LOAD}}"{{.}}" {{end}}; do
+          echo "Pulling $img";
+          {{.CONTAINER_TOOL}} pull $img;
+          echo "Loading $img";
+          kind load docker-image $img --name test;
+        done
     deps:
-      - golangci-lint
+      - docker-build
 
-  lint-fix:
-    desc: Run golangci-lint linter and perform fixes
+  #### DOCKER BUILD ####
+  manifests:
+    desc: Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects
     cmds:
-      - '{{.LOCALBIN}}/golangci-lint run --fix'
+      - '{{.LOCALBIN}}/controller-gen-{{.CONTROLLER_TOOLS_VERSION}} rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases'
     deps:
-      - golangci-lint
+      - controller-gen
+
+  generate:
+    desc: Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations
+    cmds:
+      - '{{.LOCALBIN}}/controller-gen-{{.CONTROLLER_TOOLS_VERSION}} object:headerFile="hack/boilerplate.go.txt" paths="./..."'
+    deps:
+      - controller-gen
 
   build:
     desc: Build manager binary
     cmds:
       - go build -o bin/manager cmd/main.go
-    deps:
-      - manifests
-      - generate
-      - fmt
-      - vet
-
-  run:
-    desc: Run a controller from your host
-    cmds:
-      - ENV={{.ENV}} go run ./cmd/main.go --log-level {{.LOG_LEVEL}}
     deps:
       - manifests
       - generate
@@ -197,55 +275,162 @@ tasks:
     cmds:
       - mkdir -p dist
       - cd config/manager && {{.LOCALBIN}}/kustomize edit set image controller={{.IMG}}
-      - '{{.LOCALBIN}}/kustomize build config/default > dist/install.yaml'
+      - '{{.LOCALBIN}}/kustomize-{{.KUSTOMIZE_VERSION}} build config/default > dist/install.yaml'
     deps:
       - manifests
       - generate
       - kustomize
 
+  #### HELM BUILD ####
   helm-package-kode-crd:
     desc: Package kode-crd Helm chart
+    vars:
+      VERSION: '{{.CLI_ARGS | default "0.1.0"}}'
     cmds:
-      - echo "Packaging kode-crd chart..."
+      - echo "Packaging kode-crd chart version {{.VERSION}}..."
       - mkdir -p /tmp/helm-charts/kode-crd
       - cp -r helm-charts/kode-crd/* /tmp/helm-charts/kode-crd/
-      - sed -i "s/PLACEHOLDER_VERSION/${VERSION}/g" /tmp/helm-charts/kode-crd/Chart.yaml
-      - helm package /tmp/helm-charts/kode-crd --version $VERSION --destination /tmp
-      - mv /tmp/kode-crd-$VERSION.tgz ./kode-crd-$VERSION.tgz
+      - sed -i "s/PLACEHOLDER_VERSION/{{.VERSION}}/g" /tmp/helm-charts/kode-crd/Chart.yaml
+      - helm package /tmp/helm-charts/kode-crd --version {{.VERSION}} --destination /tmp
+      - mv /tmp/kode-crd-{{.VERSION}}.tgz ./kode-crd-{{.VERSION}}.tgz
       - rm -rf /tmp/helm-charts/kode-crd
 
   helm-package-kode:
     desc: Package kode Helm chart
+    vars:
+      VERSION: '{{.CLI_ARGS | default "0.1.0"}}'
     cmds:
-      - echo "Packaging kode chart..."
+      - echo "Packaging kode chart version {{.VERSION}}..."
       - mkdir -p /tmp/helm-charts/kode
       - cp -r helm-charts/kode/* /tmp/helm-charts/kode/
-      - sed -i "s/PLACEHOLDER_VERSION/${VERSION}/g" /tmp/helm-charts/kode/Chart.yaml
-      - helm package /tmp/helm-charts/kode --version $VERSION --destination /tmp
-      - mv /tmp/kode-$VERSION.tgz ./kode-$VERSION.tgz
+      - sed -i "s/PLACEHOLDER_VERSION/{{.VERSION}}/g" /tmp/helm-charts/kode/Chart.yaml
+      - helm package /tmp/helm-charts/kode --version {{.VERSION}} --destination /tmp
+      - mv /tmp/kode-{{.VERSION}}.tgz ./kode-{{.VERSION}}.tgz
       - rm -rf /tmp/helm-charts/kode
-
-  set-version:
-    desc: Set the version for Helm charts
-    cmds:
-      - |
-        VERSION=$(echo $GITHUB_REF | sed 's/refs\/tags\///')
-        echo "Version set to $VERSION"
 
   helm-package-all:
     desc: Package all Helm charts
+    vars:
+      VERSION: '{{.CLI_ARGS | default "0.1.0"}}'
     cmds:
-      - task: set-version
       - task: helm-package-kode-crd
+        vars: { VERSION: '{{.VERSION}}' }
       - task: helm-package-kode
+        vars: { VERSION: '{{.VERSION}}' }
+
+  #### DEVELOPMENT ####
+  deploy-flux:
+    desc: Install Flux
+    cmds:
+      - timoni bundle apply -f ./hack/development/bundle.cue
+
+  undeploy-flux:
+    desc: Uninstall Flux
+    cmds:
+      - timoni bundle delete -f ./hack/development/bundle.cue
+
+  deploy-tf-controller:
+    desc: Install the tf-controller
+    cmds:
+      - kubectl apply -f ./hack/development/tf-controller.yaml
+
+  undeploy-tf-controller:
+    desc: Uninstall the tf-controller
+    cmds:
+      - kubectl delete -f ./hack/development/tf-controller.yaml
+
+  deploy-envoy-gateway:
+    desc: Install Envoy Gateway using Helm from OCI registry
+    cmds:
+      - |
+        helm upgrade --install eg oci://docker.io/envoyproxy/gateway-helm \
+          --version {{.ENVOY_GATEWAY_VERSION}} \
+          -n {{.ENVOY_GATEWAY_NAMESPACE}} \
+          --create-namespace \
+          {{.ENVOY_GATEWAY_EXTRA_ARGS}}
+    vars:
+      ENVOY_GATEWAY_VERSION: 'v0.0.0-latest'
+      ENVOY_GATEWAY_NAMESPACE: 'envoy-gateway-system'
+      ENVOY_GATEWAY_EXTRA_ARGS: ''
+
+  undeploy-envoy-gateway:
+    desc: Uninstall Envoy Gateway
+    cmds:
+      - helm uninstall eg -n {{.ENVOY_GATEWAY_NAMESPACE}}
+      - kubectl delete namespace {{.ENVOY_GATEWAY_NAMESPACE}} --ignore-not-found
+    vars:
+      ENVOY_GATEWAY_NAMESPACE: 'envoy-gateway-system'
+
+  deploy-eg:
+    desc: Deploy Envoy Gateway
+    deps:
+      - apply-dev-cert
+      - deploy-envoy-gateway
+    cmds:
+      - kubectl apply -f ./hack/development/eg.yaml -n default
+
+  undeploy-eg:
+    desc: Undeploy Envoy Gateway
+    cmds:
+      - kubectl delete -f ./hack/development/eg.yaml -n default
+
+  create-dev-cert:
+    desc: Create a development certificate for Envoy Gateway if it doesn't exist
+    cmds:
+      - mkdir -p {{.ROOT_DIR}}/hack/certs
+      - |
+        if [ ! -f {{.ROOT_DIR}}/hack/certs/example.com.crt ] || [ ! -f {{.ROOT_DIR}}/hack/certs/example.com.key ]; then
+          echo "Certificate files don't exist. Creating new certificate..."
+          openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout {{.ROOT_DIR}}/hack/certs/example.com.key -out {{.ROOT_DIR}}/hack/certs/example.com.crt -subj "/CN=*.example.com"
+        else
+          echo "Certificate files already exist. Skipping creation."
+        fi
+      - |
+        cat <<EOF > {{.ROOT_DIR}}/hack/certs/example-com-secret.yaml
+        apiVersion: v1
+        kind: Secret
+        metadata:
+          name: example-com
+          namespace: default
+        type: kubernetes.io/tls
+        data:
+          tls.crt: $(base64 -w 0 < {{.ROOT_DIR}}/hack/certs/example.com.crt)
+          tls.key: $(base64 -w 0 < {{.ROOT_DIR}}/hack/certs/example.com.key)
+        EOF
+      - echo "Certificate and Secret YAML created/updated in {{.ROOT_DIR}}/hack/certs/"
+    silent: true
+
+  apply-dev-cert:
+    desc: Apply the development certificate secret to the Kubernetes cluster
+    deps:
+      - create-dev-cert
+    cmds:
+      - kubectl apply -f {{.ROOT_DIR}}/hack/certs/example-com-secret.yaml
+
+  run:
+    desc: Run a controller from your host
+    vars:
+      LOG_LEVEL: 'debug'
+    cmds:
+      - '{{.LOCALBIN}}/controller-gen rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases'
+      - |
+        LOG_LEVEL_ARG="{{if .LOG_LEVEL}}{{.LOG_LEVEL}}{{else}}debug{{end}}"
+        ENV={{.ENV}} go run ./cmd/main.go --log-level $LOG_LEVEL_ARG {{.CLI_ARGS}} 2>&1 | tee output.log
+    deps:
+      - controller-gen
+      - manifests
+      - generate
+      - fmt
+      - vet
+      - install
 
   install:
     desc: Install CRDs into the K8s cluster specified in ~/.kube/config
-    cmds:
-      - '{{.LOCALBIN}}/kustomize-{{.KUSTOMIZE_VERSION}} build config/crd | {{.KUBECTL}} apply -f -'
     deps:
       - manifests
       - kustomize
+    cmds:
+      - '{{.LOCALBIN}}/kustomize-{{.KUSTOMIZE_VERSION}} build config/crd | {{.KUBECTL}} apply -f -'
 
   uninstall:
     desc: Uninstall CRDs from the K8s cluster specified in ~/.kube/config
@@ -260,7 +445,7 @@ tasks:
   deploy:
     desc: Deploy controller to the K8s cluster specified in ~/.kube/config
     cmds:
-      - cd config/manager && {{.LOCALBIN}}/kustomize edit set image controller={{.IMG}}
+      - cd config/manager && {{.LOCALBIN}}/kustomize-{{.KUSTOMIZE_VERSION}} edit set image controller={{.IMG}}
       - '{{.LOCALBIN}}/kustomize-{{.KUSTOMIZE_VERSION}} build config/default | {{.KUBECTL}} apply -f -'
     deps:
       - manifests
@@ -275,40 +460,32 @@ tasks:
     vars:
       IGNORE_NOT_FOUND: '{{default "false" .IGNORE_NOT_FOUND}}'
 
-  kustomize:
-    desc: Download kustomize locally if necessary
+  setup-dev:
+    desc: Set up the complete development environment
     cmds:
-      - go install sigs.k8s.io/kustomize/kustomize/v5@{{.KUSTOMIZE_VERSION}}
-      - mv {{.GOBIN}}/kustomize {{.LOCALBIN}}/kustomize-{{.KUSTOMIZE_VERSION}}
+      - task: kind-ensure
+      - task: deploy-flux
+      - task: deploy-envoy-gateway
+      - task: deploy-eg
+      - task: install
+      - echo "Development environment is ready!"
 
-  controller-gen:
-    desc: Download controller-gen locally if necessary
+  teardown-dev:
+    desc: Tear down the complete development environment
     cmds:
-      - go install sigs.k8s.io/controller-tools/cmd/controller-gen@{{.CONTROLLER_TOOLS_VERSION}}
-      - mv {{.GOBIN}}/controller-gen {{.LOCALBIN}}/controller-gen-{{.CONTROLLER_TOOLS_VERSION}}
+      - task: kind-delete
+      - echo "Development environment has been torn down."
 
-  envtest:
-    desc: Download setup-envtest locally if necessary
+  apply-samples:
+    desc: Apply Kubernetes resources defined in config/samples/
     cmds:
-      - go install sigs.k8s.io/controller-runtime/tools/setup-envtest@{{.ENVTEST_VERSION}}
-      - mv {{.GOBIN}}/setup-envtest {{.LOCALBIN}}/setup-envtest-{{.ENVTEST_VERSION}}
+      - kubectl apply -k config/samples/podtemplate/
+      - kubectl apply -k config/samples/entrypoint/
+      - kubectl apply -k config/samples/kode/
 
-  golangci-lint:
-    desc: Download golangci-lint locally if necessary
+  delete-samples:
+    desc: Delete Kubernetes resources defined in config/samples/
     cmds:
-      - go install github.com/golangci/golangci-lint/cmd/golangci-lint@{{.GOLANGCI_LINT_VERSION}}
-      - mv {{.GOBIN}}/golangci-lint {{.LOCALBIN}}/golangci-lint-{{.GOLANGCI_LINT_VERSION}}
-
-  helmify:
-    desc: Download helmify locally if necessary
-    cmds:
-      - test -s {{.LOCALBIN}}/helmify || GOBIN={{.LOCALBIN}} go install github.com/arttor/helmify/cmd/helmify@latest
-
-  helm:
-    desc: Generate Helm chart
-    cmds:
-      - '{{.LOCALBIN}}/kustomize-{{.KUSTOMIZE_VERSION}} build config/default | {{.LOCALBIN}}/helmify'
-    deps:
-      - manifests
-      - kustomize
-      - helmify
+      - kubectl delete -k config/samples/kode/
+      - kubectl delete -k config/samples/entrypoint/
+      - kubectl delete -k config/samples/podtemplate/

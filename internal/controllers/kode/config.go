@@ -1,5 +1,3 @@
-// internal/controllers/kode/config.go
-
 /*
 Copyright 2024 Emil Larsson.
 
@@ -16,70 +14,63 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package kode
 
 import (
 	"fmt"
 
-	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
+	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
 	corev1 "k8s.io/api/core/v1"
 )
 
 func InitKodeResourcesConfig(
-	kode *kodev1alpha1.Kode,
-	templates *common.Templates) *common.KodeResourcesConfig {
+	kode *kodev1alpha2.Kode,
+	template *kodev1alpha2.Template) *common.KodeResourceConfig {
 
-	var localServicePort int32
-	var externalServicePort int32
+	var kodePort *kodev1alpha2.Port
 	var secretName string
 
 	// If ExistingSecret is specified, use it
-	if kode.Spec.ExistingSecret != "" {
-		secretName = kode.Spec.ExistingSecret
+	if kode.Spec.Credentials.ExistingSecret != nil {
+		secretName = *kode.Spec.Credentials.ExistingSecret
 	} else { // If ExistingSecret is not specified, use Kode.Name
 		secretName = fmt.Sprintf("%s-auth", kode.Name)
 	}
 
-	// If EnvoyProxyConfig is not specified, use KodeTemplate.Port
-	localServicePort = templates.KodeTemplate.Port
-	externalServicePort = templates.KodeTemplate.Port
-	// If EnvoyProxyConfig is specified, use the default local service port
-	if templates.EnvoyProxyConfigName != "" {
-		localServicePort = common.DefaultLocalServicePort
-		externalServicePort = templates.KodeTemplate.Port
-	}
+	kodePort = &template.Port
 
-	pvcName := common.GetPVCName(kode)
-	serviceName := common.GetServiceName(kode)
+	pvcName := kode.GetPVCName()
+	serviceName := kode.GetServiceName()
 
-	return &common.KodeResourcesConfig{
-		KodeSpec:            kode.Spec,
-		Labels:              createLabels(kode, templates),
-		KodeName:            kode.Name,
-		KodeNamespace:       kode.Namespace,
-		Secret:              corev1.Secret{},
-		SecretName:          secretName,
-		Credentials:         common.Credentials{},
-		StatefulSetName:     kode.Name,
-		PVCName:             pvcName,
-		ServiceName:         serviceName,
-		Templates:           *templates,
-		Containers:          []corev1.Container{},
-		InitContainers:      []corev1.Container{},
-		UserInitPlugins:     kode.Spec.InitPlugins,
-		TemplateInitPlugins: templates.KodeTemplate.InitPlugins,
-		LocalServicePort:    localServicePort,
-		ExternalServicePort: externalServicePort,
+	return &common.KodeResourceConfig{
+		CommonConfig: common.CommonConfig{
+			Labels:    createLabels(kode, template),
+			Name:      kode.Name,
+			Namespace: kode.Namespace,
+		},
+		KodeSpec:    kode.Spec,
+		Credentials: kode.Spec.Credentials,
+		Port:        kodePort,
+
+		SecretName:      secretName,
+		StatefulSetName: kode.Name,
+		PVCName:         pvcName,
+		ServiceName:     serviceName,
+
+		UserInitPlugins: kode.Spec.InitPlugins,
+		Containers:      []corev1.Container{},
+		InitContainers:  []corev1.Container{},
+
+		Template: template,
 	}
 }
 
-func createLabels(kode *kodev1alpha1.Kode, templates *common.Templates) map[string]string {
+func createLabels(kode *kodev1alpha2.Kode, template *kodev1alpha2.Template) map[string]string {
 	return map[string]string{
-		"app.kubernetes.io/name":           kode.Name,
-		"app.kubernetes.io/managed-by":     "kode-operator",
-		"kode.jacero.io/name":              kode.Name,
-		"template.kode.jacero.io/name":     templates.KodeTemplateName,
-		"envoy-config.kode.jacero.io/name": templates.EnvoyProxyConfigName,
+		"app.kubernetes.io/name":       kode.Name,
+		"app.kubernetes.io/managed-by": "kode-operator",
+		"kode.jacero.io/name":          kode.Name,
+		"template.kode.jacero.io/name": string(template.Name),
 	}
 }

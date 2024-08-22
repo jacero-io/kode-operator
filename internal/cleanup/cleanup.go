@@ -19,11 +19,24 @@ package cleanup
 import (
 	"context"
 
-	"github.com/jacero-io/kode-operator/internal/common"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// CleanupManager defines the interface for cleaning up Kode resources
+// Resource represents a generic Kubernetes resource
+type Resource struct {
+	Kind      string
+	Name      string
+	Namespace string
+	Object    client.Object
+}
+
+// CleanupableResource defines the interface for resources that can be cleaned up
+type CleanupableResource interface {
+	GetResources() []Resource
+	ShouldDelete(resource Resource) bool
+}
+
+// CleanupManager defines the interface for cleaning up resources
 type CleanupManager interface {
-	Cleanup(ctx context.Context, config *common.KodeResourcesConfig) error
-	Recycle(ctx context.Context, config *common.KodeResourcesConfig) error
+	Cleanup(ctx context.Context, resource CleanupableResource) error
 }

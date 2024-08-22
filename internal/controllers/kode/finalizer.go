@@ -1,5 +1,3 @@
-// internal/controllers/kode/finalizer.go
-
 /*
 Copyright 2024 Emil Larsson.
 
@@ -16,12 +14,12 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package controller
+package kode
 
 import (
 	"context"
 
-	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
+	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
 	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -29,7 +27,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
-func (r *KodeReconciler) handleFinalizer(ctx context.Context, kode *kodev1alpha1.Kode) (ctrl.Result, error) {
+func (r *KodeReconciler) handleFinalizer(ctx context.Context, kode *kodev1alpha2.Kode) (ctrl.Result, error) {
 	log := r.Log.WithValues("kode", client.ObjectKeyFromObject(kode))
 
 	if kode.ObjectMeta.DeletionTimestamp.IsZero() {
@@ -79,21 +77,18 @@ func (r *KodeReconciler) handleFinalizer(ctx context.Context, kode *kodev1alpha1
 	return ctrl.Result{}, nil
 }
 
-func (r *KodeReconciler) finalize(ctx context.Context, kode *kodev1alpha1.Kode) error {
+func (r *KodeReconciler) finalize(ctx context.Context, kode *kodev1alpha2.Kode) error {
 	log := r.Log.WithValues("kode", client.ObjectKeyFromObject(kode))
 
-	// Initialize Kode resources config without templates
-	config := &common.KodeResourcesConfig{
-		KodeSpec:        kode.Spec,
-		KodeName:        kode.Name,
-		KodeNamespace:   kode.Namespace,
-		StatefulSetName: kode.Name,
-		PVCName:         common.GetPVCName(kode),
-		ServiceName:     common.GetServiceName(kode),
+	if kode == nil {
+		log.Info("Kode is nil, skipping finalization")
+		return nil
 	}
 
+	cleanupResource := NewKodeCleanupResource(kode)
+
 	// Perform cleanup
-	err := r.CleanupManager.Cleanup(ctx, config)
+	err := r.CleanupManager.Cleanup(ctx, cleanupResource)
 	if err != nil {
 		log.Error(err, "Failed to cleanup resources")
 		return err

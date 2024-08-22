@@ -77,6 +77,12 @@ const (
 	// ConditionTypeConfigured indicates that the resource has been properly configured with all necessary settings.
 	ConditionTypeConfigured = "Configured"
 
+	// ConditionTypeHTTPRouteAvailable indicates that the HTTP route is available and can be accessed.
+	ConditionTypeHTTPRouteAvailable = "HTTPRouteAvailable"
+
+	// ConditionTypeHTTPSRouteAvailable indicates that the HTTPS route is available and can be accessed.
+	ConditionTypeHTTPSRouteAvailable = "HTTPSRouteAvailable"
+
 	// Validation constants
 	MinPasswordLength = 8
 	MinUsernameLength = 3

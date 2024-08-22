@@ -14,16 +14,16 @@ resources:
 # default, aiding admins in cluster management. Those roles are
 # not used by the Project itself. You can comment the following lines
 # if you do not want those helpers be installed with your Project.
+- clusterpodtemplate_editor_role.yaml
+- clusterpodtemplate_viewer_role.yaml
+- podtemplate_editor_role.yaml
+- podtemplate_viewer_role.yaml
+- clustertofutemplate_editor_role.yaml
+- clustertofutemplate_viewer_role.yaml
+- tofutemplate_editor_role.yaml
+- tofutemplate_viewer_role.yaml
 - entrypoint_editor_role.yaml
 - entrypoint_viewer_role.yaml
-- envoyproxyclusterconfig_editor_role.yaml
-- envoyproxyclusterconfig_viewer_role.yaml
-- envoyproxyconfig_editor_role.yaml
-- envoyproxyconfig_viewer_role.yaml
-- kodeclustertemplate_editor_role.yaml
-- kodeclustertemplate_viewer_role.yaml
-- kodetemplate_editor_role.yaml
-- kodetemplate_viewer_role.yaml
 - kode_editor_role.yaml
 - kode_viewer_role.yaml
 

@@ -11,8 +11,8 @@ controllerManager:
         drop:
         - ALL
     image:
-      repository: ghcr.io/emil-jacero/kode-operator
-      tag: latest
+      repository: ghcr.io/jacero-io/kode-operator
+      tag: PLACEHOLDER_VERSION
     resources:
       limits:
         cpu: 500m

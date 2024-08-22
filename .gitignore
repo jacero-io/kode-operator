@@ -28,7 +28,7 @@ go.work
 
 # Other
 __debug*
-coverage/*
+coverage*
 random/*
 concatenated_output.txt
 .DS_Store

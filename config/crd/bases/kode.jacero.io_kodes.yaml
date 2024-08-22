@@ -3,7 +3,7 @@ apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
-    controller-gen.kubebuilder.io/version: v0.15.0
+    controller-gen.kubebuilder.io/version: v0.16.0
   name: kodes.kode.jacero.io
 spec:
   group: kode.jacero.io
@@ -14,7 +14,7 @@ spec:
     singular: kode
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - name: v1alpha2
     schema:
       openAPIV3Schema:
         description: Kode is the Schema for the kodes API
@@ -39,33 +39,56 @@ spec:
           spec:
             description: KodeSpec defines the desired state of Kode
             properties:
-              existingSecret:
-                description: ExistingSecret is a reference to an existing secret containing
-                  user and password.
-                type: string
+              credentials:
+                description: Specifies the credentials for the service.
+                properties:
+                  enableBuiltinAuth:
+                    default: false
+                    description: EnableBuiltinAuth enables the built-in HTTP Basic
+                      auth.
+                    type: boolean
+                  existingSecret:
+                    description: |-
+                      ExistingSecret is a reference to an existing secret containing user and password. If set, User and Password fields are ignored.
+                      MUST set "username" and "password" in lowercase in the secret. CAN set either "username" or "password" or both.
+                    type: string
+                  password:
+                    description: HTTP Basic auth password. If unset, there will be
+                      no authentication.
+                    type: string
+                  username:
+                    default: abc
+                    description: Is both the the HTTP Basic auth username (when used)
+                      and the user the container should run as. Defaults to 'abc'.
+                    type: string
+                required:
+                - username
+                type: object
               home:
                 default: /config
-                description: Home is the path to the directory for the user data
+                description: The path to the directory for the user data. Defaults
+                  to '/config'.
                 minLength: 3
                 type: string
               initPlugins:
-                description: InitPlugins specifies the OCI containers to be run as
-                  InitContainers. These containers can be used to prepare the workspace
-                  or run some setup scripts. It is an ordered list.
+                description: Specifies the OCI containers to be run as InitContainers.
+                  These containers can be used to prepare the workspace or run some
+                  setup scripts. It is an ordered list.
                 items:
                   properties:
                     args:
-                      description: Args are the arguments to the container.
+                      description: The arguments that will be passed to the command
+                        in the main container.
                       items:
                         type: string
                       type: array
                     command:
-                      description: Command is the command to run in the container.
+                      description: The command to run in the container.
                       items:
                         type: string
                       type: array
                     env:
-                      description: Env are the environment variables to the container.
+                      description: The environment variables for the main container.
                       items:
                         description: EnvVar represents an environment variable present
                           in a Container.
@@ -103,9 +126,7 @@ spec:
                                       This field is effectively required, but due to backwards compatibility is
                                       allowed to be empty. Instances of this type with an empty value here are
                                       almost certainly wrong.
-                                      TODO: Add other useful fields. apiVersion, kind, uid?
                                       More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                      TODO: Drop `kubebuilder:default` when controller-gen doesn't need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.
                                     type: string
                                   optional:
                                     description: Specify whether the ConfigMap or
@@ -171,9 +192,7 @@ spec:
                                       This field is effectively required, but due to backwards compatibility is
                                       allowed to be empty. Instances of this type with an empty value here are
                                       almost certainly wrong.
-                                      TODO: Add other useful fields. apiVersion, kind, uid?
                                       More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                      TODO: Drop `kubebuilder:default` when controller-gen doesn't need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.
                                     type: string
                                   optional:
                                     description: Specify whether the Secret or its
@@ -189,8 +208,8 @@ spec:
                         type: object
                       type: array
                     envFrom:
-                      description: EnvFrom are the environment variables taken from
-                        a Secret or ConfigMap.
+                      description: The environment variables taken from a Secret or
+                        ConfigMap for the main container.
                       items:
                         description: EnvFromSource represents the source of a set
                           of ConfigMaps
@@ -205,9 +224,7 @@ spec:
                                   This field is effectively required, but due to backwards compatibility is
                                   allowed to be empty. Instances of this type with an empty value here are
                                   almost certainly wrong.
-                                  TODO: Add other useful fields. apiVersion, kind, uid?
                                   More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                  TODO: Drop `kubebuilder:default` when controller-gen doesn't need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.
                                 type: string
                               optional:
                                 description: Specify whether the ConfigMap must be
@@ -229,9 +246,7 @@ spec:
                                   This field is effectively required, but due to backwards compatibility is
                                   allowed to be empty. Instances of this type with an empty value here are
                                   almost certainly wrong.
-                                  TODO: Add other useful fields. apiVersion, kind, uid?
                                   More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
-                                  TODO: Drop `kubebuilder:default` when controller-gen doesn't need it https://github.com/kubernetes-sigs/kubebuilder/issues/3896.
                                 type: string
                               optional:
                                 description: Specify whether the Secret must be defined
@@ -241,14 +256,14 @@ spec:
                         type: object
                       type: array
                     image:
-                      description: Image is the OCI image for the container.
+                      description: The OCI image for the container.
                       type: string
                     name:
-                      description: Name is the name of the container.
+                      description: The name of the container.
                       type: string
                     volumeMounts:
-                      description: VolumeMounts are the volume mounts for the container.
-                        Can be used to mount a ConfigMap or Secret.
+                      description: The volume mounts for the container. Can be used
+                        to mount a ConfigMap or Secret.
                       items:
                         description: VolumeMount describes a mounting of a Volume
                           within a container.
@@ -280,9 +295,7 @@ spec:
                               RecursiveReadOnly specifies whether read-only mounts should be handled
                               recursively.
 
-
                               If ReadOnly is false, this field has no meaning and must be unspecified.
-
 
                               If ReadOnly is true, and this field is set to Disabled, the mount is not made
                               recursively read-only.  If this field is set to IfPossible, the mount is made
@@ -291,10 +304,8 @@ spec:
                               supported by the container runtime, otherwise the pod will not be started and
                               an error will be generated to indicate the reason.
 
-
                               If this field is set to IfPossible or Enabled, MountPropagation must be set to
                               None (or be unspecified, which defaults to None).
-
 
                               If this field is not specified, it is treated as an equivalent of Disabled.
                             type: string
@@ -320,37 +331,32 @@ spec:
                   - name
                   type: object
                 type: array
-              password:
-                description: Password HTTP Basic auth password. If unset there will
-                  be no auth.
-                type: string
               privileged:
                 default: false
-                description: Privileged specifies if the container should run in privileged
-                  mode. Will only work if the KodeTemplate allows it. Only set to
-                  true if you know what you are doing.
+                description: Specifies if the container should run in privileged mode.
+                  Will only work if the KodeTemplate allows it. Only set to true if
+                  you know what you are doing.
                 type: boolean
               storage:
-                description: Storage specifies the storage configuration.
+                description: Specifies the storage configuration.
                 properties:
                   accessModes:
-                    description: AccessModes specifies the access modes for the persistent
-                      volume.
+                    description: Specifies the access modes for the persistent volume.
                     items:
                       type: string
                     type: array
                   existingVolumeClaim:
-                    description: ExistingVolumeClaim specifies an existing PersistentVolumeClaim
-                      to use.
+                    description: Specifies an existing PersistentVolumeClaim to use
+                      instead of creating a new one.
                     type: string
                   keepVolume:
                     default: false
-                    description: KeepVolume specifies if the volume should be kept
-                      when the kode is recycled. Defaults to false.
+                    description: Specifies if the volume should be kept when the kode
+                      is recycled. Defaults to false.
                     type: boolean
                   resources:
-                    description: Resources specifies the resource requirements for
-                      the persistent volume.
+                    description: Specifies the resource requirements for the persistent
+                      volume.
                     properties:
                       limits:
                         additionalProperties:
@@ -378,43 +384,47 @@ spec:
                         type: object
                     type: object
                   storageClassName:
-                    description: StorageClassName specifies the storage class name
-                      for the persistent volume.
+                    description: Specifies the storage class name for the persistent
+                      volume.
                     type: string
                 type: object
               templateRef:
-                description: TemplateRef is the reference to the KodeTemplate configuration.
+                description: The reference to a template. Either a PodTemplate, VirtualTemplate
+                  or TofuTemplate.
                 properties:
+                  apiVersion:
+                    description: API version of the referent.
+                    type: string
                   kind:
                     description: Kind is the resource kind.
-                    enum:
-                    - KodeTemplate
-                    - KodeClusterTemplate
+                    maxLength: 63
+                    minLength: 1
+                    pattern: ^[a-zA-Z]([-a-zA-Z0-9]*[a-zA-Z0-9])?$
                     type: string
                   name:
-                    description: Name is the name of the KodeTemplate.
+                    description: Name is the name of the resource.
+                    maxLength: 253
+                    minLength: 1
                     type: string
                   namespace:
-                    description: Namespace is the namespace of the KodeTemplate.
+                    description: Namespace is the namespace of the resource.
+                    maxLength: 63
+                    minLength: 1
+                    pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
                     type: string
                 required:
                 - kind
                 - name
                 type: object
               userConfig:
-                description: UserConfig specifies a git repository URL to get user
-                  configuration from.
-                type: string
-              username:
-                default: abc
-                description: Username is both the the HTTP Basic auth username (when
-                  used) and the user the container should run as, abc is default.
+                description: Specifies a git repository URL to get user configuration
+                  from.
+                pattern: ^(https?:\/\/)?([\w\.-]+@)?([\w\.-]+)(:\d+)?\/?([\w\.-]+)\/([\w\.-]+)(\.git)?(\/?|\#[\w\.\-_]+)?$|^oci:\/\/([\w\.-]+)(:\d+)?\/?([\w\.-\/]+)(@sha256:[a-fA-F0-9]{64})?$
                 type: string
               workspace:
-                description: Workspace is the user specified workspace directory (e.g.
-                  my-workspace).
+                description: The user specified workspace directory (e.g. my-workspace).
                 minLength: 3
-                pattern: ^[^/].*$
+                pattern: ^[a-zA-Z0-9_-]+$
                 type: string
             required:
             - templateRef
@@ -423,19 +433,10 @@ spec:
             description: KodeStatus defines the observed state of Kode
             properties:
               conditions:
-                description: Conditions represent the latest available observations
-                  of a Kode's state.
+                description: Conditions reflect the current state of the resource
                 items:
-                  description: "Condition contains details for one aspect of the current
-                    state of this API Resource.\n---\nThis struct is intended for
-                    direct use as an array at the field path .status.conditions.  For
-                    example,\n\n\n\ttype FooStatus struct{\n\t    // Represents the
-                    observations of a foo's current state.\n\t    // Known .status.conditions.type
-                    are: \"Available\", \"Progressing\", and \"Degraded\"\n\t    //
-                    +patchMergeKey=type\n\t    // +patchStrategy=merge\n\t    // +listType=map\n\t
-                    \   // +listMapKey=type\n\t    Conditions []metav1.Condition `json:\"conditions,omitempty\"
-                    patchStrategy:\"merge\" patchMergeKey:\"type\" protobuf:\"bytes,1,rep,name=conditions\"`\n\n\n\t
-                    \   // other fields\n\t}"
+                  description: Condition contains details for one aspect of the current
+                    state of this API Resource.
                   properties:
                     lastTransitionTime:
                       description: |-
@@ -476,12 +477,7 @@ spec:
                       - Unknown
                       type: string
                     type:
-                      description: |-
-                        type of condition in CamelCase or in foo.example.com/CamelCase.
-                        ---
-                        Many .condition.type values are consistent across resources like Available, but because arbitrary conditions can be
-                        useful (see .node.status.conditions), the ability to deconflict is important.
-                        The regex it matches is (dns1123SubdomainFmt/)?(qualifiedNameFmt)
+                      description: type of condition in CamelCase or in foo.example.com/CamelCase.
                       maxLength: 316
                       pattern: ^([a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*/)?(([A-Za-z0-9][-A-Za-z0-9_.]*)?[A-Za-z0-9])$
                       type: string
@@ -493,21 +489,39 @@ spec:
                   - type
                   type: object
                 type: array
+              iconUrl:
+                description: The URL to the icon for the Kode.
+                type: string
+              kodePort:
+                description: The port to access the Kode.
+                format: int32
+                minimum: 1
+                type: integer
+              kodeUrl:
+                description: The URL to access the Kode.
+                type: string
+              lastActivityTime:
+                description: The timestamp when the last activity occurred.
+                format: date-time
+                type: string
               lastError:
-                description: LastError contains the last error message encountered
-                  during reconciliation.
+                description: Contains the last error message encountered during reconciliation.
                 type: string
               lastErrorTime:
-                description: LastErrorTime is the timestamp when the last error occurred.
+                description: The timestamp when the last error occurred.
                 format: date-time
                 type: string
               observedGeneration:
                 description: ObservedGeneration is the last observed generation of
-                  the Kode resource.
+                  the resource.
                 format: int64
                 type: integer
               phase:
                 description: Phase represents the current phase of the Kode resource.
+                type: string
+              runtime:
+                description: The runtime for the kode. Can be one of 'pod', 'virtual',
+                  'tofu'.
                 type: string
             required:
             - phase

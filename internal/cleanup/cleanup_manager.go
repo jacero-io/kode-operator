@@ -23,12 +23,8 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	"github.com/jacero-io/kode-operator/internal/common"
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -44,136 +40,85 @@ func NewDefaultCleanupManager(client client.Client, log logr.Logger) CleanupMana
 	}
 }
 
-func (m *defaultCleanupManager) Cleanup(ctx context.Context, config *common.KodeResourcesConfig) error {
-	log := m.log.WithValues("kode", common.ObjectKeyFromConfig(config))
-	log.Info("Starting cleanup of Kode resources", "Config", config)
+func (m *defaultCleanupManager) Cleanup(ctx context.Context, resource CleanupableResource) error {
+	log := m.log.WithValues("resource", resource)
+	log.Info("Starting cleanup of resources")
 
-	resourcesForCleanup := []struct {
-		name      string
-		obj       client.Object
-		condition func() bool
-	}{
-		{
-			name: "StatefulSet",
-			obj: &appsv1.StatefulSet{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      config.StatefulSetName,
-					Namespace: config.KodeNamespace,
-				},
-			},
-			condition: func() bool {
-				shouldCleanup := true
-				log.V(1).Info("StatefulSet cleanup condition", "ShouldCleanup", shouldCleanup, "StatefulSetName", config.StatefulSetName)
-				return shouldCleanup
-			},
-		},
-		{
-			name: "Service",
-			obj: &corev1.Service{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      config.ServiceName,
-					Namespace: config.KodeNamespace,
-				},
-			},
-			condition: func() bool {
-				shouldCleanup := true
-				log.V(1).Info("Service cleanup condition", "ShouldCleanup", shouldCleanup, "ServiceName", config.ServiceName)
-				return shouldCleanup
-			},
-		},
-		{
-			name: "PersistentVolumeClaim",
-			obj: &corev1.PersistentVolumeClaim{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      config.PVCName,
-					Namespace: config.KodeNamespace,
-				},
-			},
-			condition: func() bool {
-				// When KodeSpec.Storage is not empty and KeepVolume is not set or set to false, it should be cleaned up
-				shouldCleanup := !config.KodeSpec.DeepCopy().Storage.IsEmpty() &&
-					(config.KodeSpec.Storage.KeepVolume == nil || !*config.KodeSpec.Storage.KeepVolume)
-				log.V(1).Info("PVC cleanup condition", "ShouldCleanup", shouldCleanup, "PVCName", config.PVCName)
-				return shouldCleanup
-			},
-		},
-	}
-
+	resources := resource.GetResources()
 	var wg sync.WaitGroup
-	for _, res := range resourcesForCleanup {
-		if res.condition() {
-			wg.Add(1)
-			go func(res struct {
-				name      string
-				obj       client.Object
-				condition func() bool
-			}) {
+
+	for _, res := range resources {
+		// Check if the resource should be deleted
+		if resource.ShouldDelete(res) {
+			wg.Add(1) // Increment the wait group counter
+			go func(res Resource) {
 				defer wg.Done()
-				if err := m.deleteResourceAsync(ctx, res.obj, res.name); err != nil {
-					log.Error(err, fmt.Sprintf("Failed to delete %s", res.name))
+				if err := m.deleteResourceAsync(ctx, res); err != nil {
+					log.Error(err, fmt.Sprintf("Failed to delete %s", res.Kind))
 				}
 			}(res)
 		} else {
-			log.V(1).Info(fmt.Sprintf("Skipping deletion of %s due to condition not met", res.name))
+			log.V(1).Info(fmt.Sprintf("Skipping deletion of %s due to condition not met", res.Kind))
 		}
 	}
 
-	// Start a goroutine to wait for all deletions to complete
 	go func() {
 		wg.Wait()
-		log.V(1).Info("Kode resources cleanup initiated successfully")
+		log.V(1).Info("Resources cleanup initiated successfully")
 	}()
 
 	return nil
 }
 
-func (m *defaultCleanupManager) Recycle(ctx context.Context, config *common.KodeResourcesConfig) error {
-	log := m.log.WithValues("kode", common.ObjectKeyFromConfig(config))
-	log.Info("Starting recycle of Kode resources")
+func (m *defaultCleanupManager) deleteResourceAsync(ctx context.Context, resource Resource) error {
+	log := m.log.WithValues(resource.Kind, client.ObjectKey{Name: resource.Name, Namespace: resource.Namespace})
 
-	log.Info("Kode resources recycled successfully")
-	return nil
-}
+	log.V(1).Info("Attempting to delete resource")
 
-func (m *defaultCleanupManager) deleteResourceAsync(ctx context.Context, obj client.Object, resourceType string) error {
-	log := m.log.WithValues(resourceType, client.ObjectKeyFromObject(obj))
-
-	log.V(1).Info("Attempting to delete resource", "Name", obj.GetName())
+	// Set the name and namespace
+	resource.Object.SetName(resource.Name)
+	resource.Object.SetNamespace(resource.Namespace)
 
 	// Attempt to delete the resource
-	if err := m.client.Delete(ctx, obj, client.PropagationPolicy(metav1.DeletePropagationForeground)); err != nil {
+	if err := m.client.Delete(ctx, resource.Object); err != nil {
 		if errors.IsNotFound(err) {
-			log.Info(fmt.Sprintf("%s not found, considering it deleted", resourceType))
+			log.Info(fmt.Sprintf("%s not found, considering it deleted", resource.Kind))
 			return nil
 		}
-		log.Error(err, fmt.Sprintf("Failed to delete %s", resourceType))
-		return fmt.Errorf("failed to delete %s: %w", resourceType, err)
+		log.Error(err, fmt.Sprintf("Failed to delete %s", resource.Kind))
+		return fmt.Errorf("failed to delete %s: %w", resource.Kind, err)
 	}
 
 	// Start a goroutine to periodically check the deletion status
-	go func() {
-		ticker := time.NewTicker(5 * time.Second)
-		defer ticker.Stop()
-
-		for {
-			select {
-			case <-ctx.Done():
-				log.V(1).Info(fmt.Sprintf("Context cancelled, stopping %s deletion check", resourceType))
-				return
-			case <-ticker.C:
-				err := m.client.Get(ctx, types.NamespacedName{Name: obj.GetName(), Namespace: obj.GetNamespace()}, obj)
-				if errors.IsNotFound(err) {
-					log.Info(fmt.Sprintf("%s confirmed deleted", resourceType))
-					return
-				}
-				if err != nil {
-					log.Error(err, fmt.Sprintf("Error checking %s deletion status", resourceType))
-					return
-				}
-				log.V(1).Info(fmt.Sprintf("%s still exists, waiting for deletion", resourceType))
-			}
-		}
-	}()
+	go m.checkDeletionStatus(ctx, resource.Object, resource.Kind)
 
 	return nil
+}
+
+func (m *defaultCleanupManager) checkDeletionStatus(ctx context.Context, obj client.Object, kind string) {
+	log := m.log.WithValues(kind, client.ObjectKeyFromObject(obj))
+
+	err := wait.PollUntilContextCancel(ctx, 5*time.Second, true, func(ctx context.Context) (bool, error) {
+		err := m.client.Get(ctx, client.ObjectKeyFromObject(obj), obj)
+		if errors.IsNotFound(err) {
+			log.Info(fmt.Sprintf("%s confirmed deleted", kind))
+			return true, nil
+		}
+		if err != nil {
+			log.Error(err, fmt.Sprintf("Error checking %s deletion status", kind))
+			return false, err
+		}
+		log.V(1).Info(fmt.Sprintf("%s still exists, waiting for deletion", kind))
+		return false, nil
+	})
+
+	if err != nil {
+		if err == context.DeadlineExceeded {
+			log.Error(err, fmt.Sprintf("Timeout waiting for %s deletion", kind))
+		} else if err == context.Canceled {
+			log.Info(fmt.Sprintf("Context canceled while waiting for %s deletion", kind))
+		} else {
+			log.Error(err, fmt.Sprintf("Error occurred while waiting for %s deletion", kind))
+		}
+	}
 }

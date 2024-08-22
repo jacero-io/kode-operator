@@ -9,7 +9,9 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
+	"github.com/go-logr/zapr"
 	"go.uber.org/zap"
+
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -17,12 +19,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	"sigs.k8s.io/controller-runtime/pkg/webhook"
+	gwapiv1 "sigs.k8s.io/gateway-api/apis/v1"
 
-	"github.com/go-logr/zapr"
-	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
+	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/cleanup"
 	entrypointcontroller "github.com/jacero-io/kode-operator/internal/controllers/entrypoint"
 	kodecontroller "github.com/jacero-io/kode-operator/internal/controllers/kode"
+	"github.com/jacero-io/kode-operator/internal/events"
 	"github.com/jacero-io/kode-operator/internal/resource"
 	"github.com/jacero-io/kode-operator/internal/status"
 	"github.com/jacero-io/kode-operator/internal/template"
@@ -37,8 +40,8 @@ var (
 
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
-
-	utilruntime.Must(kodev1alpha1.AddToScheme(scheme))
+	utilruntime.Must(kodev1alpha2.AddToScheme(scheme))
+	utilruntime.Must(gwapiv1.Install(scheme))
 	//+kubebuilder:scaffold:scheme
 }
 
@@ -115,26 +118,39 @@ func main() {
 		os.Exit(1)
 	}
 
+	// printKnownTypes(mgr.GetScheme())
+
 	if err = (&kodecontroller.KodeReconciler{
 		Client:          mgr.GetClient(),
 		Scheme:          mgr.GetScheme(),
 		Log:             ctrl.Log.WithName("Kode").WithName("Reconcile"),
-		ResourceManager: resource.NewDefaultResourceManager(mgr.GetClient(), ctrl.Log.WithName("Kode").WithName("ResourceManager")),
+		ResourceManager: resource.NewDefaultResourceManager(mgr.GetClient(), ctrl.Log.WithName("Kode").WithName("ResourceManager"), scheme),
 		TemplateManager: template.NewDefaultTemplateManager(mgr.GetClient(), ctrl.Log.WithName("Kode").WithName("TemplateManager")),
 		CleanupManager:  cleanup.NewDefaultCleanupManager(mgr.GetClient(), ctrl.Log.WithName("Kode").WithName("CleanupManager")),
 		StatusUpdater:   status.NewDefaultStatusUpdater(mgr.GetClient(), ctrl.Log.WithName("Kode").WithName("StatusUpdater")),
 		Validator:       validation.NewDefaultValidator(),
+		EventManager:    events.NewEventManager(mgr.GetClient(), ctrl.Log.WithName("Kode").WithName("EventManager"), mgr.GetScheme(), mgr.GetEventRecorderFor("kode-controller")),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Kode")
 		os.Exit(1)
 	}
 
 	if err = (&entrypointcontroller.EntryPointReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
+		Client:          mgr.GetClient(),
+		Scheme:          mgr.GetScheme(),
+		Log:             ctrl.Log.WithName("EntryPoint").WithName("Reconcile"),
+		ResourceManager: resource.NewDefaultResourceManager(mgr.GetClient(), ctrl.Log.WithName("EntryPoint").WithName("ResourceManager"), scheme),
+		TemplateManager: template.NewDefaultTemplateManager(mgr.GetClient(), ctrl.Log.WithName("EntryPoint").WithName("TemplateManager")),
+		CleanupManager:  cleanup.NewDefaultCleanupManager(mgr.GetClient(), ctrl.Log.WithName("EntryPoint").WithName("CleanupManager")),
+		StatusUpdater:   status.NewDefaultStatusUpdater(mgr.GetClient(), ctrl.Log.WithName("EntryPoint").WithName("StatusUpdater")),
+		Validator:       validation.NewDefaultValidator(),
+		EventManager:    events.NewEventManager(mgr.GetClient(), ctrl.Log.WithName("Kode").WithName("EventManager"), mgr.GetScheme(), mgr.GetEventRecorderFor("entrypoint-controller")),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "EntryPoint")
 		os.Exit(1)
+		for gvk := range mgr.GetScheme().AllKnownTypes() {
+			setupLog.V(1).Info("Known type in manager scheme", "gvk", gvk)
+		}
 	}
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
@@ -150,5 +166,11 @@ func main() {
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
+	}
+}
+
+func printKnownTypes(scheme *runtime.Scheme) {
+	for gvk := range scheme.AllKnownTypes() {
+		setupLog.V(1).Info("Known type in scheme", "gvk", gvk)
 	}
 }

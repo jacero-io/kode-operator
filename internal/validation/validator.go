@@ -19,11 +19,10 @@ package validation
 import (
 	"context"
 
-	kodev1alpha1 "github.com/jacero-io/kode-operator/api/v1alpha1"
-	"github.com/jacero-io/kode-operator/internal/common"
+	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 )
 
 // Validator defines the interface for validating Kode resources
 type Validator interface {
-	ValidateKode(ctx context.Context, kode *kodev1alpha1.Kode, templates *common.Templates) error
+	ValidateKode(ctx context.Context, kode *kodev1alpha2.Kode) error
 }
