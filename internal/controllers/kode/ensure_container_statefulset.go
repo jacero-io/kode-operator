@@ -160,12 +160,12 @@ func constructCodeServerContainers(config *common.KodeResourceConfig, workspace 
 		{Name: "PUID", Value: fmt.Sprintf("%d", config.Template.PodTemplateSpec.PUID)},
 		{Name: "PGID", Value: fmt.Sprintf("%d", config.Template.PodTemplateSpec.PGID)},
 		{Name: "TZ", Value: config.Template.PodTemplateSpec.TZ},
-		{Name: "PORT", Value: fmt.Sprintf("%d", config.Port)},
+		{Name: "PORT", Value: fmt.Sprintf("%d", *config.Port)},
 		{Name: "USERNAME", Value: config.KodeSpec.Credentials.Username},
 		{Name: "DEFAULT_WORKSPACE", Value: workspace},
 	}
 
-	if config.Credentials.EnableBuiltinAuth != false && config.Credentials.Password != "" {
+	if config.Credentials.EnableBuiltinAuth && config.Credentials.Password != "" {
 		env = append(env, corev1.EnvVar{
 			Name: "PASSWORD",
 			ValueFrom: &corev1.EnvVarSource{
@@ -195,11 +195,11 @@ func constructWebtopContainers(config *common.KodeResourceConfig) []corev1.Conta
 		{Name: "PUID", Value: fmt.Sprintf("%d", config.Template.PodTemplateSpec.PUID)},
 		{Name: "PGID", Value: fmt.Sprintf("%d", config.Template.PodTemplateSpec.PGID)},
 		{Name: "TZ", Value: config.Template.PodTemplateSpec.TZ},
-		{Name: "CUSTOM_PORT", Value: fmt.Sprintf("%d", config.Port)},
+		{Name: "CUSTOM_PORT", Value: fmt.Sprintf("%d", *config.Port)},
 		{Name: "CUSTOM_USER", Value: config.KodeSpec.Credentials.Username},
 	}
 
-	if config.Credentials.EnableBuiltinAuth != false && config.Credentials.Password != "" {
+	if config.Credentials.EnableBuiltinAuth && config.Credentials.Password != "" {
 		env = append(env, corev1.EnvVar{
 			Name: "PASSWORD",
 			ValueFrom: &corev1.EnvVarSource{
