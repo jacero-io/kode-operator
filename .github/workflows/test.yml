@@ -28,9 +28,13 @@ jobs:
           **/go.mod
 
     - name: Install dependencies
-      run: make $(LOCALBIN)
+      run: |
+        task kustomize
+        task controller-gen
+        task envtest
+        task golangci-lint
 
     - name: Run integration tests
       env:
         TEST_VERBOSITY: ""
-      run: make test-integration
+      run: task test-integration
