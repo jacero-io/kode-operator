@@ -19,8 +19,6 @@ package v1alpha2
 import (
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
-
 	egv1alpha1 "github.com/envoyproxy/gateway/api/v1alpha1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	gwapiv1 "sigs.k8s.io/gateway-api/apis/v1"
@@ -28,80 +26,104 @@ import (
 
 // EntryPointSpec defines the desired state of EntryPoint
 type EntryPointSpec struct {
-	// Type is the way the Kode resource is accessed. It could be subdomain or path.
-	// +kubebuilder:validation:description=Type is the way the Kode resource is accessed. It could be subdomain or path.
-	// +kubebuilder:validation:Optional
+	// The way the Kode resource is accessed by the user. It could be subdomain or path.
+	// Path means the Kode resource is accessed as a path of the BaseDomain (e.g kode.example.com/<kode-resource>).
+	// Subdomain means the Kode resource is accessed as a subdomain of the BaseDomain (e.g <kode-resource>.kode.example.com).
 	// +kubebuilder:validation:Enum=subdomain;path
-	RoutingType RoutingType `json:"routingType,omitempty" yaml:"routingType,omitempty"`
+	// +kubebuilder:default=path
+	RoutingType RoutingType `json:"routingType" yaml:"routingType"`
 
-	// BaseDomain is the domain name to use either as a suffix in the case of Type=domain or as a prefix/domain in the case of Type=path.
+	// The domain name to use either as a suffix in the case of Type=domain or as a prefix/domain in the case of Type=path.
 	// When the type is domain, the controller will try to publish the Kode resource as a subdomain of the given domain (e.g <kode-resource>.kode.example.com).
 	// When the type is path, the controller will try to publish the Kode resource as a path of the given BaseDomain (e.g kode.example.com/<kode-resource>).
-	// +kubebuilder:validation:description=BaseDomain is the domain name to use either as a suffix in the case of Type=domain or as a prefix/domain in the case of Type=path. When the type is domain, the controller will try to publish the Kode resource as a subdomain of the given domain (e.g <kode-resource>.kode.example.com). When the type is path, the controller will try to publish the Kode resource as a path of the given BaseDomain (e.g kode.example.com/<kode-resource>).
-	// +kubebuilder:validation:Optional
-	BaseDomain BaseDomain `json:"baseDomain,omitempty" yaml:"baseDomain,omitempty"`
+	// +kubebuilder:validation:Pattern=^([a-zA-Z0-9_]+\.)*[a-zA-Z0-9_]+$
+	BaseDomain string `json:"baseDomain" yaml:"baseDomain"`
 
 	// GatewaySpec defines the GatewaySpec for the EntryPoint. Only one of GatewaySpec or IngressSpec can be set.
-	// +kubebuilder:validation:description=GatewaySpec defines the GatewaySpec for the EntryPoint. Only one of GatewaySpec or IngressSpec can be set.
 	// +kubebuilder:validation:Optional
 	GatewaySpec *GatewaySpec `json:"gatewaySpec,omitempty" yaml:"gatewaySpec,omitempty"`
 
 	// AuthSpec defines the AuthSpec for the EntryPoint. Use this to influence the authentication and authorization policies of the EntryPoint.
-	// +kubebuilder:validation:description=AuthSpec defines the AuthSpec for the EntryPoint. Use this to influence the authentication and authorization policies of the EntryPoint.
 	// +kubebuilder:validation:Optional
 	AuthSpec *AuthSpec `json:"authSpec,omitempty" yaml:"authSpec,omitempty"`
 }
 
 type GatewaySpec struct {
-	// ExistingGatewayRef is a reference to an existing Gateway to use for the EntryPoint. Setting this will override everything else in GatewaySpec.
-	// +kubebuilder:validation:description=ExistingGatewayRef is a reference to an existing Gateway to use for the EntryPoint. Setting this will override everything else in GatewaySpec.
+	// Reference to an existing Gateway to use for the EntryPoint. Setting this will override everything else in GatewaySpec.
 	// +kubebuilder:validation:Optional
-	ExistingGatewayRef CrossNamespaceObjectReference `json:"existingGatewayRef,omitempty" yaml:"existingGatewayRef,omitempty"`
+	ExistingGatewayRef *CrossNamespaceObjectReference `json:"existingGatewayRef,omitempty" yaml:"existingGatewayRef,omitempty"`
 
-	// GatewayClassName is the name of the GatewayClass to use for the Gateway.
-	// +kubebuilder:validation:description=GatewayClassName is the name of the GatewayClass to use for the Gateway.
+	// The name of the GatewayClass to use for the Gateway.
 	// +kubebuilder:validation:Optional
-	GatewayClassName gwapiv1.ObjectName `json:"gatewayClassName,omitempty" yaml:"gatewayClassName,omitempty"`
+	GatewayClassName *gwapiv1.ObjectName `json:"gatewayClassName,omitempty" yaml:"gatewayClassName,omitempty"`
 
-	// Certificate is a reference to a Secret containing the certificate and private key to use for the Gateway HTTPS Listener.
-	// +kubebuilder:validation:description=Certificate is a reference to a Secret containing the certificate and private key to use for the Gateway HTTPS Listener.
+	// Reference to Secrets containing the certificate and private key to use for the Gateway HTTPS Listener.
 	// +kubebuilder:validation:Optional
-	Certificate []corev1.Secret `json:"certificates,omitempty" yaml:"certificates,omitempty"`
+	CertificateRefs []gwapiv1.SecretObjectReference `json:"certificateRefs,omitempty" yaml:"certificateRefs,omitempty"`
 
-	// RouteSecurityPolicy defines the SecurityPolicies to apply to the HTTPRoute dynamically.
-	// +kubebuilder:validation:description=RouteSecurityPolicy defines the SecurityPolicies to apply to the HTTPRoute dynamically.
+	// Defines the SecurityPolicies to be applied to the Gateway. Reference: https://gateway.envoyproxy.io/contributions/design/security-policy/
 	// +kubebuilder:validation:Optional
-	RouteSecurityPolicy egv1alpha1.SecurityPolicy `json:"routeSecurityPolicy,omitempty" yaml:"routeSecurityPolicy,omitempty"`
+	SecurityPolicySpec *SecurityPolicySpec `json:"securityPolicySpec,omitempty" yaml:"securityPolicySpec,omitempty"`
 
-	// EnvoyPatchPolicySpec defines the custom patch policy for the Envoy Proxy config generated by Envoy Gateway. For experienced users.
-	// +kubebuilder:validation:description=EnvoyPatchPolicySpec defines the custom patch policy for the Envoy Proxy config generated by Envoy Gateway. For experienced users.
+	// Defines the custom patch policy for the Envoy Proxy config generated by Envoy Gateway. For experienced users.
 	// +kubebuilder:validation:Optional
 	EnvoyPatchPolicySpec *egv1alpha1.EnvoyPatchPolicySpec `json:"envoyPatchPolicySpec,omitempty" yaml:"envoyPatchPolicySpec,omitempty"`
 }
 
 type AuthSpec struct {
-	// AuthPolicy is the Envoy Gateway SecurityPolicy to use for the authentication. Can be either "none", "basicAuth", "jwt", "oidc", "extAuth" or "authorization". Find more info here: https://gateway.envoyproxy.io/contributions/design/security-policy/
-	// +kubebuilder:validation:description=AuthPolicy is the Envoy Gateway SecurityPolicy to use for the authentication. Can be either "none", "basicAuth", "jwt", "oidc", "extAuth" or "authorization".
-	// +kubebuilder:validation:Optional
-	// +kubebuilder:validation:Enum=none;jwt;oidc;extAuth
-	AuthPolicy string `json:"authPolicy,omitempty" yaml:"authPolicy,omitempty"`
+	// The Envoy Gateway SecurityPolicy to use for the authentication. Can be either "none", "basicAuth", "jwt", "oidc", "extAuth" or "authorization". Reference: https://gateway.envoyproxy.io/contributions/design/security-policy/
+	// +kubebuilder:validation:Enum=none;basicAuth;jwt;oidc;extAuth
+	// +kubebuilder:default=none
+	AuthType AuthType `json:"authType" yaml:"authType"`
 
-	// IdentityPointer will influence what field is used to namespace the Kode resource. This is useful when using OIDC.
-	IdentityPointer string `json:"identityPointer,omitempty" yaml:"identityPointer,omitempty"`
+	// Defines the SecurityPolicies to be applied to the Route. Reference: https://gateway.envoyproxy.io/contributions/design/security-policy/
+	// +kubebuilder:validation:Optional
+	SecurityPolicySpec *SecurityPolicySpec `json:"securityPolicySpec,omitempty" yaml:"securityPolicySpec,omitempty"`
+
+	// Reference to a field in the JWT token of OIDC or JWT. It will influence the controller on how to route the request and authorize the user.
+	// +kubebuilder:validation:Optional
+	IdentityReference *IdentityReference `json:"identityReference,omitempty" yaml:"identityReference,omitempty"`
+}
+
+type SecurityPolicySpec struct {
+	// CORS defines the configuration for Cross-Origin Resource Sharing (CORS).
+	//
+	// +optional
+	CORS *egv1alpha1.CORS `json:"cors,omitempty"`
+
+	// BasicAuth defines the configuration for the HTTP Basic Authentication.
+	//
+	// +optional
+	BasicAuth *egv1alpha1.BasicAuth `json:"basicAuth,omitempty"`
+
+	// JWT defines the configuration for JSON Web Token (JWT) authentication.
+	//
+	// +optional
+	JWT *egv1alpha1.JWT `json:"jwt,omitempty"`
+
+	// OIDC defines the configuration for the OpenID Connect (OIDC) authentication.
+	//
+	// +optional
+	OIDC *egv1alpha1.OIDC `json:"oidc,omitempty"`
+
+	// ExtAuth defines the configuration for External Authorization.
+	//
+	// +optional
+	ExtAuth *egv1alpha1.ExtAuth `json:"extAuth,omitempty"`
+
+	// Authorization defines the authorization configuration.
+	//
+	// +optional
+	// +notImplementedHide
+	Authorization *egv1alpha1.Authorization `json:"authorization,omitempty"`
 }
 
 // EntryPointStatus defines the observed state of EntryPoint
 type EntryPointStatus struct {
 	BaseSharedStatus `json:",inline" yaml:",inline"`
 
-	// Phase represents the current phase of the EntryPointPhase resource.
+	// Represents the current phase of the EntryPointPhase resource.
 	Phase EntryPointPhase `json:"phase" yaml:"phase"`
-
-	// LastError contains the last error message encountered during reconciliation.
-	LastError string `json:"lastError,omitempty" yaml:"lastError,omitempty"`
-
-	// LastErrorTime is the timestamp when the last error occurred.
-	LastErrorTime *metav1.Time `json:"lastErrorTime,omitempty" yaml:"lastErrorTime,omitempty"`
 }
 
 // +kubebuilder:object:root=true
@@ -125,6 +147,23 @@ type EntryPointList struct {
 	Items           []EntryPoint `json:"items"`
 }
 
+// IdentityReference is a reference to a field in the JWT token of OIDC or JWT.
+// TODO: Add validation pattern: "^[a-zA-Z0-9_-]+$"
+type IdentityReference string
+
+// AuthType is the type of authentication to use for the EntryPoint.
+// +kubebuilder:validation:Enum=none;basicAuth;jwt;oidc;extAuth
+type AuthType string
+
+const (
+	AuthTypeNone          AuthType = "none"
+	AuthTypeBasicAuth     AuthType = "basicAuth"
+	AuthTypeJWT           AuthType = "jwt"
+	AuthTypeOIDC          AuthType = "oidc"
+	AuthTypeExtAuth       AuthType = "extAuth"
+	AuthTypeAuthorization AuthType = "authorization"
+)
+
 // EntryPointPhase defines the phase of the EntryPoint
 type EntryPointPhase string
 
@@ -145,8 +184,11 @@ const (
 	EntryPointPhaseActive EntryPointPhase = "Active"
 )
 
+// BaseDomain is the domain name to use either as a suffix in the case of Type=domain or as a prefix/domain in the case of Type=path.
+// TODO: Add validation pattern: "^([a-zA-Z0-9_]+\.)*[a-zA-Z0-9_]+$"
 type BaseDomain string
 
+// RoutingType is the way the Kode resource is accessed by the user. It could be subdomain or path.
 type RoutingType string
 
 const (

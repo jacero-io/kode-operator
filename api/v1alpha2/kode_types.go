@@ -28,100 +28,79 @@ import (
 
 // KodeSpec defines the desired state of Kode
 type KodeSpec struct {
-	// TemplateRef is the reference to the KodeTemplate configuration.
-	// +kubebuilder:validation:Description="Reference to the KodeTemplate configuration."
+	// The reference to a template. Either a PodTemplate, VirtualTemplate or TofuTemplate.
 	// +kubebuilder:validation:Required
 	TemplateRef CrossNamespaceObjectReference `json:"templateRef"`
 
-	// Credentials specifies the credentials for the service.
-	// +kubebuilder:validation:Description="Credentials for the service."
-	Credentials CredentialsSpec `json:"credentials,omitempty"`
+	// Specifies the credentials for the service.
+	Credentials *CredentialsSpec `json:"credentials,omitempty"`
 
-	// Home is the path to the directory for the user data
-	// +kubebuilder:validation:Description="Home is the path to the directory for the user data. Defaults to '/config'."
+	// The path to the directory for the user data. Defaults to '/config'.
 	// +kubebuilder:validation:MinLength=3
 	// +kubebuilder:default=/config
-	Home string `json:"home,omitempty"`
+	Home *string `json:"home,omitempty"`
 
-	// Workspace is the user specified workspace directory (e.g. my-workspace).
-	// +kubebuilder:validation:Description="User specified workspace directory (e.g. my-workspace)."
+	// The user specified workspace directory (e.g. my-workspace).
 	// +kubebuilder:validation:MinLength=3
-	// +kubebuilder:validation:Pattern="^[^/].*$"
-	Workspace string `json:"workspace,omitempty"`
+	// +kubebuilder:validation:Pattern="^[a-zA-Z0-9_-]+$"
+	Workspace *string `json:"workspace,omitempty"`
 
-	// Storage specifies the storage configuration.
-	// +kubebuilder:validation:Description="Storage configuration."
-	Storage KodeStorageSpec `json:"storage,omitempty"`
+	// Specifies the storage configuration.
+	Storage *KodeStorageSpec `json:"storage,omitempty"`
 
-	// UserConfig specifies a git repository URL to get user configuration from.
-	// +kubebuilder:validation:Description="Git repository URL to get user configuration from."
-	UserConfig string `json:"userConfig,omitempty"`
+	// Specifies a git repository URL to get user configuration from.
+	// +kubebuilder:validation:Pattern=`^(https?:\/\/)?([\w\.-]+@)?([\w\.-]+)(:\d+)?\/?([\w\.-]+)\/([\w\.-]+)(\.git)?(\/?|\#[\w\.\-_]+)?$|^oci:\/\/([\w\.-]+)(:\d+)?\/?([\w\.-\/]+)(@sha256:[a-fA-F0-9]{64})?$`
+	// +kubebuilder:validation:Optional
+	UserConfig *string `json:"userConfig,omitempty"`
 
-	// Privileged specifies if the container should run in privileged mode. Will only work if the KodeTemplate allows it. Only set to true if you know what you are doing.
-	// +kubebuilder:validation:Description="Specifies if the container should run in privileged mode. Will only work if the KodeTemplate allows it. Only set to true if you know what you are doing."
+	// Specifies if the container should run in privileged mode. Will only work if the KodeTemplate allows it. Only set to true if you know what you are doing.
 	// +kubebuilder:default=false
 	Privileged *bool `json:"privileged,omitempty"`
 
-	// InitPlugins specifies the OCI containers to be run as InitContainers. These containers can be used to prepare the workspace or run some setup scripts. It is an ordered list.
-	// +kubebuilder:validation:Description="OCI containers to be run as InitContainers. These containers can be used to prepare the workspace or run some setup scripts. It is an ordered list."
+	// Specifies the OCI containers to be run as InitContainers. These containers can be used to prepare the workspace or run some setup scripts. It is an ordered list.
 	InitPlugins []InitPluginSpec `json:"initPlugins,omitempty"`
 }
 
 // KodeStorageSpec defines the storage configuration
 type KodeStorageSpec struct {
-	// AccessModes specifies the access modes for the persistent volume.
-	// +kubebuilder:validation:Description="Access modes for the persistent volume."
+	// Specifies the access modes for the persistent volume.
 	AccessModes []corev1.PersistentVolumeAccessMode `json:"accessModes,omitempty"`
 
-	// StorageClassName specifies the storage class name for the persistent volume.
-	// +kubebuilder:validation:Description="Storage class name for the persistent volume."
+	// Specifies the storage class name for the persistent volume.
 	StorageClassName *string `json:"storageClassName,omitempty"`
 
-	// Resources specifies the resource requirements for the persistent volume.
-	// +kubebuilder:validation:Description="Resource requirements for the persistent volume."
-	Resources corev1.VolumeResourceRequirements `json:"resources,omitempty"`
+	// Specifies the resource requirements for the persistent volume.
+	Resources *corev1.VolumeResourceRequirements `json:"resources,omitempty"`
 
-	// KeepVolume specifies if the volume should be kept when the kode is recycled. Defaults to false.
-	// +kubebuilder:validation:Description="Specifies if the volume should be kept when the kode is recycled. Defaults to false."
+	// Specifies if the volume should be kept when the kode is recycled. Defaults to false.
 	// +kubebuilder:default=false
 	KeepVolume *bool `json:"keepVolume,omitempty"`
 
-	// ExistingVolumeClaim specifies an existing PersistentVolumeClaim to use.
-	// +kubebuilder:validation:Description="Specifies an existing PersistentVolumeClaim to use."
-	ExistingVolumeClaim string `json:"existingVolumeClaim,omitempty"`
+	// Specifies an existing PersistentVolumeClaim to use instead of creating a new one.
+	ExistingVolumeClaim *string `json:"existingVolumeClaim,omitempty"`
 }
 
 // KodeStatus defines the observed state of Kode
 type KodeStatus struct {
-	// ObservedGeneration is the last observed generation of the Kode resource.
-	ObservedGeneration int64 `json:"observedGeneration,omitempty"`
+	BaseSharedStatus `json:",inline" yaml:",inline"`
 
 	// Phase represents the current phase of the Kode resource.
 	Phase KodePhase `json:"phase"`
 
-	// Conditions represent the latest available observations of a Kode's state.
-	Conditions []metav1.Condition `json:"conditions,omitempty"`
-
-	// KodeUrl is the URL to access the Kode.
+	// The URL to access the Kode.
 	KodeUrl KodeUrl `json:"kodeUrl,omitempty"`
 
-	// KodePort is the port to access the Kode.
+	// The port to access the Kode.
 	KodePort Port `json:"kodePort,omitempty"`
 
-	// IconUrl is the URL to the icon for the Kode.
+	// The URL to the icon for the Kode.
 	IconUrl IconUrl `json:"iconUrl,omitempty"`
 
-	// Runtime is the runtime for the kode. Can be one of 'pod', 'virtual', 'tofu'.
+	// The runtime for the kode. Can be one of 'pod', 'virtual', 'tofu'.
 	Runtime Runtime `json:"runtime,omitempty"`
 
-	// LastActivityTime is the timestamp when the last activity occurred.
+	// The timestamp when the last activity occurred.
 	LastActivityTime *metav1.Time `json:"lastActivityTime,omitempty"`
-
-	// LastError contains the last error message encountered during reconciliation.
-	LastError string `json:"lastError,omitempty"`
-
-	// LastErrorTime is the timestamp when the last error occurred.
-	LastErrorTime *metav1.Time `json:"lastErrorTime,omitempty"`
 }
 
 //+kubebuilder:object:root=true
@@ -271,15 +250,17 @@ func (k *Kode) IsInactiveFor(duration time.Duration) bool {
 }
 
 func (k *Kode) SetRuntime() Runtime {
+	var runtime Runtime
 	if TemplateKind(k.Spec.TemplateRef.Kind) == TemplateKindPodTemplate || TemplateKind(k.Spec.TemplateRef.Kind) == TemplateKindClusterPodTemplate {
-		return RuntimePod
+		runtime = RuntimePod
 	} else if TemplateKind(k.Spec.TemplateRef.Kind) == TemplateKindVirtualTemplate || TemplateKind(k.Spec.TemplateRef.Kind) == TemplateKindClusterVirtualTemplate {
-		return RuntimeVirtual
+		runtime = RuntimeVirtual
 	} else if TemplateKind(k.Spec.TemplateRef.Kind) == TemplateKindTofuTemplate || TemplateKind(k.Spec.TemplateRef.Kind) == TemplateKindClusterTofuTemplate {
-		return RuntimeTofu
+		runtime = RuntimeTofu
 	} else {
 		return ""
 	}
+	return runtime
 }
 
 func (k *Kode) UpdateKodePort(ctx context.Context, c client.Client, port Port) error {
@@ -306,7 +287,7 @@ func (k *Kode) UpdateKodeUrl(ctx context.Context, c client.Client, kodeUrl KodeU
 
 func (k *Kode) GenerateKodeUrlForEntryPoint(
 	routingType RoutingType,
-	domain BaseDomain,
+	domain string,
 	name string,
 	namespace string,
 	protocol string,
@@ -332,8 +313,12 @@ func (k *Kode) GenerateKodeUrlForEntryPoint(
 	}
 }
 
-func (s KodeStorageSpec) IsEmpty() bool {
+func (s *KodeStorageSpec) IsEmpty() bool {
+	if s == nil {
+		return true
+	}
 	return len(s.AccessModes) == 0 &&
 		s.StorageClassName == nil &&
-		(s.Resources.Requests == nil || s.Resources.Requests.Storage().IsZero())
+		s.ExistingVolumeClaim == nil &&
+		(s.Resources == nil || s.Resources.Requests == nil || s.Resources.Requests.Storage().IsZero())
 }

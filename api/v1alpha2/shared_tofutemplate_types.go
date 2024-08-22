@@ -22,12 +22,10 @@ type TofuSharedSpec struct {
 	// BaseSharedSpec is the base shared spec.
 	BaseSharedSpec `json:",inline"`
 
-	// EntryPointSpec defines the desired state of the entrypoint.
-	// +kubebuilder:validation:Description="Desired state of the entrypoint."
+	// Desired state of the entrypoint.
 	EntryPointRef CrossNamespaceObjectReference `json:"entryPointRef,omitempty" yaml:"entryPointRef,omitempty"`
 
-	// TofuSpec is the terraform specification.
-	// +kubebuilder:validation:Description="Terraform specification."
+	// erraform specification.
 	// TofuSpec tofuv1alpha2.TerraformSpec `json:"tofuSpec,omitempty" yaml:"tofuSpec,omitempty"`
 }
 

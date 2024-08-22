@@ -42,8 +42,7 @@ spec:
             properties:
               allowPrivileged:
                 default: false
-                description: AllowPrivileged is a flag to allow privileged execution
-                  of the container.
+                description: Flag to allow privileged execution of the container.
                 type: boolean
               args:
                 description: Specifies the args.
@@ -58,35 +57,37 @@ spec:
               credentials:
                 description: Credentials specifies the credentials for the service.
                 properties:
-                  disableBuiltinAuth:
+                  enableBuiltinAuth:
                     default: false
-                    description: DisableBuiltinAuth disables the built-in HTTP Basic
+                    description: EnableBuiltinAuth enables the built-in HTTP Basic
                       auth.
                     type: boolean
                   existingSecret:
-                    description: ExistingSecret is a reference to an existing secret
-                      containing user and password.
+                    description: |-
+                      ExistingSecret is a reference to an existing secret containing user and password. If set, User and Password fields are ignored.
+                      MUST set "username" and "password" in lowercase in the secret. CAN set either "username" or "password" or both.
                     type: string
                   password:
-                    description: Password HTTP Basic auth password. If unset there
-                      will be no auth.
+                    description: HTTP Basic auth password. If unset, there will be
+                      no authentication.
                     type: string
                   username:
                     default: abc
-                    description: Username is both the the HTTP Basic auth username
-                      (when used) and the user the container should run as, abc is
-                      default.
+                    description: Is both the the HTTP Basic auth username (when used)
+                      and the user the container should run as. Defaults to 'abc'.
                     type: string
+                required:
+                - username
                 type: object
               defaultHome:
                 default: /config
-                description: DefaultHome is the path to the directory for the user
-                  data.
+                description: Default home is the path to the directory for the user
+                  data. Defaults to '/config'.
                 minLength: 3
                 type: string
               defaultWorkspace:
                 default: workspace
-                description: DefaultWorkspace is the default directory for the kode
+                description: Default workspace is the default directory for the kode
                   instance on first launch. Defaults to 'workspace'.
                 minLength: 3
                 pattern: ^[^/].*$
@@ -293,22 +294,23 @@ spec:
                 format: int64
                 type: integer
               initPlugins:
-                description: InitPlugins specifies the OCI containers to be run before
-                  the main container. It is an ordered list.
+                description: OCI containers to be run before the main container. It
+                  is an ordered list.
                 items:
                   properties:
                     args:
-                      description: Args are the arguments to the container.
+                      description: The arguments that will be passed to the command
+                        in the main container.
                       items:
                         type: string
                       type: array
                     command:
-                      description: Command is the command to run in the container.
+                      description: The command to run in the container.
                       items:
                         type: string
                       type: array
                     env:
-                      description: Env are the environment variables to the container.
+                      description: The environment variables for the main container.
                       items:
                         description: EnvVar represents an environment variable present
                           in a Container.
@@ -428,8 +430,8 @@ spec:
                         type: object
                       type: array
                     envFrom:
-                      description: EnvFrom are the environment variables taken from
-                        a Secret or ConfigMap.
+                      description: The environment variables taken from a Secret or
+                        ConfigMap for the main container.
                       items:
                         description: EnvFromSource represents the source of a set
                           of ConfigMaps
@@ -476,14 +478,14 @@ spec:
                         type: object
                       type: array
                     image:
-                      description: Image is the OCI image for the container.
+                      description: The OCI image for the container.
                       type: string
                     name:
-                      description: Name is the name of the container.
+                      description: The name of the container.
                       type: string
                     volumeMounts:
-                      description: VolumeMounts are the volume mounts for the container.
-                        Can be used to mount a ConfigMap or Secret.
+                      description: The volume mounts for the container. Can be used
+                        to mount a ConfigMap or Secret.
                       items:
                         description: VolumeMount describes a mounting of a Volume
                           within a container.
@@ -553,7 +555,7 @@ spec:
                 type: array
               pgid:
                 default: 1000
-                description: PGID is the group ID for the service process.
+                description: Group ID for the service process. Defaults to '1000'.
                 format: int64
                 type: integer
               port:
@@ -565,7 +567,7 @@ spec:
                 type: integer
               puid:
                 default: 1000
-                description: PUID is the user ID for the service process.
+                description: User ID for the service process. Defaults to '1000'.
                 format: int64
                 type: integer
               recycleAfterSeconds:
@@ -575,7 +577,7 @@ spec:
                 format: int64
                 type: integer
               resources:
-                description: Specifies the resources.
+                description: Specifies the resources for the pod.
                 properties:
                   claims:
                     description: |-
@@ -642,14 +644,14 @@ spec:
                 type: string
               tz:
                 default: UTC
-                description: TZ is the timezone for the service process.
+                description: Timezone for the service process. Defaults to 'UTC'.
                 type: string
             type: object
           status:
             description: ClusterPodTemplateStatus defines the observed state of ClusterKodeContainer
             properties:
               conditions:
-                description: Conditions reflect the current state of the template
+                description: Conditions reflect the current state of the resource
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -705,9 +707,16 @@ spec:
                   - type
                   type: object
                 type: array
+              lastError:
+                description: Contains the last error message encountered during reconciliation.
+                type: string
+              lastErrorTime:
+                description: The timestamp when the last error occurred.
+                format: date-time
+                type: string
               observedGeneration:
                 description: ObservedGeneration is the last observed generation of
-                  the Kode resource.
+                  the resource.
                 format: int64
                 type: integer
             type: object

@@ -18,20 +18,16 @@ package v1alpha2
 
 type CrossNamespaceObjectReference struct {
 	// API version of the referent.
-	// +kubebuilder:validation:Description="API version of the referent."
 	// +kubebuilder:validation:Optional
-	APIVersion string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
+	APIVersion *string `json:"apiVersion,omitempty" yaml:"apiVersion,omitempty"`
 
 	// Kind is the resource kind.
-	// +kubebuilder:validation:Description="Resource kind"
 	Kind Kind `json:"kind" yaml:"kind"`
 
 	// Name is the name of the resource.
-	// +kubebuilder:validation:Description="Name of the resource"
 	Name ObjectName `json:"name" yaml:"name"`
 
 	// Namespace is the namespace of the resource.
-	// +kubebuilder:validation:Description="Namespace of the resource"
 	// +kubebuilder:validation:Optional
-	Namespace Namespace `json:"namespace,omitempty" yaml:"namespace,omitempty"`
+	Namespace *Namespace `json:"namespace,omitempty" yaml:"namespace,omitempty"`
 }

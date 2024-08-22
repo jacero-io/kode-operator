@@ -21,33 +21,26 @@ import (
 )
 
 type InitPluginSpec struct {
-	// Name is the name of the container.
-	// +kubebuilder:validation:Description="Name of the container."
+	// The name of the container.
 	// +kubebuilder:validation:Required
 	Name string `json:"name"`
 
-	// Image is the OCI image for the container.
-	// +kubebuilder:validation:Description="OCI image for the container."
+	// The OCI image for the container.
 	// +kubebuilder:validation:Required
 	Image string `json:"image"`
 
-	// Command is the command to run in the container.
-	// +kubebuilder:validation:Description="Command to run in the container."
+	// The command to run in the container.
 	Command []string `json:"command,omitempty"`
 
-	// Args are the arguments to the container.
-	// +kubebuilder:validation:Description="Arguments to the container."
+	// The arguments that will be passed to the command in the main container.
 	Args []string `json:"args,omitempty"`
 
-	// Env are the environment variables to the container.
-	// +kubebuilder:validation:Description="Environment variables to the container."
+	// The environment variables for the main container.
 	Env []corev1.EnvVar `json:"env,omitempty"`
 
-	// EnvFrom are the environment variables taken from a Secret or ConfigMap.
-	// +kubebuilder:validation:Description="Environment variables taken from a Secret or ConfigMap."
+	// The environment variables taken from a Secret or ConfigMap for the main container.
 	EnvFrom []corev1.EnvFromSource `json:"envFrom,omitempty"`
 
-	// VolumeMounts are the volume mounts for the container. Can be used to mount a ConfigMap or Secret.
-	// +kubebuilder:validation:Description="Volume mounts for the container. Can be used to mount a ConfigMap or Secret."
+	// The volume mounts for the container. Can be used to mount a ConfigMap or Secret.
 	VolumeMounts []corev1.VolumeMount `json:"volumeMounts,omitempty"`
 }

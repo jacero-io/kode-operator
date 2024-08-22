@@ -19,58 +19,56 @@ package v1alpha2
 import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 type CredentialsSpec struct {
-	// Username is both the the HTTP Basic auth username (when used) and the user the container should run as, abc is default.
-	// +kubebuilder:validation:Description="Is both the the HTTP Basic auth username (when used) and the user the container should run as. Defaults to 'abc'."
+	// Is both the the HTTP Basic auth username (when used) and the user the container should run as. Defaults to 'abc'.
 	// +kubebuilder:default="abc"
-	Username string `json:"username,omitempty" yaml:"username,omitempty"`
+	Username string `json:"username" yaml:"username"`
 
-	// Password HTTP Basic auth password. If unset there will be no auth.
-	// +kubebuilder:validation:Description="HTTP Basic auth password. If unset, there will be no authentication."
+	// HTTP Basic auth password. If unset, there will be no authentication.
 	Password string `json:"password,omitempty" yaml:"password,omitempty"`
 
-	// ExistingSecret is a reference to an existing secret containing user and password.
-	// +kubebuilder:validation:Description="ExistingSecret is a reference to an existing secret containing user and password. If set, User and Password fields are ignored."
-	ExistingSecret string `json:"existingSecret,omitempty" yaml:"existingSecret,omitempty"`
+	// ExistingSecret is a reference to an existing secret containing user and password. If set, User and Password fields are ignored.
+	// MUST set "username" and "password" in lowercase in the secret. CAN set either "username" or "password" or both.
+	ExistingSecret *string `json:"existingSecret,omitempty" yaml:"existingSecret,omitempty"`
 
-	// DisableBuiltinAuth disables the built-in HTTP Basic auth.
-	// +kubebuilder:validation:Description="Disables the built-in HTTP Basic auth."
+	// EnableBuiltinAuth enables the built-in HTTP Basic auth.
 	// +kubebuilder:default=false
-	DisableBuiltinAuth bool `json:"disableBuiltinAuth,omitempty" yaml:"disableBuiltinAuth,omitempty"`
+	EnableBuiltinAuth bool `json:"enableBuiltinAuth,omitempty" yaml:"enableBuiltinAuth,omitempty"`
 }
 
 // BaseSharedSpec defines the common fields for both Tofu and Container specs
 type BaseSharedSpec struct {
 	// Credentials specifies the credentials for the service.
-	// +kubebuilder:validation:Description="Credentials for the service."
-	Credentials CredentialsSpec `json:"credentials,omitempty" yaml:"credentials,omitempty"`
+	Credentials *CredentialsSpec `json:"credentials,omitempty" yaml:"credentials,omitempty"`
 
 	// EntryPointSpec defines the desired state of the entrypoint.
-	// +kubebuilder:validation:Description="Desired state of the entrypoint."
-	EntryPointRef CrossNamespaceObjectReference `json:"entryPointRef,omitempty" yaml:"entryPointRef,omitempty"`
+	EntryPointRef *CrossNamespaceObjectReference `json:"entryPointRef,omitempty" yaml:"entryPointRef,omitempty"`
 
 	// Specifies the period before controller inactive the resource (delete all resources except volume).
-	// +kubebuilder:validation:Description="Period before controller inactive the resource (delete all resources except volume)."
 	// +kubebuilder:default=600
 	InactiveAfterSeconds *int64 `json:"inactiveAfterSeconds,omitempty" yaml:"inactiveAfterSeconds,omitempty"`
 
 	// Specifies the period before controller recycle the resource (delete all resources).
-	// +kubebuilder:validation:Description="Period before controller recycle the resource (delete all resources)."
 	// +kubebuilder:default=28800
 	RecycleAfterSeconds *int64 `json:"recycleAfterSeconds,omitempty" yaml:"recycleAfterSeconds,omitempty"`
 
 	// Port is the port for the service process. Used by EnvoyProxy to expose the kode.
-	// +kubebuilder:validation:Description="Port for the service. Used by EnvoyProxy to expose the container. Defaults to '8000'."
 	// +kubebuilder:default=8000
-	Port Port `json:"port,omitempty" yaml:"port,omitempty"`
+	Port *Port `json:"port,omitempty" yaml:"port,omitempty"`
 }
 
 // SharedStatus defines the common observed state
 type BaseSharedStatus struct {
-	// ObservedGeneration is the last observed generation of the Kode resource.
+	// ObservedGeneration is the last observed generation of the resource.
 	ObservedGeneration int64 `json:"observedGeneration,omitempty" yaml:"observedGeneration,omitempty"`
 
-	// Conditions reflect the current state of the template
+	// Conditions reflect the current state of the resource
 	Conditions []metav1.Condition `json:"conditions,omitempty" yaml:"conditions,omitempty"`
+
+	// Contains the last error message encountered during reconciliation.
+	LastError *string `json:"lastError,omitempty" yaml:"lastError,omitempty"`
+
+	// The timestamp when the last error occurred.
+	LastErrorTime *metav1.Time `json:"lastErrorTime,omitempty" yaml:"lastErrorTime,omitempty"`
 }
 
 // Template represents a unified structure for different types of Kode templates
@@ -85,7 +83,7 @@ type Template struct {
 	Namespace Namespace `json:"namespace,omitempty" yaml:"namespace,omitempty"`
 
 	// Port is the port to expose the kode instance
-	Port Port `json:"port,omitempty" yaml:"port,omitempty"`
+	Port Port `json:"port" yaml:"port"`
 
 	// PodTemplateSpec is a reference to a PodTemplate or ClusterPodTemplate
 	PodTemplateSpec *PodTemplateSharedSpec `json:"container,omitempty" yaml:"container,omitempty"`
@@ -94,8 +92,7 @@ type Template struct {
 	TofuTemplateSpec *TofuSharedSpec `json:"tofu,omitempty" yaml:"tofu,omitempty"`
 }
 
-// Port is the port for the service process. Used by EnvoyProxy to expose the kode.
-// +kubebuilder:validation:Description="Port for the service. Used by EnvoyProxy to expose the container. Defaults to '8000'."
+// Port for the service. Used by EnvoyProxy to expose the container. Defaults to '8000'.
 // +kubebuilder:validation:Minimum=1
 // +kubebuilder:default=8000
 type Port int32
