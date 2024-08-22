@@ -1,14 +1,27 @@
-# kode-operator
+# kode
 
-<span style="color: red;">DISCLAIMER! THIS PROJECT IS UNDER HEAVY DEVELOPMENT AND NOT MEANT FOR PRODUCTION USE JUST YET.</span>
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+![GitHub release (latest by date)](https://img.shields.io/github/v/release/jacero-io/kode-operator)
+![GitHub last commit](https://img.shields.io/github/last-commit/jacero-io/kode-operator)
+![GitHub issues](https://img.shields.io/github/issues/jacero-io/kode-operator)
+![GitHub pull requests](https://img.shields.io/github/issues-pr/jacero-io/kode-operator)
+[![Go Report Card](https://goreportcard.com/badge/github.com/jacero-io/kode-operator)](https://goreportcard.com/report/github.com/jacero-io/kode-operator)
+![Go Version](https://img.shields.io/badge/Go-v1.22%2B-blue)
+![Kubernetes Version](https://img.shields.io/badge/Kubernetes-v1.29.1%2B-blue)
+![Docker Version](https://img.shields.io/badge/Docker-v25.0.0%2B-blue)
+[![Artifact Hub](https://img.shields.io/endpoint?url=https://artifacthub.io/badge/repository/kode-operator)](https://artifacthub.io/packages/helm/kode-operator/kode-operator)
 
-Kode is designed to enhance the developer experience with a focus on security and observability.
+**DISCLAIMER! THIS PROJECT IS UNDER HEAVY DEVELOPMENT AND NOT MEANT FOR PRODUCTION USE.**
+
+Kode is a cloud-native development environment hosted inside a kubernetes cluster.
 
 ## Overview
 
 Kode-Operator is a Kubernetes operator that manages the entire lifecycle of various ephemeral and semi-ephemeral development environments. It integrates a comprehensive suite of security tools (Falco, Envoy proxy) and observability standards (OpenTelemetry), ensuring robust security and transparency.
 
-Currently, Kode-Operator supports Code-server, Webtop, Alnoda, and Jupyter environments, with plans to support more in the future. It is also easily extendable to support other environments and tools beyond those listed.
+Currently, Kode-Operator supports Code-server, Webtop environments, with plans to support more in the future (eg. Jupyter). It is also easily extendable to support other environments and tools beyond those listed.
+
+The project has planned to manage in-cluster virtual machines using [Virtink](https://github.com/smartxworks/virtink) or external resources with Tofu/Terraform using [tofu-controller](https://github.com/flux-iac/tofu-controller)
 
 ## Description
 
@@ -18,9 +31,10 @@ Kode-Operator simplifies the setup and management of development environments on
 
 * Define your development environments using CRDs for consistent and repeatable setups.
 * Integrated security tools like Falco and Envoy proxy protect your environments.
-* OpenTelemetry standards provide deep insights into your development environments.
-* Manage a variety of development environments such as Code-server, Webtop, Alnoda, and Jupyter.
+* OpenTelemetry standards provide deep insights.
+* Manage a variety of development environments such as Code-server, Webtop, Jupyter.
 * Easily extendable to support additional environments and tools beyond the current offerings.
+* Customize your development environment beforehand by building your own images or inject scripts into the Kode instance using [init plugins]().
 
 ## Key Concepts
 
@@ -38,6 +52,7 @@ spec:
   credentials:
     username: myuser
     password: mypassword
+    enableBuiltinAuth: true
   templateRef:
     kind: PodTemplate
     name: my-kode-template
@@ -49,7 +64,7 @@ spec:
     storageClassName: my-storage-class
     resources:
       requests:
-        storage: 1Gi
+        storage: 5Gi
 ```
 
 ### PodTemplate & ClusterPodTemplate
@@ -87,10 +102,24 @@ spec:
   defaultWorkspace: workspace
 ```
 
-### EntryPoint & EntryPoint
+### EntryPoint & ClusterEntryPoint
 
+This one expect you to have deployed Envoy Gateway and setup a gateway named `eg` in the `default` namespace.
 
 ```yaml
+apiVersion: kode.jacero.io/v1alpha2
+kind: EntryPoint
+metadata:
+  name: entrypoint-sample
+  namespace: default
+spec:
+  routingType: "subdomain"
+  baseDomain: "kode.example.com"
+  gatewaySpec:
+    existingGatewayRef:
+      kind: Gateway
+      name: eg
+      namespace: default
 
 ```
 
@@ -101,9 +130,9 @@ spec:
 * [ ] Authentication - Enforce `Basic auth`, `OIDC`, `JWT`, or `x509` authentication.
 * [ ] Authorization - Make sure only you have access to your stuff!
 * [ ] Observability - Know exactly what is going wrong and how well your development environments are doing.
-* [ ] Customizability - Add any extra configuration or run anything at startup or build your own base images.
+* [x] Customizability - Add any extra configuration or run anything at startup or build your own base images.
 * [ ] Resource Optimization - Remove unused deployments while keeping any persistent data.
-* [ ] CLI - Create templates or Kode instances right behind your keyboard.
+* [ ] CLI - Create templates or Kode instances, right behind your keyboard.
 
 ## Usage Scenarios
 
@@ -125,7 +154,7 @@ spec:
   defaultWorkspace: workspace
 ```
 
-**2. Create a Kode Instance Using the Template:**
+**2. Create a Kode instance using the template:**
 
 ```yaml
 apiVersion: v1alpha2
@@ -252,7 +281,7 @@ If you find a bug or have a feature request, please create an issue in the [issu
 2. Launch the kind cluster:
 
     ```sh
-    task kind-create
+    task setup-dev
     ```
 
 3. Use `task` to run the controller.
@@ -264,8 +293,13 @@ If you find a bug or have a feature request, please create an issue in the [issu
 4. **Run Tests**: Ensure all tests pass before submitting your pull request.
 
     ```sh
-    make test-unit
-    make test-integration
+    task test-integration
+    ```
+
+5. **Teardown dev**: Remove everything.
+
+    ```sh
+    task teardown-dev
     ```
 
 ### Documentation
