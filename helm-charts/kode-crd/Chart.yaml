@@ -2,5 +2,5 @@ apiVersion: v2
 name: kode-crd
 description: A Helm chart containing the Kode Operator Custom Resource Definitions
 type: application
-version: "PLACEHOLDER_VERSION" # This is automatically set by the GitHub Actions workflow
-appVersion: "PLACEHOLDER_VERSION" # This is automatically set by the GitHub Actions workflow
+version: "v0.0.0-latest" # This is automatically set by the GitHub Actions workflow
+appVersion: "v0.0.0-latest" # This is automatically set by the GitHub Actions workflow

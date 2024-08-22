@@ -2,11 +2,11 @@ apiVersion: v2
 name: kode
 description: A Helm chart for the Kode Operator. It installs the Kode Operator and its dependencies.
 type: application
-version: "PLACEHOLDER_VERSION" # This is automatically set by the GitHub Actions workflow
-appVersion: "PLACEHOLDER_VERSION" # This is automatically set by the GitHub Actions workflow
+version: "v0.0.0-latest" # This is automatically set by the GitHub Actions workflow
+appVersion: "v0.0.0-latest" # This is automatically set by the GitHub Actions workflow
 dependencies:
   - name: kode-crd
-    version: "PLACEHOLDER_VERSION" # This is automatically set by the GitHub Actions workflow
+    version: "v0.0.0-latest" # This is automatically set by the GitHub Actions workflow
     repository: "oci://ghcr.io/jacero-io/charts"
   - name: cert-manager
     repository: https://charts.jetstack.io
