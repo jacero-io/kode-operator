@@ -1,0 +1,26 @@
+version: '3'
+
+tasks:
+  fmt:
+    desc: Run go fmt against code
+    cmds:
+      - go fmt ./...
+
+  vet:
+    desc: Run go vet against code
+    cmds:
+      - go vet ./...
+
+  lint:
+    desc: Run golangci-lint linter
+    cmds:
+      - '{{.GOLANGCI_LINT_CMD}} run'
+    deps:
+      - golangci-lint
+
+  lint-fix:
+    desc: Run golangci-lint linter and perform fixes
+    cmds:
+      - '{{.GOLANGCI_LINT_CMD}} run --fix'
+    deps:
+      - golangci-lint

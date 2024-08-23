@@ -4,5 +4,5 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 images:
 - name: controller
-  newName: ghcr.io/jacero-io/kode-operator
-  newTag: "v0.0.0-latest" # This is automatically set by the GitHub Actions workflow
+  newName: emiljacero/kode-operator
+  newTag: latest

@@ -137,15 +137,15 @@ func (m *DefaultTemplateManager) fetchTemplate(ctx context.Context, ref kodev1al
 }
 
 func handleNotFoundError(err error, ref kodev1alpha2.CrossNamespaceObjectReference) error {
-    if errors.IsNotFound(err) {
-        namespacedName := types.NamespacedName{Name: string(ref.Name)}
-        if ref.Namespace != nil {
-            namespacedName.Namespace = string(*ref.Namespace)
-        }
-        return &common.TemplateNotFoundError{
-            NamespacedName: namespacedName,
-            Kind:           string(ref.Kind),
-        }
-    }
-    return err
+	if errors.IsNotFound(err) {
+		namespacedName := types.NamespacedName{Name: string(ref.Name)}
+		if ref.Namespace != nil {
+			namespacedName.Namespace = string(*ref.Namespace)
+		}
+		return &common.TemplateNotFoundError{
+			NamespacedName: namespacedName,
+			Kind:           string(ref.Kind),
+		}
+	}
+	return err
 }

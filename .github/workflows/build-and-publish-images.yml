@@ -59,7 +59,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          file: Dockerfile.multiplatform
+          file: Dockerfile
           platforms: ${{ env.PLATFORMS }}
           push: ${{ github.event.workflow_run.event != 'pull_request' || github.event.workflow_run.head_repository.full_name == github.repository }}
           tags: ${{ steps.meta.outputs.tags }}

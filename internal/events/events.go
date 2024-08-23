@@ -21,8 +21,8 @@ import (
 	"fmt"
 
 	"github.com/go-logr/logr"
+	"github.com/jacero-io/kode-operator/internal/common"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -48,7 +48,7 @@ const (
 
 // EventManager defines the interface for managing events
 type EventManager interface {
-	Record(ctx context.Context, object runtime.Object, eventtype EventType, reason EventReason, message string) error
+	Record(ctx context.Context, object client.Object, eventtype EventType, reason EventReason, message string) error
 }
 
 // defaultEventManager implements EventManager
@@ -70,36 +70,29 @@ func NewEventManager(client client.Client, log logr.Logger, scheme *runtime.Sche
 }
 
 // Record creates and records an event
-func (e *defaultEventManager) Record(ctx context.Context, object runtime.Object, eventtype EventType, reason EventReason, message string) error {
-	metaObj, ok := object.(metav1.Object)
-	if !ok {
-		return fmt.Errorf("object does not implement metav1.Object")
+func (e *defaultEventManager) Record(ctx context.Context, obj client.Object, eventtype EventType, reason EventReason, message string) error {
+	// Add type information to the object
+	if err := common.AddTypeInformationToObject(e.Scheme, obj); err != nil {
+		return fmt.Errorf("failed to add type information to object: %w", err)
 	}
-
 	log := e.Log.WithValues(
-		"kind", object.GetObjectKind().GroupVersionKind().Kind,
-		"name", metaObj.GetName(),
+		"kind", obj.GetObjectKind().GroupVersionKind().Kind,
+		"name", obj.GetName(),
+		"namespace", obj.GetNamespace(),
 	)
 
-	// Handle cluster-scoped resources
-	if metaObj.GetNamespace() != "" {
-		log = log.WithValues("namespace", metaObj.GetNamespace())
-	} else {
-		log = log.WithValues("scope", "cluster")
-	}
-
-	e.EventRecorder.Event(object, string(eventtype), string(reason), message)
+	e.EventRecorder.Event(obj, string(eventtype), string(reason), message)
 
 	logInfo := []interface{}{
-		"object", object.GetObjectKind().GroupVersionKind().Kind,
-		"name", metaObj.GetName(),
+		"object", obj.GetObjectKind().GroupVersionKind().Kind,
+		"name", obj.GetName(),
 		"type", eventtype,
 		"reason", reason,
 	}
 
 	// Add namespace to log info only if it's not empty
-	if metaObj.GetNamespace() != "" {
-		logInfo = append(logInfo, "namespace", metaObj.GetNamespace())
+	if obj.GetNamespace() != "" {
+		logInfo = append(logInfo, "namespace", obj.GetNamespace())
 	} else {
 		logInfo = append(logInfo, "scope", "cluster")
 	}

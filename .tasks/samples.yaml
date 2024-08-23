@@ -1,0 +1,23 @@
+version: '3'
+
+includes:
+  clusters:
+    taskfile: clusters.yaml
+    internal: true
+
+tasks:
+  apply:
+    desc: Apply Kubernetes resources defined in config/samples/ to the cluster
+    cmds:
+      - task: clusters:set-context
+      - '{{.KUBECTL}} apply -k config/samples/podtemplate/'
+      - '{{.KUBECTL}} apply -k config/samples/entrypoint/'
+      - '{{.KUBECTL}} apply -k config/samples/kode/'
+
+  delete:
+    desc: Delete Kubernetes resources defined in config/samples/ from the cluster
+    cmds:
+      - task: clusters:set-context
+      - '{{.KUBECTL}} delete -k config/samples/kode/'
+      - '{{.KUBECTL}} delete -k config/samples/entrypoint/'
+      - '{{.KUBECTL}} delete -k config/samples/podtemplate/'

@@ -1,0 +1,12 @@
+version: '3'
+
+tasks:
+  deploy:
+    desc: Deploy Flux
+    cmds:
+      - timoni bundle apply -f ./hack/development/bundle.cue
+
+  undeploy:
+    desc: Undeploy Flux
+    cmds:
+      - timoni bundle delete -f ./hack/development/bundle.cue

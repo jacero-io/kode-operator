@@ -1,0 +1,49 @@
+version: '3'
+
+tasks:
+  ensure-dir:
+    internal: true
+    desc: Ensure the local bin directory exists
+    cmds:
+      - mkdir -p {{.LOCALBIN}}
+
+  kustomize:
+    desc: Download kustomize locally if necessary
+    deps: [ensure-dir]
+    cmds:
+      - go install sigs.k8s.io/kustomize/kustomize/v5@{{.KUSTOMIZE_VERSION}}
+      - mv {{.GOBIN}}/kustomize {{.KUSTOMIZE_CMD}}
+
+  controller-gen:
+    desc: Download controller-gen locally if necessary and create/update symlink
+    deps: [ensure-dir]
+    cmds:
+      - |
+        if [ ! -f {{.CONTROLLER_GEN_CMD}}-{{.CONTROLLER_TOOLS_VERSION}} ]; then
+          echo "Downloading controller-gen {{.CONTROLLER_TOOLS_VERSION}}..."
+          go install sigs.k8s.io/controller-tools/cmd/controller-gen@{{.CONTROLLER_TOOLS_VERSION}}
+          mkdir -p {{.LOCALBIN}}
+          mv $(go env GOPATH)/bin/controller-gen {{.CONTROLLER_GEN_CMD}}-{{.CONTROLLER_TOOLS_VERSION}}
+        fi
+      - ln -sf {{.CONTROLLER_GEN_CMD}}-{{.CONTROLLER_TOOLS_VERSION}} {{.CONTROLLER_GEN_CMD}}
+
+  envtest:
+    desc: Download setup-envtest locally if necessary
+    deps: [ensure-dir]
+    cmds:
+      - go install sigs.k8s.io/controller-runtime/tools/setup-envtest@{{.ENVTEST_VERSION}}
+      - mv {{.GOBIN}}/setup-envtest {{.SETUP_ENVTEST_CMD}}
+
+  golangci-lint:
+    desc: Download golangci-lint locally if necessary
+    deps: [ensure-dir]
+    cmds:
+      - go install github.com/golangci/golangci-lint/cmd/golangci-lint@{{.GOLANGCI_LINT_VERSION}}
+      - mv {{.GOBIN}}/golangci-lint {{.GOLANGCI_LINT_CMD}}
+
+  helmify:
+    desc: Download helmify locally if necessary
+    deps: [ensure-dir]
+    cmds:
+      - go install github.com/arttor/helmify/cmd/helmify@{{.HELMIFY_VERSION}}
+      - mv {{.GOBIN}}/helmify {{.HELMIFY_CMD}}

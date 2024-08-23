@@ -1,0 +1,90 @@
+version: '3'
+
+includes:
+  tools:
+    taskfile: tools.yaml
+    internal: true
+  lint: 
+    taskfile: lint.yaml
+    internal: true
+  clusters:
+    taskfile: clusters.yaml
+    internal: true
+  build:
+    taskfile: build.yaml
+    internal: true
+  flux:
+    taskfile: flux.yaml
+    internal: true
+  envoy:
+    taskfile: envoy.yaml
+    internal: true
+
+tasks:
+  run:
+    desc: Run a controller from your host
+    vars:
+      LOG_LEVEL: 'debug'
+    cmds:
+      - '{{.CONTROLLER_GEN_CMD}} rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases'
+      - |
+        LOG_LEVEL_ARG="{{if .LOG_LEVEL}}{{.LOG_LEVEL}}{{else}}debug{{end}}"
+        ENV={{.ENV}} go run ./cmd/main.go --log-level $LOG_LEVEL_ARG {{.CLI_ARGS}} 2>&1 | tee output.log
+    deps:
+      - tools:controller-gen
+      - build:manifests
+      - build:generate
+      - lint:fmt
+      - lint:vet
+      - install
+
+  install:
+    internal: true
+    desc: Install CRDs into the cluster (Kind by default, or existing kubecontext)
+    cmds:
+      - task: clusters:set-context
+      - '{{.KUSTOMIZE_CMD}} build {{.ROOT_DIR}}/config/crd | {{.KUBECTL}} apply -f -'
+
+  uninstall:
+    internal: true
+    desc: Uninstall CRDs from the cluster (Kind by default, or existing kubecontext)
+    cmds:
+      - task: clusters:set-context
+      - '{{.KUSTOMIZE_CMD}} build {{.ROOT_DIR}}/config/crd | {{.KUBECTL}} delete --ignore-not-found={{.IGNORE_NOT_FOUND}} -f -'
+
+  deploy:
+    desc: Deploy controller to the specified cluster (Kind or remote)
+    deps:
+      - build:build-installer
+    vars:
+      DEPLOY_TYPE: '{{if eq .USE_KIND_CONTEXT "true"}}kind{{else}}remote{{end}}'
+    cmds:
+      - task: install
+      - |
+        # Update the image in the deployment YAML
+        sed -i 's|image: .*controller:.*|image: {{.IMG}}|' {{.ROOT_DIR}}/dist/install.yaml
+      - task: clusters:deploy-{{.DEPLOY_TYPE}}-prep
+      - task: clusters:deploy-{{.DEPLOY_TYPE}}
+
+  undeploy:
+    desc: Undeploy controller from the specified cluster
+    vars:
+      DEPLOY_TYPE: '{{if eq .USE_KIND_CONTEXT "true"}}kind{{else}}remote{{end}}'
+    cmds:
+      - task: clusters:undeploy-{{.DEPLOY_TYPE}}
+      - task: uninstall
+
+  setup:
+    desc: Set up the complete development environment
+    cmds:
+      - task: kind-ensure
+      - task: flux:deploy
+      - task: envoy:deploy
+      - task: envoy:install
+      - echo "Development environment is ready!"
+
+  teardown:
+    desc: Tear down the complete development environment
+    cmds:
+      - task: clusters:kind-destroy
+      - echo "Development environment has been torn down."

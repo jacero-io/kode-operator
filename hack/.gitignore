@@ -1,1 +1,4 @@
 certs/*
+dist
+config
+concatenated_output.txt

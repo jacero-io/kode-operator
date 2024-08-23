@@ -34,3 +34,4 @@ concatenated_output.txt
 .DS_Store
 output.log
 kode*.tgz
+dist

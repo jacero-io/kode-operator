@@ -1,0 +1,71 @@
+version: '3'
+
+tasks:
+  create-dev-cert:
+    desc: Create a development certificate for Envoy Gateway if it doesn't exist¨
+    cmds:
+      - mkdir -p {{.ROOT_DIR}}/hack/certs
+      - |
+        if [ ! -f {{.ROOT_DIR}}/hack/certs/example.com.crt ] || [ ! -f {{.ROOT_DIR}}/hack/certs/example.com.key ]; then
+          echo "Certificate files don't exist. Creating new certificate..."
+          openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout {{.ROOT_DIR}}/hack/certs/example.com.key -out {{.ROOT_DIR}}/hack/certs/example.com.crt -subj "/CN=*.example.com"
+        else
+          echo "Certificate files already exist. Skipping creation."
+        fi
+      - |
+        cat <<EOF > {{.ROOT_DIR}}/hack/certs/example-com-secret.yaml
+        apiVersion: v1
+        kind: Secret
+        metadata:
+          name: example-com
+          namespace: default
+        type: kubernetes.io/tls
+        data:
+          tls.crt: $(base64 -w 0 < {{.ROOT_DIR}}/hack/certs/example.com.crt)
+          tls.key: $(base64 -w 0 < {{.ROOT_DIR}}/hack/certs/example.com.key)
+        EOF
+      - echo "Certificate and Secret YAML created/updated in {{.ROOT_DIR}}/hack/certs/"
+    silent: true
+
+  apply-dev-cert:
+    desc: Apply the development certificate secret to the Kubernetes cluster
+    deps:
+      - create-dev-cert
+    cmds:
+      - kubectl apply -f {{.ROOT_DIR}}/hack/certs/example-com-secret.yaml
+    silent: true
+
+  deploy:
+    desc: Deploy Envoy Gateway
+    cmds:
+      - |
+        helm upgrade --install eg oci://docker.io/envoyproxy/gateway-helm \
+          --version {{.ENVOY_GATEWAY_VERSION}} \
+          -n {{.ENVOY_GATEWAY_NAMESPACE}} \
+          --create-namespace \
+          {{.ENVOY_GATEWAY_EXTRA_ARGS}}
+    vars:
+      ENVOY_GATEWAY_VERSION: 'v0.0.0-latest'
+      ENVOY_GATEWAY_NAMESPACE: 'envoy-gateway-system'
+      ENVOY_GATEWAY_EXTRA_ARGS: ''
+
+  undeploy:
+    desc:  Undeploy Envoy Gateway
+    cmds:
+      - helm uninstall eg -n {{.ENVOY_GATEWAY_NAMESPACE}}
+      - kubectl delete namespace {{.ENVOY_GATEWAY_NAMESPACE}} --ignore-not-found
+    vars:
+      ENVOY_GATEWAY_NAMESPACE: 'envoy-gateway-system'
+
+  install:
+    desc: Install Envoy Gateway manifests
+    deps:
+      - apply-dev-cert
+      - deploy
+    cmds:
+      - kubectl apply -f ./hack/development/eg.yaml -n default
+
+  uninstall:	
+    desc: Uninstall Envoy Gateway manifests
+    cmds:
+      - kubectl delete -f ./hack/development/eg.yaml -n default
