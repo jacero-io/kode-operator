@@ -1,7 +1,6 @@
 version: '3'
 
 vars:
-  IMG: controller:latest
   ENVTEST_K8S_VERSION: 1.30.0
   GO_VERSION: '1.22'
   GOBIN:
@@ -18,8 +17,13 @@ vars:
   TEST_VERBOSITY: -v
   ENV: development
   LOG_LEVEL: info
-  KIND_CLUSTER_NAME: test
-  KIND_CONTEXT: kind-{{.KIND_CLUSTER_NAME}}
+
+  IGNORE_NOT_FOUND: '{{.IGNORE_NOT_FOUND | default "false"}}'
+  USE_KIND_CONTEXT: '{{.USE_KIND_CONTEXT | default "true"}}'
+  KIND_KUBECONFIG: '{{.KIND_KUBECONFIG | default "${HOME}/.kube/kind-config-test"}}'
+  KIND_CONTEXT: '{{.KIND_CONTEXT | default "kind-test"}}'
+  KIND_CLUSTER_NAME: '{{.KIND_CLUSTER_NAME | default "test"}}'
+  IMG: '{{.IMG | default "controller:latest"}}'
 
 tasks:
   default:
@@ -208,7 +212,13 @@ tasks:
 
   kind-load-image:
     cmds:
-      - kind load docker-image {{.IMG}} --name test
+      - |
+        if [ "{{.USE_KIND_CONTEXT}}" = "true" ]; then
+          echo "Using Kind context..."
+          kind load docker-image {{.IMG}} --name {{.KIND_CLUSTER_NAME}}
+        else
+          echo "Skipping image load for non-Kind context"
+        fi
     deps:
       - docker-build
 
@@ -222,19 +232,150 @@ tasks:
         - linuxserver/code-server:latest
         - linuxserver/webtop:debian-xfce
     cmds:
-      - for img in {{.INT_IMAGES_TO_LOAD}}; do
-          echo "Loading $img";
-          kind load docker-image $img --name test;
-        done
       - |
-        for img in {{range .EXT_IMAGES_TO_LOAD}}"{{.}}" {{end}}; do
-          echo "Pulling $img";
-          {{.CONTAINER_TOOL}} pull $img;
-          echo "Loading $img";
-          kind load docker-image $img --name test;
-        done
+        if [ "{{.USE_KIND_CONTEXT}}" = "true" ]; then
+          echo "Using Kind context..."
+          for img in {{.INT_IMAGES_TO_LOAD}}; do
+            echo "Loading $img";
+            kind load docker-image $img --name {{.KIND_CLUSTER_NAME}};
+          done
+          for img in {{range .EXT_IMAGES_TO_LOAD}}"{{.}}" {{end}}; do
+            echo "Pulling $img";
+            {{.CONTAINER_TOOL}} pull $img;
+            echo "Loading $img";
+            kind load docker-image $img --name {{.KIND_CLUSTER_NAME}};
+          done
+        else
+          echo "Skipping image load for non-Kind context"
+        fi
     deps:
       - docker-build
+
+  #### HELM BUILD & PACKAGE ####
+  helm-package-kode-crd:
+    desc: Build and package kode-crd Helm chart
+    deps: [manifests, generate, helmify]
+    vars:
+      VERSION: '{{.CLI_ARGS | default "v0.0.0-latest"}}'
+    cmds:
+      - echo "Building kode-crd chart from config/crd..."
+      - '{{.LOCALBIN}}/kustomize-{{.KUSTOMIZE_VERSION}} build config/crd | {{.LOCALBIN}}/helmify-{{.HELMIFY_VERSION}} helm-charts/kode-crd'
+      - echo "Packaging kode-crd chart version {{.VERSION}}..."
+      - mkdir -p /tmp/helm-charts/kode-crd
+      - cp -r helm-charts/kode-crd/* /tmp/helm-charts/kode-crd/
+      - sed -i "s/v0.0.0-latest/{{.VERSION}}/g" /tmp/helm-charts/kode-crd/Chart.yaml
+      - sed -i "s/v0.0.0-latest/{{.VERSION}}/g" /tmp/helm-charts/kode-crd/README.md
+      - sed -i "s/v0.0.0--latest/{{.VERSION}}/g" /tmp/helm-charts/kode-crd/README.md # Special case for the img.shields.io badge
+      - helm package /tmp/helm-charts/kode-crd --version {{.VERSION}} --destination /tmp
+      - mv /tmp/kode-crd-{{.VERSION}}.tgz ./kode-crd-{{.VERSION}}.tgz
+      - rm -rf /tmp/helm-charts/kode-crd
+
+  helm-package-kode:
+    desc: Build and package kode Helm chart
+    deps: [manifests, generate, helmify]
+    vars:
+      VERSION: '{{.CLI_ARGS | default "v0.0.0-latest"}}'
+    cmds:
+      - echo "Building kode chart from config/crd..."
+      - '{{.LOCALBIN}}/kustomize-{{.KUSTOMIZE_VERSION}} build config/default | {{.LOCALBIN}}/helmify-{{.HELMIFY_VERSION}}  -generate-defaults -image-pull-secrets helm-charts/kode'
+      - echo "Packaging kode chart version {{.VERSION}}..."
+      - mkdir -p /tmp/helm-charts/kode
+      - cp -r helm-charts/kode/* /tmp/helm-charts/kode/
+      - sed -i "s/v0.0.0-latest/{{.VERSION}}/g" /tmp/helm-charts/kode/Chart.yaml
+      - sed -i "s/v0.0.0-latest/{{.VERSION}}/g" /tmp/helm-charts/kode/values.yaml
+      - sed -i "s/v0.0.0-latest/{{.VERSION}}/g" /tmp/helm-charts/kode/README.md
+      - sed -i "s/v0.0.0--latest/{{.VERSION}}/g" /tmp/helm-charts/kode/README.md # Special case for the img.shields.io badge
+      - helm package /tmp/helm-charts/kode --version {{.VERSION}} --destination /tmp
+      - mv /tmp/kode-{{.VERSION}}.tgz ./kode-{{.VERSION}}.tgz
+      - rm -rf /tmp/helm-charts/kode
+
+  helm-package:
+    desc: Build and package all Helm charts
+    vars:
+      VERSION: '{{.CLI_ARGS | default "v0.0.0-latest"}}'
+    cmds:
+      - task: helm-package-kode-crd
+        vars: { VERSION: '{{.VERSION}}' }
+      - task: helm-package-kode
+        vars: { VERSION: '{{.VERSION}}' }
+
+  helm-manage-kode-crd:
+    desc: Install or uninstall kode-crd Helm chart on the cluster
+    vars:
+      RELEASE_NAME: 'kode-crd'
+      NAMESPACE: 'kode-system'
+      VERSION: '{{.VERSION | default "v0.0.0-latest"}}'
+      ACTION: '{{.ACTION | default "install"}}'
+    cmds:
+      - |
+        if [ "{{.ACTION}}" = "install" ]; then
+          echo "Installing/upgrading kode-crd chart version {{.VERSION}} onto the cluster..."
+          helm upgrade --install {{.RELEASE_NAME}} ./kode-crd-{{.VERSION}}.tgz \
+            --namespace {{.NAMESPACE}} \
+            --create-namespace \
+            --wait \
+            --timeout 5m
+          echo "kode-crd chart version {{.VERSION}} installed/upgraded successfully as release {{.RELEASE_NAME}} in namespace {{.NAMESPACE}}"
+        elif [ "{{.ACTION}}" = "uninstall" ]; then
+          echo "Uninstalling kode-crd chart release {{.RELEASE_NAME}} from namespace {{.NAMESPACE}}..."
+          helm uninstall {{.RELEASE_NAME}} --namespace {{.NAMESPACE}} || true
+          echo "kode-crd chart release {{.RELEASE_NAME}} uninstalled from namespace {{.NAMESPACE}}"
+        else
+          echo "Invalid ACTION: {{.ACTION}}. Use 'install' or 'uninstall'."
+          exit 1
+        fi
+    preconditions:
+      - sh: '[ "{{.ACTION}}" = "uninstall" ] || test -f ./kode-crd-{{.VERSION}}.tgz'
+        msg: "Chart package kode-crd-{{.VERSION}}.tgz not found. Please run 'task helm-package-kode-crd' first."
+
+  helm-manage-kode:
+    desc: Install or uninstall kode Helm chart on the cluster
+    vars:
+      RELEASE_NAME: 'kode'
+      NAMESPACE: 'kode-system'
+      VERSION: '{{.VERSION | default "v0.0.0-latest"}}'
+      ACTION: '{{.ACTION | default "install"}}'
+      CONTROLLER_IMAGE_TAG: 'sha-74a3c61'
+    cmds:
+      - |
+        if [ "{{.ACTION}}" = "install" ]; then
+          echo "Installing/upgrading kode chart version {{.VERSION}} onto the cluster..."
+          helm upgrade --install {{.RELEASE_NAME}} ./kode-{{.VERSION}}.tgz \
+            --namespace {{.NAMESPACE}} \
+            --create-namespace \
+            --set controllerManager.manager.image.tag={{.CONTROLLER_IMAGE_TAG}} \
+            --wait \
+            --timeout 5m
+          echo "kode chart version {{.VERSION}} installed/upgraded successfully as release {{.RELEASE_NAME}} in namespace {{.NAMESPACE}} with controller image tag {{.CONTROLLER_IMAGE_TAG}}"
+        elif [ "{{.ACTION}}" = "uninstall" ]; then
+          echo "Uninstalling kode chart release {{.RELEASE_NAME}} from namespace {{.NAMESPACE}}..."
+          helm uninstall {{.RELEASE_NAME}} --namespace {{.NAMESPACE}} || true
+          echo "kode chart release {{.RELEASE_NAME}} uninstalled from namespace {{.NAMESPACE}}"
+        else
+          echo "Invalid ACTION: {{.ACTION}}. Use 'install' or 'uninstall'."
+          exit 1
+        fi
+    preconditions:
+      - sh: '[ "{{.ACTION}}" = "uninstall" ] || test -f ./kode-{{.VERSION}}.tgz'
+        msg: "Chart package kode-{{.VERSION}}.tgz not found. Please run 'task helm-package-kode' first."
+
+  helm-manage:
+    desc: Install or uninstall all kode Helm charts on the cluster
+    vars:
+      NAMESPACE: 'kode-system'
+      VERSION: '{{.VERSION | default "v0.0.0-latest"}}'
+      ACTION: '{{.ACTION | default "install"}}'
+    cmds:
+      - task: helm-manage-kode-crd
+        vars:
+          NAMESPACE: '{{.NAMESPACE}}'
+          VERSION: '{{.VERSION}}'
+          ACTION: '{{.ACTION}}'
+      - task: helm-manage-kode
+        vars:
+          NAMESPACE: '{{.NAMESPACE}}'
+          VERSION: '{{.VERSION}}'
+          ACTION: '{{.ACTION}}'
 
   #### DOCKER BUILD ####
   manifests:
@@ -261,26 +402,6 @@ tasks:
       - fmt
       - vet
 
-  docker-build:
-    desc: Build docker image with the manager
-    cmds:
-      - '{{.CONTAINER_TOOL}} build -t {{.IMG}} .'
-
-  docker-buildx:
-    desc: Build and push docker image for the manager for cross-platform support
-    cmds:
-      - sed -e '1 s/\(^FROM\)/FROM --platform=\$$\{BUILDPLATFORM\}/; t' -e ' 1,// s//FROM --platform=\$$\{BUILDPLATFORM\}/' Dockerfile > Dockerfile.cross
-      - '{{.CONTAINER_TOOL}} buildx create --name project-v3-builder || true'
-      - '{{.CONTAINER_TOOL}} buildx use project-v3-builder'
-      - '{{.CONTAINER_TOOL}} buildx build --push --platform={{.PLATFORMS}} --tag {{.IMG}} -f Dockerfile.cross .'
-      - '{{.CONTAINER_TOOL}} buildx rm project-v3-builder || true'
-      - rm Dockerfile.cross
-
-  docker-push:
-    desc: Push docker image with the manager
-    cmds:
-      - '{{.CONTAINER_TOOL}} push {{.IMG}}'
-
   build-installer:
     desc: Generate a consolidated YAML with CRDs and deployment
     cmds:
@@ -292,163 +413,103 @@ tasks:
       - generate
       - kustomize
 
-  #### HELM BUILD ####
-  helm-build-kode-crd:
-    desc: Package kode-crd Helm chart
-    deps: [manifests, generate, helmify]
+  docker-build-local:
+    desc: Build docker image locally
     cmds:
-      - echo "Building kode-crd chart from config/crd..."
-      - '{{.LOCALBIN}}/kustomize-{{.KUSTOMIZE_VERSION}} build config/crd | {{.LOCALBIN}}/helmify-{{.HELMIFY_VERSION}} helm-charts/kode-crd'
+      - '{{.CONTAINER_TOOL}} build -t {{.IMG}} .'
 
-  helm-package-kode-crd:
-    desc: Package kode-crd Helm chart
-    deps: [helm-build-kode-crd]
-    vars:
-      VERSION: '{{.CLI_ARGS | default "v0.0.0-latest"}}'
+  docker-push-if-needed:
+    desc: Push docker image if not using a local cluster
     cmds:
-      - echo "Packaging kode-crd chart version {{.VERSION}}..."
-      - mkdir -p /tmp/helm-charts/kode-crd
-      - cp -r helm-charts/kode-crd/* /tmp/helm-charts/kode-crd/
-      - sed -i "s/v0.0.0-latest/{{.VERSION}}/g" /tmp/helm-charts/kode-crd/Chart.yaml
-      - sed -i "s/v0.0.0-latest/{{.VERSION}}/g" /tmp/helm-charts/kode-crd/README.md
-      - sed -i "s/v0.0.0--latest/{{.VERSION}}/g" /tmp/helm-charts/kode-crd/README.md # Special case for the img.shields.io badge
-      - helm package /tmp/helm-charts/kode-crd --version {{.VERSION}} --destination /tmp
-      - mv /tmp/kode-crd-{{.VERSION}}.tgz ./kode-crd-{{.VERSION}}.tgz
-      - rm -rf /tmp/helm-charts/kode-crd
-
-  helm-build-kode:
-    desc: Build kode Helm chart
-    deps: [manifests, generate, helmify]
-    cmds:
-      - echo "Building kode chart from config/crd..."
-      - '{{.LOCALBIN}}/kustomize-{{.KUSTOMIZE_VERSION}} build config/default | {{.LOCALBIN}}/helmify-{{.HELMIFY_VERSION}}  -generate-defaults -image-pull-secrets helm-charts/kode'
-
-  helm-package-kode:
-    desc: Package kode Helm chart
-    deps: [helm-build-kode]
-    vars:
-      VERSION: '{{.CLI_ARGS | default "v0.0.0-latest"}}'
-    cmds:
-      - echo "Packaging kode chart version {{.VERSION}}..."
-      - mkdir -p /tmp/helm-charts/kode
-      - cp -r helm-charts/kode/* /tmp/helm-charts/kode/
-      - sed -i "s/v0.0.0-latest/{{.VERSION}}/g" /tmp/helm-charts/kode/Chart.yaml
-      - sed -i "s/v0.0.0-latest/{{.VERSION}}/g" /tmp/helm-charts/kode/values.yaml
-      - sed -i "s/v0.0.0-latest/{{.VERSION}}/g" /tmp/helm-charts/kode/README.md
-      - sed -i "s/v0.0.0--latest/{{.VERSION}}/g" /tmp/helm-charts/kode/README.md # Special case for the img.shields.io bagde
-      - helm package /tmp/helm-charts/kode --version {{.VERSION}} --destination /tmp
-      - mv /tmp/kode-{{.VERSION}}.tgz ./kode-{{.VERSION}}.tgz
-      - rm -rf /tmp/helm-charts/kode
-
-  helm-build:
-    desc: Package all Helm charts
-    cmds:
-      - task: helm-build-kode-crd
-      - task: helm-build-kode
-
-  helm-package:
-    desc: Package all Helm charts
-    vars:
-      VERSION: '{{.CLI_ARGS | default "v0.0.0-latest"}}'
-    cmds:
-      - task: helm-package-kode-crd
-        vars: { VERSION: '{{.VERSION}}' }
-      - task: helm-package-kode
-        vars: { VERSION: '{{.VERSION}}' }
-
-  helm-install-kode:
-    desc: Install locally packaged kode Helm chart onto the cluster
-    vars:
-      RELEASE_NAME: 'kode'
-      NAMESPACE: 'kode-system'
-      VERSION: '{{.VERSION | default "v0.0.0-latest"}}'
-      CONTROLLER_IMAGE_TAG: 'latest'
-    cmds:
-      - echo "Installing kode chart version {{.VERSION}} onto the cluster..."
       - |
-        helm upgrade --install {{.RELEASE_NAME}} ./kode-{{.VERSION}}.tgz \
-          --namespace {{.NAMESPACE}} \
-          --create-namespace \
-          --set controllerManager.manager.image.tag={{.CONTROLLER_IMAGE_TAG}} \
-          --wait \
-          --timeout 5m
-      - echo "kode chart version {{.VERSION}} installed successfully as release {{.RELEASE_NAME}} in namespace {{.NAMESPACE}} with controller image tag {{.CONTROLLER_IMAGE_TAG}}"
-    preconditions:
-      - sh: test -f ./kode-{{.VERSION}}.tgz
-        msg: "Chart package kode-{{.VERSION}}.tgz not found. Please run 'task helm-package-kode' first."
+        if [ "{{.USE_KIND_CONTEXT}}" != "true" ] && [ "{{.CLUSTER_TYPE}}" != "minikube" ]; then
+          echo "Pushing image to registry..."
+          {{.CONTAINER_TOOL}} push {{.IMG}}
+        else
+          echo "Skipping push for local cluster"
+        fi
 
-  helm-install-kode-crd:
-    desc: Install locally packaged kode-crd Helm chart onto the cluster
-    vars:
-      RELEASE_NAME: 'kode-crd'
-      NAMESPACE: 'kode-system'
-      VERSION: '{{.VERSION | default "v0.0.0-latest"}}'
+  load-image-to-cluster:
+    desc: Load the locally built image into the Kind cluster
     cmds:
-      - echo "Installing kode-crd chart version {{.VERSION}} onto the cluster..."
-      - echo "Chart file ./kode-crd-{{.VERSION}}.tgz"
-      - ls -l ./kode-crd-{{.VERSION}}.tgz || echo "Chart file not found!"
       - |
-        helm upgrade --install {{.RELEASE_NAME}} ./kode-crd-{{.VERSION}}.tgz \
-          --namespace {{.NAMESPACE}} \
-          --create-namespace \
-          --wait \
-          --timeout 5m
-      - echo "kode-crd chart version {{.VERSION}} installed successfully as release {{.RELEASE_NAME}} in namespace {{.NAMESPACE}}"
-    preconditions:
-      - sh: test -f ./kode-crd-{{.VERSION}}.tgz
-        msg: "Chart package kode-crd-{{.VERSION}}.tgz not found. Please run 'task helm-package-kode-crd' first."
+        if [ "{{.USE_KIND_CONTEXT}}" = "true" ]; then
+          echo "Loading image into Kind cluster..."
+          kind load docker-image {{.IMG}} --name {{.KIND_CLUSTER_NAME}}
+        else
+          echo "Skipping image load for non-Kind cluster"
+        fi
 
-  helm-install:
-    desc: Install locally packaged Helm chart onto the cluster
-    vars:
-      NAMESPACE: '{{.CHART_NAME}}-system'
-      VERSION: '{{.VERSION | default "v0.0.0-latest"}}'
-      CONTROLLER_IMAGE_TAG: 'sha-94f7ae3'
+  docker-buildx:
+    desc: Build docker image for the manager with cross-platform support
     cmds:
-      - task: helm-install-kode-crd
-        vars:
-          VERSION: '{{.VERSION}}'
-          NAMESPACE: '{{.NAMESPACE}}'
-          CONTROLLER_IMAGE_TAG : '{{.CONTROLLER_IMAGE_TAG}}'
-      - task: helm-install-kode
-        vars:
-          NAMESPACE: '{{.NAMESPACE}}'
-          VERSION: '{{.VERSION}}'
+      - |
+        BUILDER_NAME="project-v3-builder"
+        if ! {{.CONTAINER_TOOL}} buildx inspect $BUILDER_NAME > /dev/null 2>&1; then
+          {{.CONTAINER_TOOL}} buildx create --name $BUILDER_NAME --use
+        else
+          {{.CONTAINER_TOOL}} buildx use $BUILDER_NAME
+        fi
+      - |
+        if [ "{{.PUSH}}" = "true" ]; then
+          echo "Building and pushing multi-platform image..."
+          {{.CONTAINER_TOOL}} buildx build --platform={{.PLATFORMS}} --tag {{.IMG}} --build-arg BUILDPLATFORM={{.BUILDPLATFORM}} --push .
+        elif [ "{{.LOAD}}" = "true" ]; then
+          echo "Building and loading images for each platform..."
+          IFS=',' read -ra PLATFORM_ARRAY <<< "{{.PLATFORMS}}"
+          for PLATFORM in "${PLATFORM_ARRAY[@]}"; do
+            echo "Building for $PLATFORM..."
+            {{.CONTAINER_TOOL}} buildx build --platform=$PLATFORM --tag {{.IMG}}-$PLATFORM --build-arg BUILDPLATFORM={{.BUILDPLATFORM}} --load .
+          done
+        else
+          echo "Building multi-platform image without pushing..."
+          {{.CONTAINER_TOOL}} buildx build --platform={{.PLATFORMS}} --tag {{.IMG}} --build-arg BUILDPLATFORM={{.BUILDPLATFORM}} .
+        fi
+    vars:
+      PUSH: '{{.PUSH | default "false"}}'
+      LOAD: '{{.LOAD | default "false"}}'
+      PLATFORMS: '{{.PLATFORMS | default "linux/arm64,linux/amd64,linux/s390x,linux/ppc64le"}}'
+      BUILDPLATFORM: '{{.BUILDPLATFORM | default "${BUILDPLATFORM}"}}'
 
-  helm-uninstall-kode:
-    desc: Uninstall kode Helm chart from the cluster
-    vars:
-      RELEASE_NAME: 'kode'
-      NAMESPACE: 'kode-system'
+  docker-push:
+    desc: Push docker image with the manager
     cmds:
-      - echo "Uninstalling kode chart release {{.RELEASE_NAME}} from namespace {{.NAMESPACE}}..."
-      - helm uninstall {{.RELEASE_NAME}} --namespace {{.NAMESPACE}}
-      - echo "kode chart release {{.RELEASE_NAME}} uninstalled successfully from namespace {{.NAMESPACE}}"
-
-  helm-uninstall-kode-crd:
-    desc: Uninstall kode-crd Helm chart from the cluster
-    vars:
-      RELEASE_NAME: 'kode-crd'
-      NAMESPACE: 'kode-system'
-    cmds:
-      - echo "Uninstalling kode-crd chart release {{.RELEASE_NAME}} from namespace {{.NAMESPACE}}..."
-      - helm uninstall {{.RELEASE_NAME}} --namespace {{.NAMESPACE}}
-      - echo "kode-crd chart release {{.RELEASE_NAME}} uninstalled successfully from namespace {{.NAMESPACE}}"
-
-  helm-uninstall:
-    desc: Uninstall all kode Helm charts from the cluster
-    vars:
-      NAMESPACE: 'kode-system'
-    cmds:
-      - task: helm-uninstall-kode
-        vars:
-          NAMESPACE: '{{.NAMESPACE}}'
-      - task: helm-uninstall-kode-crd
-        vars:
-          NAMESPACE: '{{.NAMESPACE}}'
-      - echo "All kode charts uninstalled successfully from namespace {{.NAMESPACE}}"
+      - '{{.CONTAINER_TOOL}} push {{.IMG}}'
 
   #### DEVELOPMENT ####
+  create-dev-cert:
+    desc: Create a development certificate for Envoy Gateway if it doesn't exist
+    cmds:
+      - mkdir -p {{.ROOT_DIR}}/hack/certs
+      - |
+        if [ ! -f {{.ROOT_DIR}}/hack/certs/example.com.crt ] || [ ! -f {{.ROOT_DIR}}/hack/certs/example.com.key ]; then
+          echo "Certificate files don't exist. Creating new certificate..."
+          openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout {{.ROOT_DIR}}/hack/certs/example.com.key -out {{.ROOT_DIR}}/hack/certs/example.com.crt -subj "/CN=*.example.com"
+        else
+          echo "Certificate files already exist. Skipping creation."
+        fi
+      - |
+        cat <<EOF > {{.ROOT_DIR}}/hack/certs/example-com-secret.yaml
+        apiVersion: v1
+        kind: Secret
+        metadata:
+          name: example-com
+          namespace: default
+        type: kubernetes.io/tls
+        data:
+          tls.crt: $(base64 -w 0 < {{.ROOT_DIR}}/hack/certs/example.com.crt)
+          tls.key: $(base64 -w 0 < {{.ROOT_DIR}}/hack/certs/example.com.key)
+        EOF
+      - echo "Certificate and Secret YAML created/updated in {{.ROOT_DIR}}/hack/certs/"
+    silent: true
+
+  apply-dev-cert:
+    desc: Apply the development certificate secret to the Kubernetes cluster
+    deps:
+      - create-dev-cert
+    cmds:
+      - kubectl apply -f {{.ROOT_DIR}}/hack/certs/example-com-secret.yaml
+
   deploy-flux:
     desc: Install Flux
     cmds:
@@ -504,39 +565,6 @@ tasks:
     cmds:
       - kubectl delete -f ./hack/development/eg.yaml -n default
 
-  create-dev-cert:
-    desc: Create a development certificate for Envoy Gateway if it doesn't exist
-    cmds:
-      - mkdir -p {{.ROOT_DIR}}/hack/certs
-      - |
-        if [ ! -f {{.ROOT_DIR}}/hack/certs/example.com.crt ] || [ ! -f {{.ROOT_DIR}}/hack/certs/example.com.key ]; then
-          echo "Certificate files don't exist. Creating new certificate..."
-          openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout {{.ROOT_DIR}}/hack/certs/example.com.key -out {{.ROOT_DIR}}/hack/certs/example.com.crt -subj "/CN=*.example.com"
-        else
-          echo "Certificate files already exist. Skipping creation."
-        fi
-      - |
-        cat <<EOF > {{.ROOT_DIR}}/hack/certs/example-com-secret.yaml
-        apiVersion: v1
-        kind: Secret
-        metadata:
-          name: example-com
-          namespace: default
-        type: kubernetes.io/tls
-        data:
-          tls.crt: $(base64 -w 0 < {{.ROOT_DIR}}/hack/certs/example.com.crt)
-          tls.key: $(base64 -w 0 < {{.ROOT_DIR}}/hack/certs/example.com.key)
-        EOF
-      - echo "Certificate and Secret YAML created/updated in {{.ROOT_DIR}}/hack/certs/"
-    silent: true
-
-  apply-dev-cert:
-    desc: Apply the development certificate secret to the Kubernetes cluster
-    deps:
-      - create-dev-cert
-    cmds:
-      - kubectl apply -f {{.ROOT_DIR}}/hack/certs/example-com-secret.yaml
-
   run:
     desc: Run a controller from your host
     vars:
@@ -555,44 +583,139 @@ tasks:
       - install
 
   install:
-    desc: Install CRDs into the Kind cluster
+    desc: Install CRDs into the cluster (Kind by default, or existing kubecontext)
     deps:
       - manifests
       - kustomize
-      - use-kind-context
     cmds:
-      - '{{.LOCALBIN}}/kustomize-{{.KUSTOMIZE_VERSION}} build config/crd | {{.KUBECTL}} apply -f -'
+      - |
+        if [ "{{.USE_KIND_CONTEXT}}" = "true" ]; then
+          echo "Using Kind context..."
+          KUBECONFIG_ORIGINAL=$KUBECONFIG
+          export KUBECONFIG="${KUBECONFIG}:{{.KIND_KUBECONFIG}}"
+        else
+          echo "Using existing kubecontext..."
+        fi
+      - '{{.LOCALBIN}}/kustomize-{{.KUSTOMIZE_VERSION}} build config/crd | {{.KUBECTL}} {{if eq .USE_KIND_CONTEXT "true"}}--context={{.KIND_CONTEXT}}{{end}} apply -f -'
+      - |
+        if [ "{{.USE_KIND_CONTEXT}}" = "true" ]; then
+          export KUBECONFIG=$KUBECONFIG_ORIGINAL
+        fi
+    vars:
+      USE_KIND_CONTEXT: '{{.USE_KIND_CONTEXT | default "true"}}'
+      KIND_KUBECONFIG: '{{.KIND_KUBECONFIG | default "${HOME}/.kube/kind-config-test"}}'
+      KIND_CONTEXT: '{{.KIND_CONTEXT | default "kind-test"}}'
 
   uninstall:
-    desc: Uninstall CRDs from the Kind cluster
+    desc: Uninstall CRDs from the cluster (Kind by default, or existing kubecontext)
     deps:
       - manifests
       - kustomize
-      - use-kind-context
     cmds:
-      - '{{.LOCALBIN}}/kustomize-{{.KUSTOMIZE_VERSION}} build config/crd | {{.KUBECTL}} delete --ignore-not-found={{.IGNORE_NOT_FOUND}} -f -'
+      - |
+        if [ "{{.USE_KIND_CONTEXT}}" = "true" ]; then
+          echo "Using Kind context..."
+          KUBECONFIG_ORIGINAL=$KUBECONFIG
+          export KUBECONFIG="${KUBECONFIG}:{{.KIND_KUBECONFIG}}"
+        else
+          echo "Using existing kubecontext..."
+        fi
+      - '{{.LOCALBIN}}/kustomize-{{.KUSTOMIZE_VERSION}} build config/crd | {{.KUBECTL}} {{if eq .USE_KIND_CONTEXT "true"}}--context={{.KIND_CONTEXT}}{{end}} delete --ignore-not-found={{.IGNORE_NOT_FOUND}} -f -'
+      - |
+        if [ "{{.USE_KIND_CONTEXT}}" = "true" ]; then
+          export KUBECONFIG=$KUBECONFIG_ORIGINAL
+        fi
     vars:
-      IGNORE_NOT_FOUND: '{{default "false" .IGNORE_NOT_FOUND}}'
+      USE_KIND_CONTEXT: '{{.USE_KIND_CONTEXT | default "true"}}'
+      KIND_KUBECONFIG: '{{.KIND_KUBECONFIG | default "${HOME}/.kube/kind-config-test"}}'
+      KIND_CONTEXT: '{{.KIND_CONTEXT | default "kind-test"}}'
+      IGNORE_NOT_FOUND: '{{.IGNORE_NOT_FOUND | default "false"}}'
 
   deploy:
-    desc: Deploy controller to the Kind cluster
+    desc: Deploy controller to the specified cluster (Kind or remote)
     deps:
-      - manifests
-      - kustomize
-      - use-kind-context
+      - build-installer
     cmds:
-      - cd config/manager && {{.LOCALBIN}}/kustomize-{{.KUSTOMIZE_VERSION}} edit set image controller={{.IMG}}
-      - '{{.LOCALBIN}}/kustomize-{{.KUSTOMIZE_VERSION}} build config/default | {{.KUBECTL}} apply -f -'
+      - |
+        if [ "{{.USE_KIND_CONTEXT}}" = "true" ]; then
+          echo "Using Kind cluster..."
+          task: docker-build-local
+          task: load-image-to-cluster
+          KUBECONFIG_ORIGINAL=$KUBECONFIG
+          export KUBECONFIG="${KUBECONFIG}:{{.KIND_KUBECONFIG}}"
+        else
+          echo "Using remote cluster. Ensure the image is built and pushed by the GitHub workflow."
+        fi
+      - task: install
+      - |
+        # Update the image in the deployment YAML
+        sed -i 's|image: .*controller:.*|image: {{.IMG}}|' dist/install.yaml
+      - '{{.KUBECTL}} {{if eq .USE_KIND_CONTEXT "true"}}--context={{.KIND_CONTEXT}}{{end}} apply -f dist/install.yaml'
+      - |
+        if [ "{{.USE_KIND_CONTEXT}}" = "true" ]; then
+          export KUBECONFIG=$KUBECONFIG_ORIGINAL
+        fi
 
   undeploy:
-    desc: Undeploy controller from the Kind cluster
+    desc: Undeploy controller from the specified cluster
     deps:
-      - kustomize
-      - use-kind-context
+      - build-installer
     cmds:
-      - '{{.LOCALBIN}}/kustomize-{{.KUSTOMIZE_VERSION}} build config/default | {{.KUBECTL}} delete --ignore-not-found={{.IGNORE_NOT_FOUND}} -f -'
+      - |
+        if [ "{{.USE_KIND_CONTEXT}}" = "true" ]; then
+          echo "Using Kind cluster..."
+          KUBECONFIG_ORIGINAL=$KUBECONFIG
+          export KUBECONFIG="${KUBECONFIG}:{{.KIND_KUBECONFIG}}"
+        else
+          echo "Using remote cluster..."
+        fi
+      - '{{.KUBECTL}} {{if eq .USE_KIND_CONTEXT "true"}}--context={{.KIND_CONTEXT}}{{end}} delete --ignore-not-found={{.IGNORE_NOT_FOUND}} -f dist/install.yaml'
+      - |
+        if [ "{{.USE_KIND_CONTEXT}}" = "true" ]; then
+          export KUBECONFIG=$KUBECONFIG_ORIGINAL
+        fi
+      - task: uninstall
     vars:
-      IGNORE_NOT_FOUND: '{{default "false" .IGNORE_NOT_FOUND}}'
+      IGNORE_NOT_FOUND: '{{.IGNORE_NOT_FOUND | default "false"}}'
+
+  ### SAMPLES ###
+  apply-samples:
+    desc: Apply Kubernetes resources defined in config/samples/ to the cluster
+    cmds:
+      - |
+        if [ "{{.USE_KIND_CONTEXT}}" = "true" ]; then
+          echo "Using Kind context..."
+          KUBECONFIG_ORIGINAL=$KUBECONFIG
+          export KUBECONFIG="${KUBECONFIG}:{{.KIND_KUBECONFIG}}"
+        else
+          echo "Using existing kubecontext..."
+        fi
+      - '{{.KUBECTL}} {{if eq .USE_KIND_CONTEXT "true"}}--context={{.KIND_CONTEXT}}{{end}} apply -k config/samples/podtemplate/'
+      - '{{.KUBECTL}} {{if eq .USE_KIND_CONTEXT "true"}}--context={{.KIND_CONTEXT}}{{end}} apply -k config/samples/entrypoint/'
+      - '{{.KUBECTL}} {{if eq .USE_KIND_CONTEXT "true"}}--context={{.KIND_CONTEXT}}{{end}} apply -k config/samples/kode/'
+      - |
+        if [ "{{.USE_KIND_CONTEXT}}" = "true" ]; then
+          export KUBECONFIG=$KUBECONFIG_ORIGINAL
+        fi
+
+  delete-samples:
+    desc: Delete Kubernetes resources defined in config/samples/ from the cluster
+    cmds:
+      - |
+        if [ "{{.USE_KIND_CONTEXT}}" = "true" ]; then
+          echo "Using Kind context..."
+          KUBECONFIG_ORIGINAL=$KUBECONFIG
+          export KUBECONFIG="${KUBECONFIG}:{{.KIND_KUBECONFIG}}"
+        else
+          echo "Using existing kubecontext..."
+        fi
+      - '{{.KUBECTL}} {{if eq .USE_KIND_CONTEXT "true"}}--context={{.KIND_CONTEXT}}{{end}} delete -k config/samples/kode/'
+      - '{{.KUBECTL}} {{if eq .USE_KIND_CONTEXT "true"}}--context={{.KIND_CONTEXT}}{{end}} delete -k config/samples/entrypoint/'
+      - '{{.KUBECTL}} {{if eq .USE_KIND_CONTEXT "true"}}--context={{.KIND_CONTEXT}}{{end}} delete -k config/samples/podtemplate/'
+      - |
+        if [ "{{.USE_KIND_CONTEXT}}" = "true" ]; then
+          export KUBECONFIG=$KUBECONFIG_ORIGINAL
+        fi
 
   setup-dev:
     desc: Set up the complete development environment
@@ -609,21 +732,3 @@ tasks:
     cmds:
       - task: kind-delete
       - echo "Development environment has been torn down."
-
-  apply-samples:
-    desc: Apply Kubernetes resources defined in config/samples/ to the Kind cluster
-    deps:
-      - use-kind-context
-    cmds:
-      - kubectl apply -k config/samples/podtemplate/
-      - kubectl apply -k config/samples/entrypoint/
-      - kubectl apply -k config/samples/kode/
-
-  delete-samples:
-    desc: Delete Kubernetes resources defined in config/samples/ from the Kind cluster
-    deps:
-      - use-kind-context
-    cmds:
-      - kubectl delete -k config/samples/kode/
-      - kubectl delete -k config/samples/entrypoint/
-      - kubectl delete -k config/samples/podtemplate/
