@@ -724,7 +724,6 @@ tasks:
       - task: deploy-flux
       - task: deploy-envoy-gateway
       - task: deploy-eg
-      - task: install
       - echo "Development environment is ready!"
 
   teardown-dev:
