@@ -335,7 +335,7 @@ tasks:
       NAMESPACE: 'kode-system'
       VERSION: '{{.VERSION | default "v0.0.0-latest"}}'
       ACTION: '{{.ACTION | default "install"}}'
-      CONTROLLER_IMAGE_TAG: 'sha-74a3c61'
+      CONTROLLER_IMAGE_TAG: 'dev-latest'
     cmds:
       - |
         if [ "{{.ACTION}}" = "install" ]; then
