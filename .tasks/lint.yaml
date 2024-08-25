@@ -4,12 +4,12 @@ tasks:
   fmt:
     desc: Run go fmt against code
     cmds:
-      - go fmt ./...
+      - go fmt {{.ROOT_DIR}}/...
 
   vet:
     desc: Run go vet against code
     cmds:
-      - go vet ./...
+      - go vet {{.ROOT_DIR}}/...
 
   lint:
     desc: Run golangci-lint linter

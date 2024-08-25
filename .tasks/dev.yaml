@@ -59,11 +59,6 @@ tasks:
     vars:
       DEPLOY_TYPE: '{{if eq .USE_KIND_CONTEXT "true"}}kind{{else}}remote{{end}}'
     cmds:
-      - task: install
-      - |
-        # Update the image in the deployment YAML
-        sed -i 's|image: .*controller:.*|image: {{.IMG}}|' {{.ROOT_DIR}}/dist/install.yaml
-      - task: clusters:deploy-{{.DEPLOY_TYPE}}-prep
       - task: clusters:deploy-{{.DEPLOY_TYPE}}
 
   undeploy:
@@ -72,13 +67,12 @@ tasks:
       DEPLOY_TYPE: '{{if eq .USE_KIND_CONTEXT "true"}}kind{{else}}remote{{end}}'
     cmds:
       - task: clusters:undeploy-{{.DEPLOY_TYPE}}
-      - task: uninstall
 
   setup:
     desc: Set up the complete development environment
     cmds:
-      - task: kind-ensure
-      - task: flux:deploy
+      - task: clusters:kind-ensure
+      # - task: flux:deploy
       - task: envoy:deploy
       - task: envoy:install
       - echo "Development environment is ready!"

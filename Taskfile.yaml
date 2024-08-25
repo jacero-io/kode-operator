@@ -11,6 +11,11 @@ includes:
   samples: ./.tasks/samples.yaml
 
 vars:
+  GOBIN:
+    sh: echo "${GOBIN:-$(go env GOPATH)/bin}"
+  CONTAINER_TOOL: docker
+  PLATFORMS: linux/arm64,linux/amd64,linux/s390x,linux/ppc64le
+  LOCALBIN: '{{.ROOT_DIR}}/bin'
   ENVTEST_K8S_VERSION: 1.30.0
   GO_VERSION: '1.22'
   KUSTOMIZE_VERSION: v5.4.2
@@ -18,11 +23,6 @@ vars:
   ENVTEST_VERSION: release-0.18
   GOLANGCI_LINT_VERSION: v1.57.2
   HELMIFY_VERSION: v0.4.13
-  GOBIN:
-    sh: echo "${GOBIN:-$(go env GOPATH)/bin}"
-  CONTAINER_TOOL: docker
-  PLATFORMS: linux/arm64,linux/amd64,linux/s390x,linux/ppc64le
-  LOCALBIN: '{{.ROOT_DIR}}/bin'
   KUBECTL: kubectl
   KUSTOMIZE_CMD: '{{.LOCALBIN}}/kustomize-{{.KUSTOMIZE_VERSION}}'
   CONTROLLER_GEN_CMD: '{{.LOCALBIN}}/controller-gen-{{.CONTROLLER_TOOLS_VERSION}}'
@@ -39,7 +39,7 @@ vars:
   KIND_KUBECONFIG: '{{.KIND_KUBECONFIG | default "${HOME}/.kube/kind-config-test"}}'
   KIND_CLUSTER_NAME: '{{.KIND_CLUSTER_NAME | default "test"}}'
   KIND_CONTEXT: '{{ .KIND_CONTEXT | default "kind-test" }}'
-  IMG: '{{.IMG | default "emiljacero/kode-operator:latest"}}'
+  IMG: '{{.IMG | default "emiljacero/kode-operator:v0.0.0-latest"}}/bin'
 
 tasks:
   default:

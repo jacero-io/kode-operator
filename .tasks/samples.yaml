@@ -6,18 +6,58 @@ includes:
     internal: true
 
 tasks:
-  apply:
-    desc: Apply Kubernetes resources defined in config/samples/ to the cluster
+  base-apply:
+    internal: true
+    desc: Apply Kubernetes resources
+    cmds:
+      - '{{.KUBECTL}} apply -k {{.ROOT_DIR}}/config/samples/podtemplate/'
+      - '{{.KUBECTL}} apply -k {{.ROOT_DIR}}/config/samples/entrypoint/'
+      - '{{.KUBECTL}} apply -k {{.ROOT_DIR}}/config/samples/kode/'
+
+  base-delete:
+    internal: true
+    desc: Apply Kubernetes resources
+    cmds:
+      - '{{.KUBECTL}} delete -k {{.ROOT_DIR}}/config/samples/podtemplate/'
+      - '{{.KUBECTL}} delete -k {{.ROOT_DIR}}/config/samples/entrypoint/'
+      - '{{.KUBECTL}} delete -k {{.ROOT_DIR}}/config/samples/kode/'
+
+  apply-kind:
+    internal: true
+    desc: Apply Kubernetes resources defined in config/samples/ to the Kind cluster
     cmds:
       - task: clusters:set-context
-      - '{{.KUBECTL}} apply -k config/samples/podtemplate/'
-      - '{{.KUBECTL}} apply -k config/samples/entrypoint/'
-      - '{{.KUBECTL}} apply -k config/samples/kode/'
+      - task: base-apply
+
+  delete-kind:
+    internal: true
+    desc: Apply Kubernetes resources defined in config/samples/ to the Kind cluster
+    cmds:
+      - task: clusters:set-context
+      - task: base-delete
+
+  apply-remote:
+    internal: true
+    desc: Apply Kubernetes resources defined in config/samples/ to the remote cluster
+    cmds:
+      - task: base-apply
+
+  delete-remote:
+    internal: true
+    desc: Apply Kubernetes resources defined in config/samples/ to the remote cluster
+    cmds:
+      - task: base-delete
+
+  apply:
+    desc: Apply Kubernetes resources defined in config/samples/ to the cluster
+    vars:
+      DEPLOY_TYPE: '{{if eq .USE_KIND_CONTEXT "true"}}kind{{else}}remote{{end}}'
+    cmds:
+      - task: apply-{{.DEPLOY_TYPE}}
 
   delete:
     desc: Delete Kubernetes resources defined in config/samples/ from the cluster
+    vars:
+      DEPLOY_TYPE: '{{if eq .USE_KIND_CONTEXT "true"}}kind{{else}}remote{{end}}'
     cmds:
-      - task: clusters:set-context
-      - '{{.KUBECTL}} delete -k config/samples/kode/'
-      - '{{.KUBECTL}} delete -k config/samples/entrypoint/'
-      - '{{.KUBECTL}} delete -k config/samples/podtemplate/'
+      - task: delete-{{.DEPLOY_TYPE}}

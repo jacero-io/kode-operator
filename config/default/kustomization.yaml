@@ -1,12 +1,12 @@
 # Adds namespace to all resources.
-namespace: kode-operator-system
+namespace: kode-system
 
 # Value of this field is prepended to the
 # names of all resources, e.g. a deployment named
 # "wordpress" becomes "alices-wordpress".
 # Note that it should also match with the prefix (text before '-') of the namespace
 # field above.
-namePrefix: kode-operator-
+namePrefix: kode-
 
 # Labels to add to all resources and selectors.
 #labels:
@@ -15,21 +15,25 @@ namePrefix: kode-operator-
 #    someName: someValue
 
 resources:
-# - ../crd
 - ../rbac
 - ../manager
-- ../prometheus
 # [WEBHOOK] To enable webhook, uncomment all the sections with [WEBHOOK] prefix including the one in
 # crd/kustomization.yaml
-#- ../webhook
+# - ../webhook
 # [CERTMANAGER] To enable cert-manager, uncomment all sections with 'CERTMANAGER'. 'WEBHOOK' components are required.
-#- ../certmanager
+# - ../certmanager
+
+images:
+- name: controller
+  newName: ghcr.io/jacero-io/kode-operator
+  newTag: v0.0.0-latest
 
 patches:
 # [METRICS] The following patch will enable the metrics endpoint. Ensure that you also protect this endpoint.
 # More info: https://book.kubebuilder.io/reference/metrics
 # If you want to expose the metric endpoint of your controller-manager uncomment the following line.
 - path: manager_metrics_patch.yaml
+# - path: servicemonitor_patch.yaml
 
 # [WEBHOOK] To enable webhook, uncomment all the sections with [WEBHOOK] prefix including the one in
 # crd/kustomization.yaml

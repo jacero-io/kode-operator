@@ -1,14 +1,25 @@
 version: '3'
 
+includes:
+  tools:
+    taskfile: tools.yaml
+    internal: true
+  build:
+    taskfile: build.yaml
+    internal: true
+
 tasks:
-  helm-package-kode-crd:
+  package-kode-crd:
     desc: Build and package kode-crd Helm chart
-    deps: [manifests, generate, helmify]
+    deps:
+      - build:manifests
+      - build:generate
+      - tools:helmify
     vars:
       VERSION: '{{.CLI_ARGS | default "v0.0.0-latest"}}'
     cmds:
-      - echo "Building kode-crd chart from config/crd..."
-      - '{{.KUSTOMIZE_CMD}} build config/crd | {{.HELMIFY_CMD}} helm-charts/kode-crd'
+      - echo "Building kode-crd chart from {{.ROOT_DIR}}/config/crd..."
+      - '{{.KUSTOMIZE_CMD}} build {{.ROOT_DIR}}/config/crd | {{.HELMIFY_CMD}} {{.ROOT_DIR}}/helm-charts/kode-crd'
       - echo "Packaging kode-crd chart version {{.VERSION}}..."
       - mkdir -p /tmp/helm-charts/kode-crd
       - cp -r helm-charts/kode-crd/* /tmp/helm-charts/kode-crd/
@@ -16,17 +27,20 @@ tasks:
       - sed -i "s/v0.0.0-latest/{{.VERSION}}/g" /tmp/helm-charts/kode-crd/README.md
       - sed -i "s/v0.0.0--latest/{{.VERSION}}/g" /tmp/helm-charts/kode-crd/README.md # Special case for the img.shields.io badge
       - helm package /tmp/helm-charts/kode-crd --version {{.VERSION}} --destination /tmp
-      - mv /tmp/kode-crd-{{.VERSION}}.tgz ./kode-crd-{{.VERSION}}.tgz
+      - mv /tmp/kode-crd-{{.VERSION}}.tgz {{.ROOT_DIR}}/kode-crd-{{.VERSION}}.tgz
       - rm -rf /tmp/helm-charts/kode-crd
 
-  helm-package-kode:
+  package-kode:
     desc: Build and package kode Helm chart
-    deps: [manifests, generate, helmify]
+    deps:
+      - build:manifests
+      - build:generate
+      - tools:helmify
     vars:
       VERSION: '{{.CLI_ARGS | default "v0.0.0-latest"}}'
     cmds:
-      - echo "Building kode chart from config/crd..."
-      - '{{.KUSTOMIZE_CMD}} build config/default | {{.HELMIFY_CMD}} -generate-defaults -image-pull-secrets helm-charts/kode'
+      - echo "Building kode chart from {{.ROOT_DIR}}/config/default..."
+      - '{{.KUSTOMIZE_CMD}} build {{.ROOT_DIR}}/config/default | {{.HELMIFY_CMD}} -generate-defaults -image-pull-secrets {{.ROOT_DIR}}/helm-charts/kode'
       - echo "Packaging kode chart version {{.VERSION}}..."
       - mkdir -p /tmp/helm-charts/kode
       - cp -r helm-charts/kode/* /tmp/helm-charts/kode/
@@ -35,20 +49,20 @@ tasks:
       - sed -i "s/v0.0.0-latest/{{.VERSION}}/g" /tmp/helm-charts/kode/README.md
       - sed -i "s/v0.0.0--latest/{{.VERSION}}/g" /tmp/helm-charts/kode/README.md # Special case for the img.shields.io badge
       - helm package /tmp/helm-charts/kode --version {{.VERSION}} --destination /tmp
-      - mv /tmp/kode-{{.VERSION}}.tgz ./kode-{{.VERSION}}.tgz
+      - mv /tmp/kode-{{.VERSION}}.tgz {{.ROOT_DIR}}/kode-{{.VERSION}}.tgz
       - rm -rf /tmp/helm-charts/kode
 
-  helm-package:
+  package:
     desc: Build and package all Helm charts
     vars:
       VERSION: '{{.CLI_ARGS | default "v0.0.0-latest"}}'
     cmds:
-      - task: helm-package-kode-crd
+      - task: package-kode-crd
         vars: { VERSION: '{{.VERSION}}' }
-      - task: helm-package-kode
+      - task: package-kode
         vars: { VERSION: '{{.VERSION}}' }
 
-  helm-manage-kode-crd:
+  manage-kode-crd:
     desc: Install or uninstall kode-crd Helm chart on the cluster
     vars:
       RELEASE_NAME: 'kode-crd'
@@ -59,7 +73,7 @@ tasks:
       - |
         if [ "{{.ACTION}}" = "install" ]; then
           echo "Installing/upgrading kode-crd chart version {{.VERSION}} onto the cluster..."
-          helm upgrade --install {{.RELEASE_NAME}} ./kode-crd-{{.VERSION}}.tgz \
+          helm upgrade --install {{.RELEASE_NAME}} {{.ROOT_DIR}}/kode-crd-{{.VERSION}}.tgz \
             --namespace {{.NAMESPACE}} \
             --create-namespace \
             --wait \
@@ -74,24 +88,26 @@ tasks:
           exit 1
         fi
     preconditions:
-      - sh: '[ "{{.ACTION}}" = "uninstall" ] || test -f ./kode-crd-{{.VERSION}}.tgz'
-        msg: "Chart package kode-crd-{{.VERSION}}.tgz not found. Please run 'task helm-package-kode-crd' first."
+      - sh: '[ "{{.ACTION}}" = "uninstall" ] || test -f {{.ROOT_DIR}}/kode-crd-{{.VERSION}}.tgz'
+        msg: "Chart package kode-crd-{{.VERSION}}.tgz not found. Please run 'task package-kode-crd' first."
 
-  helm-manage-kode:
+  manage-kode:
     desc: Install or uninstall kode Helm chart on the cluster
     vars:
       RELEASE_NAME: 'kode'
       NAMESPACE: 'kode-system'
       VERSION: '{{.VERSION | default "v0.0.0-latest"}}'
       ACTION: '{{.ACTION | default "install"}}'
-      CONTROLLER_IMAGE_TAG: 'dev-latest'
+      CONTROLLER_IMAGE_REPO: '{{.CONTROLLER_IMAGE_REPO}}'
+      CONTROLLER_IMAGE_TAG: '{{.CONTROLLER_IMAGE_TAG}}'
     cmds:
       - |
         if [ "{{.ACTION}}" = "install" ]; then
           echo "Installing/upgrading kode chart version {{.VERSION}} onto the cluster..."
-          helm upgrade --install {{.RELEASE_NAME}} ./kode-{{.VERSION}}.tgz \
+          helm upgrade --install {{.RELEASE_NAME}} {{.ROOT_DIR}}/kode-{{.VERSION}}.tgz \
             --namespace {{.NAMESPACE}} \
             --create-namespace \
+            --set controllerManager.manager.image.repository={{.CONTROLLER_IMAGE_REPO}} \
             --set controllerManager.manager.image.tag={{.CONTROLLER_IMAGE_TAG}} \
             --wait \
             --timeout 5m
@@ -105,23 +121,25 @@ tasks:
           exit 1
         fi
     preconditions:
-      - sh: '[ "{{.ACTION}}" = "uninstall" ] || test -f ./kode-{{.VERSION}}.tgz'
-        msg: "Chart package kode-{{.VERSION}}.tgz not found. Please run 'task helm-package-kode' first."
+      - sh: '[ "{{.ACTION}}" = "uninstall" ] || test -f {{.ROOT_DIR}}/kode-{{.VERSION}}.tgz'
+        msg: "Chart package kode-{{.VERSION}}.tgz not found. Please run 'task package-kode' first."
 
-  helm-manage:
+  manage:
     desc: Install or uninstall all kode Helm charts on the cluster
     vars:
       NAMESPACE: 'kode-system'
       VERSION: '{{.VERSION | default "v0.0.0-latest"}}'
       ACTION: '{{.ACTION | default "install"}}'
     cmds:
-      - task: helm-manage-kode-crd
+      - task: manage-kode-crd
         vars:
           NAMESPACE: '{{.NAMESPACE}}'
           VERSION: '{{.VERSION}}'
           ACTION: '{{.ACTION}}'
-      - task: helm-manage-kode
+      - task: manage-kode
         vars:
           NAMESPACE: '{{.NAMESPACE}}'
           VERSION: '{{.VERSION}}'
           ACTION: '{{.ACTION}}'
+          CONTROLLER_IMAGE_REPO: '{{.CONTROLLER_IMAGE_REPO | default "emiljacero/kode-operator"}}'
+          CONTROLLER_IMAGE_TAG: '{{.CONTROLLER_IMAGE_TAG | default "v0.0.0-latest"}}'

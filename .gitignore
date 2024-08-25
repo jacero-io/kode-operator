@@ -35,3 +35,5 @@ concatenated_output.txt
 output.log
 kode*.tgz
 dist
+kode-crds.yaml
+CHANGELOG.md

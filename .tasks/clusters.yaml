@@ -82,18 +82,13 @@ tasks:
           echo "Skipping image load for non-Kind context"
         fi
 
-  deploy-kind-prep:
-    internal: true
-    cmds:
-      - echo "Preparing for Kind deployment..."
-      - task: build:docker-build
-    
   deploy-kind:
     internal: true
     cmds:
       - echo "Using Kind cluster..."
       - task: set-context
-      - task: deploy-kind-prep
+      - echo "Preparing for Kind deployment..."
+      - task: build:docker-build
       - 'kubectl apply -f {{.ROOT_DIR}}/dist/install.yaml'
 
   undeploy-kind:
