@@ -6,6 +6,7 @@ tasks:
     desc: Ensure the local bin directory exists
     cmds:
       - mkdir -p {{.LOCALBIN}}
+      - mkdir -p {{.ROOT_DIR}}/dist
 
   kustomize:
     desc: Download kustomize locally if necessary
@@ -19,13 +20,11 @@ tasks:
     deps: [ensure-dir]
     cmds:
       - |
-        if [ ! -f {{.CONTROLLER_GEN_CMD}}-{{.CONTROLLER_TOOLS_VERSION}} ]; then
+        if [ ! -f {{.CONTROLLER_GEN_CMD}} ]; then
           echo "Downloading controller-gen {{.CONTROLLER_TOOLS_VERSION}}..."
           go install sigs.k8s.io/controller-tools/cmd/controller-gen@{{.CONTROLLER_TOOLS_VERSION}}
-          mkdir -p {{.LOCALBIN}}
-          mv $(go env GOPATH)/bin/controller-gen {{.CONTROLLER_GEN_CMD}}-{{.CONTROLLER_TOOLS_VERSION}}
+          mv $(go env GOPATH)/bin/controller-gen {{.CONTROLLER_GEN_CMD}}
         fi
-      - ln -sf {{.CONTROLLER_GEN_CMD}}-{{.CONTROLLER_TOOLS_VERSION}} {{.CONTROLLER_GEN_CMD}}
 
   envtest:
     desc: Download setup-envtest locally if necessary

@@ -12,14 +12,14 @@ tasks:
   manifests:
     desc: Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects
     cmds:
-      - '{{.CONTROLLER_GEN_CMD}} rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases'
+      - '{{.CONTROLLER_GEN_CMD}} rbac:roleName=manager-role crd webhook paths="{{.ROOT_DIR}}/..." output:crd:artifacts:config=config/crd/bases'
     deps:
       - tools:controller-gen
 
   generate:
     desc: Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations
     cmds:
-      - '{{.CONTROLLER_GEN_CMD}} object:headerFile="{{.ROOT_DIR}}/hack/boilerplate.go.txt" paths="./..."'
+      - '{{.CONTROLLER_GEN_CMD}} object:headerFile="{{.ROOT_DIR}}/hack/boilerplate.go.txt" paths="{{.ROOT_DIR}}/..."'
     deps:
       - tools:controller-gen
 
@@ -36,15 +36,15 @@ tasks:
   build-installer:
     desc: Generate a consolidated YAML with CRDs and deployment, excluding Prometheus components
     deps:
+      - tools:ensure-dir
       - manifests
       - generate
       - tools:kustomize
     cmds:
-      - mkdir -p {{.ROOT_DIR}}/dist
       - cd {{.ROOT_DIR}}/config/manager && {{.KUSTOMIZE_CMD}} edit set image controller={{.IMG}}
       - |
-        mkdir -p {{.ROOT_DIR}}/hack/config/temp
-        cat <<EOF > {{.ROOT_DIR}}/hack/config/temp/kustomization.yaml
+        mkdir -p {{.ROOT_DIR}}/config/temp
+        cat <<EOF > {{.ROOT_DIR}}/config/temp/kustomization.yaml
         apiVersion: kustomize.config.k8s.io/v1beta1
         kind: Kustomization
         resources:
@@ -52,8 +52,8 @@ tasks:
         - ../rbac
         - ../manager
         EOF
-      - '{{.KUSTOMIZE_CMD}} build --load-restrictor LoadRestrictionsNone {{.ROOT_DIR}}/hack/config/temp > {{.ROOT_DIR}}/dist/install.yaml'
-      - rm -rf {{.ROOT_DIR}}/hack/config/temp
+      - '{{.KUSTOMIZE_CMD}} build --load-restrictor LoadRestrictionsNone {{.ROOT_DIR}}/config/temp > {{.ROOT_DIR}}/dist/install.yaml'
+      - rm -rf {{.ROOT_DIR}}/config/temp
 
   docker-build:
     desc: Build docker image locally
