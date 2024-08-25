@@ -6,6 +6,15 @@ includes:
     internal: true
 
 tasks:
+  get:
+    desc: Get Kubernetes resources defined in config/samples/ from the cluster
+    vars:
+      DEPLOY_TYPE: '{{if eq .USE_KIND_CONTEXT "true"}}kind{{else}}remote{{end}}'
+    cmds:
+      - '{{.KUBECTL}} get -k {{.ROOT_DIR}}/config/samples/podtemplate/'
+      - '{{.KUBECTL}} get -k {{.ROOT_DIR}}/config/samples/entrypoint/'
+      - '{{.KUBECTL}} get -k {{.ROOT_DIR}}/config/samples/kode/'
+
   base-apply:
     internal: true
     desc: Apply Kubernetes resources

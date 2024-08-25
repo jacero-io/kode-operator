@@ -1,28 +1,33 @@
 version: '3'
 
+vars:
+  ENVOY_GATEWAY_VERSION: 'v0.0.0-latest'
+  ENVOY_GATEWAY_NAMESPACE: 'envoy-gateway-system'
+  ENVOY_GATEWAY_EXTRA_ARGS: ''
+
 tasks:
   create-dev-cert:
     desc: Create a development certificate for Envoy Gateway if it doesn't exist¨
     cmds:
       - mkdir -p {{.ROOT_DIR}}/hack/certs
       - |
-        if [ ! -f {{.ROOT_DIR}}/hack/certs/example.com.crt ] || [ ! -f {{.ROOT_DIR}}/hack/certs/example.com.key ]; then
+        if [ ! -f {{.ROOT_DIR}}/hack/certs/localhost.crt ] || [ ! -f {{.ROOT_DIR}}/hack/certs/localhost.key ]; then
           echo "Certificate files don't exist. Creating new certificate..."
-          openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout {{.ROOT_DIR}}/hack/certs/example.com.key -out {{.ROOT_DIR}}/hack/certs/example.com.crt -subj "/CN=*.example.com"
+          openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout {{.ROOT_DIR}}/hack/certs/localhost.key -out {{.ROOT_DIR}}/hack/certs/localhost.crt -subj "/CN=*.localhost"
         else
           echo "Certificate files already exist. Skipping creation."
         fi
       - |
-        cat <<EOF > {{.ROOT_DIR}}/hack/certs/example-com-secret.yaml
+        cat <<EOF > {{.ROOT_DIR}}/hack/certs/localhost-secret.yaml
         apiVersion: v1
         kind: Secret
         metadata:
-          name: example-com
+          name: localhost
           namespace: default
         type: kubernetes.io/tls
         data:
-          tls.crt: $(base64 -w 0 < {{.ROOT_DIR}}/hack/certs/example.com.crt)
-          tls.key: $(base64 -w 0 < {{.ROOT_DIR}}/hack/certs/example.com.key)
+          tls.crt: $(base64 -w 0 < {{.ROOT_DIR}}/hack/certs/localhost.crt)
+          tls.key: $(base64 -w 0 < {{.ROOT_DIR}}/hack/certs/localhost.key)
         EOF
       - echo "Certificate and Secret YAML created/updated in {{.ROOT_DIR}}/hack/certs/"
     silent: true
@@ -32,7 +37,7 @@ tasks:
     deps:
       - create-dev-cert
     cmds:
-      - kubectl apply -f {{.ROOT_DIR}}/hack/certs/example-com-secret.yaml
+      - kubectl apply -f {{.ROOT_DIR}}/hack/certs/localhost-secret.yaml
     silent: true
 
   deploy:
@@ -44,18 +49,12 @@ tasks:
           -n {{.ENVOY_GATEWAY_NAMESPACE}} \
           --create-namespace \
           {{.ENVOY_GATEWAY_EXTRA_ARGS}}
-    vars:
-      ENVOY_GATEWAY_VERSION: 'v0.0.0-latest'
-      ENVOY_GATEWAY_NAMESPACE: 'envoy-gateway-system'
-      ENVOY_GATEWAY_EXTRA_ARGS: ''
 
   undeploy:
     desc:  Undeploy Envoy Gateway
     cmds:
       - helm uninstall eg -n {{.ENVOY_GATEWAY_NAMESPACE}}
       - kubectl delete namespace {{.ENVOY_GATEWAY_NAMESPACE}} --ignore-not-found
-    vars:
-      ENVOY_GATEWAY_NAMESPACE: 'envoy-gateway-system'
 
   install:
     desc: Install Envoy Gateway manifests
@@ -63,9 +62,9 @@ tasks:
       - apply-dev-cert
       - deploy
     cmds:
-      - kubectl apply -f ./hack/development/eg.yaml -n default
+      - kubectl apply -f {{.ROOT_DIR}}/hack/development/eg.yaml -n default
 
   uninstall:	
     desc: Uninstall Envoy Gateway manifests
     cmds:
-      - kubectl delete -f ./hack/development/eg.yaml -n default
+      - kubectl delete -f {{.ROOT_DIR}}/hack/development/eg.yaml -n default

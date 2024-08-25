@@ -61,3 +61,8 @@ tasks:
         else
           echo "Using existing kubecontext..."
         fi
+
+  fmt:
+    desc: Run go fmt
+    cmds:
+      - task: lint:fmt

@@ -46,7 +46,6 @@ tasks:
       - '{{.KUSTOMIZE_CMD}} build {{.ROOT_DIR}}/config/crd | {{.KUBECTL}} apply -f -'
 
   uninstall:
-    internal: true
     desc: Uninstall CRDs from the cluster (Kind by default, or existing kubecontext)
     cmds:
       - task: clusters:set-context
