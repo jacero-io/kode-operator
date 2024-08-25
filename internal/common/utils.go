@@ -143,6 +143,11 @@ func MergeLabels(labelsSlice ...map[string]string) map[string]string {
 // addTypeInformationToObject adds TypeMeta information to a runtime.Object based upon the loaded scheme.Scheme
 // taken from: https://github.com/kubernetes/kubernetes/issues/3030#issuecomment-700099699
 func AddTypeInformationToObject(scheme *runtime.Scheme, obj runtime.Object) error {
+	// Check if obj is nil
+	if obj == nil {
+		return fmt.Errorf("input object is nil")
+	}
+
 	// Check if the object already has type information
 	gvk := obj.GetObjectKind().GroupVersionKind()
 	if gvk.Kind == "" || gvk.Version == "" {

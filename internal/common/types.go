@@ -17,11 +17,8 @@ limitations under the License.
 package common
 
 import (
-	"fmt"
-
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/types"
 )
 
 type CommonConfig struct {
@@ -59,13 +56,4 @@ type EntryPointResourceConfig struct {
 
 	GatewayName      string
 	GatewayNamespace string
-}
-
-type TemplateNotFoundError struct {
-	NamespacedName types.NamespacedName
-	Kind           string
-}
-
-func (e *TemplateNotFoundError) Error() string {
-	return fmt.Sprintf("%s not found: %s", e.Kind, e.NamespacedName)
 }

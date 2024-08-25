@@ -1,0 +1,115 @@
+version: '3'
+
+includes:
+  build: 
+    taskfile: build.yaml
+    internal: true
+
+tasks:
+  set-context:
+    internal: true
+    cmds:
+      - |
+        if [ "{{.USE_KIND_CONTEXT}}" = "true" ]; then
+          echo "Using Kind context..."
+          kubectl config use-context {{.KIND_CONTEXT}}
+        else
+          echo "Using existing kubecontext..."
+        fi
+
+  kind-ensure:
+    desc: Ensure a Kind cluster exists, creating it if necessary
+    cmds:
+      - |
+        if ! kind get clusters | grep -q '^{{.KIND_CLUSTER_NAME}}$'; then
+          echo "Creating Kind cluster '{{.KIND_CLUSTER_NAME}}'..."
+          kind create cluster --name {{.KIND_CLUSTER_NAME}} --image kindest/node:v{{.ENVTEST_K8S_VERSION}}
+        else
+          echo "Kind cluster '{{.KIND_CLUSTER_NAME}}' already exists."
+        fi
+      - task: set-context
+
+  kind-create:
+    desc: Create a Kind cluster
+    cmds:
+      - kind create cluster --name {{.KIND_CLUSTER_NAME}} --image kindest/node:v{{.ENVTEST_K8S_VERSION}}
+      - task: set-context
+
+  kind-destroy:
+    desc: Delete the Kind cluster
+    cmds:
+      - kind delete cluster --name {{.KIND_CLUSTER_NAME}}
+
+  kind-start:
+    desc: Start the Kind cluster
+    cmds:
+      - docker start test-control-plane || true
+
+  kind-stop:
+    desc: Stop the Kind cluster
+    cmds:
+      - docker stop test-control-plane || true
+
+  kind-load-image:
+    cmds:
+      - |
+        kind load docker-image {{.IMG}} --name {{.KIND_CLUSTER_NAME}}
+
+  kind-load-images:
+    desc: Load internal and external Docker images into Kind cluster
+    vars:
+      INT_IMAGES_TO_LOAD: 
+        sh: echo {{.IMG}}
+      EXT_IMAGES_TO_LOAD: 
+        - envoyproxy/envoy:v1.31-latest
+        - linuxserver/code-server:latest
+        - linuxserver/webtop:debian-xfce
+    cmds:
+      - |
+        if [ "{{.USE_KIND_CONTEXT}}" = "true" ]; then
+          echo "Using Kind context..."
+          for img in {{.INT_IMAGES_TO_LOAD}}; do
+            echo "Loading $img";
+            kind load docker-image $img --name {{.KIND_CLUSTER_NAME}};
+          done
+          for img in {{range .EXT_IMAGES_TO_LOAD}}"{{.}}" {{end}}; do
+            echo "Pulling $img";
+            {{.CONTAINER_TOOL}} pull $img;
+            echo "Loading $img";
+            kind load docker-image $img --name {{.KIND_CLUSTER_NAME}};
+          done
+        else
+          echo "Skipping image load for non-Kind context"
+        fi
+
+  deploy-kind:
+    internal: true
+    cmds:
+      - echo "Using Kind cluster..."
+      - task: set-context
+      - echo "Preparing for Kind deployment..."
+      - task: build:docker-build
+      - 'kubectl apply -f {{.ROOT_DIR}}/dist/install.yaml'
+
+  undeploy-kind:
+    internal: true
+    cmds:
+      - echo "Undeploying from Kind cluster..."
+      - task: set-context
+      - '{{.KUBECTL}} delete --ignore-not-found={{.IGNORE_NOT_FOUND}} -f {{.ROOT_DIR}}/dist/install.yaml'
+
+  deploy-remote:
+    internal: true
+    cmds:
+      - echo "Using remote cluster. Ensure the image is built and pushed by the GitHub workflow."
+      - '{{.KUBECTL}} apply -f {{.ROOT_DIR}}/dist/install.yaml'
+
+  undeploy-remote:
+    internal: true
+    cmds:
+      - echo "Undeploying from remote cluster..."
+      - '{{.KUBECTL}} delete --ignore-not-found={{.IGNORE_NOT_FOUND}} -f {{.ROOT_DIR}}/dist/install.yaml'
+
+  logs:
+    cmds:
+      - '{{.KUBECTL}} logs -f deployment/controller-manager -n kode-system'

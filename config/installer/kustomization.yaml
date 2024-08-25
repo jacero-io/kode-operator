@@ -1,0 +1,21 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: kode-system
+namePrefix: kode-
+
+resources:
+- ../crd
+- ../rbac
+- ../manager
+
+images:
+- name: controller
+  newName: emiljacero/kode-operator
+  newTag: v0.0.0-latest
+
+patches:
+# [METRICS] The following patch will enable the metrics endpoint. Ensure that you also protect this endpoint.
+# More info: https://book.kubebuilder.io/reference/metrics
+# If you want to expose the metric endpoint of your controller-manager uncomment the following line.
+- path: manager_metrics_patch.yaml

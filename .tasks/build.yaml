@@ -1,0 +1,96 @@
+version: '3'
+
+includes:
+  tools:
+    taskfile: tools.yaml
+    internal: true
+  lint: 
+    taskfile: lint.yaml
+    internal: true
+
+tasks:
+  manifests:
+    desc: Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects
+    cmds:
+      - '{{.CONTROLLER_GEN_CMD}} rbac:roleName=manager-role crd webhook paths="{{.ROOT_DIR}}/..." output:crd:artifacts:config=config/crd/bases'
+    deps:
+      - tools:controller-gen
+
+  generate:
+    desc: Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations
+    cmds:
+      - '{{.CONTROLLER_GEN_CMD}} object:headerFile="{{.ROOT_DIR}}/hack/boilerplate.go.txt" paths="{{.ROOT_DIR}}/..."'
+    deps:
+      - tools:controller-gen
+
+  build:
+    desc: Build manager binary
+    cmds:
+      - go build -o bin/manager cmd/main.go
+    deps:
+      - manifests
+      - generate
+      - lint:fmt
+      - lint:vet
+
+  build-installer:
+    desc: Generate a consolidated YAML with CRDs and deployment, excluding Prometheus components
+    deps:
+      - tools:ensure-dir
+      - manifests
+      - generate
+      - tools:kustomize
+    cmds:
+      - '{{.KUSTOMIZE_CMD}} build {{.ROOT_DIR}}/config/installer > {{.ROOT_DIR}}/dist/install.yaml'
+
+  docker-build:
+    desc: Build docker image locally
+    cmds:
+      - |
+        BUILD_ARGS="--tag {{.IMG}}"
+        if [ "{{.PUSH}}" = "true" ]; then
+          echo "Building and pushing amd64 image..."
+          {{.CONTAINER_TOOL}} buildx build $BUILD_ARGS --push {{.ROOT_DIR}}/.
+        else
+          echo "Building amd64 image without pushing..."
+          {{.CONTAINER_TOOL}} buildx build $BUILD_ARGS {{.ROOT_DIR}}/.
+        fi
+    vars:
+      PUSH: '{{.PUSH | default "true"}}'
+
+  docker-build-multi:
+    desc: Build docker image for the manager with cross-platform support
+    cmds:
+      - |
+        BUILDER_NAME="project-v3-builder"
+        if ! {{.CONTAINER_TOOL}} buildx inspect $BUILDER_NAME > /dev/null 2>&1; then
+          {{.CONTAINER_TOOL}} buildx create --name $BUILDER_NAME --use
+        else
+          {{.CONTAINER_TOOL}} buildx use $BUILDER_NAME
+        fi
+      - |
+        BUILD_ARGS="--platform={{.PLATFORMS}} --tag {{.IMG}}"
+        if [ "{{.PUSH}}" = "true" ]; then
+          echo "Building and pushing multi-platform image..."
+          {{.CONTAINER_TOOL}} buildx build $BUILD_ARGS --push {{.ROOT_DIR}}/.
+        else
+          echo "Building multi-platform image without pushing..."
+          {{.CONTAINER_TOOL}} buildx build $BUILD_ARGS {{.ROOT_DIR}}/.
+        fi
+    vars:
+      PUSH: '{{.PUSH | default "false"}}'
+      PLATFORMS: '{{.PLATFORMS | default "linux/amd64,linux/arm64"}}'
+
+  package-crds:
+    desc: Combine all CRDs into a single file
+    deps:
+      - manifests
+    cmds:
+      - |
+        echo "---" > {{.ROOT_DIR}}/kode-crds.yaml
+        for file in {{.ROOT_DIR}}/config/crd/bases/*.yaml; do
+          echo "---" >> {{.ROOT_DIR}}/kode-crds.yaml
+          cat $file >> {{.ROOT_DIR}}/kode-crds.yaml
+        done
+    generates:
+      - '{{.ROOT_DIR}}/kode-crds.yaml'

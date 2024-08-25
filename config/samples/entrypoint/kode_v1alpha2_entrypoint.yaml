@@ -9,7 +9,7 @@ metadata:
   namespace: default
 spec:
   routingType: "subdomain"
-  baseDomain: "kode.example.com"
+  baseDomain: "gon1.larnet.eu"
   gatewaySpec:
     existingGatewayRef:
       kind: Gateway
