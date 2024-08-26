@@ -39,7 +39,7 @@ vars:
   KIND_KUBECONFIG: '{{.KIND_KUBECONFIG | default "${HOME}/.kube/kind-config-test"}}'
   KIND_CLUSTER_NAME: '{{.KIND_CLUSTER_NAME | default "test"}}'
   KIND_CONTEXT: '{{ .KIND_CONTEXT | default "kind-test" }}'
-  IMG: '{{.IMG | default "emiljacero/kode-operator:v0.0.0-latest"}}/bin'
+  IMG: '{{.IMG | default "emiljacero/kode-operator:v0.0.0-latest"}}'
 
 tasks:
   default:
@@ -66,3 +66,19 @@ tasks:
     desc: Run go fmt
     cmds:
       - task: lint:fmt
+
+  concat:
+    desc: Concatenate all files in the specified directory and output to concatenated_output.txt. Usage - task concat -- /path/to/directory
+    vars:
+      OUTPUT_FILE: concatenated_output.txt
+    cmds:
+      - |
+        if [ -z "{{.CLI_ARGS}}" ]; then
+          echo "Error: No directory path provided."
+          echo "Usage: task concat -- /path/to/directory"
+          exit 1
+        fi
+      - bash {{.TASKFILE_DIR}}/.tasks/concat.sh {{.CLI_ARGS}} {{.OUTPUT_FILE}}
+    generates:
+      - '{{.OUTPUT_FILE}}'
+    silent: false

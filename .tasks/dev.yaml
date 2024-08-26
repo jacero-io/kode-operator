@@ -21,21 +21,28 @@ includes:
     internal: true
 
 tasks:
-  run:
-    desc: Run a controller from your host
-    vars:
-      LOG_LEVEL: 'debug'
+  generate-manifests:
+    desc: Generate RBAC manifests
     cmds:
-      - '{{.CONTROLLER_GEN_CMD}} rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases'
+      - '{{.CONTROLLER_GEN_CMD}} rbac:roleName=manager-role crd webhook paths="{{.ROOT_DIR}}/..." output:crd:artifacts:config={{.ROOT_DIR}}/config/crd/bases'
+    deps:
+      - tools:controller-gen
+
+  run-controller:
+    desc: Run the controller
+    cmds:
       - |
         LOG_LEVEL_ARG="{{if .LOG_LEVEL}}{{.LOG_LEVEL}}{{else}}debug{{end}}"
         ENV={{.ENV}} go run ./cmd/main.go --log-level $LOG_LEVEL_ARG {{.CLI_ARGS}} 2>&1 | tee output.log
+
+  run:
+    desc: Run a controller from your host
+    cmds:
+      - task: generate-manifests
+      - task: run-controller
     deps:
-      - tools:controller-gen
       - build:manifests
       - build:generate
-      - lint:fmt
-      - lint:vet
       - install
 
   install:
