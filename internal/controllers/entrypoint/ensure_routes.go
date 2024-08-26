@@ -20,25 +20,19 @@ import (
 	"context"
 	"fmt"
 
-	// egv1alpha1 "github.com/envoyproxy/gateway/api/v1alpha1"
-
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	gwapiv1 "sigs.k8s.io/gateway-api/apis/v1"
+	gwapiv1a2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
+
+	egv1alpha1 "github.com/envoyproxy/gateway/api/v1alpha1"
 
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
 	"github.com/jacero-io/kode-operator/internal/events"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-func (r *EntryPointReconciler) ensureHTTPRoutes(
-	ctx context.Context,
-	entrypoint *kodev1alpha2.EntryPoint,
-	kode *kodev1alpha2.Kode,
-	config *common.EntryPointResourceConfig,
-	kodeHostname kodev1alpha2.KodeHostname,
-	kodeDomain kodev1alpha2.KodeDomain,
-) (bool, error) {
+func (r *EntryPointReconciler) ensureHTTPRoutes(ctx context.Context, entrypoint *kodev1alpha2.EntryPoint, kode *kodev1alpha2.Kode, config *common.EntryPointResourceConfig, kodeHostname kodev1alpha2.KodeHostname, kodeDomain kodev1alpha2.KodeDomain) (bool, error) {
 	log := r.Log.WithName("HTTPRoutesEnsurer").WithValues("entrypoint", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	ctx, cancel := common.ContextWithTimeout(ctx, 30) // 30 seconds timeout
@@ -46,20 +40,27 @@ func (r *EntryPointReconciler) ensureHTTPRoutes(
 
 	log.V(1).Info("Ensuring HTTPRoutes")
 
+	var routes []*gwapiv1.HTTPRoute
+	var httpsRouteName string
+
 	// Construct HTTP Route
 	httpRoute, err := r.constructHTTPRoute(config, kode, false, kodeHostname, kodeDomain)
 	if err != nil {
 		return false, fmt.Errorf("failed to construct HTTP route: %v", err)
 	}
+	routes = append(routes, httpRoute)
 
 	// Construct HTTPS Route
-	httpsRoute, err := r.constructHTTPRoute(config, kode, true, kodeHostname, kodeDomain)
-	if err != nil {
-		return false, fmt.Errorf("failed to construct HTTPS route: %v", err)
+	if config.IsHTTPS() {
+		httpsRoute, err := r.constructHTTPRoute(config, kode, true, kodeHostname, kodeDomain)
+		if err != nil {
+			return false, fmt.Errorf("failed to construct HTTPS route: %v", err)
+		}
+		routes = append(routes, httpsRoute)
+		httpsRouteName = httpsRoute.Name
 	}
 
-	routes := []*gwapiv1.HTTPRoute{httpRoute, httpsRoute}
-	created := false
+	created := false // Flag to indicate if any HTTPRoute was created
 
 	for _, route := range routes {
 		err := r.ResourceManager.CreateOrPatch(ctx, route, func() error {
@@ -71,14 +72,14 @@ func (r *EntryPointReconciler) ensureHTTPRoutes(
 
 		created = true
 
+		// Update EntryPoint status on the Kode resource
 		entrypointStatusErr := r.updatePhaseActive(ctx, entrypoint)
 		if entrypointStatusErr != nil {
 			return false, fmt.Errorf("failed to update EntryPoint status: %v", entrypointStatusErr)
 		}
 
-		// Event
+		// Record event for created HTTPRoute on the Kode resource
 		message := fmt.Sprintf("HTTPRoute created, %s", route.Name)
-
 		err = r.EventManager.Record(ctx, kode, events.EventTypeNormal, events.ReasonCreated, message)
 		if err != nil {
 			log.Error(err, "Failed to record event")
@@ -86,15 +87,44 @@ func (r *EntryPointReconciler) ensureHTTPRoutes(
 		}
 	}
 
+	// Construct Security Policy
+	if config.EntryPointSpec.AuthSpec != nil && config.EntryPointSpec.AuthSpec.SecurityPolicySpec != nil && config.Protocol == kodev1alpha2.ProtocolHTTPS {
+
+		policy := &egv1alpha1.SecurityPolicy{}
+		policy, err := r.constructSecurityPolicy(config, kode, httpsRouteName)
+		if err != nil {
+			return false, fmt.Errorf("failed to construct SecurityPolicy: %v", err)
+		}
+
+		err = r.ResourceManager.CreateOrPatch(ctx, policy, func() error {
+			return controllerutil.SetControllerReference(entrypoint, policy, r.Scheme)
+		})
+		if err != nil {
+			return false, fmt.Errorf("failed to ensure SecurityPolicy: %v", err)
+		}
+
+		created = true
+
+		// Update EntryPoint status on the Kode resource
+		entrypointStatusErr := r.updatePhaseActive(ctx, entrypoint)
+		if entrypointStatusErr != nil {
+			return false, fmt.Errorf("failed to update EntryPoint status: %v", entrypointStatusErr)
+		}
+
+		// Record event for created SecurityPolicy on the Kode resource
+		message := fmt.Sprintf("SecurityPolicy created, %s", policy.Name)
+		err = r.EventManager.Record(ctx, kode, events.EventTypeNormal, events.ReasonCreated, message)
+		if err != nil {
+			log.Error(err, "Failed to record event")
+			return created, err
+		}
+
+	}
+
 	return created, nil
 }
 
-func (r *EntryPointReconciler) constructHTTPRoute(
-	config *common.EntryPointResourceConfig,
-	kode *kodev1alpha2.Kode,
-	isHTTPS bool,
-	kodeHostname kodev1alpha2.KodeHostname,
-	kodeDomain kodev1alpha2.KodeDomain) (*gwapiv1.HTTPRoute, error) {
+func (r *EntryPointReconciler) constructHTTPRoute(config *common.EntryPointResourceConfig, kode *kodev1alpha2.Kode, isHTTPS bool, kodeHostname kodev1alpha2.KodeHostname, kodeDomain kodev1alpha2.KodeDomain) (*gwapiv1.HTTPRoute, error) {
 	log := r.Log.WithName("HTTPRouteConstructor").WithValues("entrypoint", common.ObjectKeyFromConfig(config.CommonConfig))
 	log.V(1).Info("Constructing HTTPRoute", "isHTTPS", isHTTPS)
 
@@ -142,7 +172,7 @@ func (r *EntryPointReconciler) constructHTTPRoute(
 		}
 	} else {
 		routeName = fmt.Sprintf("%s-tls-redirect", kode.Name)
-		httpsScheme := config.Protocol
+		httpsScheme := string(config.Protocol)
 
 		rules = []gwapiv1.HTTPRouteRule{{
 			Filters: []gwapiv1.HTTPRouteFilter{{
@@ -167,5 +197,68 @@ func (r *EntryPointReconciler) constructHTTPRoute(
 			Hostnames:       []gwapiv1.Hostname{gwapiv1.Hostname(kodeDomain)},
 			Rules:           rules,
 		},
+	}, nil
+}
+
+func (r *EntryPointReconciler) constructSecurityPolicy(config *common.EntryPointResourceConfig, kode *kodev1alpha2.Kode, httpsRouteName string) (*egv1alpha1.SecurityPolicy, error) {
+	log := r.Log.WithName("SecurityPolicyConstructor").WithValues("entrypoint", common.ObjectKeyFromConfig(config.CommonConfig))
+	log.V(1).Info("Constructing SecurityPolicy")
+
+	var policyName string
+	var policyType string
+
+	targetRef := egv1alpha1.PolicyTargetReferences{
+		TargetRef: &gwapiv1a2.LocalPolicyTargetReferenceWithSectionName{
+			LocalPolicyTargetReference: gwapiv1a2.LocalPolicyTargetReference{
+				Group: gwapiv1.Group("gateway.networking.k8s.io"),
+				Kind:  gwapiv1.Kind("HTTPRoute"),
+				Name:  gwapiv1.ObjectName(httpsRouteName),
+			},
+		},
+	}
+
+	spec := &egv1alpha1.SecurityPolicySpec{
+		PolicyTargetReferences: targetRef,
+	}
+
+	if config.EntryPointSpec.AuthSpec != nil && config.EntryPointSpec.AuthSpec.SecurityPolicySpec != nil {
+		securityPolicySpec := config.EntryPointSpec.AuthSpec.SecurityPolicySpec
+
+		switch {
+		case securityPolicySpec.OIDC != nil:
+			policyType = "oidc"
+			spec.OIDC = securityPolicySpec.OIDC
+		case securityPolicySpec.BasicAuth != nil:
+			policyType = "basic-auth"
+			spec.BasicAuth = securityPolicySpec.BasicAuth
+		case securityPolicySpec.JWT != nil:
+			policyType = "jwt"
+			spec.JWT = securityPolicySpec.JWT
+		case securityPolicySpec.ExtAuth != nil:
+			policyType = "ext-auth"
+			spec.ExtAuth = securityPolicySpec.ExtAuth
+		default:
+			return nil, fmt.Errorf("no valid security policy type specified")
+		}
+
+		// Handle IdentityReference if present
+		if config.HasIdentityReference() {
+			// TODO: Implement logic to handle IdentityReference
+		}
+	} else {
+		return nil, fmt.Errorf("security policy spec is not defined")
+	}
+
+	policyName = fmt.Sprintf("%s-%s-policy", httpsRouteName, policyType)
+
+	log.Info("Constructed Policy", "name", policyName)
+
+	return &egv1alpha1.SecurityPolicy{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      policyName,
+			Namespace: config.CommonConfig.Namespace,
+			Labels:    config.CommonConfig.Labels,
+		},
+		Spec: *spec,
 	}, nil
 }

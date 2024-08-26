@@ -290,7 +290,7 @@ func (k *Kode) GenerateKodeUrlForEntryPoint(
 	domain string,
 	name string,
 	namespace string,
-	protocol string,
+	protocol Protocol,
 ) (KodeHostname, Namespace, KodeDomain, KodeUrl, error) {
 
 	var kodeUrl KodeUrl

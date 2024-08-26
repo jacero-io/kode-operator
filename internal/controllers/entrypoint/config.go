@@ -27,19 +27,32 @@ import (
 
 func InitEntryPointResourcesConfig(entryPoint *kodev1alpha2.EntryPoint) *common.EntryPointResourceConfig {
 
+	var protocol kodev1alpha2.Protocol
+	var identityReference kodev1alpha2.IdentityReference
+
+	if entryPoint.Spec.GatewaySpec != nil && entryPoint.Spec.GatewaySpec.CertificateRefs != nil {
+		protocol = kodev1alpha2.ProtocolHTTPS
+	} else {
+		protocol = kodev1alpha2.ProtocolHTTP
+	}
+
+	if entryPoint.Spec.AuthSpec != nil && entryPoint.Spec.AuthSpec.IdentityReference != nil {
+		identityReference = *entryPoint.Spec.AuthSpec.IdentityReference
+	}
+
 	return &common.EntryPointResourceConfig{
 		CommonConfig: common.CommonConfig{
 			Labels:    createLabels(entryPoint),
 			Name:      entryPoint.Name,
 			Namespace: entryPoint.Namespace,
 		},
-
-		HTTPName:  fmt.Sprintf("%s-tls-redirect", entryPoint.Name),
-		HTTPSName: entryPoint.Name,
-		Protocol:  "https",
+		EntryPointSpec: entryPoint.Spec,
 
 		GatewayName:      fmt.Sprintf("%s-gateway", entryPoint.Name),
 		GatewayNamespace: entryPoint.Namespace,
+
+		Protocol:          protocol,
+		IdentityReference: &identityReference,
 	}
 }
 

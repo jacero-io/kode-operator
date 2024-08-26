@@ -72,74 +72,10 @@ spec:
                     description: 'Defines the SecurityPolicies to be applied to the
                       Route. Reference: https://gateway.envoyproxy.io/contributions/design/security-policy/'
                     properties:
-                      authorization:
-                        description: Authorization defines the authorization configuration.
-                        properties:
-                          defaultAction:
-                            description: |-
-                              DefaultAction defines the default action to be taken if no rules match.
-                              If not specified, the default action is Deny.
-                            enum:
-                            - Allow
-                            - Deny
-                            type: string
-                          rules:
-                            description: |-
-                              Rules defines a list of authorization rules.
-                              These rules are evaluated in order, the first matching rule will be applied,
-                              and the rest will be skipped.
-
-                              For example, if there are two rules: the first rule allows the request
-                              and the second rule denies it, when a request matches both rules, it will be allowed.
-                            items:
-                              description: AuthorizationRule defines a single authorization
-                                rule.
-                              properties:
-                                action:
-                                  description: Action defines the action to be taken
-                                    if the rule matches.
-                                  enum:
-                                  - Allow
-                                  - Deny
-                                  type: string
-                                name:
-                                  description: |-
-                                    Name is a user-friendly name for the rule.
-                                    If not specified, Envoy Gateway will generate a unique name for the rule.n
-                                  type: string
-                                principal:
-                                  description: Principal specifies the client identity
-                                    of a request.
-                                  properties:
-                                    clientCIDRs:
-                                      description: |-
-                                        ClientCIDRs are the IP CIDR ranges of the client.
-                                        Valid examples are "192.168.1.0/24" or "2001:db8::/64"
-
-                                        The client IP is inferred from the X-Forwarded-For header, a custom header,
-                                        or the proxy protocol.
-                                        You can use the `ClientIPDetection` or the `EnableProxyProtocol` field in
-                                        the `ClientTrafficPolicy` to configure how the client IP is detected.
-                                      items:
-                                        description: |-
-                                          CIDR defines a CIDR Address range.
-                                          A CIDR can be an IPv4 address range such as "192.168.1.0/24" or an IPv6 address range such as "2001:0db8:11a3:09d7::/64".
-                                        pattern: ((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\/([0-9]+))|((([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))\/([0-9]+))
-                                        type: string
-                                      minItems: 1
-                                      type: array
-                                  required:
-                                  - clientCIDRs
-                                  type: object
-                              required:
-                              - action
-                              - principal
-                              type: object
-                            type: array
-                        type: object
                       basicAuth:
-                        description: BasicAuth defines the configuration for the HTTP
-                          Basic Authentication.
+                        description: |-
+                          BasicAuth defines the configuration for the HTTP Basic Authentication. Points to a Kubernetes secret which contains the username-password pairs in htpasswd format.
+                          Reference to https://httpd.apache.org/docs/2.4/programs/htpasswd.html for more details.
                         properties:
                           users:
                             description: |-
@@ -197,63 +133,6 @@ spec:
                             type: object
                         required:
                         - users
-                        type: object
-                      cors:
-                        description: CORS defines the configuration for Cross-Origin
-                          Resource Sharing (CORS).
-                        properties:
-                          allowCredentials:
-                            description: |-
-                              AllowCredentials indicates whether a request can include user credentials
-                              like cookies, authentication headers, or TLS client certificates.
-                            type: boolean
-                          allowHeaders:
-                            description: AllowHeaders defines the headers that are
-                              allowed to be sent with requests.
-                            items:
-                              type: string
-                            type: array
-                          allowMethods:
-                            description: AllowMethods defines the methods that are
-                              allowed to make requests.
-                            items:
-                              type: string
-                            minItems: 1
-                            type: array
-                          allowOrigins:
-                            description: AllowOrigins defines the origins that are
-                              allowed to make requests.
-                            items:
-                              description: |-
-                                Origin is defined by the scheme (protocol), hostname (domain), and port of
-                                the URL used to access it. The hostname can be "precise" which is just the
-                                domain name or "wildcard" which is a domain name prefixed with a single
-                                wildcard label such as "*.example.com".
-                                In addition to that a single wildcard (with or without scheme) can be
-                                configured to match any origin.
-
-                                For example, the following are valid origins:
-                                - https://foo.example.com
-                                - https://*.example.com
-                                - http://foo.example.com:8080
-                                - http://*.example.com:8080
-                                - https://*
-                              maxLength: 253
-                              minLength: 1
-                              pattern: ^(\*|https?:\/\/(\*|(\*\.)?(([\w-]+\.?)+)?[\w-]+)(:\d{1,5})?)$
-                              type: string
-                            minItems: 1
-                            type: array
-                          exposeHeaders:
-                            description: ExposeHeaders defines the headers that can
-                              be exposed in the responses.
-                            items:
-                              type: string
-                            type: array
-                          maxAge:
-                            description: MaxAge defines how long the results of a
-                              preflight request can be cached.
-                            type: string
                         type: object
                       extAuth:
                         description: ExtAuth defines the configuration for External
@@ -1196,74 +1075,10 @@ spec:
                     description: 'Defines the SecurityPolicies to be applied to the
                       Gateway. Reference: https://gateway.envoyproxy.io/contributions/design/security-policy/'
                     properties:
-                      authorization:
-                        description: Authorization defines the authorization configuration.
-                        properties:
-                          defaultAction:
-                            description: |-
-                              DefaultAction defines the default action to be taken if no rules match.
-                              If not specified, the default action is Deny.
-                            enum:
-                            - Allow
-                            - Deny
-                            type: string
-                          rules:
-                            description: |-
-                              Rules defines a list of authorization rules.
-                              These rules are evaluated in order, the first matching rule will be applied,
-                              and the rest will be skipped.
-
-                              For example, if there are two rules: the first rule allows the request
-                              and the second rule denies it, when a request matches both rules, it will be allowed.
-                            items:
-                              description: AuthorizationRule defines a single authorization
-                                rule.
-                              properties:
-                                action:
-                                  description: Action defines the action to be taken
-                                    if the rule matches.
-                                  enum:
-                                  - Allow
-                                  - Deny
-                                  type: string
-                                name:
-                                  description: |-
-                                    Name is a user-friendly name for the rule.
-                                    If not specified, Envoy Gateway will generate a unique name for the rule.n
-                                  type: string
-                                principal:
-                                  description: Principal specifies the client identity
-                                    of a request.
-                                  properties:
-                                    clientCIDRs:
-                                      description: |-
-                                        ClientCIDRs are the IP CIDR ranges of the client.
-                                        Valid examples are "192.168.1.0/24" or "2001:db8::/64"
-
-                                        The client IP is inferred from the X-Forwarded-For header, a custom header,
-                                        or the proxy protocol.
-                                        You can use the `ClientIPDetection` or the `EnableProxyProtocol` field in
-                                        the `ClientTrafficPolicy` to configure how the client IP is detected.
-                                      items:
-                                        description: |-
-                                          CIDR defines a CIDR Address range.
-                                          A CIDR can be an IPv4 address range such as "192.168.1.0/24" or an IPv6 address range such as "2001:0db8:11a3:09d7::/64".
-                                        pattern: ((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\/([0-9]+))|((([0-9a-fA-F]{1,4}:){7,7}[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,7}:|([0-9a-fA-F]{1,4}:){1,6}:[0-9a-fA-F]{1,4}|([0-9a-fA-F]{1,4}:){1,5}(:[0-9a-fA-F]{1,4}){1,2}|([0-9a-fA-F]{1,4}:){1,4}(:[0-9a-fA-F]{1,4}){1,3}|([0-9a-fA-F]{1,4}:){1,3}(:[0-9a-fA-F]{1,4}){1,4}|([0-9a-fA-F]{1,4}:){1,2}(:[0-9a-fA-F]{1,4}){1,5}|[0-9a-fA-F]{1,4}:((:[0-9a-fA-F]{1,4}){1,6})|:((:[0-9a-fA-F]{1,4}){1,7}|:)|fe80:(:[0-9a-fA-F]{0,4}){0,4}%[0-9a-zA-Z]{1,}|::(ffff(:0{1,4}){0,1}:){0,1}((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])|([0-9a-fA-F]{1,4}:){1,4}:((25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|1{0,1}[0-9]){0,1}[0-9]))\/([0-9]+))
-                                        type: string
-                                      minItems: 1
-                                      type: array
-                                  required:
-                                  - clientCIDRs
-                                  type: object
-                              required:
-                              - action
-                              - principal
-                              type: object
-                            type: array
-                        type: object
                       basicAuth:
-                        description: BasicAuth defines the configuration for the HTTP
-                          Basic Authentication.
+                        description: |-
+                          BasicAuth defines the configuration for the HTTP Basic Authentication. Points to a Kubernetes secret which contains the username-password pairs in htpasswd format.
+                          Reference to https://httpd.apache.org/docs/2.4/programs/htpasswd.html for more details.
                         properties:
                           users:
                             description: |-
@@ -1321,63 +1136,6 @@ spec:
                             type: object
                         required:
                         - users
-                        type: object
-                      cors:
-                        description: CORS defines the configuration for Cross-Origin
-                          Resource Sharing (CORS).
-                        properties:
-                          allowCredentials:
-                            description: |-
-                              AllowCredentials indicates whether a request can include user credentials
-                              like cookies, authentication headers, or TLS client certificates.
-                            type: boolean
-                          allowHeaders:
-                            description: AllowHeaders defines the headers that are
-                              allowed to be sent with requests.
-                            items:
-                              type: string
-                            type: array
-                          allowMethods:
-                            description: AllowMethods defines the methods that are
-                              allowed to make requests.
-                            items:
-                              type: string
-                            minItems: 1
-                            type: array
-                          allowOrigins:
-                            description: AllowOrigins defines the origins that are
-                              allowed to make requests.
-                            items:
-                              description: |-
-                                Origin is defined by the scheme (protocol), hostname (domain), and port of
-                                the URL used to access it. The hostname can be "precise" which is just the
-                                domain name or "wildcard" which is a domain name prefixed with a single
-                                wildcard label such as "*.example.com".
-                                In addition to that a single wildcard (with or without scheme) can be
-                                configured to match any origin.
-
-                                For example, the following are valid origins:
-                                - https://foo.example.com
-                                - https://*.example.com
-                                - http://foo.example.com:8080
-                                - http://*.example.com:8080
-                                - https://*
-                              maxLength: 253
-                              minLength: 1
-                              pattern: ^(\*|https?:\/\/(\*|(\*\.)?(([\w-]+\.?)+)?[\w-]+)(:\d{1,5})?)$
-                              type: string
-                            minItems: 1
-                            type: array
-                          exposeHeaders:
-                            description: ExposeHeaders defines the headers that can
-                              be exposed in the responses.
-                            items:
-                              type: string
-                            type: array
-                          maxAge:
-                            description: MaxAge defines how long the results of a
-                              preflight request can be cached.
-                            type: string
                         type: object
                       extAuth:
                         description: ExtAuth defines the configuration for External
