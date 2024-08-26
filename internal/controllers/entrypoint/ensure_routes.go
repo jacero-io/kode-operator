@@ -204,8 +204,7 @@ func (r *EntryPointReconciler) constructSecurityPolicy(config *common.EntryPoint
 	log := r.Log.WithName("SecurityPolicyConstructor").WithValues("entrypoint", common.ObjectKeyFromConfig(config.CommonConfig))
 	log.V(1).Info("Constructing SecurityPolicy")
 
-	var policyName string
-	var policyType string
+	policyName := fmt.Sprintf("%s-security-policy", httpsRouteName)
 
 	targetRef := egv1alpha1.PolicyTargetReferences{
 		TargetRef: &gwapiv1a2.LocalPolicyTargetReferenceWithSectionName{
@@ -221,35 +220,34 @@ func (r *EntryPointReconciler) constructSecurityPolicy(config *common.EntryPoint
 		PolicyTargetReferences: targetRef,
 	}
 
-	if config.EntryPointSpec.AuthSpec != nil && config.EntryPointSpec.AuthSpec.SecurityPolicySpec != nil {
-		securityPolicySpec := config.EntryPointSpec.AuthSpec.SecurityPolicySpec
-
-		switch {
-		case securityPolicySpec.OIDC != nil:
-			policyType = "oidc"
-			spec.OIDC = securityPolicySpec.OIDC
-		case securityPolicySpec.BasicAuth != nil:
-			policyType = "basic-auth"
-			spec.BasicAuth = securityPolicySpec.BasicAuth
-		case securityPolicySpec.JWT != nil:
-			policyType = "jwt"
-			spec.JWT = securityPolicySpec.JWT
-		case securityPolicySpec.ExtAuth != nil:
-			policyType = "ext-auth"
-			spec.ExtAuth = securityPolicySpec.ExtAuth
-		default:
-			return nil, fmt.Errorf("no valid security policy type specified")
-		}
-
-		// Handle IdentityReference if present
-		if config.HasIdentityReference() {
-			// TODO: Implement logic to handle IdentityReference
-		}
-	} else {
+	if config.EntryPointSpec.AuthSpec == nil || config.EntryPointSpec.AuthSpec.SecurityPolicySpec == nil {
 		return nil, fmt.Errorf("security policy spec is not defined")
 	}
 
-	policyName = fmt.Sprintf("%s-%s-policy", httpsRouteName, policyType)
+	securityPolicySpec := config.EntryPointSpec.AuthSpec.SecurityPolicySpec
+
+	// Handle OIDC configuration
+	if securityPolicySpec.OIDC != nil {
+		spec.OIDC = securityPolicySpec.OIDC
+		configureOIDC(spec.OIDC, config)
+	}
+
+	// Handle JWT configuration
+	if securityPolicySpec.JWT != nil {
+		spec.JWT = securityPolicySpec.JWT
+		configureJWT(spec.JWT, config)
+	}
+
+	// Handle ExtAuth configuration
+	if securityPolicySpec.ExtAuth != nil {
+		spec.ExtAuth = securityPolicySpec.ExtAuth
+		configureExtAuth(spec.ExtAuth, config)
+	}
+
+	// Handle BasicAuth configuration
+	if securityPolicySpec.BasicAuth != nil {
+		spec.BasicAuth = securityPolicySpec.BasicAuth
+	}
 
 	log.Info("Constructed Policy", "name", policyName)
 
@@ -261,4 +259,70 @@ func (r *EntryPointReconciler) constructSecurityPolicy(config *common.EntryPoint
 		},
 		Spec: *spec,
 	}, nil
+}
+
+func configureOIDC(oidc *egv1alpha1.OIDC, config *common.EntryPointResourceConfig) {
+	if config.HasIdentityReference() && config.EntryPointSpec.AuthSpec.SecurityPolicySpec.ExtAuth != nil {
+		if oidc.Scopes == nil {
+			oidc.Scopes = []string{}
+		}
+		oidc.Scopes = append(oidc.Scopes, "openid", "profile")
+
+		forwardAccessToken := true
+		oidc.ForwardAccessToken = &forwardAccessToken
+	}
+}
+
+func configureJWT(jwt *egv1alpha1.JWT, config *common.EntryPointResourceConfig) {
+	if config.HasIdentityReference() && config.EntryPointSpec.AuthSpec.SecurityPolicySpec.ExtAuth != nil {
+		identityRef := string(*config.IdentityReference)
+
+		// Ensure we have at least one provider
+		if len(jwt.Providers) == 0 {
+			jwt.Providers = []egv1alpha1.JWTProvider{{
+				Name: "default-provider",
+			}}
+		}
+
+		// Configure the first provider (or the only one if there's just one)
+		provider := &jwt.Providers[0]
+
+		// Set up claim to header mapping
+		provider.ClaimToHeaders = append(provider.ClaimToHeaders, egv1alpha1.ClaimToHeader{
+			Header: "x-auth-user-id",
+			Claim:  identityRef,
+		})
+
+		// Enable route recomputation
+		recomputeRoute := true
+		provider.RecomputeRoute = &recomputeRoute
+	}
+}
+
+func configureExtAuth(extAuth *egv1alpha1.ExtAuth, config *common.EntryPointResourceConfig) {
+	if config.HasIdentityReference() {
+		// Ensure HeadersToExtAuth includes the necessary headers
+		if extAuth.HeadersToExtAuth == nil {
+			extAuth.HeadersToExtAuth = []string{}
+		}
+		extAuth.HeadersToExtAuth = append(extAuth.HeadersToExtAuth, 
+			"authorization", 
+			"x-forwarded-for", 
+			"x-forwarded-host",
+			"x-forwarded-proto",
+			"x-auth-user-id")
+
+		// If using HTTP ExtAuth, configure HeadersToBackend
+		if extAuth.HTTP != nil {
+			if extAuth.HTTP.HeadersToBackend == nil {
+				extAuth.HTTP.HeadersToBackend = []string{}
+			}
+			extAuth.HTTP.HeadersToBackend = append(extAuth.HTTP.HeadersToBackend, "x-auth-user-id")
+		}
+
+		// If using gRPC ExtAuth, you might want to add additional configuration here
+		if extAuth.GRPC != nil {
+			// Add gRPC-specific configuration if needed
+		}
+	}
 }
