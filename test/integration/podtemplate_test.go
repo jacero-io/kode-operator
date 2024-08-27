@@ -1,5 +1,3 @@
-// test/integration/controller/kode_integration_test.go
-
 /*
 Copyright 2024 Emil Larsson.
 
@@ -36,12 +34,8 @@ import (
 )
 
 const (
-	EntryPointsKind = "EntryPoint"
-	podTemplateKind = "ClusterPodTemplate"
-
 	resourceNamespace = "test-namespace"
 	kodeResourceName  = "kode"
-	entryPointName    = "entrypoint"
 
 	storageSize = "1Gi"
 
@@ -50,14 +44,6 @@ const (
 
 	podTemplateImageCodeServer = "linuxserver/code-server:latest"
 	podTemplateImageWebtop     = "linuxserver/webtop:debian-xfce"
-)
-
-var (
-	ctx                   context.Context
-	namespace             *corev1.Namespace
-	podTemplateCodeServer *kodev1alpha2.ClusterPodTemplate
-	podTemplateWebtop     *kodev1alpha2.ClusterPodTemplate
-	entryPoint            *kodev1alpha2.EntryPoint
 )
 
 var _ = Describe("Kode Controller PodTemplate Integration", Ordered, func() {
@@ -77,7 +63,7 @@ var _ = Describe("Kode Controller PodTemplate Integration", Ordered, func() {
 				},
 				Spec: kodev1alpha2.KodeSpec{
 					TemplateRef: kodev1alpha2.CrossNamespaceObjectReference{
-						Kind: podTemplateKind,
+						Kind: "ClusterPodTemplate",
 						Name: kodev1alpha2.ObjectName(templateName),
 					},
 					Credentials: &kodev1alpha2.CredentialsSpec{
@@ -218,7 +204,7 @@ var _ = Describe("Kode Controller PodTemplate Integration", Ordered, func() {
 			},
 			Spec: kodev1alpha2.KodeSpec{
 				TemplateRef: kodev1alpha2.CrossNamespaceObjectReference{
-					Kind: podTemplateKind,
+					Kind: "ClusterPodTemplate",
 					Name: kodev1alpha2.ObjectName(podTemplateNameCodeServer),
 				},
 				Credentials: &kodev1alpha2.CredentialsSpec{
@@ -272,7 +258,7 @@ var _ = Describe("Kode Controller Update Kode Resource Integration", func() {
 			},
 			Spec: kodev1alpha2.KodeSpec{
 				TemplateRef: kodev1alpha2.CrossNamespaceObjectReference{
-					Kind: podTemplateKind,
+					Kind: "ClusterPodTemplate",
 					Name: kodev1alpha2.ObjectName(podTemplateNameCodeServer),
 				},
 				Credentials: &kodev1alpha2.CredentialsSpec{

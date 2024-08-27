@@ -1,5 +1,3 @@
-// test/integration/controller/suite_test.go
-
 /*
 Copyright 2024 Emil Larsson.
 
@@ -30,6 +28,10 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -46,10 +48,6 @@ import (
 	"github.com/jacero-io/kode-operator/internal/status"
 	"github.com/jacero-io/kode-operator/internal/template"
 	"github.com/jacero-io/kode-operator/internal/validation"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/wait"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -69,6 +67,11 @@ var (
 	mockK8sClient *mockClient
 	k8sManager    ctrl.Manager
 	reconciler    *controller.KodeReconciler
+
+	ctx                   context.Context
+	namespace             *corev1.Namespace
+	podTemplateCodeServer *kodev1alpha2.ClusterPodTemplate
+	podTemplateWebtop     *kodev1alpha2.ClusterPodTemplate
 )
 
 func TestControllers(t *testing.T) {
@@ -87,7 +90,7 @@ var _ = BeforeSuite(func() {
 	By("bootstrapping test environment")
 	ctx, cancel = context.WithCancel(context.Background())
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths: []string{filepath.Join("..", "..", "..", "config", "crd", "bases")},
+		CRDDirectoryPaths: []string{filepath.Join("..", "..", "config", "crd", "bases")},
 	}
 
 	var err error
@@ -137,22 +140,22 @@ var _ = BeforeSuite(func() {
 	namespace = &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: resourceNamespace}}
 	Expect(k8sClient.Create(ctx, namespace)).To(Succeed())
 
-	// Create EntryPoint
-	entryPoint = &kodev1alpha2.EntryPoint{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      entryPointName,
-			Namespace: namespace.Name,
-		},
-		Spec: kodev1alpha2.EntryPointSpec{
-			RoutingType: "subdomain",
-			BaseDomain:  "kode.example.com",
-		},
-	}
-	Expect(k8sClient.Create(ctx, entryPoint)).To(Succeed())
+	// // Create EntryPoint
+	// entryPoint = &kodev1alpha2.EntryPoint{
+	// 	ObjectMeta: metav1.ObjectMeta{
+	// 		Name:      "test-entrypoint",
+	// 		Namespace: namespace.Name,
+	// 	},
+	// 	Spec: kodev1alpha2.EntryPointSpec{
+	// 		RoutingType: "subdomain",
+	// 		BaseDomain:  "kode.example.com",
+	// 	},
+	// }
+	// Expect(k8sClient.Create(ctx, entryPoint)).To(Succeed())
 
 	// Create PodTemplates
-	podTemplateCodeServer = createPodTemplate(podTemplateNameCodeServer, podTemplateImageCodeServer, "code-server")
-	podTemplateWebtop = createPodTemplate(podTemplateNameWebtop, podTemplateImageWebtop, "webtop")
+	podTemplateCodeServer = createPodTemplate(podTemplateNameCodeServer, podTemplateImageCodeServer, "code-server", "", "")
+	podTemplateWebtop = createPodTemplate(podTemplateNameWebtop, podTemplateImageWebtop, "webtop", "", "")
 
 	Expect(k8sClient.Create(ctx, podTemplateCodeServer)).To(Succeed())
 	Expect(k8sClient.Create(ctx, podTemplateWebtop)).To(Succeed())
@@ -163,7 +166,7 @@ var _ = AfterSuite(func() {
 	Expect(k8sClient.Delete(ctx, namespace)).To(Succeed())
 	Expect(k8sClient.Delete(ctx, podTemplateCodeServer)).To(Succeed())
 	Expect(k8sClient.Delete(ctx, podTemplateWebtop)).To(Succeed())
-	Expect(k8sClient.Delete(ctx, entryPoint)).To(Succeed())
+	// Expect(k8sClient.Delete(ctx, entryPoint)).To(Succeed())
 
 	cancel()
 	By("tearing down the test environment")
@@ -200,9 +203,8 @@ func (m *mockClient) Get(ctx context.Context, key client.ObjectKey, obj client.O
 	return m.Client.Get(ctx, key, obj, opts...)
 }
 
-func createPodTemplate(name, image, templateType string) *kodev1alpha2.ClusterPodTemplate {
+func createPodTemplate(name, image, templateType string, entryPointName string, entrypointNamespace string) *kodev1alpha2.ClusterPodTemplate {
 	port := kodev1alpha2.Port(8000)
-	namespace := kodev1alpha2.Namespace(resourceNamespace)
 
 	template := &kodev1alpha2.ClusterPodTemplate{
 		ObjectMeta: metav1.ObjectMeta{
@@ -212,16 +214,20 @@ func createPodTemplate(name, image, templateType string) *kodev1alpha2.ClusterPo
 			PodTemplateSharedSpec: kodev1alpha2.PodTemplateSharedSpec{
 				BaseSharedSpec: kodev1alpha2.BaseSharedSpec{
 					Port: &port,
-					EntryPointRef: &kodev1alpha2.CrossNamespaceObjectReference{
-						Kind:      EntryPointsKind,
-						Name:      entryPointName,
-						Namespace: &namespace,
-					},
 				},
 				Type:  templateType,
 				Image: image,
 			},
 		},
+	}
+
+	if entryPointName != "" {
+		entrypointNamespace := kodev1alpha2.Namespace(entrypointNamespace)
+		template.Spec.PodTemplateSharedSpec.EntryPointRef = &kodev1alpha2.CrossNamespaceObjectReference{
+			Kind:      "EntryPoint",
+			Name:      kodev1alpha2.ObjectName(entryPointName),
+			Namespace: &entrypointNamespace,
+		}
 	}
 
 	return template
