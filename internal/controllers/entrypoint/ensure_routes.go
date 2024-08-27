@@ -305,9 +305,9 @@ func configureExtAuth(extAuth *egv1alpha1.ExtAuth, config *common.EntryPointReso
 		if extAuth.HeadersToExtAuth == nil {
 			extAuth.HeadersToExtAuth = []string{}
 		}
-		extAuth.HeadersToExtAuth = append(extAuth.HeadersToExtAuth, 
-			"authorization", 
-			"x-forwarded-for", 
+		extAuth.HeadersToExtAuth = append(extAuth.HeadersToExtAuth,
+			"authorization",
+			"x-forwarded-for",
 			"x-forwarded-host",
 			"x-forwarded-proto",
 			"x-auth-user-id")

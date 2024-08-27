@@ -29,6 +29,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -46,6 +47,7 @@ import (
 	"github.com/jacero-io/kode-operator/internal/template"
 	"github.com/jacero-io/kode-operator/internal/validation"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/util/wait"
 	//+kubebuilder:scaffold:imports
@@ -61,7 +63,6 @@ const (
 
 var (
 	cfg           *rest.Config
-	ctx           context.Context
 	cancel        context.CancelFunc
 	testEnv       *envtest.Environment
 	k8sClient     client.Client
@@ -131,15 +132,46 @@ var _ = BeforeSuite(func() {
 		err = k8sManager.Start(ctx)
 		Expect(err).ToNot(HaveOccurred())
 	}()
+
+	// Create namespace
+	namespace = &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: resourceNamespace}}
+	Expect(k8sClient.Create(ctx, namespace)).To(Succeed())
+
+	// Create EntryPoint
+	entryPoint = &kodev1alpha2.EntryPoint{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      entryPointName,
+			Namespace: namespace.Name,
+		},
+		Spec: kodev1alpha2.EntryPointSpec{
+			RoutingType: "subdomain",
+			BaseDomain:  "kode.example.com",
+		},
+	}
+	Expect(k8sClient.Create(ctx, entryPoint)).To(Succeed())
+
+	// Create PodTemplates
+	podTemplateCodeServer = createPodTemplate(podTemplateNameCodeServer, podTemplateImageCodeServer, "code-server")
+	podTemplateWebtop = createPodTemplate(podTemplateNameWebtop, podTemplateImageWebtop, "webtop")
+
+	Expect(k8sClient.Create(ctx, podTemplateCodeServer)).To(Succeed())
+	Expect(k8sClient.Create(ctx, podTemplateWebtop)).To(Succeed())
 })
 
 var _ = AfterSuite(func() {
+	// Cleanup resources
+	Expect(k8sClient.Delete(ctx, namespace)).To(Succeed())
+	Expect(k8sClient.Delete(ctx, podTemplateCodeServer)).To(Succeed())
+	Expect(k8sClient.Delete(ctx, podTemplateWebtop)).To(Succeed())
+	Expect(k8sClient.Delete(ctx, entryPoint)).To(Succeed())
+
 	cancel()
 	By("tearing down the test environment")
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
 })
 
+// Keep these helper functions
 func waitForResourceDeletion(ctx context.Context, c *mockClient, obj client.Object, timeout time.Duration) error {
 	return wait.PollUntilContextTimeout(ctx, time.Second, timeout, true, func(ctx context.Context) (bool, error) {
 		err := c.Get(ctx, client.ObjectKeyFromObject(obj), obj)
@@ -166,4 +198,31 @@ func (m *mockClient) Get(ctx context.Context, key client.ObjectKey, obj client.O
 		return apierrors.NewNotFound(schema.GroupResource{}, key.Name)
 	}
 	return m.Client.Get(ctx, key, obj, opts...)
+}
+
+func createPodTemplate(name, image, templateType string) *kodev1alpha2.ClusterPodTemplate {
+	port := kodev1alpha2.Port(8000)
+	namespace := kodev1alpha2.Namespace(resourceNamespace)
+
+	template := &kodev1alpha2.ClusterPodTemplate{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: name,
+		},
+		Spec: kodev1alpha2.ClusterPodTemplateSpec{
+			PodTemplateSharedSpec: kodev1alpha2.PodTemplateSharedSpec{
+				BaseSharedSpec: kodev1alpha2.BaseSharedSpec{
+					Port: &port,
+					EntryPointRef: &kodev1alpha2.CrossNamespaceObjectReference{
+						Kind:      EntryPointsKind,
+						Name:      entryPointName,
+						Namespace: &namespace,
+					},
+				},
+				Type:  templateType,
+				Image: image,
+			},
+		},
+	}
+
+	return template
 }

@@ -41,8 +41,9 @@ vars:
   KIND_CONTEXT: '{{ .KIND_CONTEXT | default "kind-test" }}'
   IMG: '{{.IMG | default "emiljacero/kode-operator:v0.0.0-latest"}}'
 
-  CONCAT_EXCLUDE_PATTERNS: 'zz_generated.deepcopy.go,entrypoint_integration_test.go,*pvc.go,*secret.go,*sidecars.go,*statefulset.go,*tofu*,*podtemplate*,*initplugin_types.go,*finalizer.go,common/constants.go,resource_checker.go'
-  CONCAT_INCLUDE_PATTERNS: 'v1alpha2/*,common/*,controllers/entrypoint/*,controllers/kode/*,resource/*,template/*'
+  CONCAT_EXCLUDE_PATTERNS: 'zz_generated.deepcopy.go,*pvc.go,*sidecars.go,*finalizer.go,common/constants.go,resource_checker.go'
+  CONCAT_INCLUDE_PATTERNS: 'v1alpha2/kode_types.go,v1alpha2/shared_podtemplate_types.go,v1alpha2/podtemplate_cluster_types.go,v1alpha2/common_types.go,v1alpha2/entrypoint_types.go,common/*controllers/kode/*,resource/*,template/*'
+  # ,controllers/entrypoint/*,
   CONCAT_DIRECTORY: '{{.ROOT_DIR}}/'
 
 tasks:
