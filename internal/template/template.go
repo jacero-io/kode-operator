@@ -8,7 +8,6 @@ import (
 	"github.com/go-logr/logr"
 
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
-	koderrs "github.com/jacero-io/kode-operator/pkg/errors"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -166,7 +165,7 @@ func handleNotFoundError(err error, ref kodev1alpha2.CrossNamespaceObjectReferen
 		if ref.Namespace != nil {
 			namespacedName.Namespace = string(*ref.Namespace)
 		}
-		return &koderrs.TemplateNotFoundError{
+		return &TemplateNotFoundError{
 			NamespacedName: namespacedName,
 			Kind:           string(ref.Kind),
 		}
@@ -182,4 +181,13 @@ func validateRef(ref kodev1alpha2.CrossNamespaceObjectReference) error {
 		return fmt.Errorf("template reference name is empty")
 	}
 	return nil
+}
+
+type TemplateNotFoundError struct {
+	NamespacedName types.NamespacedName
+	Kind           string
+}
+
+func (e *TemplateNotFoundError) Error() string {
+	return fmt.Sprintf("%s not found: %s", e.Kind, e.NamespacedName)
 }

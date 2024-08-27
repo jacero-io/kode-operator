@@ -48,12 +48,20 @@ type KodeResourceConfig struct {
 
 // EntryPointResourceConfig holds configuration for EntryPoint resources
 type EntryPointResourceConfig struct {
-	CommonConfig CommonConfig
-
-	HTTPName  string
-	HTTPSName string
-	Protocol  string
+	CommonConfig   CommonConfig
+	EntryPointSpec kodev1alpha2.EntryPointSpec
 
 	GatewayName      string
 	GatewayNamespace string
+
+	Protocol          kodev1alpha2.Protocol
+	IdentityReference *kodev1alpha2.IdentityReference
+}
+
+func (c *EntryPointResourceConfig) IsHTTPS() bool {
+	return c.Protocol == kodev1alpha2.ProtocolHTTPS
+}
+
+func (c *EntryPointResourceConfig) HasIdentityReference() bool {
+	return c.IdentityReference != nil
 }

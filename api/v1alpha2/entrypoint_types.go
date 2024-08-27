@@ -59,7 +59,7 @@ type GatewaySpec struct {
 
 	// Reference to Secrets containing the certificate and private key to use for the Gateway HTTPS Listener.
 	// +kubebuilder:validation:Optional
-	CertificateRefs []gwapiv1.SecretObjectReference `json:"certificateRefs,omitempty" yaml:"certificateRefs,omitempty"`
+	CertificateRefs *[]gwapiv1.SecretObjectReference `json:"certificateRefs,omitempty" yaml:"certificateRefs,omitempty"`
 
 	// Defines the SecurityPolicies to be applied to the Gateway. Reference: https://gateway.envoyproxy.io/contributions/design/security-policy/
 	// +kubebuilder:validation:Optional
@@ -86,13 +86,8 @@ type AuthSpec struct {
 }
 
 type SecurityPolicySpec struct {
-	// CORS defines the configuration for Cross-Origin Resource Sharing (CORS).
-	//
-	// +optional
-	CORS *egv1alpha1.CORS `json:"cors,omitempty"`
-
-	// BasicAuth defines the configuration for the HTTP Basic Authentication.
-	//
+	// BasicAuth defines the configuration for the HTTP Basic Authentication. Points to a Kubernetes secret which contains the username-password pairs in htpasswd format.
+	// Reference to https://httpd.apache.org/docs/2.4/programs/htpasswd.html for more details.
 	// +optional
 	BasicAuth *egv1alpha1.BasicAuth `json:"basicAuth,omitempty"`
 
@@ -110,12 +105,6 @@ type SecurityPolicySpec struct {
 	//
 	// +optional
 	ExtAuth *egv1alpha1.ExtAuth `json:"extAuth,omitempty"`
-
-	// Authorization defines the authorization configuration.
-	//
-	// +optional
-	// +notImplementedHide
-	Authorization *egv1alpha1.Authorization `json:"authorization,omitempty"`
 }
 
 // EntryPointStatus defines the observed state of EntryPoint

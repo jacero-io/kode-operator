@@ -5,6 +5,9 @@ includes:
     taskfile: build.yaml
     internal: true
 
+vars:
+  KIND_CONTROL_PLANE: "{{.KIND_CLUSTER_NAME}}-control-plane"
+
 tasks:
   set-context:
     internal: true
@@ -18,7 +21,19 @@ tasks:
         fi
 
   kind-ensure:
-    desc: Ensure a Kind cluster exists, creating it if necessary
+    desc: |
+      Ensure a Kind cluster exists, creating it if necessary.
+      This task checks for the existence of a Kind cluster with the specified name and creates one if it doesn't exist.
+      
+      Usage:
+        task kind-ensure
+      
+      Variables:
+        KIND_CLUSTER_NAME: Name of the Kind cluster (default defined in Taskfile)
+        ENVTEST_K8S_VERSION: Kubernetes version to use for the cluster
+      
+      Note:
+        This task will set the kubectl context to the newly created or existing Kind cluster.
     cmds:
       - |
         if ! kind get clusters | grep -q '^{{.KIND_CLUSTER_NAME}}$'; then
@@ -43,17 +58,35 @@ tasks:
   kind-start:
     desc: Start the Kind cluster
     cmds:
-      - docker start test-control-plane || true
+      - docker start {{.KIND_CONTROL_PLANE}} || true
 
   kind-stop:
     desc: Stop the Kind cluster
     cmds:
-      - docker stop test-control-plane || true
+      - docker stop {{.KIND_CONTROL_PLANE}} || true
 
   kind-load-image:
+    desc: Load a Docker image into the Kind cluster
     cmds:
       - |
-        kind load docker-image {{.IMG}} --name {{.KIND_CLUSTER_NAME}}
+        if ! docker image inspect {{.IMG}} &> /dev/null; then
+          echo "Error: Image {{.IMG}} not found locally. Please build or pull the image first."
+          exit 1
+        fi
+      - |
+        if ! kind get clusters | grep -q '^{{.KIND_CLUSTER_NAME}}$'; then
+          echo "Error: Kind cluster '{{.KIND_CLUSTER_NAME}}' not found. Please create the cluster first."
+          exit 1
+        fi
+      - |
+        echo "Loading image {{.IMG}} into Kind cluster '{{.KIND_CLUSTER_NAME}}'..."
+        if kind load docker-image {{.IMG}} --name {{.KIND_CLUSTER_NAME}}; then
+          echo "Image loaded successfully."
+        else
+          echo "Error: Failed to load image into the Kind cluster."
+          exit 1
+        fi
+    silent: false
 
   kind-load-images:
     desc: Load internal and external Docker images into Kind cluster

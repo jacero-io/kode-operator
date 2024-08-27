@@ -8,30 +8,59 @@ includes:
     taskfile: lint.yaml
     internal: true
 
+vars:
+  BUILDER_NAME: "project-v3-builder"
+
 tasks:
   manifests:
     desc: Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects
     cmds:
-      - '{{.CONTROLLER_GEN_CMD}} rbac:roleName=manager-role crd webhook paths="{{.ROOT_DIR}}/..." output:crd:artifacts:config=config/crd/bases'
+      - '{{.CONTROLLER_GEN_CMD}} rbac:roleName=manager-role crd webhook paths="{{.ROOT_DIR}}/..." output:crd:artifacts:config={{.ROOT_DIR}}/config/crd/bases'
+    sources:
+      - '{{.ROOT_DIR}}/api/**/*.go'
+      - '{{.ROOT_DIR}}/controllers/**/*.go'
+      - '{{.ROOT_DIR}}/config/rbac/**/*.yaml'
+    generates:
+      - '{{.ROOT_DIR}}/config/crd/bases/*.yaml'
+      - '{{.ROOT_DIR}}/config/rbac/role.yaml'
     deps:
       - tools:controller-gen
 
   generate:
-    desc: Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations
+    desc: |
+      Generate code containing DeepCopy, DeepCopyInto, and DeepCopyObject method implementations.
+      This task is crucial for ensuring that Kubernetes custom resources can be properly serialized and deserialized.
+      
+      Usage:
+        task generate
+      
+      Output:
+        Generated code will be integrated into the existing codebase.
     cmds:
       - '{{.CONTROLLER_GEN_CMD}} object:headerFile="{{.ROOT_DIR}}/hack/boilerplate.go.txt" paths="{{.ROOT_DIR}}/..."'
     deps:
       - tools:controller-gen
 
-  build:
+  lint:
+    desc: Run linters
+    cmds:
+      - task: lint:fmt
+      - task: lint:vet
+
+  build-package:
     desc: Build manager binary
     cmds:
-      - go build -o bin/manager cmd/main.go
+      - go build -o {{.ROOT_DIR}}/bin/manager {{.ROOT_DIR}}/cmd/main.go
+    sources:
+      - '{{.ROOT_DIR}}/cmd/**/*.go'
+      - '{{.ROOT_DIR}}/api/**/*.go'
+      - '{{.ROOT_DIR}}/internal/**/*.go'
+      - '{{.ROOT_DIR}}/pkg/**/*.go'
+    generates:
+      - '{{.ROOT_DIR}}/bin/manager'
     deps:
       - manifests
       - generate
-      - lint:fmt
-      - lint:vet
 
   build-installer:
     desc: Generate a consolidated YAML with CRDs and deployment, excluding Prometheus components
@@ -43,42 +72,49 @@ tasks:
     cmds:
       - '{{.KUSTOMIZE_CMD}} build {{.ROOT_DIR}}/config/installer > {{.ROOT_DIR}}/dist/install.yaml'
 
+  docker-build-base:
+    internal: true
+    cmds:
+      - |
+        if ! {{.CONTAINER_TOOL}} buildx inspect {{.BUILDER_NAME}} > /dev/null 2>&1; then
+          {{.CONTAINER_TOOL}} buildx create --name {{.BUILDER_NAME}} --use
+        else
+          {{.CONTAINER_TOOL}} buildx use {{.BUILDER_NAME}}
+        fi
+      - |
+        BUILD_ARGS="--tag {{.IMG}} {{.EXTRA_BUILD_ARGS}}"
+        if [ "{{.PUSH}}" = "true" ]; then
+          echo "Building and pushing {{.BUILD_TYPE}} image..."
+          {{.CONTAINER_TOOL}} buildx build $BUILD_ARGS --push {{.ROOT_DIR}}/.
+        else
+          echo "Building {{.BUILD_TYPE}} image without pushing..."
+          {{.CONTAINER_TOOL}} buildx build $BUILD_ARGS --load {{.ROOT_DIR}}/.
+        fi
+    vars:
+      PUSH: '{{.PUSH | default "false"}}'
+      EXTRA_BUILD_ARGS: ''
+      BUILD_TYPE: 'docker'
+
   docker-build:
     desc: Build docker image locally
     cmds:
-      - |
-        BUILD_ARGS="--tag {{.IMG}}"
-        if [ "{{.PUSH}}" = "true" ]; then
-          echo "Building and pushing amd64 image..."
-          {{.CONTAINER_TOOL}} buildx build $BUILD_ARGS --push {{.ROOT_DIR}}/.
-        else
-          echo "Building amd64 image without pushing..."
-          {{.CONTAINER_TOOL}} buildx build $BUILD_ARGS {{.ROOT_DIR}}/.
-        fi
-    vars:
-      PUSH: '{{.PUSH | default "true"}}'
+      - task: docker-build-base
+        vars:
+          BUILD_TYPE: 'amd64'
+          PUSH: '{{.PUSH | default "true"}}'
+    sources:
+      - '{{.ROOT_DIR}}/Dockerfile'
+    generates:
+      - '{{.IMG}}'
 
   docker-build-multi:
     desc: Build docker image for the manager with cross-platform support
     cmds:
-      - |
-        BUILDER_NAME="project-v3-builder"
-        if ! {{.CONTAINER_TOOL}} buildx inspect $BUILDER_NAME > /dev/null 2>&1; then
-          {{.CONTAINER_TOOL}} buildx create --name $BUILDER_NAME --use
-        else
-          {{.CONTAINER_TOOL}} buildx use $BUILDER_NAME
-        fi
-      - |
-        BUILD_ARGS="--platform={{.PLATFORMS}} --tag {{.IMG}}"
-        if [ "{{.PUSH}}" = "true" ]; then
-          echo "Building and pushing multi-platform image..."
-          {{.CONTAINER_TOOL}} buildx build $BUILD_ARGS --push {{.ROOT_DIR}}/.
-        else
-          echo "Building multi-platform image without pushing..."
-          {{.CONTAINER_TOOL}} buildx build $BUILD_ARGS {{.ROOT_DIR}}/.
-        fi
+      - task: docker-build-base
+        vars:
+          BUILD_TYPE: 'multi-platform'
+          EXTRA_BUILD_ARGS: '--platform={{.PLATFORMS}}'
     vars:
-      PUSH: '{{.PUSH | default "false"}}'
       PLATFORMS: '{{.PLATFORMS | default "linux/amd64,linux/arm64"}}'
 
   package-crds:

@@ -27,6 +27,7 @@ go.work
 *~
 
 # Other
+.task
 __debug*
 coverage*
 random/*

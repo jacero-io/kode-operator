@@ -39,7 +39,12 @@ vars:
   KIND_KUBECONFIG: '{{.KIND_KUBECONFIG | default "${HOME}/.kube/kind-config-test"}}'
   KIND_CLUSTER_NAME: '{{.KIND_CLUSTER_NAME | default "test"}}'
   KIND_CONTEXT: '{{ .KIND_CONTEXT | default "kind-test" }}'
-  IMG: '{{.IMG | default "emiljacero/kode-operator:v0.0.0-latest"}}/bin'
+  IMG: '{{.IMG | default "emiljacero/kode-operator:v0.0.0-latest"}}'
+
+  CONCAT_EXCLUDE_PATTERNS: 'zz_generated.deepcopy.go,*pvc.go,*sidecars.go,*finalizer.go,common/constants.go,resource_checker.go'
+  CONCAT_INCLUDE_PATTERNS: 'v1alpha2/kode_types.go,v1alpha2/shared_podtemplate_types.go,v1alpha2/podtemplate_cluster_types.go,v1alpha2/common_types.go,v1alpha2/entrypoint_types.go,common/*controllers/kode/*,resource/*,template/*,test/integration/*'
+  # ,controllers/entrypoint/*,
+  CONCAT_DIRECTORY: '{{.ROOT_DIR}}/'
 
 tasks:
   default:
@@ -66,3 +71,33 @@ tasks:
     desc: Run go fmt
     cmds:
       - task: lint:fmt
+
+  concat:
+    desc: |
+      Concatenate project files based on include and exclude patterns.
+      
+      This task processes files in the specified directory, filtering them based on
+      include and exclude patterns, and concatenates their contents into a single output file.
+      It also removes multiline comments from the concatenated content.
+
+      Usage:
+        task concat
+
+      To override default patterns or directory:
+        task concat CONCAT_EXCLUDE_PATTERNS='pattern1,pattern2' CONCAT_INCLUDE_PATTERNS='pattern3,pattern4' CONCAT_DIRECTORY='./src/'
+
+      Variables:
+        CONCAT_EXCLUDE_PATTERNS: Comma-separated list of patterns to exclude
+        CONCAT_INCLUDE_PATTERNS: Comma-separated list of patterns to include
+        CONCAT_DIRECTORY: Directory to process (should end with a slash)
+
+      Output:
+        The concatenated content is written to 'concatenated_output.txt' in the current directory.
+
+    cmds:
+      - |
+        CONCAT_EXCLUDE_PATTERNS="{{.CONCAT_EXCLUDE_PATTERNS}}" \
+        CONCAT_INCLUDE_PATTERNS="{{.CONCAT_INCLUDE_PATTERNS}}" \
+        CONCAT_DIRECTORY="{{.CONCAT_DIRECTORY}}" \
+        sh {{.TASKFILE_DIR}}/.tasks/concat.sh
+    silent: false

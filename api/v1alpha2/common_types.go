@@ -161,3 +161,11 @@ type ObjectName string
 // +kubebuilder:validation:MinLength=1
 // +kubebuilder:validation:MaxLength=63
 type Namespace string
+
+// Protocol is the protocol used by the service.
+type Protocol string
+
+const (
+	ProtocolHTTP  Protocol = "http"
+	ProtocolHTTPS Protocol = "https"
+)
