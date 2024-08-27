@@ -39,10 +39,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	gwapiv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/cleanup"
-	controller "github.com/jacero-io/kode-operator/internal/controllers/kode"
+	entrypointctrl "github.com/jacero-io/kode-operator/internal/controllers/entrypoint"
+	kodectrl "github.com/jacero-io/kode-operator/internal/controllers/kode"
 	"github.com/jacero-io/kode-operator/internal/events"
 	"github.com/jacero-io/kode-operator/internal/resource"
 	"github.com/jacero-io/kode-operator/internal/status"
@@ -60,13 +62,14 @@ const (
 )
 
 var (
-	cfg           *rest.Config
-	cancel        context.CancelFunc
-	testEnv       *envtest.Environment
-	k8sClient     client.Client
-	mockK8sClient *mockClient
-	k8sManager    ctrl.Manager
-	reconciler    *controller.KodeReconciler
+	cfg                  *rest.Config
+	cancel               context.CancelFunc
+	testEnv              *envtest.Environment
+	k8sClient            client.Client
+	mockK8sClient        *mockClient
+	k8sManager           ctrl.Manager
+	reconciler           *kodectrl.KodeReconciler
+	entrypointReconciler *entrypointctrl.EntryPointReconciler
 
 	ctx                   context.Context
 	namespace             *corev1.Namespace
@@ -90,7 +93,10 @@ var _ = BeforeSuite(func() {
 	By("bootstrapping test environment")
 	ctx, cancel = context.WithCancel(context.Background())
 	testEnv = &envtest.Environment{
-		CRDDirectoryPaths: []string{filepath.Join("..", "..", "config", "crd", "bases")},
+		CRDDirectoryPaths: []string{
+			filepath.Join("..", "..", "config", "crd", "bases"),
+			filepath.Join("..", "crd"),
+		},
 	}
 
 	var err error
@@ -99,6 +105,8 @@ var _ = BeforeSuite(func() {
 	Expect(cfg).NotTo(BeNil())
 
 	err = kodev1alpha2.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
+	err = gwapiv1.Install(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
 
 	k8sManager, err = ctrl.NewManager(cfg, ctrl.Options{
@@ -114,7 +122,7 @@ var _ = BeforeSuite(func() {
 		deletedResources: sync.Map{},
 	}
 
-	reconciler = &controller.KodeReconciler{
+	reconciler = &kodectrl.KodeReconciler{
 		Client:          mockK8sClient,
 		Scheme:          k8sManager.GetScheme(),
 		Log:             ctrl.Log.WithName("Kode").WithName("Reconcile"),
@@ -126,8 +134,24 @@ var _ = BeforeSuite(func() {
 		EventManager:    events.NewEventManager(k8sClient, ctrl.Log.WithName("Kode").WithName("EventManager"), k8sManager.GetScheme(), k8sManager.GetEventRecorderFor("kode-controller")),
 	}
 
-	// Set up the controller with the manager
+	entrypointReconciler = &entrypointctrl.EntryPointReconciler{
+		Client:          mockK8sClient,
+		Scheme:          k8sManager.GetScheme(),
+		Log:             ctrl.Log.WithName("EntryPoint").WithName("Reconcile"),
+		ResourceManager: resource.NewDefaultResourceManager(k8sClient, ctrl.Log.WithName("EntryPoint").WithName("ResourceManager"), k8sManager.GetScheme()),
+		TemplateManager: template.NewDefaultTemplateManager(k8sClient, ctrl.Log.WithName("EntryPoint").WithName("TemplateManager")),
+		CleanupManager:  cleanup.NewDefaultCleanupManager(mockK8sClient, ctrl.Log.WithName("EntryPoint").WithName("CleanupManager")),
+		StatusUpdater:   status.NewDefaultStatusUpdater(k8sClient, ctrl.Log.WithName("EntryPoint").WithName("StatusUpdater")),
+		Validator:       validation.NewDefaultValidator(),
+		EventManager:    events.NewEventManager(k8sClient, ctrl.Log.WithName("EntryPoint").WithName("EventManager"), k8sManager.GetScheme(), k8sManager.GetEventRecorderFor("entrypoint-controller")),
+	}
+
+	// Set up the Kode controller with the manager
 	err = reconciler.SetupWithManager(k8sManager)
+	Expect(err).ToNot(HaveOccurred())
+
+	// Set up the EntryPoint controller with the manager
+	err = entrypointReconciler.SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
 	// Start the manager
@@ -139,19 +163,6 @@ var _ = BeforeSuite(func() {
 	// Create namespace
 	namespace = &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: resourceNamespace}}
 	Expect(k8sClient.Create(ctx, namespace)).To(Succeed())
-
-	// // Create EntryPoint
-	// entryPoint = &kodev1alpha2.EntryPoint{
-	// 	ObjectMeta: metav1.ObjectMeta{
-	// 		Name:      "test-entrypoint",
-	// 		Namespace: namespace.Name,
-	// 	},
-	// 	Spec: kodev1alpha2.EntryPointSpec{
-	// 		RoutingType: "subdomain",
-	// 		BaseDomain:  "kode.example.com",
-	// 	},
-	// }
-	// Expect(k8sClient.Create(ctx, entryPoint)).To(Succeed())
 
 	// Create PodTemplates
 	podTemplateCodeServer = createPodTemplate(podTemplateNameCodeServer, podTemplateImageCodeServer, "code-server", "", "")
@@ -166,7 +177,6 @@ var _ = AfterSuite(func() {
 	Expect(k8sClient.Delete(ctx, namespace)).To(Succeed())
 	Expect(k8sClient.Delete(ctx, podTemplateCodeServer)).To(Succeed())
 	Expect(k8sClient.Delete(ctx, podTemplateWebtop)).To(Succeed())
-	// Expect(k8sClient.Delete(ctx, entryPoint)).To(Succeed())
 
 	cancel()
 	By("tearing down the test environment")

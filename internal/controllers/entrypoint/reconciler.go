@@ -167,11 +167,11 @@ func (r *EntryPointReconciler) reconcileKode(ctx context.Context, kode *kodev1al
 	config := InitEntryPointResourcesConfig(entryPoint)
 
 	// Construct the KodeUrl
-	kodeHostname, kodeNamespace, kodeDomain, kodeUrl, err := kode.GenerateKodeUrlForEntryPoint(entryPoint.Spec.RoutingType, entryPoint.Spec.BaseDomain, kode.Name, kode.Namespace, config.Protocol)
+	kodeHostname, kodeDomain, kodeUrl, kodePath, err := kode.GenerateKodeUrlForEntryPoint(entryPoint.Spec.RoutingType, entryPoint.Spec.BaseDomain, kode.Name, config.Protocol)
 	if err != nil {
 		return r.handleReconcileError(ctx, kode, entryPoint, err, "Failed to construct Kode URL")
 	}
-	log.V(1).Info("Constructed Kode URL", "hostname", kodeHostname, "namespace", kodeNamespace, "domain", kodeDomain, "url", kodeUrl)
+	log.V(1).Info("Constructed Kode URL", "hostname", kodeHostname, "domain", kodeDomain, "url", kodeUrl, "path", kodePath)
 
 	// Check Kode Port
 	kodePort := kode.GetPort()

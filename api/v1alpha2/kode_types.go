@@ -178,6 +178,8 @@ type KodeDomain string
 
 type KodeUrl string
 
+type KodePath string
+
 type IconUrl string
 
 type Runtime string
@@ -289,24 +291,26 @@ func (k *Kode) GenerateKodeUrlForEntryPoint(
 	routingType RoutingType,
 	domain string,
 	name string,
-	namespace string,
 	protocol Protocol,
-) (KodeHostname, Namespace, KodeDomain, KodeUrl, error) {
+) (KodeHostname, KodeDomain, KodeUrl, KodePath, error) {
 
-	var kodeUrl KodeUrl
 	var kodeDomain KodeDomain
+	var kodePath KodePath
+	var kodeUrl KodeUrl
 
 	if routingType == RoutingTypeSubdomain {
-		kodeDomain = KodeDomain(fmt.Sprintf("%s.%s.%s", name, namespace, domain))
-		kodeUrl = KodeUrl(fmt.Sprintf("%s://%s", protocol, kodeDomain))
+		kodeDomain = KodeDomain(fmt.Sprintf("%s.%s", name, domain))
+		kodePath = "/"
+		kodeUrl = KodeUrl(fmt.Sprintf("%s://%s%s", protocol, kodeDomain, kodePath))
 
-		return KodeHostname(name), Namespace(namespace), kodeDomain, kodeUrl, nil
+		return KodeHostname(name), kodeDomain, kodeUrl, kodePath, nil
 
 	} else if routingType == RoutingTypePath {
-		kodeDomain = KodeDomain(fmt.Sprintf("%s/%s/%s", domain, namespace, name))
-		kodeUrl = KodeUrl(fmt.Sprintf("%s://%s", protocol, kodeDomain))
+		kodeDomain = KodeDomain(domain)
+		kodePath = KodePath(fmt.Sprintf("/%s", name))
+		kodeUrl = KodeUrl(fmt.Sprintf("%s://%s%s", protocol, kodeDomain, kodePath))
 
-		return KodeHostname(name), Namespace(namespace), kodeDomain, kodeUrl, nil
+		return KodeHostname(name), kodeDomain, kodeUrl, kodePath, nil
 
 	} else {
 		return "", "", "", "", fmt.Errorf("unsupported routing type: %s", routingType)
