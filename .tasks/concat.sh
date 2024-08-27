@@ -1,44 +1,57 @@
-#!/bin/bash
+#!/bin/sh
 
-# Check if two arguments are provided
-if [ $# -lt 2 ]; then
-    echo "Error: Insufficient arguments provided."
-    echo "Usage: $0 <directory_path> <output_file>"
-    exit 1
-fi
+# Output file
+output_file="concatenated_output.txt"
 
-directory="$1"
-output_file="$2"
-
-# Check if the provided directory path is empty
-if [ -z "$directory" ]; then
-    echo "Error: The provided directory path is empty."
-    echo "Usage: $0 <directory_path> <output_file>"
-    exit 1
-fi
-
-# Check if the directory exists
-if [ ! -d "$directory" ]; then
-    echo "Error: The directory '$directory' does not exist."
-    exit 1
-fi
-
-# Check if the directory is empty
-if [ -z "$(ls -A "$directory")" ]; then
-    echo "The directory '$directory' is empty. No files to concatenate."
-    exit 0
-fi
-
-# Clear the output file if it exists, or create it if it doesn't
+# Create or empty the output file
 > "$output_file"
 
-# Concatenate files
-for file in "$directory"/*; do
-    if [ -f "$file" ]; then
-        echo -e "\n# File: ${file#$directory/}\n" >> "$output_file"
-        cat "$file" >> "$output_file"
-        echo -e "\n#==== End of file: ${file#$directory/} ====\n" >> "$output_file"
+# Function to process files
+process_files() {
+  dir=$1
+  find_command="find \"$dir\" -type f"
+  
+  # Apply exclude patterns
+  old_IFS=$IFS
+  IFS=','
+  for pattern in $CONCAT_EXCLUDE_PATTERNS; do
+    if echo "$pattern" | grep -q "/"; then
+      find_command="$find_command ! -path \"*/$pattern\""
+    else
+      find_command="$find_command ! -name \"$pattern\""
     fi
+  done
+  
+  # Apply include patterns
+  if [ -n "$CONCAT_INCLUDE_PATTERNS" ]; then
+    find_command="$find_command \("
+    for pattern in $CONCAT_INCLUDE_PATTERNS; do
+      if echo "$pattern" | grep -q "/"; then
+        find_command="$find_command -path \"*/$pattern\" -o"
+      else
+        find_command="$find_command -name \"$pattern\" -o"
+      fi
+    done
+    find_command=$(echo "$find_command" | sed 's/ -o$//')  # Remove the last -o
+    find_command="$find_command \)"
+  fi
+  IFS=$old_IFS
+
+  eval "$find_command"
+}
+
+# Process the specified directory
+process_files "$CONCAT_DIRECTORY" | while read -r file; do
+  # Get the relative path of the file
+  relative_path=${file#$CONCAT_DIRECTORY}
+  relative_path=${relative_path#/}  # Remove leading slash if present
+  
+  echo -e "\n# File: $relative_path\n" >> "$output_file"
+  
+  # Remove multiline comments and output the result
+  sed '/\/\*/,/\*\//d' "$file" >> "$output_file"
+  
+  echo -e "\n#==== End of file: $relative_path ====\n" >> "$output_file"
 done
 
-echo "Files have been concatenated and saved to $output_file"
+echo "Concatenation complete. Output written to $output_file"
