@@ -29,7 +29,7 @@ import (
 )
 
 // ensureSecret ensures that the Secret exists for the Kode instance
-func (r *KodeReconciler) ensureSecret(ctx context.Context, config *common.KodeResourceConfig, kode *kodev1alpha2.Kode) error {
+func (r *KodeReconciler) ensureSecret(ctx context.Context, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig) error {
 	log := r.Log.WithName("SecretEnsurer").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	ctx, cancel := common.ContextWithTimeout(ctx, 30) // 30 seconds timeout
@@ -45,7 +45,7 @@ func (r *KodeReconciler) ensureSecret(ctx context.Context, config *common.KodeRe
 		},
 	}
 
-	if config.KodeSpec.Credentials.ExistingSecret != nil {
+	if kode.Spec.Credentials != nil && kode.Spec.Credentials.ExistingSecret != nil {
 		// ExistingSecret is specified, fetch the secret
 		err := r.ResourceManager.Get(ctx, client.ObjectKeyFromObject(secret), secret)
 		if err != nil {
@@ -64,6 +64,9 @@ func (r *KodeReconciler) ensureSecret(ctx context.Context, config *common.KodeRe
 		log.V(1).Info("Using existing secret", "Name", secret.Name, "Data", common.MaskSecretData(secret))
 
 	} else {
+		if config.Credentials == nil {
+			return fmt.Errorf("config.Credentials is nil")
+		}
 		// ExistingSecret is not specified, create or patch the secret
 		err := r.ResourceManager.CreateOrPatch(ctx, secret, func() error {
 			constructedSecret, err := r.constructSecretSpec(config)
@@ -73,7 +76,6 @@ func (r *KodeReconciler) ensureSecret(ctx context.Context, config *common.KodeRe
 
 			// Update metadata for the secret
 			secret.Data = constructedSecret.Data
-			secret.Labels = constructedSecret.Labels
 
 			return controllerutil.SetControllerReference(kode, secret, r.Scheme)
 		})
@@ -91,9 +93,6 @@ func (r *KodeReconciler) constructSecretSpec(config *common.KodeResourceConfig) 
 	log := r.Log.WithName("SecretConstructor").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Labels: config.CommonConfig.Labels,
-		},
 		Data: map[string][]byte{
 			"username": []byte(config.Credentials.Username),
 			"password": []byte(config.Credentials.Password),

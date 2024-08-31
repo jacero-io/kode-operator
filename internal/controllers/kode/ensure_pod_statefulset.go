@@ -30,7 +30,7 @@ import (
 )
 
 // ensureStatefulSet ensures that the StatefulSet exists for the Kode instance
-func (r *KodeReconciler) ensureStatefulSet(ctx context.Context, config *common.KodeResourceConfig, kode *kodev1alpha2.Kode) error {
+func (r *KodeReconciler) ensureStatefulSet(ctx context.Context, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig) error {
 	log := r.Log.WithName("StatefulSetEnsurer").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	ctx, cancel := common.ContextWithTimeout(ctx, 30) // 30 seconds timeout
@@ -161,7 +161,7 @@ func constructCodeServerContainers(config *common.KodeResourceConfig, workspace 
 		{Name: "PGID", Value: fmt.Sprintf("%d", config.Template.PodTemplateSpec.PGID)},
 		{Name: "TZ", Value: config.Template.PodTemplateSpec.TZ},
 		{Name: "PORT", Value: fmt.Sprintf("%d", *config.Port)},
-		{Name: "USERNAME", Value: config.KodeSpec.Credentials.Username},
+		{Name: "USERNAME", Value: config.Credentials.Username},
 		{Name: "DEFAULT_WORKSPACE", Value: workspace},
 	}
 
@@ -196,7 +196,7 @@ func constructWebtopContainers(config *common.KodeResourceConfig) []corev1.Conta
 		{Name: "PGID", Value: fmt.Sprintf("%d", config.Template.PodTemplateSpec.PGID)},
 		{Name: "TZ", Value: config.Template.PodTemplateSpec.TZ},
 		{Name: "CUSTOM_PORT", Value: fmt.Sprintf("%d", *config.Port)},
-		{Name: "CUSTOM_USER", Value: config.KodeSpec.Credentials.Username},
+		{Name: "CUSTOM_USER", Value: config.Credentials.Username},
 	}
 
 	if config.Credentials.EnableBuiltinAuth && config.Credentials.Password != "" {
@@ -229,7 +229,7 @@ func constructVolumesAndMounts(mountPath string, config *common.KodeResourceConf
 	volumeMounts := []corev1.VolumeMount{}
 
 	// Only add volume and volume mount if storage is explicitly defined
-	if !config.KodeSpec.Storage.IsEmpty() {
+	if config.KodeSpec.Storage != nil {
 		var volumeSource corev1.VolumeSource
 
 		if config.KodeSpec.Storage.ExistingVolumeClaim != nil {

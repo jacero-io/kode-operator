@@ -72,12 +72,9 @@ spec:
                       no authentication.
                     type: string
                   username:
-                    default: abc
                     description: Is both the the HTTP Basic auth username (when used)
                       and the user the container should run as. Defaults to 'abc'.
                     type: string
-                required:
-                - username
                 type: object
               defaultHome:
                 default: /config

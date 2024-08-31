@@ -20,6 +20,8 @@ package status
 
 import (
 	"context"
+	"sort"
+	"time"
 
 	"github.com/go-logr/logr"
 
@@ -49,15 +51,10 @@ func NewDefaultStatusUpdater(client client.Client, log logr.Logger) StatusUpdate
 	}
 }
 
-func (u *defaultStatusUpdater) UpdateStatusKode(ctx context.Context,
-	kode *kodev1alpha2.Kode,
-	phase kodev1alpha2.KodePhase,
-	conditions []metav1.Condition,
-	conditionsToRemove []string,
-	lastError string,
-	lastErrorTime *metav1.Time,
-) error {
-	// ... existing code ...
+func (u *defaultStatusUpdater) UpdateStatusKode(ctx context.Context, kode *kodev1alpha2.Kode, phase kodev1alpha2.KodePhase, conditions []metav1.Condition, conditionsToRemove []string, lastError string, lastErrorTime *metav1.Time) error {
+	log := u.Log.WithValues("kode", client.ObjectKeyFromObject(kode))
+
+	log.V(1).Info("Updating Kode status", "Phase", phase)
 
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		// Fetch the latest version of Kode
@@ -69,11 +66,18 @@ func (u *defaultStatusUpdater) UpdateStatusKode(ctx context.Context,
 		// Create a copy of the latest status
 		updatedStatus := latestKode.Status.DeepCopy()
 
+		// Ensure conditions have all required fields
+		conditions = ensureConditionFields(conditions, latestKode.Generation)
+
 		// Update only the fields we want to change
 		updatedStatus.Phase = phase
 		updatedStatus.Conditions = mergeAndRemoveConditions(updatedStatus.Conditions, conditions, conditionsToRemove)
-		updatedStatus.LastError = &lastError
-		updatedStatus.LastErrorTime = lastErrorTime
+		if lastError != "" {
+			updatedStatus.LastError = &lastError
+		}
+		if lastErrorTime != nil {
+			updatedStatus.LastErrorTime = lastErrorTime
+		}
 		updatedStatus.ObservedGeneration = latestKode.Generation
 		updatedStatus.Runtime = kode.SetRuntime()
 
@@ -83,20 +87,14 @@ func (u *defaultStatusUpdater) UpdateStatusKode(ctx context.Context,
 
 		// Apply the patch
 		if err := u.Client.Status().Patch(ctx, latestKode, patch); err != nil {
-			u.Log.Error(err, "Failed to update Kode status")
+			log.Error(err, "Failed to update Kode status")
 			return err
 		}
 		return nil
 	})
 }
 
-func (u *defaultStatusUpdater) UpdateStatusEntryPoint(ctx context.Context,
-	entryPoint *kodev1alpha2.EntryPoint,
-	phase kodev1alpha2.EntryPointPhase,
-	conditions []metav1.Condition,
-	conditionsToRemove []string,
-	lastError string,
-	lastErrorTime *metav1.Time) error {
+func (u *defaultStatusUpdater) UpdateStatusEntryPoint(ctx context.Context, entryPoint *kodev1alpha2.EntryPoint, phase kodev1alpha2.EntryPointPhase, conditions []metav1.Condition, conditionsToRemove []string, lastError string, lastErrorTime *metav1.Time) error {
 
 	log := u.Log.WithValues("entrypoint", client.ObjectKeyFromObject(entryPoint))
 
@@ -148,7 +146,18 @@ func mergeAndRemoveConditions(existing, new []metav1.Condition, toRemove []strin
 	}
 
 	// Merge new conditions
+	now := metav1.NewTime(time.Now())
 	for _, condition := range new {
+		if existingCond, exists := existingMap[condition.Type]; exists {
+			// Update LastTransitionTime only if the status has changed
+			if existingCond.Status != condition.Status {
+				condition.LastTransitionTime = now
+			} else {
+				condition.LastTransitionTime = existingCond.LastTransitionTime
+			}
+		} else {
+			condition.LastTransitionTime = now
+		}
 		existingMap[condition.Type] = condition
 	}
 
@@ -158,5 +167,23 @@ func mergeAndRemoveConditions(existing, new []metav1.Condition, toRemove []strin
 		result = append(result, condition)
 	}
 
+	// Sort conditions by type for consistent output
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].Type < result[j].Type
+	})
+
 	return result
+}
+
+func ensureConditionFields(conditions []metav1.Condition, generation int64) []metav1.Condition {
+	now := metav1.Now()
+	for i := range conditions {
+		if conditions[i].LastTransitionTime.IsZero() {
+			conditions[i].LastTransitionTime = now
+		}
+		if conditions[i].ObservedGeneration == 0 {
+			conditions[i].ObservedGeneration = generation
+		}
+	}
+	return conditions
 }

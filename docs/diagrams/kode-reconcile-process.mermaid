@@ -1,0 +1,96 @@
+stateDiagram-v2
+    [*] --> ReconciliationRequest : Controller Loop Triggered
+
+    ReconciliationRequest --> FetchLatestKode : Get Kode Resource
+    FetchLatestKode --> CheckDeletionTimestamp
+
+    CheckDeletionTimestamp --> HandleFinalizer : DeletionTimestamp Set
+
+    HandleFinalizer --> CleanupResources : Remove Controlled Resources
+    CleanupResources --> RemoveFinalizer : Cleanup Complete
+    RemoveFinalizer --> ReturnResult : Finalizer Handled
+
+    CheckDeletionTimestamp --> ResetRetryCount : DeletionTimestamp Not Set
+    ResetRetryCount --> AssessCurrentPhase
+
+    AssessCurrentPhase --> HandlePendingState : Pending
+    AssessCurrentPhase --> HandleConfiguringState : Configuring
+    AssessCurrentPhase --> HandleProvisioningState : Provisioning
+    AssessCurrentPhase --> HandleActiveState : Active
+    AssessCurrentPhase --> HandleInactiveState : Inactive
+    AssessCurrentPhase --> HandleFailedState : Failed
+    AssessCurrentPhase --> HandleUnknownState : Unknown
+    AssessCurrentPhase --> HandleSuspendingState : Suspending
+    AssessCurrentPhase --> HandleSuspendedState : Suspended
+    AssessCurrentPhase --> HandleResumingState : Resuming
+
+    HandlePendingState --> ValidateKode
+    ValidateKode --> FetchTemplate : Validation Passed
+    FetchTemplate --> InitializeConfig : Template Found
+    FetchTemplate --> TransitionTo : Template Not Found
+    InitializeConfig --> TransitionTo
+    ValidateKode --> TransitionTo : Validation Failed
+
+    HandleConfiguringState --> EnsureResources
+    EnsureResources --> UpdateConfiguringStatus
+    UpdateConfiguringStatus --> TransitionTo
+
+    HandleProvisioningState --> CheckResourceReadiness
+    CheckResourceReadiness --> UpdateProvisioningStatus : Not Ready
+    CheckResourceReadiness --> UpdatePort
+    UpdatePort --> TransitionTo : All Ready
+    UpdateProvisioningStatus --> ReturnResult : Requeue
+
+    HandleActiveState --> CheckResourceHealth
+    CheckResourceHealth --> TransitionTo : Unhealthy
+    CheckResourceHealth --> UpdateActiveStatus : Healthy
+    UpdateActiveStatus --> ReturnResult : Requeue
+
+    HandleInactiveState --> UpdateInactiveStatus
+    UpdateInactiveStatus --> ReturnResult : Requeue
+
+    HandleFailedState --> IncrementRetryCount
+    IncrementRetryCount --> CheckMaxRetries
+    CheckMaxRetries --> TransitionTo : Retry
+    CheckMaxRetries --> UpdateFailedStatus : Max Retries Exceeded
+    UpdateFailedStatus --> ReturnResult : Requeue
+
+    HandleUnknownState --> DetermineCurrentState
+    DetermineCurrentState --> TransitionTo
+
+    state TransitionTo {
+        [*] --> CheckIfTransitionRequired
+        CheckIfTransitionRequired --> AddStateChangeCondition : Transition Required
+        CheckIfTransitionRequired --> [*] : No Transition Required
+        AddStateChangeCondition --> UpdateStatusKode
+        UpdateStatusKode --> UpdateEvent
+        UpdateEvent --> SetRequeueTimer
+        SetRequeueTimer --> [*] : Return and Requeue
+    }
+
+    TransitionTo --> ReturnResult : Requeue
+
+    ReturnResult --> EndReconciliation : No Requeue
+    ReturnResult --> Requeue : Requeue Requested
+    Requeue --> [*] : Wait for Next Reconciliation
+    EndReconciliation --> [*] : End Current Cycle
+
+    note right of TransitionTo
+        Handles all state transitions,
+        updates status, and manages events
+    end note
+
+    note right of ReturnResult
+        ctrl.Result determines
+        requeue or end
+    end note
+
+    note left of Requeue
+        Resource added back to
+        reconciliation queue
+    end note
+
+    note left of DetermineCurrentState
+        Attempts to determine the actual
+        state based on resource conditions
+    end note

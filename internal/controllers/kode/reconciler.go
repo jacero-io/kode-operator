@@ -31,6 +31,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	client "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
@@ -76,175 +77,214 @@ const (
 
 func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("kode", req.NamespacedName)
+	log.V(1).Info("Starting reconciliation")
 
 	// Fetch the Kode instance
-	kode, err := common.GetLatestKode(ctx, r.Client, req.Name, req.Namespace)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			log.V(1).Info("Kode resource not found. Ignoring since object must be deleted.")
-			return ctrl.Result{}, nil
+	kode := &kodev1alpha2.Kode{}
+	if err := r.Client.Get(ctx, req.NamespacedName, kode); err != nil {
+		if client.IgnoreNotFound(err) != nil {
+			log.Error(err, "Unable to fetch Kode")
+			return ctrl.Result{}, err
 		}
-		log.Error(err, "Failed to get Kode")
-		return ctrl.Result{RequeueAfter: RequeueInterval}, err
-	}
-
-	// Handle finalizer
-	result, err := r.handleFinalizer(ctx, kode)
-	if err != nil {
-		return result, err
-	}
-	if !result.IsZero() {
-		return result, nil
-	}
-
-	// If the object is being deleted, stop here
-	if !kode.DeletionTimestamp.IsZero() {
+		// Kode not found, likely deleted, nothing to do
 		return ctrl.Result{}, nil
 	}
 
-	// Check if reconciliation is needed
-	if kode.Generation == kode.Status.ObservedGeneration && kode.Status.Phase == kodev1alpha2.KodePhaseActive {
-		log.V(1).Info("Resource is stable and active, no reconciliation needed")
-		return ctrl.Result{}, nil // No requeue, controller will be triggered by changes
+	// Handle deletion
+	if !kode.DeletionTimestamp.IsZero() {
+		return r.handleFinalizer(ctx, kode)
 	}
 
-	// Fetch templates and initialize config
-	template, err := r.fetchTemplatesWithRetry(ctx, kode)
+	// Ensure finalizer is present (fallback)
+	if !controllerutil.ContainsFinalizer(kode, common.KodeFinalizerName) {
+		controllerutil.AddFinalizer(kode, common.KodeFinalizerName)
+		if err := r.Client.Update(ctx, kode); err != nil {
+			log.Error(err, "Failed to add finalizer")
+			return ctrl.Result{Requeue: true}, err
+		}
+		log.Info("Added finalizer to Kode resource")
+		return ctrl.Result{Requeue: true}, nil
+	}
+
+	// Initialize status if it's a new resource
+	if kode.Status.Phase == "" {
+		return r.transitionTo(ctx, kode, kodev1alpha2.KodePhasePending)
+	}
+
+	// Reset retry count if we're not in a failed state
+	if kode.Status.Phase != kodev1alpha2.KodePhaseFailed && kode.Status.RetryCount > 0 {
+		if err := r.updateRetryCount(ctx, kode, 0); err != nil {
+			log.Error(err, "Failed to reset retry count")
+			return ctrl.Result{Requeue: true}, err
+		}
+	}
+
+	// Handle state transition
+	var result ctrl.Result
+	var err error
+
+	switch kode.Status.Phase {
+	case kodev1alpha2.KodePhasePending:
+		result, err = r.handlePendingState(ctx, kode)
+	case kodev1alpha2.KodePhaseConfiguring:
+		result, err = r.handleConfiguringState(ctx, kode)
+	case kodev1alpha2.KodePhaseProvisioning:
+		result, err = r.handleProvisioningState(ctx, kode)
+	case kodev1alpha2.KodePhaseActive:
+		result, err = r.handleActiveState(ctx, kode)
+	case kodev1alpha2.KodePhaseInactive:
+		result, err = r.handleInactiveState(ctx, kode)
+	case kodev1alpha2.KodePhaseSuspending:
+		result, err = r.handleSuspendingState(ctx, kode)
+	case kodev1alpha2.KodePhaseSuspended:
+		result, err = r.handleSuspendedState(ctx, kode)
+	case kodev1alpha2.KodePhaseResuming:
+		result, err = r.handleResumingState(ctx, kode)
+	case kodev1alpha2.KodePhaseDeleting:
+		result, err = r.handleDeletingState(ctx, kode)
+	case kodev1alpha2.KodePhaseFailed:
+		result, err = r.handleFailedState(ctx, kode)
+	case kodev1alpha2.KodePhaseUnknown:
+		result, err = r.handleUnknownState(ctx, kode)
+	default:
+		log.Info("Unknown phase, transitioning to Unknown", "phase", kode.Status.Phase)
+		return r.transitionTo(ctx, kode, kodev1alpha2.KodePhaseUnknown)
+	}
+
+	// Handle errors from state handlers
 	if err != nil {
-		log.Error(err, "Failed to fetch templates")
-		if errors.IsNotFound(err) {
-			if statusErr := r.updatePhaseFailed(ctx, kode, err, []metav1.Condition{
-				{
-					Type:    string(common.ConditionTypeError),
-					Status:  metav1.ConditionTrue,
-					Reason:  "TemplateMissing",
-					Message: fmt.Sprintf("Failed to fetch templates: %s", err.Error()),
-				},
-				{
-					Type:    string(common.ConditionTypeReady),
-					Status:  metav1.ConditionFalse,
-					Reason:  "ResourceNotReady",
-					Message: "Kode resource is not ready due to Template was not found",
-				},
-				{
-					Type:    string(common.ConditionTypeAvailable),
-					Status:  metav1.ConditionFalse,
-					Reason:  "ResourceUnavailable",
-					Message: "Kode resource is not available due to Template was not found",
-				},
-				{
-					Type:    string(common.ConditionTypeProgressing),
-					Status:  metav1.ConditionFalse,
-					Reason:  "ProgressHalted",
-					Message: "Progress halted due to Template was not found",
-				},
-			}); statusErr != nil {
-				log.Error(statusErr, "Failed to update Kode status")
-				return ctrl.Result{RequeueAfter: RequeueInterval}, err
-			}
-
-			err = r.EventManager.Record(ctx, kode, events.EventTypeWarning, events.ReasonFailed, fmt.Sprintf("Failed to reconcile Kode: %v", err))
-			if err != nil {
-				log.Error(err, "Failed to record event")
-			}
-
-			return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil
+		log.Error(err, "Error handling state", "phase", kode.Status.Phase)
+		if kode.Status.Phase != kodev1alpha2.KodePhaseFailed {
+			// Transition to failed state if not already there
+			return r.transitionTo(ctx, kode, kodev1alpha2.KodePhaseFailed)
 		}
-		// For other errors, requeue after a shorter interval
-		return ctrl.Result{RequeueAfter: RequeueInterval}, err
-	}
-	config := InitKodeResourcesConfig(kode, template)
-
-	// Ensure resources
-	if err := r.ensureResources(ctx, config); err != nil {
-		log.Error(err, "Failed to ensure resources")
-		return ctrl.Result{RequeueAfter: RequeueInterval}, err
+		// If already in failed state, just requeue
+		return ctrl.Result{Requeue: true}, nil
 	}
 
-	// Check resource readiness
-	ready, err := r.checkResourcesReady(ctx, config)
-	if err != nil {
-		log.Error(err, "Failed to check resource readiness")
-		return ctrl.Result{RequeueAfter: 5 * time.Second}, err
-	}
-
-	if !ready {
-		if kode.Status.Phase != kodev1alpha2.KodePhasePending {
-			log.Info("Resources not ready, updating status to Pending")
-			if statusErr := r.updatePhasePending(ctx, kode); statusErr != nil {
-				log.Error(statusErr, "Failed to update Kode status to Pending")
-				return ctrl.Result{RequeueAfter: RequeueInterval}, statusErr
-			}
-		}
-		return ctrl.Result{RequeueAfter: RequeueInterval}, nil // Requeue while not ready
-	}
-
-	// Update Port Status
-	if err := r.updatePortStatus(ctx, kode, config.Template); err != nil {
-		log.Error(err, "Failed to update Port status")
-		if statusErr := r.updatePhaseFailed(ctx, kode, err, []metav1.Condition{
-			{
-				Type:    string(common.ConditionTypeError),
-				Status:  metav1.ConditionTrue,
-				Reason:  "PortUpdate",
-				Message: fmt.Sprintf("Failed to update Port status: %s", err.Error()),
-			},
-			{
-				Type:    string(common.ConditionTypeReady),
-				Status:  metav1.ConditionFalse,
-				Reason:  "ResourceNotReady",
-				Message: "Kode resource is not ready due to failed port update",
-			},
-			{
-				Type:    string(common.ConditionTypeAvailable),
-				Status:  metav1.ConditionFalse,
-				Reason:  "ResourceUnavailable",
-				Message: "Kode resource is not available due to failed port update",
-			},
-			{
-				Type:    string(common.ConditionTypeProgressing),
-				Status:  metav1.ConditionFalse,
-				Reason:  "ProgressHalted",
-				Message: "Progress halted due to failed port update",
-			},
-		}); statusErr != nil {
-			log.Error(statusErr, "Failed to update Kode status")
-			return ctrl.Result{RequeueAfter: RequeueInterval}, err
-		}
-
-		err := r.EventManager.Record(ctx, kode, events.EventTypeWarning, events.ReasonFailed, fmt.Sprintf("Failed to reconcile Kode: %v", err))
-		if err != nil {
-			log.Error(err, "Failed to record event")
-			return ctrl.Result{RequeueAfter: RequeueInterval}, err
-		}
-
-		return ctrl.Result{RequeueAfter: RequeueInterval}, err
-	}
-
-	// Resources are ready, update status to Active if it's not already
-	if kode.Status.Phase != kodev1alpha2.KodePhaseActive {
-		log.Info("Resources ready, updating status to Active")
-		if statusErr := r.updatePhaseActive(ctx, kode); statusErr != nil {
-			log.Error(statusErr, "Failed to update Kode status to Active")
-			return ctrl.Result{RequeueAfter: RequeueInterval}, statusErr
-		}
-
-		err := r.EventManager.Record(ctx, kode, events.EventTypeNormal, events.ReasonReconciled, "Kode resource reconciled successfully")
-		if err != nil {
-			log.Error(err, "Failed to record event")
-			return ctrl.Result{RequeueAfter: RequeueInterval}, err
-		}
-	}
-
-	// Update ObservedGeneration
-	if kode.Status.ObservedGeneration != kode.Generation {
+	// Update ObservedGeneration if it's out of sync and we're not requeuing
+	if kode.Generation != kode.Status.ObservedGeneration && result.IsZero() {
 		if err := r.updateObservedGeneration(ctx, kode); err != nil {
 			log.Error(err, "Failed to update ObservedGeneration")
-			return ctrl.Result{RequeueAfter: RequeueInterval}, err
+			return ctrl.Result{Requeue: true}, nil
 		}
 	}
-	log.Info("Kode reconciliation successful")
-	return ctrl.Result{}, nil
+
+	log.V(1).Info("Reconciliation completed", "result", result)
+	return result, nil
+}
+
+func (r *KodeReconciler) transitionTo(ctx context.Context, kode *kodev1alpha2.Kode, newPhase kodev1alpha2.KodePhase) (ctrl.Result, error) {
+	log := r.Log.WithValues("kode", client.ObjectKeyFromObject(kode))
+
+	if kode.Status.Phase == newPhase {
+		// No transition needed
+		return ctrl.Result{}, nil
+	}
+
+	log.V(1).Info("Transitioning Kode state", "from", kode.Status.Phase, "to", newPhase)
+
+	// Create a deep copy of the kode object to avoid modifying the cache
+	kodeCopy := kode.DeepCopy()
+
+	// Update the phase
+	oldPhase := kodeCopy.Status.Phase
+	kodeCopy.Status.Phase = newPhase
+
+	// Add a condition to reflect the state change
+	condition := metav1.Condition{
+		Type:               string(newPhase),
+		Status:             metav1.ConditionTrue,
+		Reason:             "StateTransition",
+		Message:            fmt.Sprintf("Kode transitioned from %s to %s state", oldPhase, newPhase),
+		LastTransitionTime: metav1.Now(),
+		ObservedGeneration: kodeCopy.Generation,
+	}
+
+	// Update the status
+	if err := r.StatusUpdater.UpdateStatusKode(ctx, kodeCopy, newPhase, []metav1.Condition{condition}, nil, "", nil); err != nil {
+		log.Error(err, "Failed to update status for state transition")
+		return ctrl.Result{Requeue: true}, err
+	}
+
+	// Perform any additional actions based on the new state
+	var requeueAfter time.Duration
+	switch newPhase {
+	case kodev1alpha2.KodePhaseConfiguring:
+		if kode.Status.Phase != kodev1alpha2.KodePhaseConfiguring {
+			if err := r.StatusUpdater.UpdateStatusKode(ctx, kode, kodev1alpha2.KodePhaseConfiguring, []metav1.Condition{
+				{
+					Type:    "Configuring",
+					Status:  metav1.ConditionTrue,
+					Reason:  "EnteringConfiguringState",
+					Message: "Kode is being configured.",
+				},
+			}, nil, "", nil); err != nil {
+				log.Error(err, "Failed to update status for Configuring state")
+				return ctrl.Result{Requeue: true}, err
+			}
+		}
+
+		// Trigger immediate reconciliation to start configuration
+		requeueAfter = 1 * time.Millisecond
+	case kodev1alpha2.KodePhaseProvisioning:
+		err := r.EventManager.Record(ctx, kode, events.EventTypeNormal, events.ReasonKodeProvisioning, "Kode is being provisioned")
+		if err != nil {
+			log.Error(err, "Failed to record Kode provisioning event")
+		}
+		// Trigger quick reconciliation to check resource readiness
+		requeueAfter = 1 * time.Millisecond
+	case kodev1alpha2.KodePhaseActive:
+		// Maybe update related resources or send notifications
+		if err := r.EventManager.Record(ctx, kode, events.EventTypeNormal, events.ReasonKodeActive, "Kode is now active"); err != nil {
+			log.Error(err, "Failed to record Kode active event")
+		}
+	case kodev1alpha2.KodePhaseSuspending:
+		if err := r.EventManager.Record(ctx, kode, events.EventTypeNormal, events.ReasonKodeSuspended, "Kode is being suspended"); err != nil {
+			log.Error(err, "Failed to record Kode suspended event")
+		}
+		// Start resource cleanup process
+		requeueAfter = 1 * time.Millisecond
+	case kodev1alpha2.KodePhaseSuspended:
+		// Record suspension event
+		if err := r.EventManager.Record(ctx, kode, events.EventTypeNormal, events.ReasonKodeSuspended, "Kode has been suspended"); err != nil {
+			log.Error(err, "Failed to record Kode suspended event")
+		}
+	case kodev1alpha2.KodePhaseResuming:
+		err := r.EventManager.Record(ctx, kode, events.EventTypeNormal, events.ReasonKodeResuming, "Kode is resuming")
+		if err != nil {
+			log.Error(err, "Failed to record Kode resuming event")
+		}
+		// Start resuming process
+		requeueAfter = 1 * time.Millisecond
+	case kodev1alpha2.KodePhaseDeleting:
+		err := r.EventManager.Record(ctx, kode, events.EventTypeNormal, events.ReasonKodeDeleting, "Kode is being deleted")
+		if err != nil {
+			log.Error(err, "Failed to record Kode deleting event")
+		}
+		// Trigger immediate reconciliation to start deletion process
+		requeueAfter = 1 * time.Millisecond
+	case kodev1alpha2.KodePhaseFailed:
+		// Record failure event
+		if err := r.EventManager.Record(ctx, kode, events.EventTypeWarning, events.ReasonKodeFailed, "Kode has entered Failed state"); err != nil {
+			log.Error(err, "Failed to record Kode failed event")
+		}
+		// Set up for potential retry
+		requeueAfter = time.Minute
+	case kodev1alpha2.KodePhaseUnknown:
+		// Record unknown state event
+		if err := r.EventManager.Record(ctx, kode, events.EventTypeWarning, events.ReasonKodeUnknown, "Kode has entered Unknown state"); err != nil {
+			log.Error(err, "Failed to record Kode unknown state event")
+		}
+		// Set up for quick recheck
+		requeueAfter = 10 * time.Second
+	}
+
+	// Requeue to handle the new state
+	if requeueAfter > 0 {
+		return ctrl.Result{RequeueAfter: requeueAfter}, nil
+	}
+	return ctrl.Result{Requeue: true}, nil
 }
 
 func (r *KodeReconciler) fetchTemplatesWithRetry(ctx context.Context, kode *kodev1alpha2.Kode) (*kodev1alpha2.Template, error) {
@@ -309,6 +349,18 @@ func (r *KodeReconciler) updateObservedGeneration(ctx context.Context, kode *kod
 			"Namespace", latest.Namespace,
 			"Generation", latest.Generation)
 		return nil
+	})
+}
+
+func (r *KodeReconciler) updateRetryCount(ctx context.Context, kode *kodev1alpha2.Kode, count int) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		latest, err := common.GetLatestKode(ctx, r.Client, kode.Name, kode.Namespace)
+		if err != nil {
+			return err
+		}
+
+		latest.Status.RetryCount = count
+		return r.Client.Status().Update(ctx, latest)
 	})
 }
 

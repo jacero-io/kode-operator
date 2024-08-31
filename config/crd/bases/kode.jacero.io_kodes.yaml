@@ -57,12 +57,9 @@ spec:
                       no authentication.
                     type: string
                   username:
-                    default: abc
                     description: Is both the the HTTP Basic auth username (when used)
                       and the user the container should run as. Defaults to 'abc'.
                     type: string
-                required:
-                - username
                 type: object
               home:
                 default: /config
@@ -519,6 +516,10 @@ spec:
               phase:
                 description: Phase represents the current phase of the Kode resource.
                 type: string
+              retryCount:
+                description: RetryCount keeps track of the number of retry attempts
+                  for failed states.
+                type: integer
               runtime:
                 description: The runtime for the kode. Can be one of 'pod', 'virtual',
                   'tofu'.

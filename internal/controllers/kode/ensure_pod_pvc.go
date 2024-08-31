@@ -30,7 +30,7 @@ import (
 )
 
 // ensurePVC ensures that the PersistentVolumeClaim exists for the Kode instance
-func (r *KodeReconciler) ensurePVC(ctx context.Context, config *common.KodeResourceConfig, kode *kodev1alpha2.Kode) error {
+func (r *KodeReconciler) ensurePersistentVolumeClaim(ctx context.Context, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig) error {
 	log := r.Log.WithName("PVCEnsurer").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	ctx, cancel := common.ContextWithTimeout(ctx, 30) // 30 seconds timeout
@@ -38,7 +38,12 @@ func (r *KodeReconciler) ensurePVC(ctx context.Context, config *common.KodeResou
 
 	log.V(1).Info("Ensuring PVC")
 
-	// If ExistingVolumeClaim is specified, return nil
+	// If the storage spec is nil, skip PVC creation
+	if config.KodeSpec.Storage == nil {
+		log.V(1).Info("Storage spec is nil, skipping PVC creation")
+		return nil
+	}
+	// If ExistingVolumeClaim is specified, skip PVC creation
 	if config.KodeSpec.Storage.ExistingVolumeClaim != nil {
 		log.V(1).Info("ExistingVolumeClaim specified, skipping PVC creation", "ExistingVolumeClaim", config.KodeSpec.Storage.ExistingVolumeClaim)
 		return nil
@@ -93,20 +98,6 @@ func (r *KodeReconciler) ensurePVC(ctx context.Context, config *common.KodeResou
 
 	return nil
 }
-
-// // Check if PVC already exists
-// existingPVC := &corev1.PersistentVolumeClaim{}
-// err = r.Get(ctx, client.ObjectKeyFromObject(pvc), existingPVC)
-// if err == nil {
-//     // PVC exists, ensure finalizer is present
-// 	if !controllerutil.ContainsFinalizer(existingPVC, common.FinalizerName) {
-// 		controllerutil.AddFinalizer(existingPVC, common.PVCFinalizerName)
-//         if err := r.Update(ctx, existingPVC); err != nil {
-//             return fmt.Errorf("failed to update PVC finalizers: %w", err)
-//         }
-//     }
-//     return nil
-// }
 
 // constructPVCSpec constructs a PersistentVolumeClaim for the Kode instance
 func (r *KodeReconciler) constructPVCSpec(config *common.KodeResourceConfig) (*corev1.PersistentVolumeClaim, error) {

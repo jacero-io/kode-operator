@@ -46,7 +46,6 @@ tasks:
       - install
 
   install:
-    internal: true
     desc: Install CRDs into the cluster (Kind by default, or existing kubecontext)
     cmds:
       - task: clusters:set-context

@@ -9,7 +9,7 @@ metadata:
   namespace: default
 spec:
   routingType: "subdomain"
-  baseDomain: "gon1.larnet.eu"
+  baseDomain: "localhost"
   gatewaySpec:
     existingGatewayRef:
       kind: Gateway

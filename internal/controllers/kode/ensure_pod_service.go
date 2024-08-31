@@ -29,7 +29,7 @@ import (
 )
 
 // ensureService ensures that the Service exists for the Kode instance
-func (r *KodeReconciler) ensureService(ctx context.Context, config *common.KodeResourceConfig, kode *kodev1alpha2.Kode) error {
+func (r *KodeReconciler) ensureService(ctx context.Context, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig) error {
 	log := r.Log.WithName("ServiceEnsurer").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	ctx, cancel := common.ContextWithTimeout(ctx, 30) // 30 seconds timeout

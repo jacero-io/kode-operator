@@ -2,16 +2,19 @@ version: '3'
 
 tasks:
   fmt:
+    internal: true
     desc: Run go fmt against code
     cmds:
       - go fmt {{.ROOT_DIR}}/...
 
   vet:
+    internal: true
     desc: Run go vet against code
     cmds:
       - go vet {{.ROOT_DIR}}/...
 
   lint:
+    internal: true
     desc: Run golangci-lint linter
     cmds:
       - '{{.GOLANGCI_LINT_CMD}} run'
@@ -19,6 +22,7 @@ tasks:
       - golangci-lint
 
   lint-fix:
+    internal: true
     desc: Run golangci-lint linter and perform fixes
     cmds:
       - '{{.GOLANGCI_LINT_CMD}} run --fix'

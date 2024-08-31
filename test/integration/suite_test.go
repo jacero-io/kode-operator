@@ -57,8 +57,20 @@ import (
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
 const (
-	timeout  = time.Second * 60
-	interval = time.Second * 1
+	timeout                 = time.Second * 60
+	interval                = time.Second * 5
+	entryPointNameSubdomain = "test-entrypoint-with-subdomain"
+	entryPointNamePath      = "test-entrypoint-with-path"
+
+	resourceNamespace = "test-namespace"
+
+	storageSize = "1Gi"
+
+	podTemplateNameCodeServer = "podtemplate-codeserver"
+	podTemplateNameWebtop     = "podtemplate-webtop"
+
+	podTemplateImageCodeServer = "linuxserver/code-server:latest"
+	podTemplateImageWebtop     = "linuxserver/webtop:debian-xfce"
 )
 
 var (
@@ -75,6 +87,9 @@ var (
 	namespace             *corev1.Namespace
 	podTemplateCodeServer *kodev1alpha2.ClusterPodTemplate
 	podTemplateWebtop     *kodev1alpha2.ClusterPodTemplate
+
+	entryPointSubdomain *kodev1alpha2.EntryPoint
+	entryPointPath      *kodev1alpha2.EntryPoint
 )
 
 func TestControllers(t *testing.T) {
@@ -86,6 +101,11 @@ type mockClient struct {
 	client.Client
 	deletedResources sync.Map
 }
+
+var (
+	podTemplateSubdomain *kodev1alpha2.ClusterPodTemplate
+	podTemplatePath      *kodev1alpha2.ClusterPodTemplate
+)
 
 var _ = BeforeSuite(func() {
 	logf.SetLogger(zap.New(zap.WriteTo(GinkgoWriter), zap.UseDevMode(true)))
@@ -140,10 +160,10 @@ var _ = BeforeSuite(func() {
 		Log:             ctrl.Log.WithName("EntryPoint").WithName("Reconcile"),
 		ResourceManager: resource.NewDefaultResourceManager(k8sClient, ctrl.Log.WithName("EntryPoint").WithName("ResourceManager"), k8sManager.GetScheme()),
 		TemplateManager: template.NewDefaultTemplateManager(k8sClient, ctrl.Log.WithName("EntryPoint").WithName("TemplateManager")),
-		CleanupManager:  cleanup.NewDefaultCleanupManager(mockK8sClient, ctrl.Log.WithName("EntryPoint").WithName("CleanupManager")),
+		CleanupManager:  cleanup.NewDefaultCleanupManager(k8sClient, ctrl.Log.WithName("EntryPoint").WithName("CleanupManager")),
 		StatusUpdater:   status.NewDefaultStatusUpdater(k8sClient, ctrl.Log.WithName("EntryPoint").WithName("StatusUpdater")),
 		Validator:       validation.NewDefaultValidator(),
-		EventManager:    events.NewEventManager(k8sClient, ctrl.Log.WithName("EntryPoint").WithName("EventManager"), k8sManager.GetScheme(), k8sManager.GetEventRecorderFor("entrypoint-controller")),
+		EventManager:    events.NewEventManager(k8sClient, ctrl.Log.WithName("Kode").WithName("EventManager"), k8sManager.GetScheme(), k8sManager.GetEventRecorderFor("entrypoint-controller")),
 	}
 
 	// Set up the Kode controller with the manager
@@ -161,22 +181,50 @@ var _ = BeforeSuite(func() {
 	}()
 
 	// Create namespace
+	By("Creating a namespace")
 	namespace = &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: resourceNamespace}}
 	Expect(k8sClient.Create(ctx, namespace)).To(Succeed())
 
-	// Create PodTemplates
-	podTemplateCodeServer = createPodTemplate(podTemplateNameCodeServer, podTemplateImageCodeServer, "code-server", "", "")
-	podTemplateWebtop = createPodTemplate(podTemplateNameWebtop, podTemplateImageWebtop, "webtop", "", "")
+	// Create EntryPoint
+	By("Creating a subdomain-based EntryPoint")
+	entryPointSubdomain = createEntryPoint(entryPointNameSubdomain, namespace.Name, kodev1alpha2.RoutingTypeSubdomain)
+	Expect(k8sClient.Create(ctx, entryPointSubdomain)).To(Succeed())
 
+	By("Creating a path-based EntryPoint")
+	entryPointPath = createEntryPoint(entryPointNamePath, namespace.Name, kodev1alpha2.RoutingTypePath)
+	Expect(k8sClient.Create(ctx, entryPointPath)).To(Succeed())
+
+	// Create PodTemplates
+	By("Creating a ClusterPodTemplate with an entrypoint with subdomain routing")
+	podTemplateCodeServer = createPodTemplate(podTemplateNameCodeServer, podTemplateImageCodeServer, "code-server", entryPointSubdomain.Name, entryPointSubdomain.Namespace)
 	Expect(k8sClient.Create(ctx, podTemplateCodeServer)).To(Succeed())
+
+	By("Creating a ClusterPodTemplate with an entrypoint with path routing")
+	podTemplateWebtop = createPodTemplate(podTemplateNameWebtop, podTemplateImageWebtop, "webtop", entryPointSubdomain.Name, entryPointSubdomain.Namespace)
 	Expect(k8sClient.Create(ctx, podTemplateWebtop)).To(Succeed())
+
+	By("Creating a ClusterPodTemplate with an entrypoint with subdomain routing")
+	podTemplateSubdomain = createPodTemplate("pod-template-subdomain", podTemplateImageCodeServer, "code-server", entryPointSubdomain.Name, entryPointSubdomain.Namespace)
+	Expect(k8sClient.Create(ctx, podTemplateSubdomain)).To(Succeed())
+
+	By("Creating a ClusterPodTemplate with an entrypoint with path routing")
+	podTemplatePath = createPodTemplate("pod-template-path", podTemplateImageCodeServer, "code-server", entryPointPath.Name, entryPointPath.Namespace)
+	Expect(k8sClient.Create(ctx, podTemplatePath)).To(Succeed())
 })
 
 var _ = AfterSuite(func() {
-	// Cleanup resources
+	// Cleanup namespace
 	Expect(k8sClient.Delete(ctx, namespace)).To(Succeed())
+
+	// Cleanup EntryPoint
+	Expect(k8sClient.Delete(ctx, entryPointSubdomain)).To(Succeed())
+	Expect(k8sClient.Delete(ctx, entryPointPath)).To(Succeed())
+
+	// Cleanup PodTemplates
 	Expect(k8sClient.Delete(ctx, podTemplateCodeServer)).To(Succeed())
 	Expect(k8sClient.Delete(ctx, podTemplateWebtop)).To(Succeed())
+	Expect(k8sClient.Delete(ctx, podTemplateSubdomain)).To(Succeed())
+	Expect(k8sClient.Delete(ctx, podTemplatePath)).To(Succeed())
 
 	cancel()
 	By("tearing down the test environment")
@@ -241,4 +289,42 @@ func createPodTemplate(name, image, templateType string, entryPointName string, 
 	}
 
 	return template
+}
+
+func createEntryPoint(name string, namespaceName string, routingType kodev1alpha2.RoutingType) *kodev1alpha2.EntryPoint {
+	return &kodev1alpha2.EntryPoint{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespaceName,
+		},
+		Spec: kodev1alpha2.EntryPointSpec{
+			RoutingType: routingType,
+			BaseDomain:  "testing.com",
+		},
+	}
+}
+
+func createKode(name, namespaceName string, podTemplateName string, credentials *kodev1alpha2.CredentialsSpec, storage *kodev1alpha2.KodeStorageSpec) *kodev1alpha2.Kode {
+	kode := &kodev1alpha2.Kode{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespaceName,
+		},
+		Spec: kodev1alpha2.KodeSpec{
+			TemplateRef: kodev1alpha2.CrossNamespaceObjectReference{
+				Kind: "ClusterPodTemplate",
+				Name: kodev1alpha2.ObjectName(podTemplateName),
+			},
+		},
+	}
+
+	if credentials != nil {
+		kode.Spec.Credentials = credentials
+	}
+
+	if storage != nil {
+		kode.Spec.Storage = storage
+	}
+
+	return kode
 }

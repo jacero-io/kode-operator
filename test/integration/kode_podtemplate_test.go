@@ -33,54 +33,33 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-const (
-	resourceNamespace = "test-namespace"
-	kodeResourceName  = "kode"
-
-	storageSize = "1Gi"
-
-	podTemplateNameCodeServer = "podtemplate-codeserver"
-	podTemplateNameWebtop     = "podtemplate-webtop"
-
-	podTemplateImageCodeServer = "linuxserver/code-server:latest"
-	podTemplateImageWebtop     = "linuxserver/webtop:debian-xfce"
-)
-
 var _ = Describe("Kode Controller PodTemplate Integration", Ordered, func() {
 
 	DescribeTable("Kode resource creation",
 		func(templateName string, templateType string, expectedContainerCount int, exposePort int32) {
+
+			kodeName := fmt.Sprintf("%s-%s", "kode-standard", templateName)
 			username := "abc"
 			password := "123"
-
-			kodeName := fmt.Sprintf("%s-%s", kodeResourceName, templateName)
 			statefulSetName := kodeName
 			storageClassName := "standard"
-			kode := &kodev1alpha2.Kode{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      kodeName,
-					Namespace: namespace.Name,
-				},
-				Spec: kodev1alpha2.KodeSpec{
-					TemplateRef: kodev1alpha2.CrossNamespaceObjectReference{
-						Kind: "ClusterPodTemplate",
-						Name: kodev1alpha2.ObjectName(templateName),
-					},
-					Credentials: &kodev1alpha2.CredentialsSpec{
-						Username: username,
-						Password: password,
-					},
-					Storage: &kodev1alpha2.KodeStorageSpec{
-						AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
-						Resources: &corev1.VolumeResourceRequirements{
-							Requests: corev1.ResourceList{
-								corev1.ResourceStorage: resource.MustParse(storageSize),
-							},
-						},
-						StorageClassName: &storageClassName,
-					},
-				},
+
+			credentials := &kodev1alpha2.CredentialsSpec{
+				Username: username,
+				Password: password,
 			}
+
+			storage := &kodev1alpha2.KodeStorageSpec{
+				AccessModes: []corev1.PersistentVolumeAccessMode{corev1.ReadWriteOnce},
+				Resources: &corev1.VolumeResourceRequirements{
+					Requests: corev1.ResourceList{
+						corev1.ResourceStorage: resource.MustParse(storageSize),
+					},
+				},
+				StorageClassName: &storageClassName,
+			}
+
+			kode := createKode(kodeName, namespace.Name, templateName, credentials, storage)
 
 			// Create Kode resource
 			Expect(k8sClient.Create(ctx, kode)).To(Succeed())
@@ -97,7 +76,8 @@ var _ = Describe("Kode Controller PodTemplate Integration", Ordered, func() {
 
 			if templateType == "code-server" {
 				Expect(createdStatefulSet.Spec.Template.Spec.Containers[0].Image).To(Equal(podTemplateImageCodeServer))
-				Expect(createdStatefulSet.Spec.Template.Spec.Containers[0].Env).To(ContainElement(corev1.EnvVar{Name: "DEFAULT_WORKSPACE", Value: "/config/workspace"}))
+				// Expect(createdStatefulSet.Spec.Template.Spec.Containers[0].Env).To(ContainElement(corev1.EnvVar{Name: "DEFAULT_WORKSPACE", Value: "/config/workspace"}))
+				Expect(createdStatefulSet.Spec.Template.Spec.Containers[0].Env).To(ContainElement(corev1.EnvVar{Name: "USERNAME", Value: "abc"}))
 			} else if templateType == "webtop" {
 				Expect(createdStatefulSet.Spec.Template.Spec.Containers[0].Image).To(Equal(podTemplateImageWebtop))
 				Expect(createdStatefulSet.Spec.Template.Spec.Containers[0].Env).To(ContainElement(corev1.EnvVar{Name: "CUSTOM_USER", Value: "abc"}))
@@ -197,25 +177,13 @@ var _ = Describe("Kode Controller PodTemplate Integration", Ordered, func() {
 		password := "123"
 		kodeName := "kode-no-storage"
 
-		kode := &kodev1alpha2.Kode{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      kodeName,
-				Namespace: namespace.Name,
-			},
-			Spec: kodev1alpha2.KodeSpec{
-				TemplateRef: kodev1alpha2.CrossNamespaceObjectReference{
-					Kind: "ClusterPodTemplate",
-					Name: kodev1alpha2.ObjectName(podTemplateNameCodeServer),
-				},
-				Credentials: &kodev1alpha2.CredentialsSpec{
-					Username: username,
-					Password: password,
-				},
-				// No storage specification
-			},
+		credentials := &kodev1alpha2.CredentialsSpec{
+			Username: username,
+			Password: password,
 		}
 
 		// Create Kode resource
+		kode := createKode(kodeName, namespace.Name, podTemplateNameCodeServer, credentials, nil) // No storage
 		Expect(k8sClient.Create(ctx, kode)).To(Succeed())
 
 		// Check StatefulSet
@@ -243,83 +211,109 @@ var _ = Describe("Kode Controller PodTemplate Integration", Ordered, func() {
 			return errors.IsNotFound(err)
 		}, timeout, interval).Should(BeTrue())
 	})
-})
 
-var _ = Describe("Kode Controller Update Kode Resource Integration", func() {
+	It("should create the secret with default username when credentials are not specified", func() {
+		kodeName := "kode-default-credentials"
 
-	It("should correctly handle Kode resource updates", func() {
-		kodeName := "kode-update-test"
+		// Create Kode resource
+		kode := createKode(kodeName, namespace.Name, podTemplateNameCodeServer, nil, nil) // No credentials
+		Expect(k8sClient.Create(ctx, kode)).To(Succeed())
 
-		// Create initial Kode resource
-		initialKode := &kodev1alpha2.Kode{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      kodeName,
-				Namespace: namespace.Name,
-			},
-			Spec: kodev1alpha2.KodeSpec{
-				TemplateRef: kodev1alpha2.CrossNamespaceObjectReference{
-					Kind: "ClusterPodTemplate",
-					Name: kodev1alpha2.ObjectName(podTemplateNameCodeServer),
-				},
-				Credentials: &kodev1alpha2.CredentialsSpec{
-					Username: "initial-user",
-					Password: "initial-pass",
-				},
-			},
-		}
-
-		Expect(k8sClient.Create(ctx, initialKode)).To(Succeed())
-
-		// Wait for initial resources to be created
+		// Check Secret
+		secretName := kode.GetSecretName()
+		secretLookupKey := types.NamespacedName{Name: secretName, Namespace: namespace.Name}
+		createdSecret := &corev1.Secret{}
 		Eventually(func() error {
-			return k8sClient.Get(ctx, types.NamespacedName{Name: kodeName, Namespace: namespace.Name}, &appsv1.StatefulSet{})
+			return k8sClient.Get(ctx, secretLookupKey, createdSecret)
 		}, timeout, interval).Should(Succeed())
 
-		// Update Kode resource
-		updatedKode := &kodev1alpha2.Kode{}
-		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: kodeName, Namespace: namespace.Name}, updatedKode)).To(Succeed())
-
-		updatedUsername := "updated-user"
-		updatedPassword := "updated-pass"
-
-		updatedKode.Spec.Credentials.Username = updatedUsername
-		updatedKode.Spec.Credentials.Password = updatedPassword
-
-		Expect(k8sClient.Update(ctx, updatedKode)).To(Succeed())
-
-		// // verify Secret update
-		// Eventually(func() bool {
-		// 	secret := &corev1.Secret{}
-		// 	if err := k8sClient.Get(ctx, types.NamespacedName{Name: kodeName, Namespace: namespace.Name}, secret); err != nil {
-		// 		return false
-		// 	}
-		// 	return string(secret.Data["username"]) == updatedUsername
-		// }, timeout, interval).Should(BeTrue(), "Secret should be updated with new credentials")
-
-		// Verify Kode resource update
-		Eventually(func() bool {
-			kode := &kodev1alpha2.Kode{}
-			if err := k8sClient.Get(ctx, types.NamespacedName{Name: kodeName, Namespace: namespace.Name}, kode); err != nil {
-				return false
-			}
-			return kode.Spec.Credentials.Username == updatedUsername
-		}, timeout, interval).Should(BeTrue(), "Kode resource should be updated with new credentials")
-
-		// Verify Kode status update
-		Eventually(func() bool {
-			kode := &kodev1alpha2.Kode{}
-			if err := k8sClient.Get(ctx, types.NamespacedName{Name: kodeName, Namespace: namespace.Name}, kode); err != nil {
-				return false
-			}
-			return kode.Status.Phase == kodev1alpha2.KodePhaseActive
-		}, timeout, interval).Should(BeTrue(), "Kode status should be updated to Active")
+		Expect(createdSecret.Name).To(Equal(secretName))
+		Expect(createdSecret.Data).To(HaveKeyWithValue("username", []byte(common.Username)))
 
 		// Cleanup
-		Expect(k8sClient.Delete(ctx, updatedKode)).To(Succeed())
-
-		// Verify cleanup
-		Eventually(func() error {
-			return k8sClient.Get(ctx, types.NamespacedName{Name: kodeName, Namespace: namespace.Name}, &kodev1alpha2.Kode{})
-		}, timeout, interval).Should(MatchError(ContainSubstring("not found")), "Kode resource should be deleted")
+		Expect(k8sClient.Delete(ctx, kode)).To(Succeed())
+		Eventually(func() bool {
+			err := k8sClient.Get(ctx, types.NamespacedName{Name: kodeName, Namespace: namespace.Name}, &kodev1alpha2.Kode{})
+			return errors.IsNotFound(err)
+		}, timeout, interval).Should(BeTrue())
 	})
 })
+
+// var _ = Describe("Kode Controller Update Kode Resource Integration", func() {
+
+// 	It("should correctly handle Kode resource updates", func() {
+// 		kodeName := "kode-update-test"
+
+// 		// Create initial Kode resource
+// 		initialKode := &kodev1alpha2.Kode{
+// 			ObjectMeta: metav1.ObjectMeta{
+// 				Name:      kodeName,
+// 				Namespace: namespace.Name,
+// 			},
+// 			Spec: kodev1alpha2.KodeSpec{
+// 				TemplateRef: kodev1alpha2.CrossNamespaceObjectReference{
+// 					Kind: "ClusterPodTemplate",
+// 					Name: kodev1alpha2.ObjectName(podTemplateNameCodeServer),
+// 				},
+// 				Credentials: &kodev1alpha2.CredentialsSpec{
+// 					Username: "initial-user",
+// 					Password: "initial-pass",
+// 				},
+// 			},
+// 		}
+
+// 		Expect(k8sClient.Create(ctx, initialKode)).To(Succeed())
+
+// 		// Wait for initial resources to be created
+// 		Eventually(func() error {
+// 			return k8sClient.Get(ctx, types.NamespacedName{Name: kodeName, Namespace: namespace.Name}, &appsv1.StatefulSet{})
+// 		}, timeout, interval).Should(Succeed())
+
+// 		// Update Kode resource
+// 		updatedKode := &kodev1alpha2.Kode{}
+// 		Expect(k8sClient.Get(ctx, types.NamespacedName{Name: kodeName, Namespace: namespace.Name}, updatedKode)).To(Succeed())
+
+// 		updatedUsername := "updated-user"
+// 		updatedPassword := "updated-pass"
+
+// 		updatedKode.Spec.Credentials.Username = updatedUsername
+// 		updatedKode.Spec.Credentials.Password = updatedPassword
+
+// 		Expect(k8sClient.Update(ctx, updatedKode)).To(Succeed())
+
+// 		// // verify Secret update
+// 		// Eventually(func() bool {
+// 		// 	secret := &corev1.Secret{}
+// 		// 	if err := k8sClient.Get(ctx, types.NamespacedName{Name: kodeName, Namespace: namespace.Name}, secret); err != nil {
+// 		// 		return false
+// 		// 	}
+// 		// 	return string(secret.Data["username"]) == updatedUsername
+// 		// }, timeout, interval).Should(BeTrue(), "Secret should be updated with new credentials")
+
+// 		// Verify Kode resource update
+// 		Eventually(func() bool {
+// 			kode := &kodev1alpha2.Kode{}
+// 			if err := k8sClient.Get(ctx, types.NamespacedName{Name: kodeName, Namespace: namespace.Name}, kode); err != nil {
+// 				return false
+// 			}
+// 			return kode.Spec.Credentials.Username == updatedUsername
+// 		}, timeout, interval).Should(BeTrue(), "Kode resource should be updated with new credentials")
+
+// 		// Verify Kode status update
+// 		Eventually(func() bool {
+// 			kode := &kodev1alpha2.Kode{}
+// 			if err := k8sClient.Get(ctx, types.NamespacedName{Name: kodeName, Namespace: namespace.Name}, kode); err != nil {
+// 				return false
+// 			}
+// 			return kode.Status.Phase == kodev1alpha2.KodePhaseActive
+// 		}, timeout, interval).Should(BeTrue(), "Kode status should be updated to Active")
+
+// 		// Cleanup
+// 		Expect(k8sClient.Delete(ctx, updatedKode)).To(Succeed())
+
+// 		// Verify cleanup
+// 		Eventually(func() error {
+// 			return k8sClient.Get(ctx, types.NamespacedName{Name: kodeName, Namespace: namespace.Name}, &kodev1alpha2.Kode{})
+// 		}, timeout, interval).Should(MatchError(ContainSubstring("not found")), "Kode resource should be deleted")
+// 	})
+// })

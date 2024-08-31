@@ -44,6 +44,20 @@ const (
 	ReasonUpdated    EventReason = "Updated"
 	ReasonFailed     EventReason = "Failed"
 	ReasonReconciled EventReason = "Reconciled"
+
+	// Kode event reasons
+	ReasonKodeProvisioning EventReason = "KodeProvisioning"
+	ReasonKodeActive       EventReason = "KodeActive"
+	ReasonKodeSuspended    EventReason = "KodeSuspended"
+	ReasonKodeResuming     EventReason = "KodeResuming"
+	ReasonKodeDeleting     EventReason = "KodeDeleting"
+	ReasonKodeFailed       EventReason = "KodeFailed"
+	ReasonKodeUnknown      EventReason = "KodeUnknown"
+
+	// EntryPoint event reasons
+	ReasonEntryPointActive  EventReason = "EntryPointActive"
+	ReasonEntryPointFailed  EventReason = "EntryPointFailed"
+	ReasonEntryPointUnknown EventReason = "EntryPointUnknown"
 )
 
 // EventManager defines the interface for managing events
