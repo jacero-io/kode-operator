@@ -20,9 +20,12 @@ import (
 	"context"
 	"fmt"
 
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
-	"k8s.io/apimachinery/pkg/types"
+	"github.com/jacero-io/kode-operator/internal/events"
 )
 
 func (r *KodeReconciler) ensurePodResources(ctx context.Context, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig) error {
@@ -49,10 +52,52 @@ func (r *KodeReconciler) ensurePodResources(ctx context.Context, kode *kodev1alp
 		return err
 	}
 
+	// Check CSI resize capability before ensuring PVC
+	var resizeSupported bool
+	if config.KodeSpec.Storage != nil && config.KodeSpec.Storage.ExistingVolumeClaim == nil {
+		pvc := &corev1.PersistentVolumeClaim{}
+		err := r.Client.Get(ctx, types.NamespacedName{Name: config.PVCName, Namespace: latestKode.Namespace}, pvc)
+		if err == nil {
+			// PVC exists, check resize capability
+			resizeSupported, err = r.checkCSIResizeCapability(ctx, pvc)
+			if err != nil {
+				log.Error(err, "Failed to check CSI resize capability")
+				eventMessage := "Failed to check CSI resize capability"
+				if recordErr := r.EventManager.Record(ctx, latestKode, events.EventTypeWarning, events.ReasonKodeCSIResizeCapabilityCheckFailed, eventMessage); recordErr != nil {
+					log.Error(recordErr, "Failed to record CSI resize check failure event")
+				}
+				return err
+			}
+		} else {
+			// PVC doesn't exist yet, we'll check after creation
+			resizeSupported = false
+		}
+	}
+
 	// Ensure the PersistentVolumeClaim
-	if err := r.ensurePersistentVolumeClaim(ctx, latestKode, config); err != nil {
+	if err := r.ensurePersistentVolumeClaim(ctx, latestKode, config, resizeSupported); err != nil {
 		log.Error(err, "Failed to ensure PersistentVolumeClaim")
 		return err
+	}
+
+	// If PVC was just created, check resize capability now
+	if config.KodeSpec.Storage != nil && config.KodeSpec.Storage.ExistingVolumeClaim == nil && !resizeSupported {
+		pvc := &corev1.PersistentVolumeClaim{}
+		err := r.Client.Get(ctx, types.NamespacedName{Name: config.PVCName, Namespace: latestKode.Namespace}, pvc)
+		if err != nil {
+			log.Error(err, "Failed to get PVC for CSI resize check")
+			return err
+		}
+
+		resizeSupported, err = r.checkCSIResizeCapability(ctx, pvc)
+		if err != nil {
+			log.Error(err, "Failed to check CSI resize capability")
+			eventMessage := "Failed to check CSI resize capability after PVC creation"
+			if recordErr := r.EventManager.Record(ctx, latestKode, events.EventTypeWarning, events.ReasonKodeCSIResizeCapabilityCheckFailed, eventMessage); recordErr != nil {
+				log.Error(recordErr, "Failed to record CSI resize check failure event")
+			}
+			return err
+		}
 	}
 
 	// Ensure the StatefulSet
