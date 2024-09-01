@@ -242,8 +242,8 @@ var _ = Describe("Kode Controller PodTemplate Integration", Ordered, func() {
 })
 
 var _ = Describe("Kode Controller Update Integration", func() {
-	Context("When updating Kode resource", func() {
-		It("Should correctly handle Kode resource updates", func() {
+	Context("When updating credentials", func() {
+		It("Should update the Kode resource and Secret", func() {
 			kodeName := "kode-update-test"
 			username := "abc"
 			password := "123"
@@ -276,7 +276,7 @@ var _ = Describe("Kode Controller Update Integration", func() {
 
 			Expect(k8sClient.Update(ctx, updatedKode)).To(Succeed())
 
-			// Verify Kode resource update
+			// Verify Kode resource is updated
 			refreshedKode := &kodev1alpha2.Kode{}
 			Eventually(func() bool {
 				err := k8sClient.Get(ctx, kodeNamespacedName, refreshedKode)
@@ -284,34 +284,23 @@ var _ = Describe("Kode Controller Update Integration", func() {
 					fmt.Printf("Error getting Kode: %v\n", err)
 					return false
 				}
-				fmt.Printf("Current username: %s, Expected username: %s\n", refreshedKode.Spec.Credentials.Username, updatedUsername)
 				return refreshedKode.Spec.Credentials.Username == updatedUsername
 			}, timeout, interval).Should(BeTrue(), "Kode resource should be updated with new credentials")
 
-			// Verify Kode status update
-			// refreshedKode = &kodev1alpha2.Kode{}
-			// Eventually(func() bool {
-			// 	err := k8sClient.Get(ctx, kodeNamespacedName, refreshedKode)
-			// 	if err != nil {
-			// 		fmt.Printf("Error getting Kode: %v\n", err)
-			// 		return false
-			// 	}
-			// 	fmt.Printf("Current phase: %s, Expected phase: %s\n", refreshedKode.Status.Phase, kodev1alpha2.KodePhaseActive)
-			// 	fmt.Printf("Current username: %s, Expected username: %s\n", refreshedKode.Spec.Credentials.Username, updatedUsername)
-			// 	fmt.Printf("Current Generation: %d, Expected Generation: %d\n", refreshedKode.Status.ObservedGeneration, refreshedKode.Generation)
-			// 	return refreshedKode.Status.Phase == kodev1alpha2.KodePhaseActive
-			// }, timeout, interval).Should(BeTrue(), "Kode status should be updated to Active")
+			// verify Secret is updated
+			kodeSecret := &kodev1alpha2.Kode{}
+			err := k8sClient.Get(ctx, kodeNamespacedName, kodeSecret)
+			Expect(err).NotTo(HaveOccurred())
 
-			// verify Secret update
-			secretNamespacedName := types.NamespacedName{Name: refreshedKode.GetSecretName(), Namespace: namespace.Name}
-			secret := &corev1.Secret{}
+			secretNamespacedName := types.NamespacedName{Name: kodeSecret.GetSecretName(), Namespace: namespace.Name}
+			refreshedSecret := &corev1.Secret{}
 			Eventually(func() bool {
-				err := k8sClient.Get(ctx, secretNamespacedName, secret)
+				err := k8sClient.Get(ctx, secretNamespacedName, refreshedSecret)
 				if err != nil {
 					fmt.Printf("Error getting Secret: %v\n", err)
 					return false
 				}
-				return string(secret.Data["username"]) == updatedUsername
+				return string(refreshedSecret.Data["username"]) == updatedUsername
 			}, timeout, interval).Should(BeTrue(), "Secret should be updated with new credentials")
 
 			// Cleanup
