@@ -101,10 +101,18 @@ type KodeStatus struct {
 
 	// The timestamp when the last activity occurred.
 	LastActivityTime *metav1.Time `json:"lastActivityTime,omitempty"`
+
+	// RetryCount keeps track of the number of retry attempts for failed states.
+	RetryCount int `json:"retryCount,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.phase",description="Status of the Kode"
+// +kubebuilder:printcolumn:name="Runtime",type="string",JSONPath=".status.runtime",description="Runtime of the Kode"
+// +kubebuilder:printcolumn:name="URL",type="string",JSONPath=".status.kodeUrl",description="URL to access the Kode"
+// +kubebuilder:printcolumn:name="Template",type="string",JSONPath=".spec.templateRef.name",description="Template name"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // Kode is the Schema for the kodes API
 type Kode struct {
@@ -135,41 +143,59 @@ const (
 	TemplateKindClusterTofuTemplate    TemplateKind = "ClusterTofuTemplate"
 )
 
-// KodePhase represents the current phase of the Kode resource.
+// KodePhase represents the current state of the Kode resource.
 type KodePhase string
 
 const (
-	// KodePhaseCreating indicates that the Kode resource is in the process of being created.
-	// This includes the initial setup and creation of associated Kubernetes resources.
-	KodePhaseCreating KodePhase = "Creating"
-
-	// KodePhaseCreated indicates that all the necessary Kubernetes resources for the Kode
-	// have been successfully created, but may not yet be fully operational.
-	KodePhaseCreated KodePhase = "Created"
-
-	// KodePhaseFailed indicates that an error occurred during the creation, updating,
-	// or management of the Kode resource or its associated Kubernetes resources.
-	KodePhaseFailed KodePhase = "Failed"
-
-	// KodePhasePending indicates that the Kode resource has been created, but is waiting
-	// for its associated resources to become ready or for external dependencies to be met.
+	// KodePhasePending indicates the initial state when a new Kode resource is created.
+	// The controller has acknowledged the resource but hasn't started processing it yet.
 	KodePhasePending KodePhase = "Pending"
 
-	// KodePhaseActive indicates that the Kode resource and all its associated Kubernetes
-	// resources are fully operational and ready to serve requests.
+	// KodePhaseConfiguring indicates that the controller is actively setting up the Kode resource.
+	// This includes creating necessary Kubernetes resources, configuring storage, and applying user configurations.
+	KodePhaseConfiguring KodePhase = "Configuring"
+
+	// KodePhaseProvisioning indicates that all necessary resources for the Kode have been created,
+	// but the system is waiting for these resources to become fully operational.
+	// This may include waiting for pods to be scheduled and reach a ready state or for any initialization processes to complete.
+	KodePhaseProvisioning KodePhase = "Provisioning"
+
+	// KodePhaseActive indicates that the Kode resource is fully operational.
+	// All associated Kubernetes resources are created and ready to serve requests.
+	// The Kode environment is accessible to users in this state.
 	KodePhaseActive KodePhase = "Active"
 
-	// KodePhaseInactive indicates that the Kode resource has been marked for deletion
-	// due to inactivity. Resources may be partially or fully removed in this state.
+	// KodePhaseInactive indicates that the Kode resource has been flagged for suspension.
+	// This could be due to inactivity or to free up resources.
+	// Some resources may be partially or fully removed to free up cluster resources.
 	KodePhaseInactive KodePhase = "Inactive"
 
-	// KodePhaseRecycling indicates that the Kode resource is in the process of being
-	// cleaned up and its resources are being partially or fully deleted.
-	KodePhaseRecycling KodePhase = "Recycling"
+	// KodePhaseSuspending indicates that the Kode resource is in the process of being suspended.
+	// The controller is actively working on stopping the Kode environment and preserving its state.
+	KodePhaseSuspending KodePhase = "Suspending"
 
-	// KodePhaseRecycled indicates that the Kode resource has been fully recycled,
-	// with all associated resources either partially or fully deleted.
-	KodePhaseRecycled KodePhase = "Recycled"
+	// KodePhaseSuspended indicates that the Kode resource is in a suspended state.
+	// The Kode environment is not running, but its configuration and data are preserved.
+	// It can be resumed later without loss of user data or settings.
+	KodePhaseSuspended KodePhase = "Suspended"
+
+	// KodePhaseResuming indicates that the Kode resource is in the process of being reactivated from a suspended state.
+	// The controller is recreating necessary resources and restoring the Kode environment to its previous active state.
+	KodePhaseResuming KodePhase = "Resuming"
+
+	// KodePhaseDeleting indicates the Kode resource is being permanently removed.
+	// The controller is in the process of deleting all associated Kubernetes resources.
+	KodePhaseDeleting KodePhase = "Deleting"
+
+	// KodePhaseFailed indicates that an error occurred during the lifecycle of the Kode resource.
+	// This could be during creation, updating, or management of the Kode or its associated resources.
+	// The controller will typically attempt to recover from this state automatically.
+	KodePhaseFailed KodePhase = "Failed"
+
+	// KodePhaseUnknown indicates that the Kode resource is in an indeterminate state.
+	// This may occur if the controller loses connection with the resource or encounters unexpected conditions.
+	// The controller will attempt to reconcile and determine the correct state.
+	KodePhaseUnknown KodePhase = "Unknown"
 )
 
 type KodeHostname string
@@ -194,6 +220,10 @@ func init() {
 	SchemeBuilder.Register(&Kode{}, &KodeList{})
 }
 
+func (k *Kode) GetSecretName() string {
+	return fmt.Sprintf("%s-auth", k.Name)
+}
+
 func (k *Kode) GetServiceName() string {
 	return k.Name + "-svc"
 }
@@ -210,8 +240,16 @@ func (k *Kode) IsActive() bool {
 	return k.Status.Phase == KodePhaseActive
 }
 
-func (k *Kode) IsRecycled() bool {
-	return k.Status.Phase == KodePhaseRecycled
+func (k *Kode) IsInactive() bool {
+	return k.Status.Phase == KodePhaseInactive
+}
+
+func (k *Kode) IsSuspended() bool {
+	return k.Status.Phase == KodePhaseSuspended
+}
+
+func (k *Kode) IsDeleting() bool {
+	return k.Status.Phase == KodePhaseDeleting
 }
 
 func (k *Kode) SetCondition(conditionType string, status metav1.ConditionStatus, reason, message string) {

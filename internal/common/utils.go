@@ -33,6 +33,15 @@ func GetCurrentTime() metav1.Time {
 	return metav1.NewTime(time.Now())
 }
 
+func GetLatestObject(ctx context.Context, c client.Client, name, namespace string, obj client.Object) error {
+	switch obj.(type) {
+	case *kodev1alpha2.Kode, *kodev1alpha2.EntryPoint:
+		return c.Get(ctx, client.ObjectKey{Name: name, Namespace: namespace}, obj)
+	default:
+		return fmt.Errorf("unsupported object type: %T", obj)
+	}
+}
+
 func GetLatestKode(ctx context.Context, client client.Client, name string, namespace string) (*kodev1alpha2.Kode, error) {
 	kode := &kodev1alpha2.Kode{}
 	err := client.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, kode)

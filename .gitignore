@@ -34,6 +34,7 @@ random/*
 concatenated_output.txt
 .DS_Store
 output.log
+test.log
 kode*.tgz
 dist
 kode-crds.yaml

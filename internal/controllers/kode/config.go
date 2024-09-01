@@ -17,8 +17,6 @@ limitations under the License.
 package kode
 
 import (
-	"fmt"
-
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
 	corev1 "k8s.io/api/core/v1"
@@ -28,14 +26,23 @@ func InitKodeResourcesConfig(
 	kode *kodev1alpha2.Kode,
 	template *kodev1alpha2.Template) *common.KodeResourceConfig {
 
+	var credentials *kodev1alpha2.CredentialsSpec
 	var kodePort *kodev1alpha2.Port
 	var secretName string
 
 	// If ExistingSecret is specified, use it
-	if kode.Spec.Credentials.ExistingSecret != nil {
+	if kode.Spec.Credentials != nil && kode.Spec.Credentials.ExistingSecret != nil {
 		secretName = *kode.Spec.Credentials.ExistingSecret
 	} else { // If ExistingSecret is not specified, use Kode.Name
-		secretName = fmt.Sprintf("%s-auth", kode.Name)
+		secretName = kode.GetSecretName()
+	}
+
+	if kode.Spec.Credentials == nil {
+		credentials = &kodev1alpha2.CredentialsSpec{
+			Username: common.Username,
+		}
+	} else {
+		credentials = kode.Spec.Credentials
 	}
 
 	kodePort = &template.Port
@@ -50,7 +57,7 @@ func InitKodeResourcesConfig(
 			Namespace: kode.Namespace,
 		},
 		KodeSpec:    kode.Spec,
-		Credentials: kode.Spec.Credentials,
+		Credentials: credentials,
 		Port:        kodePort,
 
 		SecretName:      secretName,

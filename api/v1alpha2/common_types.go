@@ -20,8 +20,7 @@ import metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 type CredentialsSpec struct {
 	// Is both the the HTTP Basic auth username (when used) and the user the container should run as. Defaults to 'abc'.
-	// +kubebuilder:default="abc"
-	Username string `json:"username" yaml:"username"`
+	Username string `json:"username,omitempty" yaml:"username,omitempty"`
 
 	// HTTP Basic auth password. If unset, there will be no authentication.
 	Password string `json:"password,omitempty" yaml:"password,omitempty"`

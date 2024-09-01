@@ -25,7 +25,7 @@ import (
 )
 
 // ensureSidecarContainers ensures that the Envoy container exists for the Kode instance
-func (r *KodeReconciler) ensureSidecarContainers(ctx context.Context, config *common.KodeResourceConfig, kode *kodev1alpha2.Kode) error {
+func (r *KodeReconciler) ensureSidecarContainers(ctx context.Context, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig) error {
 	log := r.Log.WithName("SidecarContainerEnsurer").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	log.V(1).Info("Ensuring sidecar containers")

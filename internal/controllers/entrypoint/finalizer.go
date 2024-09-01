@@ -33,9 +33,9 @@ func (r *EntryPointReconciler) handleFinalizer(ctx context.Context, entryPoint *
 
 	if entryPoint.ObjectMeta.DeletionTimestamp.IsZero() {
 		// Object is not being deleted, so ensure the finalizer is present
-		if !controllerutil.ContainsFinalizer(entryPoint, common.FinalizerName) {
-			controllerutil.AddFinalizer(entryPoint, common.FinalizerName)
-			log.Info("Adding finalizer", "finalizer", common.FinalizerName)
+		if !controllerutil.ContainsFinalizer(entryPoint, common.EntryPointFinalizerName) {
+			controllerutil.AddFinalizer(entryPoint, common.EntryPointFinalizerName)
+			log.Info("Adding finalizer", "finalizer", common.EntryPointFinalizerName)
 			if err := r.Client.Update(ctx, entryPoint); err != nil {
 				log.Error(err, "Failed to add finalizer")
 				return ctrl.Result{}, err
@@ -45,7 +45,7 @@ func (r *EntryPointReconciler) handleFinalizer(ctx context.Context, entryPoint *
 	}
 
 	// Object is being deleted
-	if controllerutil.ContainsFinalizer(entryPoint, common.FinalizerName) {
+	if controllerutil.ContainsFinalizer(entryPoint, common.EntryPointFinalizerName) {
 		// Run finalization logic
 		if err := r.finalize(ctx, entryPoint); err != nil {
 			log.Error(err, "Failed to run finalizer")
@@ -60,9 +60,9 @@ func (r *EntryPointReconciler) handleFinalizer(ctx context.Context, entryPoint *
 				return err
 			}
 
-			if controllerutil.ContainsFinalizer(latestEntrypoint, common.FinalizerName) {
-				controllerutil.RemoveFinalizer(latestEntrypoint, common.FinalizerName)
-				log.Info("Removing finalizer", "finalizer", common.FinalizerName)
+			if controllerutil.ContainsFinalizer(latestEntrypoint, common.EntryPointFinalizerName) {
+				controllerutil.RemoveFinalizer(latestEntrypoint, common.EntryPointFinalizerName)
+				log.Info("Removing finalizer", "finalizer", common.EntryPointFinalizerName)
 				return r.Client.Update(ctx, latestEntrypoint)
 			}
 			return nil

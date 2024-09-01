@@ -30,7 +30,7 @@ import (
 )
 
 // ensureStatefulSet ensures that the StatefulSet exists for the Kode instance
-func (r *KodeReconciler) ensureStatefulSet(ctx context.Context, config *common.KodeResourceConfig, kode *kodev1alpha2.Kode) error {
+func (r *KodeReconciler) ensureStatefulSet(ctx context.Context, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig) error {
 	log := r.Log.WithName("StatefulSetEnsurer").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	ctx, cancel := common.ContextWithTimeout(ctx, 30) // 30 seconds timeout
@@ -42,6 +42,7 @@ func (r *KodeReconciler) ensureStatefulSet(ctx context.Context, config *common.K
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      config.CommonConfig.Name,
 			Namespace: config.CommonConfig.Namespace,
+			Labels:    config.CommonConfig.Labels,
 		},
 	}
 
@@ -52,7 +53,6 @@ func (r *KodeReconciler) ensureStatefulSet(ctx context.Context, config *common.K
 		}
 
 		statefulSet.Spec = constructedstatefulSet.Spec
-		statefulSet.ObjectMeta.Labels = constructedstatefulSet.ObjectMeta.Labels
 
 		return controllerutil.SetControllerReference(kode, statefulSet, r.Scheme)
 	})
@@ -92,9 +92,13 @@ func (r *KodeReconciler) constructStatefulSetSpec(config *common.KodeResourceCon
 	var initContainers []corev1.Container
 
 	if templateSpec.Type == "code-server" {
+		log.V(1).Info("Constructing CodeServer containers")
 		containers = constructCodeServerContainers(config, workspace)
+		log.V(1).Info("Constructed CodeServer containers", "containers", containers)
 	} else if templateSpec.Type == "webtop" {
+		log.V(1).Info("Constructing Webtop containers")
 		containers = constructWebtopContainers(config)
+		log.V(1).Info("Constructed Webtop containers", "containers", containers)
 	} else {
 		return nil, fmt.Errorf("unknown template type: %s", templateSpec.Type)
 	}
@@ -161,7 +165,7 @@ func constructCodeServerContainers(config *common.KodeResourceConfig, workspace 
 		{Name: "PGID", Value: fmt.Sprintf("%d", config.Template.PodTemplateSpec.PGID)},
 		{Name: "TZ", Value: config.Template.PodTemplateSpec.TZ},
 		{Name: "PORT", Value: fmt.Sprintf("%d", *config.Port)},
-		{Name: "USERNAME", Value: config.KodeSpec.Credentials.Username},
+		{Name: "USERNAME", Value: config.Credentials.Username},
 		{Name: "DEFAULT_WORKSPACE", Value: workspace},
 	}
 
@@ -196,7 +200,7 @@ func constructWebtopContainers(config *common.KodeResourceConfig) []corev1.Conta
 		{Name: "PGID", Value: fmt.Sprintf("%d", config.Template.PodTemplateSpec.PGID)},
 		{Name: "TZ", Value: config.Template.PodTemplateSpec.TZ},
 		{Name: "CUSTOM_PORT", Value: fmt.Sprintf("%d", *config.Port)},
-		{Name: "CUSTOM_USER", Value: config.KodeSpec.Credentials.Username},
+		{Name: "CUSTOM_USER", Value: config.Credentials.Username},
 	}
 
 	if config.Credentials.EnableBuiltinAuth && config.Credentials.Password != "" {
@@ -229,7 +233,7 @@ func constructVolumesAndMounts(mountPath string, config *common.KodeResourceConf
 	volumeMounts := []corev1.VolumeMount{}
 
 	// Only add volume and volume mount if storage is explicitly defined
-	if !config.KodeSpec.Storage.IsEmpty() {
+	if config.KodeSpec.Storage != nil {
 		var volumeSource corev1.VolumeSource
 
 		if config.KodeSpec.Storage.ExistingVolumeClaim != nil {

@@ -16,47 +16,17 @@ limitations under the License.
 
 package common
 
-import (
-	"time"
-
-	corev1 "k8s.io/api/core/v1"
-)
-
 const (
 	// General constants
-	OperatorName     = "kode-operator"
-	FinalizerName    = "kode.jacero.io/finalizer"
-	PVCFinalizerName = "kode.jacero.io/pvc-finalizer"
+	KodeFinalizerName       = "kode.jacero.io/kode-finalizer"
+	EntryPointFinalizerName = "kode.jacero.io/entrypoint-finalizer"
+	PVCFinalizerName        = "kode.jacero.io/kode-pvc-finalizer"
 
-	// Resource-related constants
-	DefaultNamespace        = "default"
-	KodeVolumeStorageName   = "kode-storage"
-	DefaultLocalServicePort = 3000
+	// Resource related constants
+	KodeVolumeStorageName = "kode-storage"
 
-	// Container-related constants
-	EnvoyProxyContainerName = "envoy-proxy"
-	EnvoyProxyRunAsUser     = 1111
-	ProxyInitContainerName  = "proxy-init"
-	ProxyInitContainerImage = "openpolicyagent/proxy_init:v8"
-	BasicAuthContainerPort  = 9001
-
-	// Basic Auth-related constants
-	BasicAuthContainerImage = "ghcr.io/emil-jacero/grpc-basic-auth:latest"
-	BasicAuthContainerName  = "basic-auth-service"
-
-	// Time-related constants
-	ReconcileTimeout            = 1 * time.Minute
-	RequeueInterval             = 10 * time.Second
-	DefaultInactiveAfterSeconds = 600
-	DefaultRecycleAfterSeconds  = 28800
-
-	// Label keys
-	LabelAppName   = "app.kubernetes.io/name"
-	LabelManagedBy = "app.kubernetes.io/managed-by"
-	LabelKodeName  = "kode.jacero.io/name"
-
-	// Annotation keys
-	AnnotationLastUpdated = "kode.jacero.io/last-updated"
+	// Credential related constants
+	Username = "abc"
 
 	// These are the condition types that are used in the status of the Kode and EntryPoint resources
 	// ConditionTypeReady indicates that the resource is fully operational and prepared to serve its intended purpose.
@@ -82,21 +52,4 @@ const (
 
 	// ConditionTypeHTTPSRouteAvailable indicates that the HTTPS route is available and can be accessed.
 	ConditionTypeHTTPSRouteAvailable = "HTTPSRouteAvailable"
-
-	// Validation constants
-	MinPasswordLength = 8
-	MinUsernameLength = 3
-	MaxUsernameLength = 256
-)
-
-var (
-	// DefaultLabels are the base labels added to all resources created by the operator
-	DefaultLabels = map[string]string{
-		LabelManagedBy: OperatorName,
-	}
-
-	// DefaultAccessModes are the default access modes for PersistentVolumeClaims
-	DefaultAccessModes = []corev1.PersistentVolumeAccessMode{
-		corev1.ReadWriteOnce,
-	}
 )
