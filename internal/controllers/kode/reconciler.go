@@ -18,15 +18,12 @@ package kode
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/go-logr/logr"
 
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	client "sigs.k8s.io/controller-runtime/pkg/client"
@@ -68,6 +65,7 @@ const (
 // +kubebuilder:rbac:groups=kode.jacero.io,resources=tofutemplates,verbs=get;list;watch
 // +kubebuilder:rbac:groups=kode.jacero.io,resources=clustertofutemplates,verbs=get;list;watch
 // +kubebuilder:rbac:groups="coordination.k8s.io",resources=leases,verbs=get;list;watch;create;update;patch;delete,namespace=kode-system
+// +kubebuilder:rbac:groups="storage.k8s.io",resources=storageclasses,verbs=get;list;watch
 // +kubebuilder:rbac:groups="apps",resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=services,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
@@ -89,6 +87,7 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		// Kode not found, likely deleted, nothing to do
 		return ctrl.Result{}, nil
 	}
+	log.V(1).Info("Fetched Kode resource", "Name", kode.Name, "Namespace", kode.Namespace, "Generation", kode.Generation, "ObservedGeneration", kode.Status.ObservedGeneration, "Phase", kode.Status.Phase)
 
 	// Handle deletion
 	if !kode.DeletionTimestamp.IsZero() {
@@ -162,16 +161,7 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		return ctrl.Result{Requeue: true}, nil
 	}
 
-	// Update ObservedGeneration if it's out of sync and we're not requeuing
-	if kode.Generation != kode.Status.ObservedGeneration && result.IsZero() {
-		if err := r.updateObservedGeneration(ctx, kode); err != nil {
-			log.Error(err, "Failed to update ObservedGeneration")
-			return ctrl.Result{Requeue: true}, nil
-		}
-		log.V(1).Info("Updated ObservedGeneration", "Generation", kode.Generation, "ObservedGeneration", kode.Status.ObservedGeneration)
-	}
-
-	log.V(1).Info("Reconciliation completed", "result", result)
+	log.V(1).Info("Reconciliation completed", "Phase", kode.Status.Phase, "result", result)
 	return result, nil
 }
 
@@ -221,7 +211,7 @@ func (r *KodeReconciler) transitionTo(ctx context.Context, kode *kodev1alpha2.Ko
 		}
 
 		// Trigger immediate reconciliation to start configuration
-		requeueAfter = 1 * time.Millisecond
+		// requeueAfter = 1 * time.Millisecond
 
 	case kodev1alpha2.KodePhaseConfiguring:
 		removeConditions := []string{"Pending"}
@@ -255,9 +245,10 @@ func (r *KodeReconciler) transitionTo(ctx context.Context, kode *kodev1alpha2.Ko
 		}
 
 		// Trigger immediate reconciliation to start provisioning
-		requeueAfter = 1 * time.Millisecond
+		// requeueAfter = 1 * time.Millisecond
 
 	case kodev1alpha2.KodePhaseProvisioning:
+
 		removeConditions := []string{"Configuring", "Pending"}
 		if err := r.StatusUpdater.UpdateStatusKode(ctx, kode, kodev1alpha2.KodePhaseProvisioning, []metav1.Condition{
 			{
@@ -289,10 +280,10 @@ func (r *KodeReconciler) transitionTo(ctx context.Context, kode *kodev1alpha2.Ko
 		}
 
 		// Trigger immediate reconciliation to transition to active state
-		requeueAfter = 1 * time.Millisecond
+		// requeueAfter = 1 * time.Millisecond
 
 	case kodev1alpha2.KodePhaseActive:
-		removeConditions := []string{"Configuring", "Pending", "ResourcesNotReady", "StateTransition"}
+		removeConditions := []string{"Configuring", "Pending", "ResourcesNotReady"}
 		if err := r.StatusUpdater.UpdateStatusKode(ctx, kode, kodev1alpha2.KodePhaseActive, []metav1.Condition{
 			{
 				Type:    common.ConditionTypeReady,
@@ -325,11 +316,8 @@ func (r *KodeReconciler) transitionTo(ctx context.Context, kode *kodev1alpha2.Ko
 		if err := r.EventManager.Record(ctx, kode, events.EventTypeNormal, events.ReasonKodeSuspended, "Kode is being suspended"); err != nil {
 			log.Error(err, "Failed to record Kode suspended event")
 		}
-		// Start resource cleanup process
-		requeueAfter = 1 * time.Millisecond
 
 	case kodev1alpha2.KodePhaseSuspended:
-		// Record suspension event
 		if err := r.EventManager.Record(ctx, kode, events.EventTypeNormal, events.ReasonKodeSuspended, "Kode has been suspended"); err != nil {
 			log.Error(err, "Failed to record Kode suspended event")
 		}
@@ -339,23 +327,19 @@ func (r *KodeReconciler) transitionTo(ctx context.Context, kode *kodev1alpha2.Ko
 		if err != nil {
 			log.Error(err, "Failed to record Kode resuming event")
 		}
-		// Start resuming process
-		requeueAfter = 1 * time.Millisecond
 
 	case kodev1alpha2.KodePhaseDeleting:
 		err := r.EventManager.Record(ctx, kode, events.EventTypeNormal, events.ReasonKodeDeleting, "Kode is being deleted")
 		if err != nil {
 			log.Error(err, "Failed to record Kode deleting event")
 		}
-		// Trigger immediate reconciliation to start deletion process
-		requeueAfter = 1 * time.Millisecond
 
 	case kodev1alpha2.KodePhaseFailed:
 		// Record failure event
 		if err := r.EventManager.Record(ctx, kode, events.EventTypeWarning, events.ReasonKodeFailed, "Kode has entered Failed state"); err != nil {
 			log.Error(err, "Failed to record Kode failed event")
 		}
-		// Set up for potential retry
+		// Requeue with a delay to avoid spinning
 		requeueAfter = time.Minute
 
 	case kodev1alpha2.KodePhaseUnknown:
@@ -363,7 +347,7 @@ func (r *KodeReconciler) transitionTo(ctx context.Context, kode *kodev1alpha2.Ko
 		if err := r.EventManager.Record(ctx, kode, events.EventTypeWarning, events.ReasonKodeUnknown, "Kode has entered Unknown state"); err != nil {
 			log.Error(err, "Failed to record Kode unknown state event")
 		}
-		// Set up for quick recheck
+		// Requeue with a delay to avoid spinning
 		requeueAfter = 10 * time.Second
 
 	}

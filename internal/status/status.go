@@ -78,7 +78,6 @@ func (u *defaultStatusUpdater) UpdateStatusKode(ctx context.Context, kode *kodev
 		if lastErrorTime != nil {
 			updatedStatus.LastErrorTime = lastErrorTime
 		}
-		updatedStatus.ObservedGeneration = latestKode.Generation
 		updatedStatus.Runtime = kode.SetRuntime()
 
 		// Create a patch

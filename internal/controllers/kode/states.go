@@ -21,9 +21,6 @@ import (
 	"fmt"
 	"time"
 
-	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	client "sigs.k8s.io/controller-runtime/pkg/client"
@@ -86,6 +83,15 @@ func (r *KodeReconciler) handleConfiguringState(ctx context.Context, kode *kodev
 		return r.handleResourceCreationError(ctx, kode, err)
 	}
 
+	// Update ObservedGeneration if it's out of sync
+	if kode.Generation != kode.Status.ObservedGeneration {
+		if err := r.updateObservedGeneration(ctx, kode); err != nil {
+			log.Error(err, "Failed to update ObservedGeneration")
+			return ctrl.Result{Requeue: true}, nil
+		}
+		log.V(1).Info("Updated ObservedGeneration", "Generation", kode.Generation, "ObservedGeneration", kode.Status.ObservedGeneration)
+	}
+
 	// Transition to Provisioning state
 	return r.transitionTo(ctx, kode, kodev1alpha2.KodePhaseProvisioning)
 }
@@ -93,6 +99,11 @@ func (r *KodeReconciler) handleConfiguringState(ctx context.Context, kode *kodev
 func (r *KodeReconciler) handleProvisioningState(ctx context.Context, kode *kodev1alpha2.Kode) (ctrl.Result, error) {
 	log := r.Log.WithValues("kode", client.ObjectKeyFromObject(kode))
 	log.V(1).Info("Handling Provisioning state")
+
+	// When the observed generation is not equal to the generation, it needs to be reconfigured
+	if kode.Generation != kode.Status.ObservedGeneration {
+		return r.transitionTo(ctx, kode, kodev1alpha2.KodePhaseConfiguring)
+	}
 
 	// Fetch the template
 	template, err := r.fetchTemplatesWithRetry(ctx, kode)
@@ -128,6 +139,7 @@ func (r *KodeReconciler) handleActiveState(ctx context.Context, kode *kodev1alph
 	log := r.Log.WithValues("kode", client.ObjectKeyFromObject(kode))
 	log.V(1).Info("Handling Active state")
 
+	// When the observed generation is not equal to the generation, it needs to be reconfigured
 	if kode.Generation != kode.Status.ObservedGeneration {
 		return r.transitionTo(ctx, kode, kodev1alpha2.KodePhaseConfiguring)
 	}
