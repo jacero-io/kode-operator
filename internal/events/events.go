@@ -62,9 +62,14 @@ const (
 	ReasonKodeExistingPVCUsed                EventReason = "KodeExistingPVCUsed"
 
 	// EntryPoint event reasons
-	ReasonEntryPointActive  EventReason = "EntryPointActive"
-	ReasonEntryPointFailed  EventReason = "EntryPointFailed"
-	ReasonEntryPointUnknown EventReason = "EntryPointUnknown"
+	ReasonEntryPointConfiguring         EventReason = "EntryPointConfiguring"
+	ReasonEntryPointProvisioning        EventReason = "EntryPointProvisioning"
+	ReasonEntryPointActive              EventReason = "EntryPointActive"
+	ReasonEntryPointDeleting            EventReason = "EntryPointDeleting"
+	ReasonEntryPointFailed              EventReason = "EntryPointFailed"
+	ReasonEntryPointUnknown             EventReason = "EntryPointUnknown"
+	ReasonEntryPointValidationFailed    EventReason = "EntryPointValidationFailed"
+	ReasonEntryPointResourceCheckFailed EventReason = "EntryPointResourceCheckFailed"
 )
 
 // EventManager defines the interface for managing events

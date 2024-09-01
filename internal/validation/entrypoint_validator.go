@@ -22,14 +22,15 @@ import (
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 )
 
-// Validator defines the interface for validating Kode resources
-type Validator interface {
-	ValidateKode(ctx context.Context, kode *kodev1alpha2.Kode) error
-	ValidateEntryPoint(ctx context.Context, entryPoint *kodev1alpha2.EntryPoint) error
+func (v *validator) ValidateEntryPoint(ctx context.Context, entryPoint *kodev1alpha2.EntryPoint) error {
+	if err := v.validateEntryPointSpec(entryPoint); err != nil {
+		return err
+	}
+	return nil
 }
 
-type validator struct{}
+func (v *validator) validateEntryPointSpec(entryPoint *kodev1alpha2.EntryPoint) error {
+	// var errors []string
 
-func NewDefaultValidator() Validator {
-	return &validator{}
+	return nil
 }

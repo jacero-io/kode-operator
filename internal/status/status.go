@@ -101,27 +101,33 @@ func (u *defaultStatusUpdater) UpdateStatusEntryPoint(ctx context.Context, entry
 
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		// Fetch the latest version of EntryPoint
-		latestEntry, err := common.GetLatestEntryPoint(ctx, u.Client, entryPoint.Name, entryPoint.Namespace)
+		latestEntryPoint, err := common.GetLatestEntryPoint(ctx, u.Client, entryPoint.Name, entryPoint.Namespace)
 		if err != nil {
 			return err
 		}
 
 		// Create a copy of the latest status
-		updatedStatus := latestEntry.Status.DeepCopy()
+		updatedStatus := latestEntryPoint.Status.DeepCopy()
+
+		// Ensure conditions have all required fields
+		conditions = ensureConditionFields(conditions, latestEntryPoint.Generation)
 
 		// Update only the fields we want to change
 		updatedStatus.Phase = phase
 		updatedStatus.Conditions = mergeAndRemoveConditions(updatedStatus.Conditions, conditions, conditionsToRemove)
-		updatedStatus.LastError = &lastError
-		updatedStatus.LastErrorTime = lastErrorTime
-		updatedStatus.ObservedGeneration = latestEntry.Generation
+		if lastError != "" {
+			updatedStatus.LastError = &lastError
+		}
+		if lastErrorTime != nil {
+			updatedStatus.LastErrorTime = lastErrorTime
+		}
 
 		// Create a patch
-		patch := client.MergeFrom(latestEntry.DeepCopy())
-		latestEntry.Status = *updatedStatus
+		patch := client.MergeFrom(latestEntryPoint.DeepCopy())
+		latestEntryPoint.Status = *updatedStatus
 
 		// Apply the patch
-		if err := u.Client.Status().Patch(ctx, latestEntry, patch); err != nil {
+		if err := u.Client.Status().Patch(ctx, latestEntryPoint, patch); err != nil {
 			log.Error(err, "Failed to update EntryPoint status")
 			return err
 		}
