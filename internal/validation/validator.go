@@ -25,4 +25,11 @@ import (
 // Validator defines the interface for validating Kode resources
 type Validator interface {
 	ValidateKode(ctx context.Context, kode *kodev1alpha2.Kode) error
+	ValidateEntryPoint(ctx context.Context, entryPoint *kodev1alpha2.EntryPoint) error
+}
+
+type validator struct{}
+
+func NewDefaultValidator() Validator {
+	return &validator{}
 }

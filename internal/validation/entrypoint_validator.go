@@ -14,26 +14,23 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package kode
+package validation
 
 import (
 	"context"
 
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
-	"github.com/jacero-io/kode-operator/internal/common"
 )
 
-func (r *KodeReconciler) updatePortStatus(ctx context.Context, kode *kodev1alpha2.Kode, template *kodev1alpha2.Template) error {
-	// Fetch the latest version of Kode
-	latestKode, err := common.GetLatestKode(ctx, r.Client, kode.Name, kode.Namespace)
-	if err != nil {
+func (v *validator) ValidateEntryPoint(ctx context.Context, entryPoint *kodev1alpha2.EntryPoint) error {
+	if err := v.validateEntryPointSpec(entryPoint); err != nil {
 		return err
 	}
+	return nil
+}
 
-	// Update the Kode port
-	err = latestKode.UpdateKodePort(ctx, r.Client, template.Port)
-	if err != nil {
-		return err
-	}
+func (v *validator) validateEntryPointSpec(entryPoint *kodev1alpha2.EntryPoint) error {
+	// var errors []string
+
 	return nil
 }

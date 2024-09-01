@@ -164,7 +164,7 @@ func (r *KodeReconciler) handleActiveState(ctx context.Context, kode *kodev1alph
 		return r.transitionTo(ctx, kode, kodev1alpha2.KodePhaseConfiguring)
 	}
 
-	// Requeue for regular check
+	// Do not requeue if resources are ready
 	return ctrl.Result{}, nil
 }
 
@@ -200,6 +200,7 @@ func (r *KodeReconciler) handleSuspendingState(ctx context.Context, kode *kodev1
 func (r *KodeReconciler) handleSuspendedState(ctx context.Context, kode *kodev1alpha2.Kode) (ctrl.Result, error) {
 	log := r.Log.WithValues("kode", client.ObjectKeyFromObject(kode))
 	log.V(1).Info("Handling Suspending state")
+
 	return ctrl.Result{Requeue: true}, nil
 }
 
@@ -207,6 +208,7 @@ func (r *KodeReconciler) handleSuspendedState(ctx context.Context, kode *kodev1a
 func (r *KodeReconciler) handleResumingState(ctx context.Context, kode *kodev1alpha2.Kode) (ctrl.Result, error) {
 	log := r.Log.WithValues("kode", client.ObjectKeyFromObject(kode))
 	log.V(1).Info("Handling Suspending state")
+
 	if kode.Status.Phase != kodev1alpha2.KodePhaseResuming {
 		if err := r.StatusUpdater.UpdateStatusKode(ctx, kode, kodev1alpha2.KodePhaseResuming, []metav1.Condition{
 			{
@@ -220,6 +222,7 @@ func (r *KodeReconciler) handleResumingState(ctx context.Context, kode *kodev1al
 			return ctrl.Result{Requeue: true}, err
 		}
 	}
+
 	return ctrl.Result{Requeue: true}, nil
 }
 

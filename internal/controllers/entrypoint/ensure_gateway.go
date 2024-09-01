@@ -31,7 +31,7 @@ import (
 )
 
 // ensureGateway ensures that the Gateway exists for the EntryPoint instance
-func (r *EntryPointReconciler) ensureGateway(ctx context.Context, entryPoint *kodev1alpha2.EntryPoint, config *common.EntryPointResourceConfig) error {
+func (r *EntryPointReconciler) ensureGateway(ctx context.Context, entryPoint *kodev1alpha2.EntryPoint, config *common.EntryPointResourceConfig) (*gwapiv1.Gateway, error) {
 	log := r.Log.WithName("GatewayEnsurer").WithValues("entrypoint", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	ctx, cancel := common.ContextWithTimeout(ctx, 30) // 30 seconds timeout
@@ -39,9 +39,15 @@ func (r *EntryPointReconciler) ensureGateway(ctx context.Context, entryPoint *ko
 
 	log.V(1).Info("Ensuring Gateway")
 
-	if entryPoint.Spec.GatewaySpec.ExistingGatewayRef.Name != "" {
+	if entryPoint.Spec.GatewaySpec != nil && entryPoint.Spec.GatewaySpec.ExistingGatewayRef != nil {
 		log.V(1).Info("Gateway already exists", "gateway", entryPoint.Spec.GatewaySpec.ExistingGatewayRef)
-		return nil
+		gateway := &gwapiv1.Gateway{}
+		err := r.Client.Get(ctx, types.NamespacedName{Name: string(entryPoint.Spec.GatewaySpec.ExistingGatewayRef.Name), Namespace: entryPoint.Namespace}, gateway)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get existing Gateway: %w", err)
+		}
+
+		return gateway, nil
 	}
 
 	gateway := &gwapiv1.Gateway{
@@ -65,10 +71,10 @@ func (r *EntryPointReconciler) ensureGateway(ctx context.Context, entryPoint *ko
 	})
 
 	if err != nil {
-		return fmt.Errorf("failed to create or patch Gateway: %w", err)
+		return nil, fmt.Errorf("failed to create or patch Gateway: %w", err)
 	}
 
-	return nil
+	return gateway, nil
 }
 
 // constructGateway constructs a Gateway for the EntryPoint instance
@@ -97,4 +103,40 @@ func (r *EntryPointReconciler) constructGatewaySpec(entryPoint *kodev1alpha2.Ent
 	log.V(1).Info("Constructed Gateway", "gateway", gateway)
 
 	return gateway, nil
+}
+
+func (r *EntryPointReconciler) getGateway(ctx context.Context, entryPoint *kodev1alpha2.EntryPoint) (*gwapiv1.Gateway, error) {
+	// Implementation for fetching the Gateway associated with the EntryPoint
+	// ...
+	var err error
+	gateway := &gwapiv1.Gateway{}
+
+	return gateway, err
+}
+
+func (r *EntryPointReconciler) isGatewayReady(gateway *gwapiv1.Gateway) (bool, error) {
+	// Implementation for checking if the Gateway is ready
+	// ...
+	var err error
+	ready := false
+
+	return ready, err
+}
+
+func (r *EntryPointReconciler) isSecurityPolicyReady(ctx context.Context, entryPoint *kodev1alpha2.EntryPoint) (bool, error) {
+	// Implementation for checking if the SecurityPolicy is ready
+	// ...
+	var err error
+	ready := false
+
+	return ready, err
+}
+
+func (r *EntryPointReconciler) isEnvoyPatchPolicyReady(ctx context.Context, entryPoint *kodev1alpha2.EntryPoint) (bool, error) {
+	// Implementation for checking if the EnvoyPatchPolicy is ready
+	// ...
+	var err error
+	ready := false
+
+	return ready, err
 }

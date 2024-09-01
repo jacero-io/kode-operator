@@ -157,20 +157,32 @@ const (
 type EntryPointPhase string
 
 const (
-	// EntryPointPhaseCreating means the EntryPoint is being created.
-	EntryPointPhaseCreating EntryPointPhase = "Creating"
-
-	// KodePhaseCreated indicates that the Kode resource has been created.
-	EntryPointPhaseCreated EntryPointPhase = "Created"
-
-	// EntryPointPhaseFailed means the EntryPoint has failed.
-	EntryPointPhaseFailed EntryPointPhase = "Failed"
-
-	// EntryPointPhasePending means the EntryPoint is pending.
+	// EntryPointPhasePending indicates that the EntryPoint resource is pending.
+	// The Gateway and other resources are not created yet.
 	EntryPointPhasePending EntryPointPhase = "Pending"
 
-	// EntryPointPhaseActive means the EntryPoint is active.
+	// EntryPointPhaseConfiguring indicates that the EntryPoint resource is configuring.
+	// The Gateway and other resources are being created.
+	EntryPointPhaseConfiguring EntryPointPhase = "Configuring"
+
+	// EntryPointPhaseProvisioning indicates that the EntryPoint resource is provisioning.
+	// The Gateway and other resources are being provisioned.
+	// The EntryPoint is not ready to serve traffic.
+	EntryPointPhaseProvisioning EntryPointPhase = "Provisioning"
+
+	// EntryPointPhaseActive indicates that the EntryPoint resource is fully operational.
+	// The Gateway and other resources have been created and the EntryPoint is ready to serve traffic.
 	EntryPointPhaseActive EntryPointPhase = "Active"
+
+	// EntryPointPhaseDeleting indicates that the EntryPoint resource is being deleted.
+	// The Gateway and other resources are being deleted.
+	EntryPointPhaseDeleting EntryPointPhase = "Deleting"
+
+	// EntryPointPhaseFailed indicates that the EntryPoint resource has failed.
+	EntryPointPhaseFailed EntryPointPhase = "Failed"
+
+	// EntryPointPhaseUnknown indicates that the EntryPoint resource is in an unknown state.
+	EntryPointPhaseUnknown EntryPointPhase = "Unknown"
 )
 
 // BaseDomain is the domain name to use either as a suffix in the case of Type=domain or as a prefix/domain in the case of Type=path.
