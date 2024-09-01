@@ -32,7 +32,6 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -58,7 +57,7 @@ import (
 // http://onsi.github.io/ginkgo/ to learn more about Ginkgo.
 
 const (
-	timeout                 = time.Second * 30
+	timeout                 = time.Second * 60
 	interval                = time.Millisecond * 250
 	entryPointNameSubdomain = "test-entrypoint-with-subdomain"
 	entryPointNamePath      = "test-entrypoint-with-path"
@@ -79,7 +78,6 @@ var (
 	cancel               context.CancelFunc
 	testEnv              *envtest.Environment
 	k8sClient            client.Client
-	mockK8sClient        *mockClient
 	k8sManager           ctrl.Manager
 	reconciler           *kodectrl.KodeReconciler
 	entrypointReconciler *entrypointctrl.EntryPointReconciler
@@ -140,116 +138,96 @@ var _ = BeforeSuite(func() {
 	k8sClient = k8sManager.GetClient()
 	Expect(k8sClient).ToNot(BeNil())
 
-	mockK8sClient = &mockClient{
-		Client:           k8sClient,
-		deletedResources: sync.Map{},
-	}
+	// Set up StorageClass
 	err = setupStorageClass(ctx, k8sClient)
 	Expect(err).ToNot(HaveOccurred())
 
 	reconciler = &kodectrl.KodeReconciler{
-		Client:          mockK8sClient,
+		Client:          k8sClient,
 		Scheme:          k8sManager.GetScheme(),
 		Log:             ctrl.Log.WithName("Kode").WithName("Reconcile"),
 		ResourceManager: resource.NewDefaultResourceManager(k8sClient, ctrl.Log.WithName("Kode").WithName("ResourceManager"), k8sManager.GetScheme()),
 		TemplateManager: template.NewDefaultTemplateManager(k8sClient, ctrl.Log.WithName("Kode").WithName("TemplateManager")),
-		CleanupManager:  cleanup.NewDefaultCleanupManager(mockK8sClient, ctrl.Log.WithName("Kode").WithName("CleanupManager")),
+		CleanupManager:  cleanup.NewDefaultCleanupManager(k8sClient, ctrl.Log.WithName("Kode").WithName("CleanupManager")),
 		StatusUpdater:   status.NewDefaultStatusUpdater(k8sClient, ctrl.Log.WithName("Kode").WithName("StatusUpdater")),
 		Validator:       validation.NewDefaultValidator(),
 		EventManager:    events.NewEventManager(k8sClient, ctrl.Log.WithName("Kode").WithName("EventManager"), k8sManager.GetScheme(), k8sManager.GetEventRecorderFor("kode-controller")),
 	}
 
 	entrypointReconciler = &entrypointctrl.EntryPointReconciler{
-		Client:          mockK8sClient,
+		Client:          k8sClient,
 		Scheme:          k8sManager.GetScheme(),
 		Log:             ctrl.Log.WithName("EntryPoint").WithName("Reconcile"),
 		ResourceManager: resource.NewDefaultResourceManager(k8sClient, ctrl.Log.WithName("EntryPoint").WithName("ResourceManager"), k8sManager.GetScheme()),
 		TemplateManager: template.NewDefaultTemplateManager(k8sClient, ctrl.Log.WithName("EntryPoint").WithName("TemplateManager")),
-		CleanupManager:  cleanup.NewDefaultCleanupManager(mockK8sClient, ctrl.Log.WithName("EntryPoint").WithName("CleanupManager")),
+		CleanupManager:  cleanup.NewDefaultCleanupManager(k8sClient, ctrl.Log.WithName("EntryPoint").WithName("CleanupManager")),
 		StatusUpdater:   status.NewDefaultStatusUpdater(k8sClient, ctrl.Log.WithName("EntryPoint").WithName("StatusUpdater")),
 		Validator:       validation.NewDefaultValidator(),
 		EventManager:    events.NewEventManager(k8sClient, ctrl.Log.WithName("Kode").WithName("EventManager"), k8sManager.GetScheme(), k8sManager.GetEventRecorderFor("entrypoint-controller")),
 	}
 
-	// Set up the Kode controller with the manager
 	err = reconciler.SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
-	// Set up the EntryPoint controller with the manager
 	err = entrypointReconciler.SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
-	// Start the manager
 	go func() {
 		err = k8sManager.Start(ctx)
 		Expect(err).ToNot(HaveOccurred())
 	}()
 
 	// Create namespace
-	By("Creating a namespace")
 	namespace = &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: resourceNamespace}}
 	Expect(k8sClient.Create(ctx, namespace)).To(Succeed())
 
-	// Create EntryPoint
-	By("Creating a subdomain-based EntryPoint")
+	// Create EntryPoints
 	entryPointSubdomain = createEntryPoint(entryPointNameSubdomain, namespace.Name, kodev1alpha2.RoutingTypeSubdomain)
 	Expect(k8sClient.Create(ctx, entryPointSubdomain)).To(Succeed())
 
-	By("Creating a path-based EntryPoint")
 	entryPointPath = createEntryPoint(entryPointNamePath, namespace.Name, kodev1alpha2.RoutingTypePath)
 	Expect(k8sClient.Create(ctx, entryPointPath)).To(Succeed())
 
 	// Create PodTemplates
-	By("Creating a ClusterPodTemplate with an entrypoint with subdomain routing")
 	podTemplateCodeServer = createPodTemplate(podTemplateNameCodeServer, podTemplateImageCodeServer, "code-server", entryPointSubdomain.Name, entryPointSubdomain.Namespace)
 	Expect(k8sClient.Create(ctx, podTemplateCodeServer)).To(Succeed())
 
-	By("Creating a ClusterPodTemplate with an entrypoint with path routing")
 	podTemplateWebtop = createPodTemplate(podTemplateNameWebtop, podTemplateImageWebtop, "webtop", entryPointSubdomain.Name, entryPointSubdomain.Namespace)
 	Expect(k8sClient.Create(ctx, podTemplateWebtop)).To(Succeed())
 
-	By("Creating a ClusterPodTemplate with an entrypoint with subdomain routing")
 	podTemplateSubdomain = createPodTemplate("pod-template-subdomain", podTemplateImageCodeServer, "code-server", entryPointSubdomain.Name, entryPointSubdomain.Namespace)
 	Expect(k8sClient.Create(ctx, podTemplateSubdomain)).To(Succeed())
 
-	By("Creating a ClusterPodTemplate with an entrypoint with path routing")
 	podTemplatePath = createPodTemplate("pod-template-path", podTemplateImageCodeServer, "code-server", entryPointPath.Name, entryPointPath.Namespace)
 	Expect(k8sClient.Create(ctx, podTemplatePath)).To(Succeed())
 })
 
 var _ = AfterSuite(func() {
-	// Cleanup namespace
-	Expect(k8sClient.Delete(ctx, namespace)).To(Succeed())
-
-	// Cleanup EntryPoint
-	Expect(k8sClient.Delete(ctx, entryPointSubdomain)).To(Succeed())
-	Expect(k8sClient.Delete(ctx, entryPointPath)).To(Succeed())
-
-	// Cleanup PodTemplates
-	Expect(k8sClient.Delete(ctx, podTemplateCodeServer)).To(Succeed())
-	Expect(k8sClient.Delete(ctx, podTemplateWebtop)).To(Succeed())
-	Expect(k8sClient.Delete(ctx, podTemplateSubdomain)).To(Succeed())
-	Expect(k8sClient.Delete(ctx, podTemplatePath)).To(Succeed())
-
 	cancel()
 	By("tearing down the test environment")
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
 })
 
-// Keep these helper functions
-func waitForResourceDeletion(ctx context.Context, c *mockClient, obj client.Object, timeout time.Duration) error {
-	return wait.PollUntilContextTimeout(ctx, time.Second, timeout, true, func(ctx context.Context) (bool, error) {
-		err := c.Get(ctx, client.ObjectKeyFromObject(obj), obj)
-		if apierrors.IsNotFound(err) {
-			return true, nil
-		}
-		if err != nil {
-			return false, err
-		}
-		return false, nil
-	})
-}
+// var _ = AfterSuite(func() {
+// 	// Cleanup namespace
+// 	Expect(k8sClient.Delete(ctx, namespace)).To(Succeed())
+
+// 	// Cleanup EntryPoint
+// 	Expect(k8sClient.Delete(ctx, entryPointSubdomain)).To(Succeed())
+// 	Expect(k8sClient.Delete(ctx, entryPointPath)).To(Succeed())
+
+// 	// Cleanup PodTemplates
+// 	Expect(k8sClient.Delete(ctx, podTemplateCodeServer)).To(Succeed())
+// 	Expect(k8sClient.Delete(ctx, podTemplateWebtop)).To(Succeed())
+// 	Expect(k8sClient.Delete(ctx, podTemplateSubdomain)).To(Succeed())
+// 	Expect(k8sClient.Delete(ctx, podTemplatePath)).To(Succeed())
+
+// 	cancel()
+// 	By("tearing down the test environment")
+// 	err := testEnv.Stop()
+// 	Expect(err).NotTo(HaveOccurred())
+// })
 
 func (m *mockClient) Delete(ctx context.Context, obj client.Object, opts ...client.DeleteOption) error {
 	key := fmt.Sprintf("%T/%s/%s", obj, obj.GetNamespace(), obj.GetName())

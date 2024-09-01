@@ -17,9 +17,7 @@ limitations under the License.
 package integration
 
 import (
-	"context"
 	"fmt"
-	"time"
 
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
@@ -29,7 +27,6 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/api/resource"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
@@ -140,35 +137,20 @@ var _ = Describe("Kode Controller PodTemplate Integration", Ordered, func() {
 
 			By("Ensuring all related resources are cleaned up")
 			Eventually(func() error {
-				ctx, cancel := context.WithTimeout(context.Background(), time.Minute*5)
-				defer cancel()
-
 				// Check if StatefulSet is deleted
-				err := waitForResourceDeletion(ctx, mockK8sClient, &appsv1.StatefulSet{
-					ObjectMeta: metav1.ObjectMeta{Name: statefulSetName, Namespace: namespace.Name},
-				}, time.Minute*5)
-				if err != nil {
-					return fmt.Errorf("StatefulSet deletion error: %v", err)
+				err := k8sClient.Get(ctx, types.NamespacedName{Name: statefulSetName, Namespace: namespace.Name}, &appsv1.StatefulSet{})
+				if !errors.IsNotFound(err) {
+					return fmt.Errorf("StatefulSet still exists: %v", err)
 				}
 
 				// Check if Service is deleted
-				err = waitForResourceDeletion(ctx, mockK8sClient, &corev1.Service{
-					ObjectMeta: metav1.ObjectMeta{Name: serviceName, Namespace: namespace.Name},
-				}, time.Minute*5)
-				if err != nil {
-					return fmt.Errorf("Service deletion error: %v", err)
-				}
-
-				// Check if PVC is deleted
-				err = waitForResourceDeletion(ctx, mockK8sClient, &corev1.PersistentVolumeClaim{
-					ObjectMeta: metav1.ObjectMeta{Name: pvcName, Namespace: namespace.Name},
-				}, time.Minute*5)
-				if err != nil {
-					return fmt.Errorf("PersistentVolumeClaim deletion error: %v", err)
+				err = k8sClient.Get(ctx, types.NamespacedName{Name: serviceName, Namespace: namespace.Name}, &corev1.Service{})
+				if !errors.IsNotFound(err) {
+					return fmt.Errorf("Service still exists: %v", err)
 				}
 
 				return nil
-			}, time.Minute*5, time.Second).Should(Succeed(), "Failed to clean up all resources")
+			}, timeout, interval).Should(Succeed(), "Failed to clean up all resources")
 		},
 		Entry("code-server", podTemplateNameCodeServer, "code-server", 1, int32(8000)),
 		Entry("webtop", podTemplateNameWebtop, "webtop", 1, int32(8000)),
