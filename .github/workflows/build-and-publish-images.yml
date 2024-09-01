@@ -1,15 +1,10 @@
 name: Build & Publish container images to GHCR
 
 on:
-  push:
-    branches:
-      - main
-      - 'feature/*'
-    tags:
-      - 'v*.*.*'
-  pull_request:
-    branches:
-      - main
+  workflow_run:
+    workflows: ["Integration Tests"]
+    types:
+      - completed
 
 jobs:
   build-and-publish:
