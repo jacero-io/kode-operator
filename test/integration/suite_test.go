@@ -28,6 +28,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -128,6 +129,8 @@ var _ = BeforeSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 	err = gwapiv1.Install(scheme.Scheme)
 	Expect(err).NotTo(HaveOccurred())
+	err = storagev1.AddToScheme(scheme.Scheme)
+	Expect(err).NotTo(HaveOccurred())
 
 	k8sManager, err = ctrl.NewManager(cfg, ctrl.Options{
 		Scheme: scheme.Scheme,
@@ -141,6 +144,8 @@ var _ = BeforeSuite(func() {
 		Client:           k8sClient,
 		deletedResources: sync.Map{},
 	}
+	err = setupStorageClass(ctx, k8sClient)
+	Expect(err).ToNot(HaveOccurred())
 
 	reconciler = &kodectrl.KodeReconciler{
 		Client:          mockK8sClient,
@@ -259,6 +264,24 @@ func (m *mockClient) Get(ctx context.Context, key client.ObjectKey, obj client.O
 		return apierrors.NewNotFound(schema.GroupResource{}, key.Name)
 	}
 	return m.Client.Get(ctx, key, obj, opts...)
+}
+
+func setupStorageClass(ctx context.Context, k8sClient client.Client) error {
+	volumeBindingMode := storagev1.VolumeBindingImmediate
+	storageClass := &storagev1.StorageClass{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "standard",
+		},
+		Provisioner:       "kubernetes.io/no-provisioner",
+		VolumeBindingMode: &volumeBindingMode,
+	}
+
+	err := k8sClient.Create(ctx, storageClass)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func createPodTemplate(name, image, templateType string, entryPointName string, entrypointNamespace string) *kodev1alpha2.ClusterPodTemplate {

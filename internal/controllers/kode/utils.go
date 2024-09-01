@@ -23,6 +23,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/retry"
@@ -171,4 +172,31 @@ func (r *KodeReconciler) determineCurrentState(ctx context.Context, kode *kodev1
 
 	// If everything is set up and ready, consider it active
 	return kodev1alpha2.KodePhaseActive, nil
+}
+
+func (r *KodeReconciler) checkCSIResizeCapability(ctx context.Context, pvc *corev1.PersistentVolumeClaim) (bool, error) {
+	if pvc.Spec.StorageClassName == nil {
+		return false, fmt.Errorf("PVC does not have a StorageClassName specified")
+	}
+
+	// Get the StorageClass
+	sc := &storagev1.StorageClass{}
+	err := r.Client.Get(ctx, client.ObjectKey{Name: *pvc.Spec.StorageClassName}, sc)
+	if err != nil {
+		return false, fmt.Errorf("failed to get StorageClass: %v", err)
+	}
+
+	// Check if volume expansion is allowed
+	if sc.AllowVolumeExpansion != nil && *sc.AllowVolumeExpansion {
+		return true, nil
+	}
+
+	// If AllowVolumeExpansion is not set, we can check for any CSI-specific annotations
+	// This is an example and might vary depending on the CSI driver
+	if value, exists := sc.Annotations["csi.storage.k8s.io/resizable"]; exists && value == "true" {
+		return true, nil
+	}
+
+	// If no resize capability is detected, return false
+	return false, nil
 }
