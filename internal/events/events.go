@@ -56,10 +56,10 @@ const (
 	ReasonKodeUnknown                        EventReason = "KodeUnknown"
 	ReasonKodeCSIResizeCapabilityChecked     EventReason = "KodeCSIResizeCapabilityChecked"
 	ReasonKodeCSIResizeCapabilityCheckFailed EventReason = "KodeCSIResizeCapabilityCheckFailed"
-	ReasonKodePVCResizeAttempted			 EventReason = "KodePVCResizeAttempted"
-	ReasonKodePVCResizeSkipped				 EventReason = "KodePVCResizeSkipped"
-	ReasonKodePVCCreated					 EventReason = "KodePVCCreated"
-	ReasonKodeExistingPVCUsed				 EventReason = "KodeExistingPVCUsed"
+	ReasonKodePVCResizeAttempted             EventReason = "KodePVCResizeAttempted"
+	ReasonKodePVCResizeSkipped               EventReason = "KodePVCResizeSkipped"
+	ReasonKodePVCCreated                     EventReason = "KodePVCCreated"
+	ReasonKodeExistingPVCUsed                EventReason = "KodeExistingPVCUsed"
 
 	// EntryPoint event reasons
 	ReasonEntryPointActive  EventReason = "EntryPointActive"

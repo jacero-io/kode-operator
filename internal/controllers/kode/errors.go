@@ -28,7 +28,6 @@ import (
 	"github.com/jacero-io/kode-operator/internal/common"
 )
 
-
 func (r *KodeReconciler) handleTemplateFetchError(ctx context.Context, kode *kodev1alpha2.Kode, err error) (ctrl.Result, error) {
 	log := r.Log.WithValues("kode", client.ObjectKeyFromObject(kode))
 	if err := r.StatusUpdater.UpdateStatusKode(ctx, kode, kodev1alpha2.KodePhaseFailed, []metav1.Condition{

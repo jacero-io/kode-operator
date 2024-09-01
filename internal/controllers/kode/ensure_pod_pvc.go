@@ -75,51 +75,51 @@ func (r *KodeReconciler) ensurePersistentVolumeClaim(ctx context.Context, kode *
 		// Get the existing PVC
 		existing := &corev1.PersistentVolumeClaim{}
 		err = r.Client.Get(ctx, client.ObjectKeyFromObject(pvc), existing)
-        if err == nil {
-            // PVC exists, update only if resize is supported
-            if resizeSupported {
-                if !pvc.Spec.Resources.Requests.Storage().Equal(*constructedPVC.Spec.Resources.Requests.Storage()) {
-                    pvc.Spec.Resources = constructedPVC.Spec.Resources
-                    log.V(1).Info("Updating PVC resources", "NewSize", constructedPVC.Spec.Resources.Requests.Storage())
-                    
-                    // Record event for resize attempt
+		if err == nil {
+			// PVC exists, update only if resize is supported
+			if resizeSupported {
+				if !pvc.Spec.Resources.Requests.Storage().Equal(*constructedPVC.Spec.Resources.Requests.Storage()) {
+					pvc.Spec.Resources = constructedPVC.Spec.Resources
+					log.V(1).Info("Updating PVC resources", "NewSize", constructedPVC.Spec.Resources.Requests.Storage())
+
+					// Record event for resize attempt
 					eventMessage := fmt.Sprintf("Attempting to resize PVC %s to %s", pvc.Name, constructedPVC.Spec.Resources.Requests.Storage().String())
 					err := r.EventManager.Record(ctx, kode, events.EventTypeNormal, events.ReasonKodePVCResizeAttempted, eventMessage)
 					if err != nil {
 						log.Error(err, "Failed to record event")
 					}
-                }
-            } else {
-                log.V(1).Info("Resize not supported, skipping PVC resource update")
-                
-                // Record event for skipped resize
+				}
+			} else {
+				log.V(1).Info("Resize not supported, skipping PVC resource update")
+
+				// Record event for skipped resize
 				eventMessage := fmt.Sprintf("Skipped resizing PVC %s, CSI driver does not support volume expansion", pvc.Name)
-                err := r.EventManager.Record(ctx, kode, events.EventTypeWarning, events.ReasonKodePVCResizeSkipped, eventMessage)
+				err := r.EventManager.Record(ctx, kode, events.EventTypeWarning, events.ReasonKodePVCResizeSkipped, eventMessage)
 				if err != nil {
 					log.Error(err, "Failed to record event")
 				}
-            }
-            pvc.ObjectMeta.Labels = constructedPVC.ObjectMeta.Labels
-            pvc.ObjectMeta.Annotations = constructedPVC.ObjectMeta.Annotations
-            // Preserve immutable fields
-            pvc.Spec.AccessModes = existing.Spec.AccessModes
-            pvc.Spec.VolumeName = existing.Spec.VolumeName
-            pvc.Spec.VolumeMode = existing.Spec.VolumeMode
-            pvc.Spec.StorageClassName = existing.Spec.StorageClassName
-            pvc.Spec.Selector = existing.Spec.Selector
-        } else if errors.IsNotFound(err) {
-            // PVC doesn't exist, use the entire constructed spec
-            pvc.Spec = constructedPVC.Spec
-            
-            // Record event for PVC creation
+			}
+			pvc.ObjectMeta.Labels = constructedPVC.ObjectMeta.Labels
+			pvc.ObjectMeta.Annotations = constructedPVC.ObjectMeta.Annotations
+			// Preserve immutable fields
+			pvc.Spec.AccessModes = existing.Spec.AccessModes
+			pvc.Spec.VolumeName = existing.Spec.VolumeName
+			pvc.Spec.VolumeMode = existing.Spec.VolumeMode
+			pvc.Spec.StorageClassName = existing.Spec.StorageClassName
+			pvc.Spec.Selector = existing.Spec.Selector
+		} else if errors.IsNotFound(err) {
+			// PVC doesn't exist, use the entire constructed spec
+			pvc.Spec = constructedPVC.Spec
+
+			// Record event for PVC creation
 			eventMessage := fmt.Sprintf("Created new PVC %s with size %s", pvc.Name, constructedPVC.Spec.Resources.Requests.Storage().String())
 			err := r.EventManager.Record(ctx, kode, events.EventTypeNormal, events.ReasonKodePVCCreated, eventMessage)
 			if err != nil {
 				log.Error(err, "Failed to record event")
 			}
-        } else {
-            return fmt.Errorf("failed to get existing PVC: %v", err)
-        }
+		} else {
+			return fmt.Errorf("failed to get existing PVC: %v", err)
+		}
 
 		// Update metadata for both new and existing PVCs
 		pvc.ObjectMeta.Labels = constructedPVC.ObjectMeta.Labels

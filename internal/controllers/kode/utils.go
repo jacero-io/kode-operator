@@ -32,7 +32,6 @@ import (
 	"github.com/jacero-io/kode-operator/internal/common"
 )
 
-
 func (r *KodeReconciler) fetchTemplatesWithRetry(ctx context.Context, kode *kodev1alpha2.Kode) (*kodev1alpha2.Template, error) {
 	var template *kodev1alpha2.Template
 	var lastErr error
