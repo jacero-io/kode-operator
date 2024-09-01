@@ -58,7 +58,7 @@ import (
 
 const (
 	timeout                 = time.Second * 60
-	interval                = time.Second * 5
+	interval                = time.Millisecond * 250
 	entryPointNameSubdomain = "test-entrypoint-with-subdomain"
 	entryPointNamePath      = "test-entrypoint-with-path"
 
@@ -160,7 +160,7 @@ var _ = BeforeSuite(func() {
 		Log:             ctrl.Log.WithName("EntryPoint").WithName("Reconcile"),
 		ResourceManager: resource.NewDefaultResourceManager(k8sClient, ctrl.Log.WithName("EntryPoint").WithName("ResourceManager"), k8sManager.GetScheme()),
 		TemplateManager: template.NewDefaultTemplateManager(k8sClient, ctrl.Log.WithName("EntryPoint").WithName("TemplateManager")),
-		CleanupManager:  cleanup.NewDefaultCleanupManager(k8sClient, ctrl.Log.WithName("EntryPoint").WithName("CleanupManager")),
+		CleanupManager:  cleanup.NewDefaultCleanupManager(mockK8sClient, ctrl.Log.WithName("EntryPoint").WithName("CleanupManager")),
 		StatusUpdater:   status.NewDefaultStatusUpdater(k8sClient, ctrl.Log.WithName("EntryPoint").WithName("StatusUpdater")),
 		Validator:       validation.NewDefaultValidator(),
 		EventManager:    events.NewEventManager(k8sClient, ctrl.Log.WithName("Kode").WithName("EventManager"), k8sManager.GetScheme(), k8sManager.GetEventRecorderFor("entrypoint-controller")),
