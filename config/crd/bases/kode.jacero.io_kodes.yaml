@@ -14,7 +14,27 @@ spec:
     singular: kode
   scope: Namespaced
   versions:
-  - name: v1alpha2
+  - additionalPrinterColumns:
+    - description: Status of the Kode
+      jsonPath: .status.phase
+      name: Status
+      type: string
+    - description: Runtime of the Kode
+      jsonPath: .status.runtime
+      name: Runtime
+      type: string
+    - description: URL to access the Kode
+      jsonPath: .status.kodeUrl
+      name: URL
+      type: string
+    - description: Template name
+      jsonPath: .spec.templateRef.name
+      name: Template
+      type: string
+    - jsonPath: .metadata.creationTimestamp
+      name: Age
+      type: date
+    name: v1alpha2
     schema:
       openAPIV3Schema:
         description: Kode is the Schema for the kodes API

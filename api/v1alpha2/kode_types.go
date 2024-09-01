@@ -108,6 +108,11 @@ type KodeStatus struct {
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.phase",description="Status of the Kode"
+// +kubebuilder:printcolumn:name="Runtime",type="string",JSONPath=".status.runtime",description="Runtime of the Kode"
+// +kubebuilder:printcolumn:name="URL",type="string",JSONPath=".status.kodeUrl",description="URL to access the Kode"
+// +kubebuilder:printcolumn:name="Template",type="string",JSONPath=".spec.templateRef.name",description="Template name"
+// +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 
 // Kode is the Schema for the kodes API
 type Kode struct {
