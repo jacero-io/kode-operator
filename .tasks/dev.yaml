@@ -24,26 +24,24 @@ tasks:
   generate-manifests:
     desc: Generate RBAC manifests
     cmds:
-      - '{{.CONTROLLER_GEN_CMD}} rbac:roleName=manager-role crd webhook paths="{{.ROOT_DIR}}/..." output:crd:artifacts:config={{.ROOT_DIR}}/config/crd/bases'
+      - task: build:manifests
+      - task: build:generate
     deps:
       - tools:controller-gen
 
   run-controller:
     desc: Run the controller
     cmds:
-      - |
-        LOG_LEVEL_ARG="{{if .LOG_LEVEL}}{{.LOG_LEVEL}}{{else}}debug{{end}}"
-        ENV={{.ENV}} go run ./cmd/main.go --log-level $LOG_LEVEL_ARG {{.CLI_ARGS}} 2>&1 | tee output.log
+      - ENV={{.ENV}} go run ./cmd/main.go --log-level {{.LOG_LEVEL_ARG}} {{.CLI_ARGS}} 2>&1 | tee output.log
+    vars:
+      LOG_LEVEL_ARG: '{{if .LOG_LEVEL}}{{.LOG_LEVEL}}{{else}}debug{{end}}'
 
   run:
     desc: Run a controller from your host
     cmds:
       - task: generate-manifests
+      - task: install
       - task: run-controller
-    deps:
-      - build:manifests
-      - build:generate
-      - install
 
   install:
     desc: Install CRDs into the cluster (Kind by default, or existing kubecontext)
