@@ -23,6 +23,7 @@ stateDiagram-v2
     AssessCurrentPhase --> HandleSuspendingState : Suspending
     AssessCurrentPhase --> HandleSuspendedState : Suspended
     AssessCurrentPhase --> HandleResumingState : Resuming
+    AssessCurrentPhase --> HandleDeletingState : Deleting
 
     HandlePendingState --> ValidateKode
     ValidateKode --> FetchTemplate : Validation Passed
@@ -31,8 +32,11 @@ stateDiagram-v2
     InitializeConfig --> TransitionTo
     ValidateKode --> TransitionTo : Validation Failed
 
-    HandleConfiguringState --> EnsureResources
-    EnsureResources --> UpdateConfiguringStatus
+    HandleConfiguringState --> FetchTemplate
+    FetchTemplate --> EnsureResources : Template Found
+    FetchTemplate --> TransitionTo : Template Not Found
+    EnsureResources --> UpdateConfiguringStatus : Resources Ensured
+    EnsureResources --> TransitionTo : Error Occurred
     UpdateConfiguringStatus --> TransitionTo
 
     HandleProvisioningState --> CheckResourceReadiness
@@ -46,9 +50,6 @@ stateDiagram-v2
     CheckResourceHealth --> UpdateActiveStatus : Healthy
     UpdateActiveStatus --> ReturnResult : Requeue
 
-    HandleInactiveState --> UpdateInactiveStatus
-    UpdateInactiveStatus --> ReturnResult : Requeue
-
     HandleFailedState --> IncrementRetryCount
     IncrementRetryCount --> CheckMaxRetries
     CheckMaxRetries --> TransitionTo : Retry
@@ -58,13 +59,17 @@ stateDiagram-v2
     HandleUnknownState --> DetermineCurrentState
     DetermineCurrentState --> TransitionTo
 
+    HandleDeletingState --> UpdateDeletingStatus
+    UpdateDeletingStatus --> CheckDeletionComplete
+    CheckDeletionComplete --> TransitionTo : Deletion Not Complete
+    CheckDeletionComplete --> ReturnResult : Deletion Complete
+
     state TransitionTo {
         [*] --> CheckIfTransitionRequired
-        CheckIfTransitionRequired --> AddStateChangeCondition : Transition Required
+        CheckIfTransitionRequired --> UpdateStatus : Transition Required
         CheckIfTransitionRequired --> [*] : No Transition Required
-        AddStateChangeCondition --> UpdateStatusKode
-        UpdateStatusKode --> UpdateEvent
-        UpdateEvent --> SetRequeueTimer
+        UpdateStatus --> RecordEvent
+        RecordEvent --> SetRequeueTimer
         SetRequeueTimer --> [*] : Return and Requeue
     }
 
@@ -93,4 +98,14 @@ stateDiagram-v2
     note left of DetermineCurrentState
         Attempts to determine the actual
         state based on resource conditions
+    end note
+
+    note right of EnsureResources
+        See separate EnsureResources diagram
+        for detailed resource creation process
+    end note
+
+    note right of FetchTemplate
+        See separate FetchTemplate diagram
+        for detailed template fetch process
     end note
