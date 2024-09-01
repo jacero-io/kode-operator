@@ -33,6 +33,21 @@ import (
 	"github.com/jacero-io/kode-operator/internal/common"
 )
 
+func (r *KodeReconciler) updatePortStatus(ctx context.Context, kode *kodev1alpha2.Kode, template *kodev1alpha2.Template) error {
+	// Fetch the latest version of Kode
+	latestKode, err := common.GetLatestKode(ctx, r.Client, kode.Name, kode.Namespace)
+	if err != nil {
+		return err
+	}
+
+	// Update the Kode port
+	err = latestKode.UpdateKodePort(ctx, r.Client, template.Port)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (r *KodeReconciler) fetchTemplatesWithRetry(ctx context.Context, kode *kodev1alpha2.Kode) (*kodev1alpha2.Template, error) {
 	var template *kodev1alpha2.Template
 	var lastErr error
