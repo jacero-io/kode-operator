@@ -14,6 +14,9 @@ on:
 jobs:
   integration-tests:
     runs-on: ubuntu-latest
+    outputs:
+      git_ref: ${{ steps.git_ref.outputs.ref }}
+      is_tag: ${{ steps.git_ref.outputs.is_tag }}
 
     steps:
     - name: Checkout code
@@ -40,6 +43,17 @@ jobs:
         task tools:envtest
         task tools:golangci-lint
 
+    - name: Get Git Ref
+      id: git_ref
+      run: |
+        if [[ $GITHUB_REF == refs/tags/* ]]; then
+          echo "ref=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          echo "is_tag=true" >> $GITHUB_OUTPUT
+        else
+          echo "ref=${GITHUB_REF#refs/heads/}" >> $GITHUB_OUTPUT
+          echo "is_tag=false" >> $GITHUB_OUTPUT
+        fi
+  
     - name: Run tests
       env:
         TEST_VERBOSITY: ""
