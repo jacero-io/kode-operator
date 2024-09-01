@@ -32,7 +32,7 @@ vars:
 
   TEST_VERBOSITY: -v
   ENV: development
-  LOG_LEVEL: info
+  LOG_LEVEL: debug
 
   IGNORE_NOT_FOUND: '{{.IGNORE_NOT_FOUND | default "false"}}'
   USE_KIND_CONTEXT: '{{.USE_KIND_CONTEXT | default "true"}}'
