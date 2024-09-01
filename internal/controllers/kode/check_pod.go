@@ -110,39 +110,6 @@ func (r *KodeReconciler) checkPodResources(ctx context.Context, kode *kodev1alph
 	}
 	log.V(1).Info("All pods are ready")
 
-	log.Info("All resources are ready")
+	log.V(1).Info("All resources are ready")
 	return true, nil
-}
-
-func (r *KodeReconciler) verifyResources(ctx context.Context, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig) error {
-	log := r.Log.WithValues("kode", types.NamespacedName{Name: kode.Name, Namespace: kode.Namespace})
-
-	// Verify Secret
-	secret := &corev1.Secret{}
-	if err := r.Client.Get(ctx, types.NamespacedName{Name: config.SecretName, Namespace: kode.Namespace}, secret); err != nil {
-		return fmt.Errorf("failed to get Secret: %w", err)
-	}
-
-	// Verify Service
-	service := &corev1.Service{}
-	if err := r.Client.Get(ctx, types.NamespacedName{Name: config.ServiceName, Namespace: kode.Namespace}, service); err != nil {
-		return fmt.Errorf("failed to get Service: %w", err)
-	}
-
-	// Verify StatefulSet
-	statefulSet := &appsv1.StatefulSet{}
-	if err := r.Client.Get(ctx, types.NamespacedName{Name: config.StatefulSetName, Namespace: kode.Namespace}, statefulSet); err != nil {
-		return fmt.Errorf("failed to get StatefulSet: %w", err)
-	}
-
-	// Verify PVC if storage is specified
-	if !config.KodeSpec.Storage.IsEmpty() {
-		pvc := &corev1.PersistentVolumeClaim{}
-		if err := r.Client.Get(ctx, types.NamespacedName{Name: config.PVCName, Namespace: kode.Namespace}, pvc); err != nil {
-			return fmt.Errorf("failed to get PersistentVolumeClaim: %w", err)
-		}
-	}
-
-	log.Info("All resources verified")
-	return nil
 }

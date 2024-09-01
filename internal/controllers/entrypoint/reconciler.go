@@ -308,6 +308,6 @@ func (r *EntryPointReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Owns(&gwapiv1.HTTPRoute{}).
 		Owns(&gwapiv1.Gateway{}).
 		Watches(&kodev1alpha2.Kode{}, &handler.EnqueueRequestForObject{}).
-		WithOptions(controller.Options{MaxConcurrentReconciles: 2}).
+		WithOptions(controller.Options{MaxConcurrentReconciles: 1}).
 		Complete(r)
 }

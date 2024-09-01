@@ -35,22 +35,7 @@ import (
 
 func (r *KodeReconciler) handlePendingState(ctx context.Context, kode *kodev1alpha2.Kode) (ctrl.Result, error) {
 	log := r.Log.WithValues("kode", client.ObjectKeyFromObject(kode))
-	log.Info("Handling Pending state")
-
-	// Update status to reflect entering Pending state
-	if kode.Status.Phase != kodev1alpha2.KodePhasePending {
-		if err := r.StatusUpdater.UpdateStatusKode(ctx, kode, kodev1alpha2.KodePhasePending, []metav1.Condition{
-			{
-				Type:    "Pending",
-				Status:  metav1.ConditionTrue,
-				Reason:  "EnteringPendingState",
-				Message: "Kode is in pending state, preparing for configuration.",
-			},
-		}, nil, "", nil); err != nil {
-			log.Error(err, "Failed to update status for Pending state")
-			return ctrl.Result{Requeue: true}, err
-		}
-	}
+	log.V(1).Info("Handling Pending state")
 
 	// Add finalizer if it doesn't exist
 	if !controllerutil.ContainsFinalizer(kode, common.KodeFinalizerName) {
@@ -85,7 +70,7 @@ func (r *KodeReconciler) handlePendingState(ctx context.Context, kode *kodev1alp
 
 func (r *KodeReconciler) handleConfiguringState(ctx context.Context, kode *kodev1alpha2.Kode) (ctrl.Result, error) {
 	log := r.Log.WithValues("kode", client.ObjectKeyFromObject(kode))
-	log.Info("Handling Configuring state")
+	log.V(1).Info("Handling Configuring state")
 
 	// Fetch the template
 	template, err := r.fetchTemplatesWithRetry(ctx, kode)
@@ -107,21 +92,7 @@ func (r *KodeReconciler) handleConfiguringState(ctx context.Context, kode *kodev
 
 func (r *KodeReconciler) handleProvisioningState(ctx context.Context, kode *kodev1alpha2.Kode) (ctrl.Result, error) {
 	log := r.Log.WithValues("kode", client.ObjectKeyFromObject(kode))
-	log.Info("Handling Provisioning state")
-
-	if kode.Status.Phase != kodev1alpha2.KodePhaseProvisioning {
-		if err := r.StatusUpdater.UpdateStatusKode(ctx, kode, kodev1alpha2.KodePhaseProvisioning, []metav1.Condition{
-			{
-				Type:    "Provisioning",
-				Status:  metav1.ConditionTrue,
-				Reason:  "EnteringProvisioningState",
-				Message: "Kode is being provisioned and are not fully operational yet.",
-			},
-		}, nil, "", nil); err != nil {
-			log.Error(err, "Failed to update status for Provisioning state")
-			return ctrl.Result{Requeue: true}, err
-		}
-	}
+	log.V(1).Info("Handling Provisioning state")
 
 	// Fetch the template
 	template, err := r.fetchTemplatesWithRetry(ctx, kode)
@@ -155,7 +126,11 @@ func (r *KodeReconciler) handleProvisioningState(ctx context.Context, kode *kode
 
 func (r *KodeReconciler) handleActiveState(ctx context.Context, kode *kodev1alpha2.Kode) (ctrl.Result, error) {
 	log := r.Log.WithValues("kode", client.ObjectKeyFromObject(kode))
-	log.Info("Handling Active state")
+	log.V(1).Info("Handling Active state")
+
+	if kode.Generation != kode.Status.ObservedGeneration {
+		return r.transitionTo(ctx, kode, kodev1alpha2.KodePhaseConfiguring)
+	}
 
 	// Fetch the template
 	template, err := r.fetchTemplatesWithRetry(ctx, kode)
@@ -177,40 +152,13 @@ func (r *KodeReconciler) handleActiveState(ctx context.Context, kode *kodev1alph
 		return r.transitionTo(ctx, kode, kodev1alpha2.KodePhaseConfiguring)
 	}
 
-	// TODO: Implement suspend logic, with config from template
-	// Check for inactivity
-	// if kode.IsInactiveFor(time.Hour * 1) {
-	//     // Transition to Inactive state
-	//     return r.transitionTo(ctx, kode, kodev1alpha2.KodePhaseInactive)
-	// }
-
-	// Update status to reflect the Active state
-	if err := r.StatusUpdater.UpdateStatusKode(ctx, kode, kodev1alpha2.KodePhaseActive, []metav1.Condition{
-		{
-			Type:    "Active",
-			Status:  metav1.ConditionTrue,
-			Reason:  "KodeRunning",
-			Message: "Kode is active and running.",
-		},
-	}, []string{"Configuring", "Pending", "ResourcesNotReady"}, "", nil); err != nil {
-		log.Error(err, "Failed to update status for Active state")
-		return ctrl.Result{Requeue: true}, err
-	}
-
 	// Requeue for regular check
 	return ctrl.Result{}, nil
 }
 
 func (r *KodeReconciler) handleInactiveState(ctx context.Context, kode *kodev1alpha2.Kode) (ctrl.Result, error) {
 	log := r.Log.WithValues("kode", client.ObjectKeyFromObject(kode))
-	log.Info("Handling Inactive state")
-
-	// TODO: Implement suspend logic, with config from template
-	// Check if there's been any recent activity
-	// if !kode.IsInactiveFor(time.Hour * 1) {
-	//     // Transition back to Active state
-	//     return r.transitionTo(ctx, kode, kodev1alpha2.KodePhaseActive)
-	// }
+	log.V(1).Info("Handling Inactive state")
 
 	// Start suspension process
 	return r.transitionTo(ctx, kode, kodev1alpha2.KodePhaseSuspending)
@@ -219,7 +167,7 @@ func (r *KodeReconciler) handleInactiveState(ctx context.Context, kode *kodev1al
 // TODO: Implement suspending logic
 func (r *KodeReconciler) handleSuspendingState(ctx context.Context, kode *kodev1alpha2.Kode) (ctrl.Result, error) {
 	log := r.Log.WithValues("kode", client.ObjectKeyFromObject(kode))
-	log.Info("Handling Suspending state")
+	log.V(1).Info("Handling Suspending state")
 	if kode.Status.Phase != kodev1alpha2.KodePhaseSuspending {
 		if err := r.StatusUpdater.UpdateStatusKode(ctx, kode, kodev1alpha2.KodePhaseSuspending, []metav1.Condition{
 			{
@@ -239,14 +187,14 @@ func (r *KodeReconciler) handleSuspendingState(ctx context.Context, kode *kodev1
 // TODO: Implement suspended logic
 func (r *KodeReconciler) handleSuspendedState(ctx context.Context, kode *kodev1alpha2.Kode) (ctrl.Result, error) {
 	log := r.Log.WithValues("kode", client.ObjectKeyFromObject(kode))
-	log.Info("Handling Suspending state")
+	log.V(1).Info("Handling Suspending state")
 	return ctrl.Result{Requeue: true}, nil
 }
 
 // TODO: Implement resuming logic
 func (r *KodeReconciler) handleResumingState(ctx context.Context, kode *kodev1alpha2.Kode) (ctrl.Result, error) {
 	log := r.Log.WithValues("kode", client.ObjectKeyFromObject(kode))
-	log.Info("Handling Suspending state")
+	log.V(1).Info("Handling Suspending state")
 	if kode.Status.Phase != kodev1alpha2.KodePhaseResuming {
 		if err := r.StatusUpdater.UpdateStatusKode(ctx, kode, kodev1alpha2.KodePhaseResuming, []metav1.Condition{
 			{
@@ -265,7 +213,7 @@ func (r *KodeReconciler) handleResumingState(ctx context.Context, kode *kodev1al
 
 func (r *KodeReconciler) handleDeletingState(ctx context.Context, kode *kodev1alpha2.Kode) (ctrl.Result, error) {
 	log := r.Log.WithValues("kode", client.ObjectKeyFromObject(kode))
-	log.Info("Handling Deleting state")
+	log.V(1).Info("Handling Deleting state")
 
 	if kode.Status.Phase != kodev1alpha2.KodePhaseDeleting {
 		if err := r.StatusUpdater.UpdateStatusKode(ctx, kode, kodev1alpha2.KodePhaseDeleting, []metav1.Condition{
@@ -295,7 +243,7 @@ func (r *KodeReconciler) handleDeletingState(ctx context.Context, kode *kodev1al
 
 func (r *KodeReconciler) handleFailedState(ctx context.Context, kode *kodev1alpha2.Kode) (ctrl.Result, error) {
 	log := r.Log.WithValues("kode", client.ObjectKeyFromObject(kode))
-	log.Info("Handling Failed state")
+	log.V(1).Info("Handling Failed state")
 
 	// Increment retry count
 	newRetryCount := kode.Status.RetryCount + 1
@@ -329,7 +277,7 @@ func (r *KodeReconciler) handleFailedState(ctx context.Context, kode *kodev1alph
 
 func (r *KodeReconciler) handleUnknownState(ctx context.Context, kode *kodev1alpha2.Kode) (ctrl.Result, error) {
 	log := r.Log.WithValues("kode", client.ObjectKeyFromObject(kode))
-	log.Info("Handling Unknown state")
+	log.V(1).Info("Handling Unknown state")
 
 	// Attempt to determine the correct state
 	currentState, err := r.determineCurrentState(ctx, kode)
@@ -376,12 +324,6 @@ func (r *KodeReconciler) determineCurrentState(ctx context.Context, kode *kodev1
 	if !resourcesReady {
 		return kodev1alpha2.KodePhaseConfiguring, nil
 	}
-
-	// TODO: Implement suspend logic, with config from template
-	// Check for inactivity
-	// if kode.IsInactiveFor(time.Hour * 1) {
-	//     return kodev1alpha2.KodePhaseInactive, nil
-	// }
 
 	// If everything is set up and ready, consider it active
 	return kodev1alpha2.KodePhaseActive, nil

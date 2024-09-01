@@ -46,6 +46,7 @@ const (
 	ReasonReconciled EventReason = "Reconciled"
 
 	// Kode event reasons
+	ReasonKodeConfiguring  EventReason = "KodeConfiguring"
 	ReasonKodeProvisioning EventReason = "KodeProvisioning"
 	ReasonKodeActive       EventReason = "KodeActive"
 	ReasonKodeSuspended    EventReason = "KodeSuspended"

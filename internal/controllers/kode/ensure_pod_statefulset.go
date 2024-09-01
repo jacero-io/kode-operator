@@ -42,6 +42,7 @@ func (r *KodeReconciler) ensureStatefulSet(ctx context.Context, kode *kodev1alph
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      config.CommonConfig.Name,
 			Namespace: config.CommonConfig.Namespace,
+			Labels:    config.CommonConfig.Labels,
 		},
 	}
 
@@ -52,7 +53,6 @@ func (r *KodeReconciler) ensureStatefulSet(ctx context.Context, kode *kodev1alph
 		}
 
 		statefulSet.Spec = constructedstatefulSet.Spec
-		statefulSet.ObjectMeta.Labels = constructedstatefulSet.ObjectMeta.Labels
 
 		return controllerutil.SetControllerReference(kode, statefulSet, r.Scheme)
 	})
@@ -92,9 +92,13 @@ func (r *KodeReconciler) constructStatefulSetSpec(config *common.KodeResourceCon
 	var initContainers []corev1.Container
 
 	if templateSpec.Type == "code-server" {
+		log.V(1).Info("Constructing CodeServer containers")
 		containers = constructCodeServerContainers(config, workspace)
+		log.V(1).Info("Constructed CodeServer containers", "containers", containers)
 	} else if templateSpec.Type == "webtop" {
+		log.V(1).Info("Constructing Webtop containers")
 		containers = constructWebtopContainers(config)
+		log.V(1).Info("Constructed Webtop containers", "containers", containers)
 	} else {
 		return nil, fmt.Errorf("unknown template type: %s", templateSpec.Type)
 	}

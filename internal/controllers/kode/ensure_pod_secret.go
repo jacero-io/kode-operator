@@ -45,7 +45,7 @@ func (r *KodeReconciler) ensureSecret(ctx context.Context, kode *kodev1alpha2.Ko
 		},
 	}
 
-	if kode.Spec.Credentials != nil && kode.Spec.Credentials.ExistingSecret != nil {
+	if config.Credentials != nil && config.Credentials.ExistingSecret != nil {
 		// ExistingSecret is specified, fetch the secret
 		err := r.ResourceManager.Get(ctx, client.ObjectKeyFromObject(secret), secret)
 		if err != nil {
