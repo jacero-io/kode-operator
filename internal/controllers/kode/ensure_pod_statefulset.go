@@ -234,20 +234,11 @@ func constructVolumesAndMounts(mountPath string, config *common.KodeResourceConf
 
 	// Only add volume and volume mount if storage is explicitly defined
 	if config.KodeSpec.Storage != nil {
-		var volumeSource corev1.VolumeSource
 
-		if config.KodeSpec.Storage.ExistingVolumeClaim != nil {
-			volumeSource = corev1.VolumeSource{
-				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: *config.KodeSpec.Storage.ExistingVolumeClaim,
-				},
-			}
-		} else {
-			volumeSource = corev1.VolumeSource{
-				PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-					ClaimName: config.PVCName,
-				},
-			}
+		volumeSource := corev1.VolumeSource{
+			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
+				ClaimName: config.PVCName,
+			},
 		}
 
 		volume := corev1.Volume{

@@ -8,8 +8,15 @@ metadata:
   name: entrypoint-sample
   namespace: default
 spec:
+  # routingType: "subdomain"
+  # baseDomain: "localhost"
+  # gatewaySpec:
+  #   existingGatewayRef:
+  #     kind: Gateway
+  #     name: eg
+  #     namespace: default
   routingType: "subdomain"
-  baseDomain: "localhost"
+  baseDomain: "gon1.larnet.eu"
   gatewaySpec:
     existingGatewayRef:
       kind: Gateway

@@ -60,7 +60,7 @@ func NewDefaultCleanupManager(client client.Client, log logr.Logger) CleanupMana
 }
 
 func (m *defaultCleanupManager) Cleanup(ctx context.Context, resource CleanupableResource) error {
-	log := m.log.WithValues("resource", resource)
+	log := m.log.WithValues("cleanup", "manager")
 	log.Info("Starting cleanup of resources")
 
 	resources := resource.GetResources()

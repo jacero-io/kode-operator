@@ -63,7 +63,7 @@ tasks:
       - generate
 
   build-installer:
-    desc: Generate a consolidated YAML with CRDs and deployment, excluding Prometheus components
+    desc: Generate a consolidated YAML with CRDs and deployment manifests
     deps:
       - tools:ensure-dir
       - manifests

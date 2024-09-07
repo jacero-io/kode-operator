@@ -44,21 +44,21 @@ func (r *EntryPointReconciler) ensureHTTPRoutes(ctx context.Context, entrypoint 
 	var httpsRouteName string
 
 	// Construct HTTP Route
-	httpRoute, err := r.constructHTTPRoute(config, kode, false, kodeHostname, kodeDomain)
-	if err != nil {
-		return false, fmt.Errorf("failed to construct HTTP route: %v", err)
-	}
-	routes = append(routes, httpRoute)
+	// httpRoute, err := r.constructHTTPRoute(config, kode, true, kodeHostname, kodeDomain)
+	// if err != nil {
+	// 	return false, fmt.Errorf("failed to construct HTTP route: %v", err)
+	// }
+	// routes = append(routes, httpRoute)
 
 	// Construct HTTPS Route
-	if config.IsHTTPS() {
-		httpsRoute, err := r.constructHTTPRoute(config, kode, true, kodeHostname, kodeDomain)
-		if err != nil {
-			return false, fmt.Errorf("failed to construct HTTPS route: %v", err)
-		}
-		routes = append(routes, httpsRoute)
-		httpsRouteName = httpsRoute.Name
+	// if config.IsHTTPS() {}
+	httpsRoute, err := r.constructHTTPRoute(config, kode, false, kodeHostname, kodeDomain)
+	if err != nil {
+		return false, fmt.Errorf("failed to construct HTTPS route: %v", err)
 	}
+	routes = append(routes, httpsRoute)
+	httpsRouteName = httpsRoute.Name
+
 
 	created := false // Flag to indicate if any HTTPRoute was created
 
@@ -124,13 +124,15 @@ func (r *EntryPointReconciler) ensureHTTPRoutes(ctx context.Context, entrypoint 
 	return created, nil
 }
 
-func (r *EntryPointReconciler) constructHTTPRoute(config *common.EntryPointResourceConfig, kode *kodev1alpha2.Kode, isHTTPS bool, kodeHostname kodev1alpha2.KodeHostname, kodeDomain kodev1alpha2.KodeDomain) (*gwapiv1.HTTPRoute, error) {
+func (r *EntryPointReconciler) constructHTTPRoute(config *common.EntryPointResourceConfig, kode *kodev1alpha2.Kode, isRedirect bool, kodeHostname kodev1alpha2.KodeHostname, kodeDomain kodev1alpha2.KodeDomain) (*gwapiv1.HTTPRoute, error) {
 	log := r.Log.WithName("HTTPRouteConstructor").WithValues("entrypoint", common.ObjectKeyFromConfig(config.CommonConfig))
-	log.V(1).Info("Constructing HTTPRoute", "isHTTPS", isHTTPS)
+	log.V(1).Info("Constructing HTTPRoute", "isRedirect", isRedirect)
 
+	// Construct ParentReference
 	namespace := gwapiv1.Namespace(config.GatewayNamespace)
+	gatewayName := gwapiv1.ObjectName(config.GatewayName)
 	parentRef := gwapiv1.ParentReference{
-		Name:      gwapiv1.ObjectName(config.GatewayName),
+		Name:      gatewayName,
 		Namespace: &namespace,
 	}
 
@@ -141,7 +143,19 @@ func (r *EntryPointReconciler) constructHTTPRoute(config *common.EntryPointResou
 	}
 	kodePort := gwapiv1.PortNumber(kode.GetPort())
 
-	if isHTTPS {
+	if isRedirect {
+		routeName = fmt.Sprintf("%s-tls-redirect", kode.Name)
+		httpsScheme := string(config.Protocol)
+
+		rules = []gwapiv1.HTTPRouteRule{{
+			Filters: []gwapiv1.HTTPRouteFilter{{
+				Type: gwapiv1.HTTPRouteFilterRequestRedirect,
+				RequestRedirect: &gwapiv1.HTTPRequestRedirectFilter{
+					Scheme: &httpsScheme,
+				},
+			}},
+		}}
+	} else {
 		pathMatchType := gwapiv1.PathMatchPathPrefix
 		pathString := "/"
 		service := gwapiv1.Kind("Service")
@@ -170,21 +184,9 @@ func (r *EntryPointReconciler) constructHTTPRoute(config *common.EntryPointResou
 				}},
 			}}
 		}
-	} else {
-		routeName = fmt.Sprintf("%s-tls-redirect", kode.Name)
-		httpsScheme := string(config.Protocol)
-
-		rules = []gwapiv1.HTTPRouteRule{{
-			Filters: []gwapiv1.HTTPRouteFilter{{
-				Type: gwapiv1.HTTPRouteFilterRequestRedirect,
-				RequestRedirect: &gwapiv1.HTTPRequestRedirectFilter{
-					Scheme: &httpsScheme,
-				},
-			}},
-		}}
 	}
 
-	log.Info("Constructed HTTPRoute", "name", routeName, "hostname", kodeHostname, "rules", rules)
+	log.Info("Constructed HTTPRoute", "name", routeName, "hostname", kodeHostname, "domain", kodeDomain, "port", kodePort, "isRedirect", isRedirect, "protocol", config.Protocol, "rules", rules)
 
 	return &gwapiv1.HTTPRoute{
 		ObjectMeta: metav1.ObjectMeta{

@@ -16,6 +16,8 @@ spec:
     kind: PodTemplate
     name: podtemplate-codeserver-sample
     namespace: default
+  storage:
+    existingVolumeClaim: kode1-existing-pvc
   # storage:
   #   accessModes:
   #     - ReadWriteOnce
@@ -23,3 +25,15 @@ spec:
   #     requests:
   #       storage: 1Gi
   #   storageClassName: standard
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: kode1-existing-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: openebs-hostpath-home-media
+  resources:
+    requests:
+      storage: 50Gi
