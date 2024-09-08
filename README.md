@@ -19,9 +19,9 @@ Kode is a cloud-native development environment hosted inside a kubernetes cluste
 
 Kode-Operator is a Kubernetes operator that manages the entire lifecycle of various ephemeral and semi-ephemeral development environments. It integrates a comprehensive suite of security tools (Falco, Envoy proxy) and observability standards (OpenTelemetry), ensuring robust security and transparency.
 
-Currently, Kode-Operator supports Code-server, Webtop environments, with plans to support more in the future (eg. Jupyter). It is also easily extendable to support other environments and tools beyond those listed.
+Currently, Kode-Operator supports Code-server, Webtop environments, with plans to support more in the future (eg. Jupyter). It is also relatively easily extendable to support other environments and tools beyond those listed. It supports containerd as kubernetes runtime with plans to include kata containers in the future.
 
-The project has planned to manage in-cluster virtual machines using [Virtink](https://github.com/smartxworks/virtink) or external resources with Tofu/Terraform using [tofu-controller](https://github.com/flux-iac/tofu-controller)
+The project has planned to manage in-cluster virtual machines using [Virtink](https://github.com/smartxworks/virtink) or [KubeVirt](https://kubevirt.io/) or external resources with Tofu/Terraform using [tofu-controller](https://github.com/flux-iac/tofu-controller).
 
 ## Description
 
@@ -32,8 +32,9 @@ Kode-Operator simplifies the setup and management of development environments on
 * Define your development environments using CRDs for consistent and repeatable setups.
 * Integrated security tools like Falco and Envoy proxy protect your environments.
 * OpenTelemetry standards provide deep insights.
-* Manage a variety of development environments such as Code-server, Webtop, Jupyter.
-* Easily extendable to support additional environments and tools beyond the current offerings.
+* Manage a variety of development environments such as Code-server, Webtop, and Jupyter.
+* Easily choose between different runtimes (e.g. containerd, kata/firecracker, or kubevirt)
+* Easily extendable to support additional environments and tools beyond the current ones.
 * Customize your development environment beforehand by building your own images or inject scripts into the Kode instance using [init plugins]().
 
 ## Key Concepts
