@@ -62,6 +62,7 @@ tasks:
     desc: Deploy controller to the specified cluster (Kind or remote)
     deps:
       - build:build-installer
+      - build:docker-build
     vars:
       DEPLOY_TYPE: '{{if eq .USE_KIND_CONTEXT "true"}}kind{{else}}remote{{end}}'
     cmds:
