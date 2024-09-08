@@ -29,6 +29,14 @@ func InitEntryPointResourcesConfig(entryPoint *kodev1alpha2.EntryPoint) *common.
 
 	var protocol kodev1alpha2.Protocol
 	var identityReference kodev1alpha2.IdentityReference
+	var gatewayName string
+
+	if entryPoint.Spec.GatewaySpec.ExistingGatewayRef != nil {
+		gatewayName = string(entryPoint.Spec.GatewaySpec.ExistingGatewayRef.Name)
+	} else {
+		gatewayName = fmt.Sprintf("%s-gateway", entryPoint.Name)
+	}
+
 
 	if entryPoint.Spec.GatewaySpec != nil && entryPoint.Spec.GatewaySpec.CertificateRefs != nil {
 		protocol = kodev1alpha2.ProtocolHTTPS
@@ -48,7 +56,7 @@ func InitEntryPointResourcesConfig(entryPoint *kodev1alpha2.EntryPoint) *common.
 		},
 		EntryPointSpec: entryPoint.Spec,
 
-		GatewayName:      fmt.Sprintf("%s-gateway", entryPoint.Name),
+		GatewayName:      gatewayName,
 		GatewayNamespace: entryPoint.Namespace,
 
 		Protocol:          protocol,

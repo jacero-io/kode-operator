@@ -59,17 +59,6 @@ tasks:
     cmds:
       - task --list
 
-  set-context:
-    internal: true
-    cmds:
-      - |
-        if [ "{{.USE_KIND_CONTEXT}}" = "true" ]; then
-          echo "Using Kind context..."
-          kubectl config use-context {{.KIND_CONTEXT}}
-        else
-          echo "Using existing kubecontext..."
-        fi
-
   fmt:
     desc: Run go fmt
     cmds:

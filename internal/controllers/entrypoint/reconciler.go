@@ -194,7 +194,7 @@ func (r *EntryPointReconciler) reconcileKode(ctx context.Context, kode *kodev1al
 	if err != nil {
 		return r.handleReconcileError(ctx, kode, entryPoint, err, "Failed to construct Kode URL")
 	}
-	log.V(1).Info("Constructed Kode URL", "hostname", kodeHostname, "domain", kodeDomain, "url", kodeUrl, "path", kodePath)
+	log.V(1).Info("Constructed Kode URL", "hostname", kodeHostname, "domain", kodeDomain, "url", kodeUrl, "path", kodePath, "protocol", config.Protocol)
 
 	// Check Kode Port
 	kodePort := kode.GetPort()

@@ -89,7 +89,6 @@ func (r *KodeReconciler) ensurePodResources(ctx context.Context, kode *kodev1alp
 			return err
 		}
 
-		resizeSupported, err = r.checkCSIResizeCapability(ctx, pvc)
 		if err != nil {
 			log.Error(err, "Failed to check CSI resize capability")
 			eventMessage := "Failed to check CSI resize capability after PVC creation"

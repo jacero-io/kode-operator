@@ -337,16 +337,16 @@ func (k *Kode) GenerateKodeUrlForEntryPoint(
 	var kodeUrl KodeUrl
 
 	if routingType == RoutingTypeSubdomain {
-		kodeDomain = KodeDomain(fmt.Sprintf("%s.%s", name, domain))
+		kodeDomain = KodeDomain(fmt.Sprintf("%s.%s", name, domain)) // eg. my-workspace.kode.dev
 		kodePath = "/"
-		kodeUrl = KodeUrl(fmt.Sprintf("%s://%s%s", protocol, kodeDomain, kodePath))
+		kodeUrl = KodeUrl(fmt.Sprintf("%s://%s%s", protocol, kodeDomain, kodePath)) // eg. https://my-workspace.kode.dev/
 
 		return KodeHostname(name), kodeDomain, kodeUrl, kodePath, nil
 
 	} else if routingType == RoutingTypePath {
-		kodeDomain = KodeDomain(domain)
-		kodePath = KodePath(fmt.Sprintf("/%s", name))
-		kodeUrl = KodeUrl(fmt.Sprintf("%s://%s%s", protocol, kodeDomain, kodePath))
+		kodeDomain = KodeDomain(domain) // eg. kode.dev
+		kodePath = KodePath(fmt.Sprintf("/%s", name)) // eg. /my-workspace
+		kodeUrl = KodeUrl(fmt.Sprintf("%s://%s%s", protocol, kodeDomain, kodePath)) // eg. https://kode.dev/my-workspace
 
 		return KodeHostname(name), kodeDomain, kodeUrl, kodePath, nil
 

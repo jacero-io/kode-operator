@@ -92,37 +92,38 @@ tasks:
         msg: "Chart package kode-crd-{{.VERSION}}.tgz not found. Please run 'task package-kode-crd' first."
 
   manage-kode:
-    desc: Install or uninstall kode Helm chart on the cluster
-    vars:
-      RELEASE_NAME: 'kode'
-      NAMESPACE: 'kode-system'
-      VERSION: '{{.VERSION | default "v0.0.0-latest"}}'
-      ACTION: '{{.ACTION | default "install"}}'
-      CONTROLLER_IMAGE_REPO: '{{.CONTROLLER_IMAGE_REPO}}'
-      CONTROLLER_IMAGE_TAG: '{{.CONTROLLER_IMAGE_TAG}}'
-    cmds:
-      - |
-        if [ "{{.ACTION}}" = "install" ]; then
-          echo "Installing/upgrading kode chart version {{.VERSION}} onto the cluster..."
-          helm upgrade --install {{.RELEASE_NAME}} {{.ROOT_DIR}}/kode-{{.VERSION}}.tgz \
-            --namespace {{.NAMESPACE}} \
-            --create-namespace \
-            --set controllerManager.manager.image.repository={{.CONTROLLER_IMAGE_REPO}} \
-            --set controllerManager.manager.image.tag={{.CONTROLLER_IMAGE_TAG}} \
-            --wait \
-            --timeout 5m
-          echo "kode chart version {{.VERSION}} installed/upgraded successfully as release {{.RELEASE_NAME}} in namespace {{.NAMESPACE}} with controller image tag {{.CONTROLLER_IMAGE_TAG}}"
-        elif [ "{{.ACTION}}" = "uninstall" ]; then
-          echo "Uninstalling kode chart release {{.RELEASE_NAME}} from namespace {{.NAMESPACE}}..."
-          helm uninstall {{.RELEASE_NAME}} --namespace {{.NAMESPACE}} || true
-          echo "kode chart release {{.RELEASE_NAME}} uninstalled from namespace {{.NAMESPACE}}"
-        else
-          echo "Invalid ACTION: {{.ACTION}}. Use 'install' or 'uninstall'."
-          exit 1
-        fi
-    preconditions:
-      - sh: '[ "{{.ACTION}}" = "uninstall" ] || test -f {{.ROOT_DIR}}/kode-{{.VERSION}}.tgz'
-        msg: "Chart package kode-{{.VERSION}}.tgz not found. Please run 'task package-kode' first."
+      desc: Install or uninstall kode Helm chart on the cluster
+      vars:
+        RELEASE_NAME: 'kode'
+        NAMESPACE: 'kode-system'
+        VERSION: '{{.VERSION | default "v0.0.0-latest"}}'
+        ACTION: '{{.ACTION | default "install"}}'
+        CONTROLLER_IMAGE_REPO: '{{.CONTROLLER_IMAGE_REPO}}'
+        CONTROLLER_IMAGE_TAG: '{{.CONTROLLER_IMAGE_TAG}}'
+      cmds:
+        - |
+          if [ "{{.ACTION}}" = "install" ]; then
+            echo "Installing/upgrading kode chart version {{.VERSION}} onto the cluster..."
+            helm upgrade --install {{.RELEASE_NAME}} {{.ROOT_DIR}}/kode-{{.VERSION}}.tgz \
+              --namespace {{.NAMESPACE}} \
+              --create-namespace \
+              --set controllerManager.manager.image.repository={{.CONTROLLER_IMAGE_REPO}} \
+              --set controllerManager.manager.image.tag={{.CONTROLLER_IMAGE_TAG}} \
+              --set controllerManager.manager.imagePullPolicy=Always \
+              --wait \
+              --timeout 5m
+            echo "kode chart version {{.VERSION}} installed/upgraded successfully as release {{.RELEASE_NAME}} in namespace {{.NAMESPACE}} with controller image tag {{.CONTROLLER_IMAGE_TAG}}"
+          elif [ "{{.ACTION}}" = "uninstall" ]; then
+            echo "Uninstalling kode chart release {{.RELEASE_NAME}} from namespace {{.NAMESPACE}}..."
+            helm uninstall {{.RELEASE_NAME}} --namespace {{.NAMESPACE}} || true
+            echo "kode chart release {{.RELEASE_NAME}} uninstalled from namespace {{.NAMESPACE}}"
+          else
+            echo "Invalid ACTION: {{.ACTION}}. Use 'install' or 'uninstall'."
+            exit 1
+          fi
+      preconditions:
+        - sh: '[ "{{.ACTION}}" = "uninstall" ] || test -f {{.ROOT_DIR}}/kode-{{.VERSION}}.tgz'
+          msg: "Chart package kode-{{.VERSION}}.tgz not found. Please run 'task package-kode' first."
 
   manage:
     desc: Install or uninstall all kode Helm charts on the cluster

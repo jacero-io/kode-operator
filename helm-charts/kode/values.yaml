@@ -10,6 +10,7 @@ controllerManager:
     image:
       repository: ghcr.io/jacero-io/kode-operator
       tag: v0.0.0-latest
+    imagePullPolicy: IfNotPresent
     resources:
       limits:
         cpu: 500m

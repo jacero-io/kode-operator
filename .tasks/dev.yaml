@@ -45,6 +45,9 @@ tasks:
 
   install:
     desc: Install CRDs into the cluster (Kind by default, or existing kubecontext)
+    deps:
+      - build:build-installer
+      - tools:kustomize
     cmds:
       - task: clusters:set-context
       - '{{.KUSTOMIZE_CMD}} build {{.ROOT_DIR}}/config/crd | {{.KUBECTL}} apply -f -'

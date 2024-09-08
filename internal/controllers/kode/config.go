@@ -29,6 +29,7 @@ func InitKodeResourcesConfig(
 	var credentials *kodev1alpha2.CredentialsSpec
 	var kodePort *kodev1alpha2.Port
 	var secretName string
+	var pvcName string
 
 	// If ExistingSecret is specified, use it
 	if kode.Spec.Credentials != nil && kode.Spec.Credentials.ExistingSecret != nil {
@@ -45,9 +46,14 @@ func InitKodeResourcesConfig(
 		credentials = kode.Spec.Credentials
 	}
 
+	if kode.Spec.Storage != nil && kode.Spec.Storage.ExistingVolumeClaim != nil {
+		pvcName = *kode.Spec.Storage.ExistingVolumeClaim
+	} else {
+		pvcName = kode.GetPVCName()
+	}
+
 	kodePort = &template.Port
 
-	pvcName := kode.GetPVCName()
 	serviceName := kode.GetServiceName()
 
 	return &common.KodeResourceConfig{

@@ -19,6 +19,7 @@ tasks:
         else
           echo "Using existing kubecontext..."
         fi
+    silent: true
 
   kind-ensure:
     desc: |
@@ -35,6 +36,7 @@ tasks:
       Note:
         This task will set the kubectl context to the newly created or existing Kind cluster.
     cmds:
+      - task: set-context
       - |
         if ! kind get clusters | grep -q '^{{.KIND_CLUSTER_NAME}}$'; then
           echo "Creating Kind cluster '{{.KIND_CLUSTER_NAME}}'..."
@@ -42,17 +44,17 @@ tasks:
         else
           echo "Kind cluster '{{.KIND_CLUSTER_NAME}}' already exists."
         fi
-      - task: set-context
 
   kind-create:
     desc: Create a Kind cluster
     cmds:
-      - kind create cluster --name {{.KIND_CLUSTER_NAME}} --image kindest/node:v{{.ENVTEST_K8S_VERSION}}
       - task: set-context
+      - kind create cluster --name {{.KIND_CLUSTER_NAME}} --image kindest/node:v{{.ENVTEST_K8S_VERSION}}
 
   kind-destroy:
     desc: Delete the Kind cluster
     cmds:
+      - task: set-context
       - kind delete cluster --name {{.KIND_CLUSTER_NAME}}
 
   kind-start:
@@ -68,6 +70,7 @@ tasks:
   kind-load-image:
     desc: Load a Docker image into the Kind cluster
     cmds:
+      - task: set-context
       - |
         if ! docker image inspect {{.IMG}} &> /dev/null; then
           echo "Error: Image {{.IMG}} not found locally. Please build or pull the image first."
@@ -98,6 +101,7 @@ tasks:
         - linuxserver/code-server:latest
         - linuxserver/webtop:debian-xfce
     cmds:
+      - task: set-context
       - |
         if [ "{{.USE_KIND_CONTEXT}}" = "true" ]; then
           echo "Using Kind context..."
@@ -117,11 +121,12 @@ tasks:
 
   deploy-kind:
     internal: true
+    deps:
+      - build:docker-build
+      - build:build-installer
     cmds:
-      - echo "Using Kind cluster..."
       - task: set-context
-      - echo "Preparing for Kind deployment..."
-      - task: build:docker-build
+      - echo "Deploying to Kind cluster..."
       - 'kubectl apply -f {{.ROOT_DIR}}/dist/install.yaml'
 
   undeploy-kind:
@@ -133,8 +138,11 @@ tasks:
 
   deploy-remote:
     internal: true
+    deps:
+      - build:docker-build
+      - build:build-installer
     cmds:
-      - echo "Using remote cluster. Ensure the image is built and pushed by the GitHub workflow."
+      - echo "Using remote cluster. Ensure the image is built."
       - '{{.KUBECTL}} apply -f {{.ROOT_DIR}}/dist/install.yaml'
 
   undeploy-remote:
