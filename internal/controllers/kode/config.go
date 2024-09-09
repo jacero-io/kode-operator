@@ -34,7 +34,7 @@ func InitKodeResourcesConfig(
 	// If ExistingSecret is specified, use it
 	if kode.Spec.Credentials != nil && kode.Spec.Credentials.ExistingSecret != nil {
 		secretName = *kode.Spec.Credentials.ExistingSecret
-	} else { // If ExistingSecret is not specified, use Kode.Name
+	} else { // If ExistingSecret is not specified, use Kode secret name
 		secretName = kode.GetSecretName()
 	}
 
