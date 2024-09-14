@@ -20,6 +20,7 @@ import (
 	"time"
 
 	egv1alpha1 "github.com/envoyproxy/gateway/api/v1alpha1"
+	"github.com/jacero-io/kode-operator/internal/constants"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	gwapiv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
@@ -201,38 +202,45 @@ func init() {
 	SchemeBuilder.Register(&EntryPoint{}, &EntryPointList{})
 }
 
-func (e *EntryPoint) IsActive() bool {
-	return e.Status.Phase == EntryPointPhaseActive
-}
-
-func (e *EntryPoint) SetCondition(conditionType string, status metav1.ConditionStatus, reason, message string) {
+func (k *EntryPoint) SetCondition(conditionType constants.ConditionType, status metav1.ConditionStatus, reason, message string) {
 	newCondition := metav1.Condition{
-		Type:               conditionType,
+		Type:               string(conditionType),
 		Status:             status,
 		Reason:             reason,
 		Message:            message,
 		LastTransitionTime: metav1.NewTime(time.Now()),
 	}
 
-	for i, condition := range e.Status.Conditions {
-		if condition.Type == conditionType {
+	// Update existing condition if it exists
+	for i, condition := range k.Status.Conditions {
+		if condition.Type == string(conditionType) {
 			if condition.Status != status {
-				e.Status.Conditions[i] = newCondition
+				k.Status.Conditions[i] = newCondition
 			}
 			return
 		}
 	}
 
-	e.Status.Conditions = append(e.Status.Conditions, newCondition)
+	k.Status.Conditions = append(k.Status.Conditions, newCondition)
 }
 
-func (e *EntryPoint) GetCondition(conditionType string) *metav1.Condition {
-	for _, condition := range e.Status.Conditions {
-		if condition.Type == conditionType {
+func (k *EntryPoint) GetCondition(conditionType constants.ConditionType) *metav1.Condition {
+	for _, condition := range k.Status.Conditions {
+		if condition.Type == string(conditionType) {
 			return &condition
 		}
 	}
 	return nil
+}
+
+func (k *EntryPoint) DeleteCondition(conditionType constants.ConditionType) {
+	conditions := []metav1.Condition{}
+	for _, condition := range k.Status.Conditions {
+		if condition.Type != string(conditionType) {
+			conditions = append(conditions, condition)
+		}
+	}
+	k.Status.Conditions = conditions
 }
 
 func (e *EntryPoint) IsSubdomainRouting() bool {

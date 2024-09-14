@@ -22,7 +22,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/jacero-io/kode-operator/internal/common"
+	"github.com/jacero-io/kode-operator/internal/constants"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -32,7 +32,7 @@ import (
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 )
 
-var _ = Describe("Kode Controller PodTemplate Integration", Ordered, func() {
+var _ = Describe("Kode Controller ContainerTemplate Integration", Ordered, func() {
 
 	DescribeTable("Kode resource creation",
 		func(templateName string, templateType string, expectedContainerCount int, exposePort int32) {
@@ -74,11 +74,11 @@ var _ = Describe("Kode Controller PodTemplate Integration", Ordered, func() {
 			Expect(createdStatefulSet.Spec.Template.Spec.Containers).To(HaveLen(expectedContainerCount))
 
 			if templateType == "code-server" {
-				Expect(createdStatefulSet.Spec.Template.Spec.Containers[0].Image).To(Equal(podTemplateImageCodeServer))
+				Expect(createdStatefulSet.Spec.Template.Spec.Containers[0].Image).To(Equal(containerTemplateImageCodeServer))
 				// Expect(createdStatefulSet.Spec.Template.Spec.Containers[0].Env).To(ContainElement(corev1.EnvVar{Name: "DEFAULT_WORKSPACE", Value: "/config/workspace"}))
 				Expect(createdStatefulSet.Spec.Template.Spec.Containers[0].Env).To(ContainElement(corev1.EnvVar{Name: "USERNAME", Value: "abc"}))
 			} else if templateType == "webtop" {
-				Expect(createdStatefulSet.Spec.Template.Spec.Containers[0].Image).To(Equal(podTemplateImageWebtop))
+				Expect(createdStatefulSet.Spec.Template.Spec.Containers[0].Image).To(Equal(containerTemplateImageWebtop))
 				Expect(createdStatefulSet.Spec.Template.Spec.Containers[0].Env).To(ContainElement(corev1.EnvVar{Name: "CUSTOM_USER", Value: "abc"}))
 			}
 
@@ -98,13 +98,13 @@ var _ = Describe("Kode Controller PodTemplate Integration", Ordered, func() {
 
 			// Check if the PVC is mounted in the StatefulSet
 			volumeMount := corev1.VolumeMount{
-				Name:      common.KodeVolumeStorageName,
+				Name:      constants.KodeVolumeStorageName,
 				MountPath: "/config",
 			}
 			Expect(createdStatefulSet.Spec.Template.Spec.Containers[0].VolumeMounts).To(ContainElement(volumeMount))
 
 			volume := corev1.Volume{
-				Name: common.KodeVolumeStorageName,
+				Name: constants.KodeVolumeStorageName,
 				VolumeSource: corev1.VolumeSource{
 					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 						ClaimName: pvcName,
@@ -152,8 +152,8 @@ var _ = Describe("Kode Controller PodTemplate Integration", Ordered, func() {
 				return nil
 			}, timeout, interval).Should(Succeed(), "Failed to clean up all resources")
 		},
-		Entry("code-server", podTemplateNameCodeServer, "code-server", 1, int32(8000)),
-		Entry("webtop", podTemplateNameWebtop, "webtop", 1, int32(8000)),
+		Entry("code-server", containerTemplateNameCodeServer, "code-server", 1, int32(8000)),
+		Entry("webtop", containerTemplateNameWebtop, "webtop", 1, int32(8000)),
 	)
 
 	It("should not create a PersistentVolumeClaim when storage is not specified", func() {
@@ -167,7 +167,7 @@ var _ = Describe("Kode Controller PodTemplate Integration", Ordered, func() {
 		}
 
 		// Create Kode resource
-		kode := createKode(kodeName, namespace.Name, podTemplateNameCodeServer, credentials, nil) // No storage
+		kode := createKode(kodeName, namespace.Name, containerTemplateNameCodeServer, credentials, nil) // No storage
 		Expect(k8sClient.Create(ctx, kode)).To(Succeed())
 
 		// Check StatefulSet
@@ -178,8 +178,8 @@ var _ = Describe("Kode Controller PodTemplate Integration", Ordered, func() {
 		}, timeout, interval).Should(Succeed())
 
 		// Ensure no PVC-related volume or volumeMount exists
-		Expect(createdStatefulSet.Spec.Template.Spec.Volumes).NotTo(ContainElement(HaveField("Name", common.KodeVolumeStorageName)))
-		Expect(createdStatefulSet.Spec.Template.Spec.Containers[0].VolumeMounts).NotTo(ContainElement(HaveField("Name", common.KodeVolumeStorageName)))
+		Expect(createdStatefulSet.Spec.Template.Spec.Volumes).NotTo(ContainElement(HaveField("Name", constants.KodeVolumeStorageName)))
+		Expect(createdStatefulSet.Spec.Template.Spec.Containers[0].VolumeMounts).NotTo(ContainElement(HaveField("Name", constants.KodeVolumeStorageName)))
 
 		// Check that PVC doesn't exist
 		pvcName := fmt.Sprintf("%s-pvc", kodeName)
@@ -200,7 +200,7 @@ var _ = Describe("Kode Controller PodTemplate Integration", Ordered, func() {
 		kodeName := "kode-default-credentials"
 
 		// Create Kode resource
-		kode := createKode(kodeName, namespace.Name, podTemplateNameCodeServer, nil, nil) // No credentials
+		kode := createKode(kodeName, namespace.Name, containerTemplateNameCodeServer, nil, nil) // No credentials
 		Expect(k8sClient.Create(ctx, kode)).To(Succeed())
 
 		// Check Secret
@@ -212,7 +212,7 @@ var _ = Describe("Kode Controller PodTemplate Integration", Ordered, func() {
 		}, timeout, interval).Should(Succeed())
 
 		Expect(createdSecret.Name).To(Equal(secretName))
-		Expect(createdSecret.Data).To(HaveKeyWithValue("username", []byte(common.Username)))
+		Expect(createdSecret.Data).To(HaveKeyWithValue("username", []byte(constants.Username)))
 
 		// Cleanup
 		Expect(k8sClient.Delete(ctx, kode)).To(Succeed())
@@ -236,7 +236,7 @@ var _ = Describe("Kode Controller Update Integration", func() {
 			}
 
 			// Create initial Kode resource
-			initialKode := createKode(kodeName, namespace.Name, podTemplateNameCodeServer, credentials, nil)
+			initialKode := createKode(kodeName, namespace.Name, containerTemplateNameCodeServer, credentials, nil)
 			Expect(k8sClient.Create(ctx, initialKode)).To(Succeed())
 
 			kodeNamespacedName := types.NamespacedName{Name: kodeName, Namespace: namespace.Name}

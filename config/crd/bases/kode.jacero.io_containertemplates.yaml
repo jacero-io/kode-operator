@@ -1,24 +1,23 @@
+---
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
-  name: podtemplates.kode.jacero.io
   annotations:
     controller-gen.kubebuilder.io/version: v0.16.0
-  labels:
-  {{- include "kode-crd.labels" . | nindent 4 }}
+  name: containertemplates.kode.jacero.io
 spec:
   group: kode.jacero.io
   names:
-    kind: PodTemplate
-    listKind: PodTemplateList
-    plural: podtemplates
-    singular: podtemplate
+    kind: ContainerTemplate
+    listKind: ContainerTemplateList
+    plural: containertemplates
+    singular: containertemplate
   scope: Namespaced
   versions:
   - name: v1alpha2
     schema:
       openAPIV3Schema:
-        description: PodTemplate is the Schema for the podtemplates API
+        description: ContainerTemplate is the Schema for the ContainerTemplates API
         properties:
           apiVersion:
             description: |-
@@ -38,7 +37,7 @@ spec:
           metadata:
             type: object
           spec:
-            description: PodTemplateSpec defines the desired state of ClusterKodeContainer
+            description: ContainerTemplateSpec defines the desired state of ClusterKodeContainer
             properties:
               allowPrivileged:
                 default: false
@@ -59,7 +58,8 @@ spec:
                 properties:
                   enableBuiltinAuth:
                     default: false
-                    description: EnableBuiltinAuth enables the built-in HTTP Basic auth.
+                    description: EnableBuiltinAuth enables the built-in HTTP Basic
+                      auth.
                     type: boolean
                   existingSecret:
                     description: |-
@@ -67,8 +67,8 @@ spec:
                       MUST set "username" and "password" in lowercase in the secret. CAN set either "username" or "password" or both.
                     type: string
                   password:
-                    description: HTTP Basic auth password. If unset, there will be no
-                      authentication.
+                    description: HTTP Basic auth password. If unset, there will be
+                      no authentication.
                     type: string
                   username:
                     description: Is both the the HTTP Basic auth username (when used)
@@ -215,8 +215,8 @@ spec:
                             spec.nodeName, spec.serviceAccountName, status.hostIP, status.podIP, status.podIPs.
                           properties:
                             apiVersion:
-                              description: Version of the schema the FieldPath is written
-                                in terms of, defaults to "v1".
+                              description: Version of the schema the FieldPath is
+                                written in terms of, defaults to "v1".
                               type: string
                             fieldPath:
                               description: Path of the field to select in the specified
@@ -232,8 +232,8 @@ spec:
                             (limits.cpu, limits.memory, limits.ephemeral-storage, requests.cpu, requests.memory and requests.ephemeral-storage) are currently supported.
                           properties:
                             containerName:
-                              description: 'Container name: required for volumes, optional
-                                for env vars'
+                              description: 'Container name: required for volumes,
+                                optional for env vars'
                               type: string
                             divisor:
                               anyOf:
@@ -312,8 +312,8 @@ spec:
                           in a Container.
                         properties:
                           name:
-                            description: Name of the environment variable. Must be a
-                              C_IDENTIFIER.
+                            description: Name of the environment variable. Must be
+                              a C_IDENTIFIER.
                             type: string
                           value:
                             description: |-
@@ -347,8 +347,8 @@ spec:
                                       More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                                     type: string
                                   optional:
-                                    description: Specify whether the ConfigMap or its
-                                      key must be defined
+                                    description: Specify whether the ConfigMap or
+                                      its key must be defined
                                     type: boolean
                                 required:
                                 - key
@@ -413,8 +413,8 @@ spec:
                                       More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                                     type: string
                                   optional:
-                                    description: Specify whether the Secret or its key
-                                      must be defined
+                                    description: Specify whether the Secret or its
+                                      key must be defined
                                     type: boolean
                                 required:
                                 - key
@@ -429,8 +429,8 @@ spec:
                       description: The environment variables taken from a Secret or
                         ConfigMap for the main container.
                       items:
-                        description: EnvFromSource represents the source of a set of
-                          ConfigMaps
+                        description: EnvFromSource represents the source of a set
+                          of ConfigMaps
                         properties:
                           configMapRef:
                             description: The ConfigMap to select from
@@ -445,13 +445,14 @@ spec:
                                   More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names
                                 type: string
                               optional:
-                                description: Specify whether the ConfigMap must be defined
+                                description: Specify whether the ConfigMap must be
+                                  defined
                                 type: boolean
                             type: object
                             x-kubernetes-map-type: atomic
                           prefix:
-                            description: An optional identifier to prepend to each key
-                              in the ConfigMap. Must be a C_IDENTIFIER.
+                            description: An optional identifier to prepend to each
+                              key in the ConfigMap. Must be a C_IDENTIFIER.
                             type: string
                           secretRef:
                             description: The Secret to select from
@@ -482,8 +483,8 @@ spec:
                       description: The volume mounts for the container. Can be used
                         to mount a ConfigMap or Secret.
                       items:
-                        description: VolumeMount describes a mounting of a Volume within
-                          a container.
+                        description: VolumeMount describes a mounting of a Volume
+                          within a container.
                         properties:
                           mountPath:
                             description: |-
@@ -511,19 +512,19 @@ spec:
                             description: |-
                               RecursiveReadOnly specifies whether read-only mounts should be handled
                               recursively.
-  
+
                               If ReadOnly is false, this field has no meaning and must be unspecified.
-  
+
                               If ReadOnly is true, and this field is set to Disabled, the mount is not made
                               recursively read-only.  If this field is set to IfPossible, the mount is made
                               recursively read-only, if it is supported by the container runtime.  If this
                               field is set to Enabled, the mount is made recursively read-only if it is
                               supported by the container runtime, otherwise the pod will not be started and
                               an error will be generated to indicate the reason.
-  
+
                               If this field is set to IfPossible or Enabled, MountPropagation must be set to
                               None (or be unspecified, which defaults to None).
-  
+
                               If this field is not specified, it is treated as an equivalent of Disabled.
                             type: string
                           subPath:
@@ -578,10 +579,10 @@ spec:
                     description: |-
                       Claims lists the names of resources, defined in spec.resourceClaims,
                       that are used by this container.
-  
+
                       This is an alpha field and requires enabling the
                       DynamicResourceAllocation feature gate.
-  
+
                       This field is immutable. It can only be set for containers.
                     items:
                       description: ResourceClaim references one entry in PodSpec.ResourceClaims.
@@ -643,7 +644,7 @@ spec:
                 type: string
             type: object
           status:
-            description: PodTemplateStatus defines the observed state of ClusterKodeContainer
+            description: ContainerTemplateStatus defines the observed state of ClusterKodeContainer
             properties:
               conditions:
                 description: Conditions reflect the current state of the resource
@@ -710,8 +711,8 @@ spec:
                 format: date-time
                 type: string
               observedGeneration:
-                description: ObservedGeneration is the last observed generation of the
-                  resource.
+                description: ObservedGeneration is the last observed generation of
+                  the resource.
                 format: int64
                 type: integer
             type: object
@@ -720,9 +721,3 @@ spec:
     storage: true
     subresources:
       status: {}
-status:
-  acceptedNames:
-    kind: ""
-    plural: ""
-  conditions: []
-  storedVersions: []

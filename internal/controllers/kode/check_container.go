@@ -30,7 +30,7 @@ import (
 )
 
 func (r *KodeReconciler) checkPodResources(ctx context.Context, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig) (bool, error) {
-	log := r.Log.WithValues("kode", types.NamespacedName{Name: kode.Name, Namespace: kode.Namespace})
+	log := r.Log.WithValues("kode", types.NamespacedName{Name: kode.Name, Namespace: kode.Namespace}, "phase", kode.Status.Phase)
 	log.V(1).Info("Checking if resources are ready")
 
 	// Check Secret
@@ -110,6 +110,49 @@ func (r *KodeReconciler) checkPodResources(ctx context.Context, kode *kodev1alph
 	}
 	log.V(1).Info("All pods are ready")
 
-	log.V(1).Info("All resources are ready")
+	log.V(1).Info("All resources are ready", "Phase", kode.Status.Phase)
+	return true, nil
+}
+
+func (r *KodeReconciler) checkResourcesDeleted(ctx context.Context, kode *kodev1alpha2.Kode) (bool, error) {
+	log := r.Log.WithValues("kode", client.ObjectKeyFromObject(kode))
+
+	// Check StatefulSet
+	statefulSet := &appsv1.StatefulSet{}
+	err := r.Client.Get(ctx, types.NamespacedName{Name: kode.Name, Namespace: kode.Namespace}, statefulSet)
+	if err == nil || !errors.IsNotFound(err) {
+		log.V(1).Info("StatefulSet still exists or error occurred", "error", err)
+		return false, client.IgnoreNotFound(err)
+	}
+
+	// Check Secret
+	secret := &corev1.Secret{}
+	err = r.Client.Get(ctx, types.NamespacedName{Name: kode.GetSecretName(), Namespace: kode.Namespace}, secret)
+	if err == nil || !errors.IsNotFound(err) {
+		log.V(1).Info("Secret still exists or error occurred", "error", err)
+		return false, client.IgnoreNotFound(err)
+	}
+
+	// Check PVC if not in test environment
+	if !r.IsTestEnvironment {
+		if kode.Spec.Storage != nil && kode.Spec.Storage.ExistingVolumeClaim == nil {
+			pvc := &corev1.PersistentVolumeClaim{}
+			err = r.Client.Get(ctx, types.NamespacedName{Name: kode.GetPVCName(), Namespace: kode.Namespace}, pvc)
+			if err == nil || !errors.IsNotFound(err) {
+				log.V(1).Info("PVC still exists or error occurred", "error", err)
+				return false, client.IgnoreNotFound(err)
+			}
+		}
+	}
+
+	// Check Service
+	service := &corev1.Service{}
+	err = r.Client.Get(ctx, types.NamespacedName{Name: kode.GetServiceName(), Namespace: kode.Namespace}, service)
+	if err == nil || !errors.IsNotFound(err) {
+		log.V(1).Info("Service still exists or error occurred", "error", err)
+		return false, client.IgnoreNotFound(err)
+	}
+
+	// All resources are deleted
 	return true, nil
 }

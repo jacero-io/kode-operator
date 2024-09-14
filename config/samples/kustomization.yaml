@@ -1,17 +1,16 @@
 ## Append samples of your project ##
 resources:
-- kode/kode_v1alpha2_kode_codeserver.yaml
-# - kode/kode_v1alpha2_kode_webtop.yaml
-
-- podtemplate/kode_v1alpha2_podtemplate_codeserver.yaml
-# - podtemplate/kode_v1alpha2_podtemplate_webtop.yaml
 
 - entrypoint/kode_v1alpha2_entrypoint.yaml
 
-# - kode_v1alpha2_kode.yaml
-# - kode_v1alpha2_entrypoint.yaml
-# - kode_v1alpha2_tofutemplate.yaml
-# - kode_v1alpha2_clustertofutemplate.yaml
-# - kode_v1alpha2_podtemplate.yaml
-# - kode_v1alpha2_clusterpodtemplate.yaml
+- kode/kode_v1alpha2_kode_codeserver.yaml
+# - kode/kode_v1alpha2_kode_webtop.yaml
+
+- containertemplate/kode_v1alpha2_containertemplate_codeserver.yaml
+# - containertemplate/kode_v1alpha2_containertemplate_webtop.yaml
+
+# - tofutemplate/kode_v1alpha2_tofutemplate.yaml
+# - tofutemplate/kode_v1alpha2_clustertofutemplate.yaml
+
+
 #+kubebuilder:scaffold:manifestskustomizesamples

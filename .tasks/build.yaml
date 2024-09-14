@@ -9,6 +9,11 @@ includes:
     internal: true
 
 vars:
+  KUSTOMIZE_CMD: '{{.LOCALBIN}}/kustomize-{{.KUSTOMIZE_VERSION}}'
+  CONTROLLER_GEN_CMD: '{{.LOCALBIN}}/controller-gen-{{.CONTROLLER_TOOLS_VERSION}}'
+  SETUP_ENVTEST_CMD: '{{.LOCALBIN}}/setup-envtest-{{.ENVTEST_VERSION}}'
+  GOLANGCI_LINT_CMD: '{{.LOCALBIN}}/golangci-lint-{{.GOLANGCI_LINT_VERSION}}'
+  HELMIFY_CMD: '{{.LOCALBIN}}/helmify-{{.HELMIFY_VERSION}}'
   BUILDER_NAME: "project-v3-builder"
 
 tasks:

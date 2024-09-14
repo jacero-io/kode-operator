@@ -1,16 +1,16 @@
-# permissions for end users to view podtemplates.
+# permissions for end users to view containertemplates.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   labels:
     app.kubernetes.io/name: kode-operator
     app.kubernetes.io/managed-by: kustomize
-  name: podtemplate-viewer-role
+  name: containertemplate-viewer-role
 rules:
 - apiGroups:
   - kode.jacero.io
   resources:
-  - podtemplates
+  - containertemplates
   verbs:
   - get
   - list
@@ -18,6 +18,6 @@ rules:
 - apiGroups:
   - kode.jacero.io
   resources:
-  - podtemplates/status
+  - containertemplates/status
   verbs:
   - get

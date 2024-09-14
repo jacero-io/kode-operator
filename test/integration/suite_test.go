@@ -66,11 +66,11 @@ const (
 
 	storageSize = "1Gi"
 
-	podTemplateNameCodeServer = "podtemplate-codeserver"
-	podTemplateNameWebtop     = "podtemplate-webtop"
+	containerTemplateNameCodeServer = "containertemplate-codeserver"
+	containerTemplateNameWebtop     = "containertemplate-webtop"
 
-	podTemplateImageCodeServer = "linuxserver/code-server:latest"
-	podTemplateImageWebtop     = "linuxserver/webtop:debian-xfce"
+	containerTemplateImageCodeServer = "linuxserver/code-server:latest"
+	containerTemplateImageWebtop     = "linuxserver/webtop:debian-xfce"
 )
 
 var (
@@ -82,10 +82,10 @@ var (
 	reconciler           *kodectrl.KodeReconciler
 	entrypointReconciler *entrypointctrl.EntryPointReconciler
 
-	ctx                   context.Context
-	namespace             *corev1.Namespace
-	podTemplateCodeServer *kodev1alpha2.ClusterPodTemplate
-	podTemplateWebtop     *kodev1alpha2.ClusterPodTemplate
+	ctx                         context.Context
+	namespace                   *corev1.Namespace
+	containerTemplateCodeServer *kodev1alpha2.ClusterContainerTemplate
+	containerTemplateWebtop     *kodev1alpha2.ClusterContainerTemplate
 
 	entryPointSubdomain *kodev1alpha2.EntryPoint
 	entryPointPath      *kodev1alpha2.EntryPoint
@@ -102,8 +102,8 @@ type mockClient struct {
 }
 
 var (
-	podTemplateSubdomain *kodev1alpha2.ClusterPodTemplate
-	podTemplatePath      *kodev1alpha2.ClusterPodTemplate
+	containerTemplateSubdomain *kodev1alpha2.ClusterContainerTemplate
+	containerTemplatePath      *kodev1alpha2.ClusterContainerTemplate
 )
 
 var _ = BeforeSuite(func() {
@@ -143,15 +143,15 @@ var _ = BeforeSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 
 	reconciler = &kodectrl.KodeReconciler{
-		Client:          k8sClient,
-		Scheme:          k8sManager.GetScheme(),
-		Log:             ctrl.Log.WithName("Kode").WithName("Reconcile"),
-		ResourceManager: resource.NewDefaultResourceManager(k8sClient, ctrl.Log.WithName("Kode").WithName("ResourceManager"), k8sManager.GetScheme()),
-		TemplateManager: template.NewDefaultTemplateManager(k8sClient, ctrl.Log.WithName("Kode").WithName("TemplateManager")),
-		CleanupManager:  cleanup.NewDefaultCleanupManager(k8sClient, ctrl.Log.WithName("Kode").WithName("CleanupManager")),
-		StatusUpdater:   status.NewDefaultStatusUpdater(k8sClient, ctrl.Log.WithName("Kode").WithName("StatusUpdater")),
-		Validator:       validation.NewDefaultValidator(),
-		EventManager:    events.NewEventManager(k8sClient, ctrl.Log.WithName("Kode").WithName("EventManager"), k8sManager.GetScheme(), k8sManager.GetEventRecorderFor("kode-controller")),
+		Client:            k8sClient,
+		Scheme:            k8sManager.GetScheme(),
+		Log:               ctrl.Log.WithName("Kode").WithName("Reconcile"),
+		ResourceManager:   resource.NewDefaultResourceManager(k8sClient, ctrl.Log.WithName("Kode").WithName("ResourceManager"), k8sManager.GetScheme()),
+		TemplateManager:   template.NewDefaultTemplateManager(k8sClient, ctrl.Log.WithName("Kode").WithName("TemplateManager")),
+		CleanupManager:    cleanup.NewDefaultCleanupManager(k8sClient, ctrl.Log.WithName("Kode").WithName("CleanupManager")),
+		Validator:         validation.NewDefaultValidator(),
+		EventManager:      events.NewEventManager(k8sClient, ctrl.Log.WithName("Kode").WithName("EventManager"), k8sManager.GetScheme(), k8sManager.GetEventRecorderFor("kode-controller")),
+		IsTestEnvironment: true,
 	}
 
 	entrypointReconciler = &entrypointctrl.EntryPointReconciler{
@@ -188,18 +188,18 @@ var _ = BeforeSuite(func() {
 	entryPointPath = createEntryPoint(entryPointNamePath, namespace.Name, kodev1alpha2.RoutingTypePath)
 	Expect(k8sClient.Create(ctx, entryPointPath)).To(Succeed())
 
-	// Create PodTemplates
-	podTemplateCodeServer = createPodTemplate(podTemplateNameCodeServer, podTemplateImageCodeServer, "code-server", entryPointSubdomain.Name, entryPointSubdomain.Namespace)
-	Expect(k8sClient.Create(ctx, podTemplateCodeServer)).To(Succeed())
+	// Create ContainerTemplates
+	containerTemplateCodeServer = createContainerTemplate(containerTemplateNameCodeServer, containerTemplateImageCodeServer, "code-server", entryPointSubdomain.Name, entryPointSubdomain.Namespace)
+	Expect(k8sClient.Create(ctx, containerTemplateCodeServer)).To(Succeed())
 
-	podTemplateWebtop = createPodTemplate(podTemplateNameWebtop, podTemplateImageWebtop, "webtop", entryPointSubdomain.Name, entryPointSubdomain.Namespace)
-	Expect(k8sClient.Create(ctx, podTemplateWebtop)).To(Succeed())
+	containerTemplateWebtop = createContainerTemplate(containerTemplateNameWebtop, containerTemplateImageWebtop, "webtop", entryPointSubdomain.Name, entryPointSubdomain.Namespace)
+	Expect(k8sClient.Create(ctx, containerTemplateWebtop)).To(Succeed())
 
-	podTemplateSubdomain = createPodTemplate("pod-template-subdomain", podTemplateImageCodeServer, "code-server", entryPointSubdomain.Name, entryPointSubdomain.Namespace)
-	Expect(k8sClient.Create(ctx, podTemplateSubdomain)).To(Succeed())
+	containerTemplateSubdomain = createContainerTemplate("pod-template-subdomain", containerTemplateImageCodeServer, "code-server", entryPointSubdomain.Name, entryPointSubdomain.Namespace)
+	Expect(k8sClient.Create(ctx, containerTemplateSubdomain)).To(Succeed())
 
-	podTemplatePath = createPodTemplate("pod-template-path", podTemplateImageCodeServer, "code-server", entryPointPath.Name, entryPointPath.Namespace)
-	Expect(k8sClient.Create(ctx, podTemplatePath)).To(Succeed())
+	containerTemplatePath = createContainerTemplate("pod-template-path", containerTemplateImageCodeServer, "code-server", entryPointPath.Name, entryPointPath.Namespace)
+	Expect(k8sClient.Create(ctx, containerTemplatePath)).To(Succeed())
 })
 
 var _ = AfterSuite(func() {
@@ -208,26 +208,6 @@ var _ = AfterSuite(func() {
 	err := testEnv.Stop()
 	Expect(err).NotTo(HaveOccurred())
 })
-
-// var _ = AfterSuite(func() {
-// 	// Cleanup namespace
-// 	Expect(k8sClient.Delete(ctx, namespace)).To(Succeed())
-
-// 	// Cleanup EntryPoint
-// 	Expect(k8sClient.Delete(ctx, entryPointSubdomain)).To(Succeed())
-// 	Expect(k8sClient.Delete(ctx, entryPointPath)).To(Succeed())
-
-// 	// Cleanup PodTemplates
-// 	Expect(k8sClient.Delete(ctx, podTemplateCodeServer)).To(Succeed())
-// 	Expect(k8sClient.Delete(ctx, podTemplateWebtop)).To(Succeed())
-// 	Expect(k8sClient.Delete(ctx, podTemplateSubdomain)).To(Succeed())
-// 	Expect(k8sClient.Delete(ctx, podTemplatePath)).To(Succeed())
-
-// 	cancel()
-// 	By("tearing down the test environment")
-// 	err := testEnv.Stop()
-// 	Expect(err).NotTo(HaveOccurred())
-// })
 
 func (m *mockClient) Delete(ctx context.Context, obj client.Object, opts ...client.DeleteOption) error {
 	key := fmt.Sprintf("%T/%s/%s", obj, obj.GetNamespace(), obj.GetName())
@@ -262,15 +242,15 @@ func setupStorageClass(ctx context.Context, k8sClient client.Client) error {
 	return nil
 }
 
-func createPodTemplate(name, image, templateType string, entryPointName string, entrypointNamespace string) *kodev1alpha2.ClusterPodTemplate {
+func createContainerTemplate(name, image, templateType string, entryPointName string, entrypointNamespace string) *kodev1alpha2.ClusterContainerTemplate {
 	port := kodev1alpha2.Port(8000)
 
-	template := &kodev1alpha2.ClusterPodTemplate{
+	template := &kodev1alpha2.ClusterContainerTemplate{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 		},
-		Spec: kodev1alpha2.ClusterPodTemplateSpec{
-			PodTemplateSharedSpec: kodev1alpha2.PodTemplateSharedSpec{
+		Spec: kodev1alpha2.ClusterContainerTemplateSpec{
+			ContainerTemplateSharedSpec: kodev1alpha2.ContainerTemplateSharedSpec{
 				BaseSharedSpec: kodev1alpha2.BaseSharedSpec{
 					Port: &port,
 				},
@@ -282,7 +262,7 @@ func createPodTemplate(name, image, templateType string, entryPointName string, 
 
 	if entryPointName != "" {
 		entrypointNamespace := kodev1alpha2.Namespace(entrypointNamespace)
-		template.Spec.PodTemplateSharedSpec.EntryPointRef = &kodev1alpha2.CrossNamespaceObjectReference{
+		template.Spec.ContainerTemplateSharedSpec.EntryPointRef = &kodev1alpha2.CrossNamespaceObjectReference{
 			Kind:      "EntryPoint",
 			Name:      kodev1alpha2.ObjectName(entryPointName),
 			Namespace: &entrypointNamespace,
@@ -305,7 +285,7 @@ func createEntryPoint(name string, namespaceName string, routingType kodev1alpha
 	}
 }
 
-func createKode(name, namespaceName string, podTemplateName string, credentials *kodev1alpha2.CredentialsSpec, storage *kodev1alpha2.KodeStorageSpec) *kodev1alpha2.Kode {
+func createKode(name, namespaceName string, containerTemplateName string, credentials *kodev1alpha2.CredentialsSpec, storage *kodev1alpha2.KodeStorageSpec) *kodev1alpha2.Kode {
 	kode := &kodev1alpha2.Kode{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -313,8 +293,8 @@ func createKode(name, namespaceName string, podTemplateName string, credentials 
 		},
 		Spec: kodev1alpha2.KodeSpec{
 			TemplateRef: kodev1alpha2.CrossNamespaceObjectReference{
-				Kind: "ClusterPodTemplate",
-				Name: kodev1alpha2.ObjectName(podTemplateName),
+				Kind: "ClusterContainerTemplate",
+				Name: kodev1alpha2.ObjectName(containerTemplateName),
 			},
 		},
 	}

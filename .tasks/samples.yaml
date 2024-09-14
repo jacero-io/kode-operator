@@ -11,7 +11,7 @@ tasks:
     vars:
       DEPLOY_TYPE: '{{if eq .USE_KIND_CONTEXT "true"}}kind{{else}}remote{{end}}'
     cmds:
-      - '{{.KUBECTL}} get -k {{.ROOT_DIR}}/config/samples/podtemplate/'
+      - '{{.KUBECTL}} get -k {{.ROOT_DIR}}/config/samples/containertemplate/'
       - '{{.KUBECTL}} get -k {{.ROOT_DIR}}/config/samples/entrypoint/'
       - '{{.KUBECTL}} get -k {{.ROOT_DIR}}/config/samples/kode/'
 
@@ -19,7 +19,7 @@ tasks:
     internal: true
     desc: Apply Kubernetes resources
     cmds:
-      - '{{.KUBECTL}} apply -k {{.ROOT_DIR}}/config/samples/podtemplate/'
+      - '{{.KUBECTL}} apply -k {{.ROOT_DIR}}/config/samples/containertemplate/'
       - '{{.KUBECTL}} apply -k {{.ROOT_DIR}}/config/samples/entrypoint/'
       - '{{.KUBECTL}} apply -k {{.ROOT_DIR}}/config/samples/kode/'
 
@@ -27,7 +27,7 @@ tasks:
     internal: true
     desc: Apply Kubernetes resources
     cmds:
-      - '{{.KUBECTL}} delete -k {{.ROOT_DIR}}/config/samples/podtemplate/'
+      - '{{.KUBECTL}} delete -k {{.ROOT_DIR}}/config/samples/containertemplate/'
       - '{{.KUBECTL}} delete -k {{.ROOT_DIR}}/config/samples/entrypoint/'
       - '{{.KUBECTL}} delete -k {{.ROOT_DIR}}/config/samples/kode/'
 

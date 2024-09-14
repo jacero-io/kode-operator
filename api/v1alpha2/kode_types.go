@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jacero-io/kode-operator/internal/constants"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -28,7 +29,7 @@ import (
 
 // KodeSpec defines the desired state of Kode
 type KodeSpec struct {
-	// The reference to a template. Either a PodTemplate, VirtualTemplate or TofuTemplate.
+	// The reference to a template. Either a ContainerTemplate, VirtualTemplate or TofuTemplate.
 	// +kubebuilder:validation:Required
 	TemplateRef CrossNamespaceObjectReference `json:"templateRef"`
 
@@ -94,16 +95,19 @@ type KodeStatus struct {
 	KodePort Port `json:"kodePort,omitempty"`
 
 	// The URL to the icon for the Kode.
-	IconUrl IconUrl `json:"iconUrl,omitempty"`
+	KodeIconUrl KodeIconUrl `json:"iconUrl,omitempty"`
 
 	// The runtime for the kode. Can be one of 'pod', 'virtual', 'tofu'.
-	Runtime Runtime `json:"runtime,omitempty"`
+	Runtime KodeRuntime `json:"runtime,omitempty"`
 
 	// The timestamp when the last activity occurred.
 	LastActivityTime *metav1.Time `json:"lastActivityTime,omitempty"`
 
 	// RetryCount keeps track of the number of retry attempts for failed states.
 	RetryCount int `json:"retryCount,omitempty"`
+
+	// DeletionCycle keeps track of the number of deletion cycles. This is used to determine if the resource is deleting.
+	DeletionCycle int `json:"deletionCycle,omitempty"`
 }
 
 //+kubebuilder:object:root=true
@@ -131,17 +135,6 @@ type KodeList struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []Kode `json:"items"`
 }
-
-type TemplateKind string
-
-const (
-	TemplateKindPodTemplate            TemplateKind = "PodTemplate"
-	TemplateKindClusterPodTemplate     TemplateKind = "ClusterPodTemplate"
-	TemplateKindVirtualTemplate        TemplateKind = "VirtualTemplate"
-	TemplateKindClusterVirtualTemplate TemplateKind = "ClusterVirtualTemplate"
-	TemplateKindTofuTemplate           TemplateKind = "TofuTemplate"
-	TemplateKindClusterTofuTemplate    TemplateKind = "ClusterTofuTemplate"
-)
 
 // KodePhase represents the current state of the Kode resource.
 type KodePhase string
@@ -206,18 +199,99 @@ type KodeUrl string
 
 type KodePath string
 
-type IconUrl string
+type KodeIconUrl string
 
-type Runtime string
+type KodeRuntime string
 
 const (
-	RuntimePod     Runtime = "pod"
-	RuntimeVirtual Runtime = "virtual"
-	RuntimeTofu    Runtime = "tofu"
+	RuntimeContainer KodeRuntime = "container"
+	RuntimeVirtual   KodeRuntime = "virtual"
+	RuntimeTofu      KodeRuntime = "tofu"
 )
 
 func init() {
 	SchemeBuilder.Register(&Kode{}, &KodeList{})
+}
+
+func (k *Kode) SetCondition(conditionType constants.ConditionType, status metav1.ConditionStatus, reason, message string) {
+	newCondition := metav1.Condition{
+		Type:               string(conditionType),
+		Status:             status,
+		Reason:             reason,
+		Message:            message,
+		LastTransitionTime: metav1.NewTime(time.Now()),
+	}
+
+	// Update existing condition if it exists
+	for i, condition := range k.Status.Conditions {
+		if condition.Type == string(conditionType) {
+			if condition.Status != status {
+				k.Status.Conditions[i] = newCondition
+			}
+			return
+		}
+	}
+
+	k.Status.Conditions = append(k.Status.Conditions, newCondition)
+}
+
+func (k *Kode) GetCondition(conditionType constants.ConditionType) *metav1.Condition {
+	for _, condition := range k.Status.Conditions {
+		if condition.Type == string(conditionType) {
+			return &condition
+		}
+	}
+	return nil
+}
+
+func (k *Kode) DeleteCondition(conditionType constants.ConditionType) {
+	conditions := []metav1.Condition{}
+	for _, condition := range k.Status.Conditions {
+		if condition.Type != string(conditionType) {
+			conditions = append(conditions, condition)
+		}
+	}
+	k.Status.Conditions = conditions
+}
+
+func (k *Kode) SetRuntime() KodeRuntime {
+	var runtime KodeRuntime
+	if TemplateKind(k.Spec.TemplateRef.Kind) == TemplateKindContainerTemplate || TemplateKind(k.Spec.TemplateRef.Kind) == TemplateKindClusterContainerTemplate {
+		runtime = RuntimeContainer
+	} else if TemplateKind(k.Spec.TemplateRef.Kind) == TemplateKindVirtualTemplate || TemplateKind(k.Spec.TemplateRef.Kind) == TemplateKindClusterVirtualTemplate {
+		runtime = RuntimeVirtual
+	} else if TemplateKind(k.Spec.TemplateRef.Kind) == TemplateKindTofuTemplate || TemplateKind(k.Spec.TemplateRef.Kind) == TemplateKindClusterTofuTemplate {
+		runtime = RuntimeTofu
+	} else {
+		return ""
+	}
+	return runtime
+}
+
+func (k *Kode) SetPhase(phase KodePhase) {
+	k.Status.Phase = phase
+}
+
+func (k *Kode) UpdatePort(ctx context.Context, c client.Client, port Port) error {
+	patch := client.MergeFrom(k.DeepCopy())
+	k.Status.KodePort = port
+
+	err := c.Status().Patch(ctx, k, patch)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (k *Kode) UpdateUrl(ctx context.Context, c client.Client, kodeUrl KodeUrl) error {
+	patch := client.MergeFrom(k.DeepCopy())
+	k.Status.KodeUrl = kodeUrl
+
+	err := c.Status().Patch(ctx, k, patch)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (k *Kode) GetSecretName() string {
@@ -236,93 +310,11 @@ func (k *Kode) GetPort() Port {
 	return k.Status.KodePort
 }
 
-func (k *Kode) IsActive() bool {
-	return k.Status.Phase == KodePhaseActive
-}
-
-func (k *Kode) IsInactive() bool {
-	return k.Status.Phase == KodePhaseInactive
-}
-
-func (k *Kode) IsSuspended() bool {
-	return k.Status.Phase == KodePhaseSuspended
-}
-
-func (k *Kode) IsDeleting() bool {
-	return k.Status.Phase == KodePhaseDeleting
-}
-
-func (k *Kode) SetCondition(conditionType string, status metav1.ConditionStatus, reason, message string) {
-	newCondition := metav1.Condition{
-		Type:               conditionType,
-		Status:             status,
-		Reason:             reason,
-		Message:            message,
-		LastTransitionTime: metav1.NewTime(time.Now()),
-	}
-
-	for i, condition := range k.Status.Conditions {
-		if condition.Type == conditionType {
-			if condition.Status != status {
-				k.Status.Conditions[i] = newCondition
-			}
-			return
-		}
-	}
-
-	k.Status.Conditions = append(k.Status.Conditions, newCondition)
-}
-
-func (k *Kode) GetCondition(conditionType string) *metav1.Condition {
-	for _, condition := range k.Status.Conditions {
-		if condition.Type == conditionType {
-			return &condition
-		}
-	}
-	return nil
-}
-
 func (k *Kode) IsInactiveFor(duration time.Duration) bool {
 	if k.Status.LastActivityTime == nil {
 		return false
 	}
 	return time.Since(k.Status.LastActivityTime.Time) > duration
-}
-
-func (k *Kode) SetRuntime() Runtime {
-	var runtime Runtime
-	if TemplateKind(k.Spec.TemplateRef.Kind) == TemplateKindPodTemplate || TemplateKind(k.Spec.TemplateRef.Kind) == TemplateKindClusterPodTemplate {
-		runtime = RuntimePod
-	} else if TemplateKind(k.Spec.TemplateRef.Kind) == TemplateKindVirtualTemplate || TemplateKind(k.Spec.TemplateRef.Kind) == TemplateKindClusterVirtualTemplate {
-		runtime = RuntimeVirtual
-	} else if TemplateKind(k.Spec.TemplateRef.Kind) == TemplateKindTofuTemplate || TemplateKind(k.Spec.TemplateRef.Kind) == TemplateKindClusterTofuTemplate {
-		runtime = RuntimeTofu
-	} else {
-		return ""
-	}
-	return runtime
-}
-
-func (k *Kode) UpdateKodePort(ctx context.Context, c client.Client, port Port) error {
-	patch := client.MergeFrom(k.DeepCopy())
-	k.Status.KodePort = port
-
-	err := c.Status().Patch(ctx, k, patch)
-	if err != nil {
-		return err
-	}
-	return nil
-}
-
-func (k *Kode) UpdateKodeUrl(ctx context.Context, c client.Client, kodeUrl KodeUrl) error {
-	patch := client.MergeFrom(k.DeepCopy())
-	k.Status.KodeUrl = kodeUrl
-
-	err := c.Status().Patch(ctx, k, patch)
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 func (k *Kode) GenerateKodeUrlForEntryPoint(
@@ -344,8 +336,8 @@ func (k *Kode) GenerateKodeUrlForEntryPoint(
 		return KodeHostname(name), kodeDomain, kodeUrl, kodePath, nil
 
 	} else if routingType == RoutingTypePath {
-		kodeDomain = KodeDomain(domain) // eg. kode.dev
-		kodePath = KodePath(fmt.Sprintf("/%s", name)) // eg. /my-workspace
+		kodeDomain = KodeDomain(domain)                                             // eg. kode.dev
+		kodePath = KodePath(fmt.Sprintf("/%s", name))                               // eg. /my-workspace
 		kodeUrl = KodeUrl(fmt.Sprintf("%s://%s%s", protocol, kodeDomain, kodePath)) // eg. https://kode.dev/my-workspace
 
 		return KodeHostname(name), kodeDomain, kodeUrl, kodePath, nil

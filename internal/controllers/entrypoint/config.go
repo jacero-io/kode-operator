@@ -37,7 +37,6 @@ func InitEntryPointResourcesConfig(entryPoint *kodev1alpha2.EntryPoint) *common.
 		gatewayName = fmt.Sprintf("%s-gateway", entryPoint.Name)
 	}
 
-
 	if entryPoint.Spec.GatewaySpec != nil && entryPoint.Spec.GatewaySpec.CertificateRefs != nil {
 		protocol = kodev1alpha2.ProtocolHTTPS
 	} else {

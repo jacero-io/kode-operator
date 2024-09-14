@@ -16,79 +16,80 @@ limitations under the License.
 
 package entrypoint
 
-import (
-	"context"
+// import (
+// 	"context"
 
-	"k8s.io/client-go/util/retry"
-	ctrl "sigs.k8s.io/controller-runtime"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+// 	"k8s.io/client-go/util/retry"
+// 	ctrl "sigs.k8s.io/controller-runtime"
+// 	"sigs.k8s.io/controller-runtime/pkg/client"
+// 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
-	"github.com/jacero-io/kode-operator/internal/common"
-)
+// 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
+// 	"github.com/jacero-io/kode-operator/internal/common"
+// 	"github.com/jacero-io/kode-operator/internal/constants"
+// )
 
-func (r *EntryPointReconciler) handleFinalizer(ctx context.Context, entryPoint *kodev1alpha2.EntryPoint) (ctrl.Result, error) {
-	log := r.Log.WithValues("entryPoint", client.ObjectKeyFromObject(entryPoint))
+// func (r *EntryPointReconciler) handleFinalizer(ctx context.Context, entryPoint *kodev1alpha2.EntryPoint) (ctrl.Result, error) {
+// 	log := r.Log.WithValues("entryPoint", client.ObjectKeyFromObject(entryPoint))
 
-	if entryPoint.ObjectMeta.DeletionTimestamp.IsZero() {
-		// Object is not being deleted, so ensure the finalizer is present
-		if !controllerutil.ContainsFinalizer(entryPoint, common.EntryPointFinalizerName) {
-			controllerutil.AddFinalizer(entryPoint, common.EntryPointFinalizerName)
-			log.Info("Adding finalizer", "finalizer", common.EntryPointFinalizerName)
-			if err := r.Client.Update(ctx, entryPoint); err != nil {
-				log.Error(err, "Failed to add finalizer")
-				return ctrl.Result{}, err
-			}
-		}
-		return ctrl.Result{}, nil
-	}
+// 	if entryPoint.ObjectMeta.DeletionTimestamp.IsZero() {
+// 		// Object is not being deleted, so ensure the finalizer is present
+// 		if !controllerutil.ContainsFinalizer(entryPoint, constants.EntryPointFinalizerName) {
+// 			controllerutil.AddFinalizer(entryPoint, constants.EntryPointFinalizerName)
+// 			log.Info("Adding finalizer", "finalizer", constants.EntryPointFinalizerName)
+// 			if err := r.Client.Update(ctx, entryPoint); err != nil {
+// 				log.Error(err, "Failed to add finalizer")
+// 				return ctrl.Result{}, err
+// 			}
+// 		}
+// 		return ctrl.Result{}, nil
+// 	}
 
-	// Object is being deleted
-	if controllerutil.ContainsFinalizer(entryPoint, common.EntryPointFinalizerName) {
-		// Run finalization logic
-		if err := r.finalize(ctx, entryPoint); err != nil {
-			log.Error(err, "Failed to run finalizer")
-			return ctrl.Result{}, err
-		}
+// 	// Object is being deleted
+// 	if controllerutil.ContainsFinalizer(entryPoint, constants.EntryPointFinalizerName) {
+// 		// Run finalization logic
+// 		if err := r.finalize(ctx, entryPoint); err != nil {
+// 			log.Error(err, "Failed to run finalizer")
+// 			return ctrl.Result{}, err
+// 		}
 
-		// Remove finalizer
-		err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
-			// Fetch the latest version of EntryPoint
-			latestEntrypoint, err := common.GetLatestEntryPoint(ctx, r.Client, entryPoint.Name, entryPoint.Namespace)
-			if err != nil {
-				return err
-			}
+// 		// Remove finalizer
+// 		err := retry.RetryOnConflict(retry.DefaultRetry, func() error {
+// 			// Fetch the latest version of EntryPoint
+// 			latestEntrypoint, err := common.GetLatestEntryPoint(ctx, r.Client, entryPoint.Name, entryPoint.Namespace)
+// 			if err != nil {
+// 				return err
+// 			}
 
-			if controllerutil.ContainsFinalizer(latestEntrypoint, common.EntryPointFinalizerName) {
-				controllerutil.RemoveFinalizer(latestEntrypoint, common.EntryPointFinalizerName)
-				log.Info("Removing finalizer", "finalizer", common.EntryPointFinalizerName)
-				return r.Client.Update(ctx, latestEntrypoint)
-			}
-			return nil
-		})
+// 			if controllerutil.ContainsFinalizer(latestEntrypoint, constants.EntryPointFinalizerName) {
+// 				controllerutil.RemoveFinalizer(latestEntrypoint, constants.EntryPointFinalizerName)
+// 				log.Info("Removing finalizer", "finalizer", constants.EntryPointFinalizerName)
+// 				return r.Client.Update(ctx, latestEntrypoint)
+// 			}
+// 			return nil
+// 		})
 
-		if err != nil {
-			log.Error(err, "Failed to remove finalizer")
-			return ctrl.Result{}, err
-		}
-	}
+// 		if err != nil {
+// 			log.Error(err, "Failed to remove finalizer")
+// 			return ctrl.Result{}, err
+// 		}
+// 	}
 
-	return ctrl.Result{}, nil
-}
+// 	return ctrl.Result{}, nil
+// }
 
-func (r *EntryPointReconciler) finalize(ctx context.Context, entryPoint *kodev1alpha2.EntryPoint) error {
-	log := r.Log.WithValues("entrypoint", client.ObjectKeyFromObject(entryPoint))
+// func (r *EntryPointReconciler) finalize(ctx context.Context, entryPoint *kodev1alpha2.EntryPoint) error {
+// 	log := r.Log.WithValues("entrypoint", client.ObjectKeyFromObject(entryPoint))
 
-	cleanupResource := NewEntryPointCleanupResource(entryPoint)
+// 	cleanupResource := NewEntryPointCleanupResource(entryPoint)
 
-	// Perform cleanup
-	err := r.CleanupManager.Cleanup(ctx, cleanupResource)
-	if err != nil {
-		log.Error(err, "Failed to cleanup resources")
-		return err
-	}
+// 	// Perform cleanup
+// 	err := r.CleanupManager.Cleanup(ctx, cleanupResource)
+// 	if err != nil {
+// 		log.Error(err, "Failed to cleanup resources")
+// 		return err
+// 	}
 
-	log.Info("Finalization completed successfully")
-	return nil
-}
+// 	log.Info("Finalization completed successfully")
+// 	return nil
+// }

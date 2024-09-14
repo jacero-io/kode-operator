@@ -29,7 +29,7 @@ import (
 )
 
 func (r *KodeReconciler) ensurePodResources(ctx context.Context, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig) error {
-	log := r.Log.WithValues("kode", types.NamespacedName{Name: kode.Name, Namespace: kode.Namespace})
+	log := r.Log.WithValues("kode", types.NamespacedName{Name: kode.Name, Namespace: kode.Namespace}, "phase", kode.Status.Phase)
 	log.Info("Ensuring resources")
 
 	// Fetch the latest Kode object
@@ -86,11 +86,6 @@ func (r *KodeReconciler) ensurePodResources(ctx context.Context, kode *kodev1alp
 		err := r.Client.Get(ctx, types.NamespacedName{Name: config.PVCName, Namespace: latestKode.Namespace}, pvc)
 		if err != nil {
 			log.Error(err, "Failed to get PVC for CSI resize check")
-			return err
-		}
-
-		if err != nil {
-			log.Error(err, "Failed to check CSI resize capability")
 			eventMessage := "Failed to check CSI resize capability after PVC creation"
 			if recordErr := r.EventManager.Record(ctx, latestKode, events.EventTypeWarning, events.ReasonKodeCSIResizeCapabilityCheckFailed, eventMessage); recordErr != nil {
 				log.Error(recordErr, "Failed to record CSI resize check failure event")
@@ -105,5 +100,6 @@ func (r *KodeReconciler) ensurePodResources(ctx context.Context, kode *kodev1alp
 		return err
 	}
 
+	log.Info("Resources ensured")
 	return nil
 }

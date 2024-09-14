@@ -19,6 +19,7 @@ package kode
 import (
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
+	"github.com/jacero-io/kode-operator/internal/constants"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -40,7 +41,7 @@ func InitKodeResourcesConfig(
 
 	if kode.Spec.Credentials == nil {
 		credentials = &kodev1alpha2.CredentialsSpec{
-			Username: common.Username,
+			Username: constants.Username,
 		}
 	} else {
 		credentials = kode.Spec.Credentials

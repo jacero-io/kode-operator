@@ -23,6 +23,7 @@ import (
 
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
+	"github.com/jacero-io/kode-operator/internal/constants"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -72,7 +73,7 @@ func (r *KodeReconciler) constructStatefulSetSpec(config *common.KodeResourceCon
 	log := r.Log.WithName("SatefulSetConstructor").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	replicas := int32(1)
-	templateSpec := config.Template.PodTemplateSpec
+	templateSpec := config.Template.ContainerTemplateSpec
 
 	var workspace string
 	var mountPath string
@@ -126,7 +127,7 @@ func (r *KodeReconciler) constructStatefulSetSpec(config *common.KodeResourceCon
 	}
 
 	// Add TemplateInitPlugins as InitContainers
-	for _, initPlugin := range config.Template.PodTemplateSpec.InitPlugins {
+	for _, initPlugin := range config.Template.ContainerTemplateSpec.InitPlugins {
 		initContainers = append(initContainers, constructInitPluginContainer(initPlugin))
 	}
 
@@ -161,9 +162,9 @@ func (r *KodeReconciler) constructStatefulSetSpec(config *common.KodeResourceCon
 
 func constructCodeServerContainers(config *common.KodeResourceConfig, workspace string) []corev1.Container {
 	env := []corev1.EnvVar{
-		{Name: "PUID", Value: fmt.Sprintf("%d", config.Template.PodTemplateSpec.PUID)},
-		{Name: "PGID", Value: fmt.Sprintf("%d", config.Template.PodTemplateSpec.PGID)},
-		{Name: "TZ", Value: config.Template.PodTemplateSpec.TZ},
+		{Name: "PUID", Value: fmt.Sprintf("%d", config.Template.ContainerTemplateSpec.PUID)},
+		{Name: "PGID", Value: fmt.Sprintf("%d", config.Template.ContainerTemplateSpec.PGID)},
+		{Name: "TZ", Value: config.Template.ContainerTemplateSpec.TZ},
 		{Name: "PORT", Value: fmt.Sprintf("%d", *config.Port)},
 		{Name: "USERNAME", Value: config.Credentials.Username},
 		{Name: "DEFAULT_WORKSPACE", Value: workspace},
@@ -185,7 +186,7 @@ func constructCodeServerContainers(config *common.KodeResourceConfig, workspace 
 
 	return []corev1.Container{{
 		Name:  "code-server",
-		Image: config.Template.PodTemplateSpec.Image,
+		Image: config.Template.ContainerTemplateSpec.Image,
 		Env:   env,
 		Ports: []corev1.ContainerPort{{
 			Name:          "http",
@@ -196,9 +197,9 @@ func constructCodeServerContainers(config *common.KodeResourceConfig, workspace 
 
 func constructWebtopContainers(config *common.KodeResourceConfig) []corev1.Container {
 	env := []corev1.EnvVar{
-		{Name: "PUID", Value: fmt.Sprintf("%d", config.Template.PodTemplateSpec.PUID)},
-		{Name: "PGID", Value: fmt.Sprintf("%d", config.Template.PodTemplateSpec.PGID)},
-		{Name: "TZ", Value: config.Template.PodTemplateSpec.TZ},
+		{Name: "PUID", Value: fmt.Sprintf("%d", config.Template.ContainerTemplateSpec.PUID)},
+		{Name: "PGID", Value: fmt.Sprintf("%d", config.Template.ContainerTemplateSpec.PGID)},
+		{Name: "TZ", Value: config.Template.ContainerTemplateSpec.TZ},
 		{Name: "CUSTOM_PORT", Value: fmt.Sprintf("%d", *config.Port)},
 		{Name: "CUSTOM_USER", Value: config.Credentials.Username},
 	}
@@ -219,7 +220,7 @@ func constructWebtopContainers(config *common.KodeResourceConfig) []corev1.Conta
 
 	return []corev1.Container{{
 		Name:  "webtop",
-		Image: config.Template.PodTemplateSpec.Image,
+		Image: config.Template.ContainerTemplateSpec.Image,
 		Env:   env,
 		Ports: []corev1.ContainerPort{{
 			Name:          "http",
@@ -242,12 +243,12 @@ func constructVolumesAndMounts(mountPath string, config *common.KodeResourceConf
 		}
 
 		volume := corev1.Volume{
-			Name:         common.KodeVolumeStorageName,
+			Name:         constants.KodeVolumeStorageName,
 			VolumeSource: volumeSource,
 		}
 
 		volumeMount := corev1.VolumeMount{
-			Name:      common.KodeVolumeStorageName,
+			Name:      constants.KodeVolumeStorageName,
 			MountPath: mountPath,
 		}
 

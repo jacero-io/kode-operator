@@ -20,14 +20,28 @@ import (
 	"context"
 	"time"
 
-	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
+	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
+	"github.com/jacero-io/kode-operator/internal/constants"
 )
 
 func (r *EntryPointReconciler) handlePendingState(ctx context.Context, entryPoint *kodev1alpha2.EntryPoint) (ctrl.Result, error) {
 	log := r.Log.WithValues("entrypoint", types.NamespacedName{Name: entryPoint.Name, Namespace: entryPoint.Namespace})
 	log.Info("Handling Pending state")
+
+	// Add finalizer if it doesn't exist
+	if !controllerutil.ContainsFinalizer(entryPoint, constants.EntryPointFinalizerName) {
+		controllerutil.AddFinalizer(entryPoint, constants.EntryPointFinalizerName)
+		if err := r.Client.Update(ctx, entryPoint); err != nil {
+			log.Error(err, "Failed to add finalizer")
+			return ctrl.Result{Requeue: true}, err
+		}
+		log.Info("Added finalizer to EntryPoint resource")
+	}
 
 	// Validate EntryPoint configuration
 	if err := r.Validator.ValidateEntryPoint(ctx, entryPoint); err != nil {
@@ -57,7 +71,12 @@ func (r *EntryPointReconciler) handlePendingState(ctx context.Context, entryPoin
 		return r.handleResourceError(ctx, entryPoint, err, "BaseDomainUnavailable")
 	}
 
-	// If everything is valid, transition to Configuring state
+	// Set conditions for Pending state
+	entryPoint.SetCondition(constants.ConditionTypeReady, metav1.ConditionFalse, "Pending", "EntryPoint resource is pending configuration")
+	entryPoint.SetCondition(constants.ConditionTypeAvailable, metav1.ConditionFalse, "Pending", "EntryPoint resource is not yet available")
+	entryPoint.SetCondition(constants.ConditionTypeProgressing, metav1.ConditionTrue, "Configuring", "EntryPoint resource is being configured")
+
+	// Transition to Configuring state
 	return r.transitionTo(ctx, entryPoint, kodev1alpha2.EntryPointPhaseConfiguring)
 }
 
@@ -150,6 +169,31 @@ func (r *EntryPointReconciler) handleDeletingState(ctx context.Context, entryPoi
 	log := r.Log.WithValues("entrypoint", types.NamespacedName{Name: entryPoint.Name, Namespace: entryPoint.Namespace})
 	log.Info("Handling Deleting state")
 
+	// Set conditions for deleting state
+	entryPoint.SetCondition(constants.ConditionTypeReady, metav1.ConditionFalse, "Deleting", "EntryPoint resource is being deleted")
+	entryPoint.SetCondition(constants.ConditionTypeAvailable, metav1.ConditionFalse, "Deleting", "EntryPoint resource is being deleted")
+	entryPoint.SetCondition(constants.ConditionTypeProgressing, metav1.ConditionTrue, "Deleting", "EntryPoint resource is being deleted")
+
+	// Check if all child resources are deleted
+	childResourcesDeleted, err := r.areChildResourcesDeleted(ctx, entryPoint)
+	if err != nil {
+		log.Error(err, "Failed to check child resources deletion status")
+		return ctrl.Result{Requeue: true}, err
+	}
+
+	if !childResourcesDeleted {
+		log.Info("Child resources are still being deleted, requeuing")
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+	}
+
+	// Remove finalizer
+	controllerutil.RemoveFinalizer(entryPoint, constants.EntryPointFinalizerName)
+	if err := r.Client.Update(ctx, entryPoint); err != nil {
+		log.Error(err, "Failed to remove finalizer")
+		return ctrl.Result{Requeue: true}, err
+	}
+
+	log.Info("EntryPoint resource deletion complete")
 	return ctrl.Result{}, nil
 }
 
@@ -165,4 +209,9 @@ func (r *EntryPointReconciler) handleUnknownState(ctx context.Context, entryPoin
 	log.Info("Handling Unknown state")
 
 	return ctrl.Result{}, nil
+}
+
+func (r *EntryPointReconciler) areChildResourcesDeleted(ctx context.Context, entryPoint *kodev1alpha2.EntryPoint) (bool, error) {
+	// TODO: Implement the logic to check if all child resources (HTTPRoutes, Gateway, etc.) are deleted
+	return true, nil
 }

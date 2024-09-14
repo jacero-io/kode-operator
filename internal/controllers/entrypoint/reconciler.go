@@ -82,6 +82,9 @@ func (r *EntryPointReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 
 	switch v := obj.(type) {
 	case *kodev1alpha2.EntryPoint:
+		// Skip reconciliation of EntryPoints because it is not yet implemented
+		// log.V(1).Info("Skipping reconciliation of EntryPoint", "namespace", v.Namespace, "name", v.Name)
+		// return ctrl.Result{}, nil
 		log.V(1).Info("Reconciling EntryPoint", "namespace", v.Namespace, "name", v.Name)
 		return r.reconcileEntryPoint(ctx, v)
 	case *kodev1alpha2.Kode:
@@ -98,71 +101,48 @@ func (r *EntryPointReconciler) reconcileEntryPoint(ctx context.Context, entryPoi
 
 	// Handle deletion
 	if !entryPoint.DeletionTimestamp.IsZero() {
-		return r.handleFinalizer(ctx, entryPoint)
+		return r.handleDeletingState(ctx, entryPoint)
 	}
 
-	if entryPoint.Spec.GatewaySpec != nil && entryPoint.Spec.GatewaySpec.ExistingGatewayRef.Name != "" {
-		log.Info("EntryPoint has existing Gateway, skipping reconciliation")
-		return ctrl.Result{}, nil
-	} else {
-		log.Info("EntryPoint does not have existing Gateway but this controller is not fully implemented yet, skipping reconciliation")
-		return ctrl.Result{}, nil
+	// Initialize status if it's a new resource
+	if entryPoint.Status.Phase == "" {
+		return r.transitionTo(ctx, entryPoint, kodev1alpha2.EntryPointPhasePending)
 	}
 
-	// // Ensure finalizer is present
-	// if !controllerutil.ContainsFinalizer(entryPoint, common.EntryPointFinalizerName) {
-	// 	controllerutil.AddFinalizer(entryPoint, common.EntryPointFinalizerName)
-	// 	if err := r.Client.Update(ctx, entryPoint); err != nil {
-	// 		log.Error(err, "Failed to add finalizer")
-	// 		return ctrl.Result{Requeue: true}, err
-	// 	}
-	// 	log.Info("Added finalizer to EntryPoint resource")
-	// 	return ctrl.Result{Requeue: true}, nil
-	// }
+	// Handle state transition
+	var result ctrl.Result
+	var err error
 
-	// // Initialize status if it's a new resource
-	// if entryPoint.Status.Phase == "" {
-	// 	return r.transitionTo(ctx, entryPoint, kodev1alpha2.EntryPointPhasePending)
-	// }
+	switch entryPoint.Status.Phase {
+	case kodev1alpha2.EntryPointPhasePending:
+		result, err = r.handlePendingState(ctx, entryPoint)
+	case kodev1alpha2.EntryPointPhaseConfiguring:
+		result, err = r.handleConfiguringState(ctx, entryPoint)
+	case kodev1alpha2.EntryPointPhaseProvisioning:
+		result, err = r.handleProvisioningState(ctx, entryPoint)
+	case kodev1alpha2.EntryPointPhaseActive:
+		result, err = r.handleActiveState(ctx, entryPoint)
+	case kodev1alpha2.EntryPointPhaseDeleting:
+		result, err = r.handleDeletingState(ctx, entryPoint)
+	case kodev1alpha2.EntryPointPhaseFailed:
+		result, err = r.handleFailedState(ctx, entryPoint)
+	default:
+		log.Info("Unknown phase, transitioning to Failed", "phase", entryPoint.Status.Phase)
+		return r.transitionTo(ctx, entryPoint, kodev1alpha2.EntryPointPhaseFailed)
+	}
 
-	// // Handle state transition
-	// var result ctrl.Result
-	// var err error
+	if err != nil {
+		log.Error(err, "Error handling state", "phase", entryPoint.Status.Phase)
+		return r.transitionTo(ctx, entryPoint, kodev1alpha2.EntryPointPhaseFailed)
+	}
 
-	// // Handle state transition
-	// switch entryPoint.Status.Phase {
-	// case kodev1alpha2.EntryPointPhasePending:
-	// 	result, err = r.handlePendingState(ctx, entryPoint)
-	// case kodev1alpha2.EntryPointPhaseConfiguring:
-	// 	result, err = r.handleConfiguringState(ctx, entryPoint)
-	// case kodev1alpha2.EntryPointPhaseProvisioning:
-	// 	result, err = r.handleProvisioningState(ctx, entryPoint)
-	// case kodev1alpha2.EntryPointPhaseActive:
-	// 	result, err = r.handleActiveState(ctx, entryPoint)
-	// case kodev1alpha2.EntryPointPhaseDeleting:
-	// 	result, err = r.handleDeletingState(ctx, entryPoint)
-	// case kodev1alpha2.EntryPointPhaseFailed:
-	// 	result, err = r.handleFailedState(ctx, entryPoint)
-	// case kodev1alpha2.EntryPointPhaseUnknown:
-	// 	result, err = r.handleUnknownState(ctx, entryPoint)
-	// default:
-	// 	log.Info("Unknown phase, transitioning to Unknown", "phase", entryPoint.Status.Phase)
-	// 	return r.transitionTo(ctx, entryPoint, kodev1alpha2.EntryPointPhaseUnknown)
-	// }
+	// Update the EntryPoint status
+	if err := r.updateStatus(ctx, entryPoint); err != nil {
+		log.Error(err, "Failed to update EntryPoint status")
+		return ctrl.Result{Requeue: true}, err
+	}
 
-	// // Handle errors from state handlers
-	// if err != nil {
-	// 	log.Error(err, "Error handling state", "phase", entryPoint.Status.Phase)
-	// 	if entryPoint.Status.Phase != kodev1alpha2.EntryPointPhaseFailed {
-	// 		// Transition to failed state if not already there
-	// 		return r.transitionTo(ctx, entryPoint, kodev1alpha2.EntryPointPhaseFailed)
-	// 	}
-	// 	// If already in failed state, just requeue
-	// 	return ctrl.Result{Requeue: true}, nil
-	// }
-
-	// log.V(1).Info("State transition successful", "phase", entryPoint.Status.Phase)
-	// return result, nil
+	return result, nil
 }
 
 func (r *EntryPointReconciler) reconcileKode(ctx context.Context, kode *kodev1alpha2.Kode) (ctrl.Result, error) {
@@ -172,7 +152,7 @@ func (r *EntryPointReconciler) reconcileKode(ctx context.Context, kode *kodev1al
 
 	// Only reconcile if Kode is in Active phase
 	if kode.Status.Phase != kodev1alpha2.KodePhaseActive {
-		log.Info("Kode is not in Active phase, skipping reconciliation", "phase", kode.Status.Phase)
+		log.V(1).Info("Kode is not in Active phase, skipping reconciliation", "phase", kode.Status.Phase)
 		return ctrl.Result{}, nil
 	}
 
@@ -189,12 +169,18 @@ func (r *EntryPointReconciler) reconcileKode(ctx context.Context, kode *kodev1al
 
 	config := InitEntryPointResourcesConfig(entryPoint)
 
-	// Construct the KodeUrl
+	// Construct Kode URL
 	kodeHostname, kodeDomain, kodeUrl, kodePath, err := kode.GenerateKodeUrlForEntryPoint(entryPoint.Spec.RoutingType, entryPoint.Spec.BaseDomain, kode.Name, config.Protocol)
 	if err != nil {
 		return r.handleReconcileError(ctx, kode, entryPoint, err, "Failed to construct Kode URL")
 	}
 	log.V(1).Info("Constructed Kode URL", "hostname", kodeHostname, "domain", kodeDomain, "url", kodeUrl, "path", kodePath, "protocol", config.Protocol)
+
+	// Check if Kode URL has changed
+	if kode.Status.KodeUrl == kodeUrl {
+		log.Info("Kode URL has not changed, skipping reconciliation", "KodeUrl", kode.Status.KodeUrl)
+		return ctrl.Result{}, nil
+	}
 
 	// Check Kode Port
 	kodePort := kode.GetPort()
@@ -212,7 +198,9 @@ func (r *EntryPointReconciler) reconcileKode(ctx context.Context, kode *kodev1al
 
 	// Update kode URL
 	if kodeUrl != "" {
-		kode.UpdateKodeUrl(ctx, r.Client, kodeUrl)
+		kode.UpdateUrl(ctx, r.Client, kodeUrl)
+		// TODO: Rewrite status handling to work with SetCondition
+		// kode.SetCondition(constants.ConditionTypeAvailable, metav1.ConditionTrue, "ResourcesReady", "Kode is available and ready to use")
 	}
 
 	log.Info("HTTPRoute configuration successful", "created", created, "kodeUrl", kodeUrl)

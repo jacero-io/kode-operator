@@ -26,7 +26,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
-	"github.com/jacero-io/kode-operator/internal/common"
+	"github.com/jacero-io/kode-operator/internal/constants"
 	"github.com/jacero-io/kode-operator/internal/events"
 )
 
@@ -41,25 +41,25 @@ func (r *EntryPointReconciler) handleReconcileError(ctx context.Context, kode *k
 	if entryPoint != nil {
 		entryPointUpdateErr := r.updatePhaseFailed(ctx, entryPoint, err, []metav1.Condition{
 			{
-				Type:    string(common.ConditionTypeError),
+				Type:    string(constants.ConditionTypeError),
 				Status:  metav1.ConditionTrue,
 				Reason:  "ReconciliationFailed",
 				Message: fmt.Sprintf("%s: %v", message, err),
 			},
 			{
-				Type:    string(common.ConditionTypeReady),
+				Type:    string(constants.ConditionTypeReady),
 				Status:  metav1.ConditionFalse,
 				Reason:  "ResourceNotReady",
 				Message: "Resource is not ready due to reconciliation failure",
 			},
 			{
-				Type:    string(common.ConditionTypeAvailable),
+				Type:    string(constants.ConditionTypeAvailable),
 				Status:  metav1.ConditionFalse,
 				Reason:  "ResourceUnavailable",
 				Message: "Resource is not available due to reconciliation failure",
 			},
 			{
-				Type:    string(common.ConditionTypeProgressing),
+				Type:    string(constants.ConditionTypeProgressing),
 				Status:  metav1.ConditionFalse,
 				Reason:  "ProgressHalted",
 				Message: "Progress halted due to resource reconciliation failure",
@@ -81,7 +81,7 @@ func (r *EntryPointReconciler) handleReconcileError(ctx context.Context, kode *k
 
 	// Update Kode status
 	kodeUpdateErr := r.updateKodeStatus(ctx, kode, kodev1alpha2.KodePhaseFailed, []metav1.Condition{{
-		Type:               string(common.ConditionTypeError),
+		Type:               string(constants.ConditionTypeError),
 		Status:             metav1.ConditionTrue,
 		Reason:             "ReconciliationFailed",
 		Message:            fmt.Sprintf("%s: %v", message, err),
@@ -110,7 +110,7 @@ func (r *EntryPointReconciler) handleValidationError(ctx context.Context, entryP
 	// Update status with validation error
 	if updateErr := r.StatusUpdater.UpdateStatusEntryPoint(ctx, entryPoint, kodev1alpha2.EntryPointPhaseFailed, []metav1.Condition{
 		{
-			Type:    string(common.ConditionTypeError),
+			Type:    string(constants.ConditionTypeError),
 			Status:  metav1.ConditionTrue,
 			Reason:  "ValidationFailed",
 			Message: fmt.Sprintf("EntryPoint validation failed: %v", err),
@@ -136,7 +136,7 @@ func (r *EntryPointReconciler) handleResourceError(ctx context.Context, entryPoi
 	// Update status with resource error
 	if updateErr := r.StatusUpdater.UpdateStatusEntryPoint(ctx, entryPoint, kodev1alpha2.EntryPointPhaseFailed, []metav1.Condition{
 		{
-			Type:    string(common.ConditionTypeError),
+			Type:    string(constants.ConditionTypeError),
 			Status:  metav1.ConditionTrue,
 			Reason:  reason,
 			Message: fmt.Sprintf("Resource check failed: %v", err),

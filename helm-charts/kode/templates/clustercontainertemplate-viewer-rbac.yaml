@@ -1,14 +1,14 @@
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: {{ include "kode.fullname" . }}-clusterpodtemplate-viewer-role
+  name: {{ include "kode.fullname" . }}-clustercontainertemplate-viewer-role
   labels:
   {{- include "kode.labels" . | nindent 4 }}
 rules:
 - apiGroups:
   - kode.jacero.io
   resources:
-  - clusterpodtemplates
+  - clustercontainertemplates
   verbs:
   - get
   - list
@@ -16,6 +16,6 @@ rules:
 - apiGroups:
   - kode.jacero.io
   resources:
-  - clusterpodtemplates/status
+  - clustercontainertemplates/status
   verbs:
   - get

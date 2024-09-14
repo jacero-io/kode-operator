@@ -121,15 +121,15 @@ func main() {
 	// printKnownTypes(mgr.GetScheme())
 
 	if err = (&kodecontroller.KodeReconciler{
-		Client:          mgr.GetClient(),
-		Scheme:          mgr.GetScheme(),
-		Log:             ctrl.Log.WithName("Kode").WithName("Reconcile"),
-		ResourceManager: resource.NewDefaultResourceManager(mgr.GetClient(), ctrl.Log.WithName("Kode").WithName("ResourceManager"), scheme),
-		TemplateManager: template.NewDefaultTemplateManager(mgr.GetClient(), ctrl.Log.WithName("Kode").WithName("TemplateManager")),
-		CleanupManager:  cleanup.NewDefaultCleanupManager(mgr.GetClient(), ctrl.Log.WithName("Kode").WithName("CleanupManager")),
-		StatusUpdater:   status.NewDefaultStatusUpdater(mgr.GetClient(), ctrl.Log.WithName("Kode").WithName("StatusUpdater")),
-		Validator:       validation.NewDefaultValidator(),
-		EventManager:    events.NewEventManager(mgr.GetClient(), ctrl.Log.WithName("Kode").WithName("EventManager"), mgr.GetScheme(), mgr.GetEventRecorderFor("kode-controller")),
+		Client:            mgr.GetClient(),
+		Scheme:            mgr.GetScheme(),
+		Log:               ctrl.Log.WithName("Kode").WithName("Reconcile"),
+		ResourceManager:   resource.NewDefaultResourceManager(mgr.GetClient(), ctrl.Log.WithName("Kode").WithName("ResourceManager"), scheme),
+		TemplateManager:   template.NewDefaultTemplateManager(mgr.GetClient(), ctrl.Log.WithName("Kode").WithName("TemplateManager")),
+		CleanupManager:    cleanup.NewDefaultCleanupManager(mgr.GetClient(), ctrl.Log.WithName("Kode").WithName("CleanupManager")),
+		Validator:         validation.NewDefaultValidator(),
+		EventManager:      events.NewEventManager(mgr.GetClient(), ctrl.Log.WithName("Kode").WithName("EventManager"), mgr.GetScheme(), mgr.GetEventRecorderFor("kode-controller")),
+		IsTestEnvironment: false,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Kode")
 		os.Exit(1)

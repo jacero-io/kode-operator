@@ -55,7 +55,7 @@ spec:
     password: mypassword
     enableBuiltinAuth: true
   templateRef:
-    kind: PodTemplate
+    kind: ContainerTemplate
     name: my-kode-template
   home: /home/myuser
   workspace: my-workspace
@@ -68,15 +68,15 @@ spec:
         storage: 5Gi
 ```
 
-### PodTemplate & ClusterPodTemplate
+### ContainerTemplate & ClusterContainerTemplate
 
 These are cluster scoped and namespace scoped templates. A template contains an image and some default configuration for that image. You can also include an Envoy Proxy configuration that is then applied to the sidecar of the resulting Kode instance.
 
-**Example for PodTemplate:**
+**Example for ContainerTemplate:**
 
 ```yaml
 apiVersion: kode.jacero.io/v1alpha2
-kind: PodTemplate
+kind: ContainerTemplate
 metadata:
   name: my-kode-template
   namespace: default
@@ -88,11 +88,11 @@ spec:
   defaultWorkspace: workspace
 ```
 
-**Example for ClusterPodTemplate:**
+**Example for ClusterContainerTemplate:**
 
 ```yaml
 apiVersion: kode.jacero.io/v1alpha2
-kind: ClusterPodTemplate
+kind: ClusterContainerTemplate
 metadata:
   name: my-kode-cluster-template
 spec:
@@ -126,7 +126,7 @@ spec:
 
 ### Features
 
-* [x] PodTemplate - Deploying `code-server`, `webtop`, and `jupyter` directly into kubernetes accessing them through your browser.
+* [x] ContainerTemplate - Deploying `code-server`, `webtop`, and `jupyter` directly into kubernetes accessing them through your browser.
 * [ ] TofuTemplate - Deploying anything you can imagine in using Tofu.
 * [ ] Authentication - Enforce `Basic auth`, `OIDC`, `JWT`, or `x509` authentication.
 * [ ] Authorization - Make sure only you have access to your stuff!
@@ -141,11 +141,11 @@ spec:
 
 You want to set up a VSCode-like development environment using Code-server for your team. This setup allows developers to access their development environment from any browser.
 
-**1. Create a PodTemplate for code-server:**
+**1. Create a ContainerTemplate for code-server:**
 
 ```yaml
 apiVersion: v1alpha2
-kind: PodTemplate
+kind: ContainerTemplate
 metadata:
   name: code-server-template
 spec:
@@ -166,7 +166,7 @@ spec:
   credentials:
     username: devuser
   templateRef:
-    kind: PodTemplate
+    kind: ContainerTemplate
     name: code-server-template
   workspace: my-project # Overrides the template workspace
 ```

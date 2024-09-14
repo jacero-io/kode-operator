@@ -20,37 +20,37 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// PodTemplateSpec defines the desired state of ClusterKodeContainer
-type PodTemplateSpec struct {
-	PodTemplateSharedSpec `json:",inline" yaml:",inline"`
+// ContainerTemplateSpec defines the desired state of ClusterKodeContainer
+type ContainerTemplateSpec struct {
+	ContainerTemplateSharedSpec `json:",inline" yaml:",inline"`
 }
 
-// PodTemplateStatus defines the observed state of ClusterKodeContainer
-type PodTemplateStatus struct {
-	PodTemplateSharedStatus `json:",inline" yaml:",inline"`
+// ContainerTemplateStatus defines the observed state of ClusterKodeContainer
+type ContainerTemplateStatus struct {
+	ContainerTemplateSharedStatus `json:",inline" yaml:",inline"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 
-// PodTemplate is the Schema for the podtemplates API
-type PodTemplate struct {
+// ContainerTemplate is the Schema for the ContainerTemplates API
+type ContainerTemplate struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   PodTemplateSpec   `json:"spec,omitempty"`
-	Status PodTemplateStatus `json:"status,omitempty"`
+	Spec   ContainerTemplateSpec   `json:"spec,omitempty"`
+	Status ContainerTemplateStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// PodTemplateList contains a list of PodTemplate
-type PodTemplateList struct {
+// ContainerTemplateList contains a list of ContainerTemplate
+type ContainerTemplateList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []PodTemplate `json:"items"`
+	Items           []ContainerTemplate `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&PodTemplate{}, &PodTemplateList{})
+	SchemeBuilder.Register(&ContainerTemplate{}, &ContainerTemplateList{})
 }

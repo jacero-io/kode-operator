@@ -18,37 +18,37 @@ package kode
 
 import (
 	"context"
+	"reflect"
 	"time"
 
 	"github.com/go-logr/logr"
 
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	client "sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
-	"sigs.k8s.io/controller-runtime/pkg/handler"
 
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/cleanup"
-	"github.com/jacero-io/kode-operator/internal/common"
+	"github.com/jacero-io/kode-operator/internal/constants"
 	"github.com/jacero-io/kode-operator/internal/events"
 	"github.com/jacero-io/kode-operator/internal/resource"
-	"github.com/jacero-io/kode-operator/internal/status"
 	"github.com/jacero-io/kode-operator/internal/template"
 	"github.com/jacero-io/kode-operator/internal/validation"
 )
 
 type KodeReconciler struct {
-	Client          client.Client
-	Scheme          *runtime.Scheme
-	Log             logr.Logger
-	ResourceManager resource.ResourceManager
-	TemplateManager template.TemplateManager
-	CleanupManager  cleanup.CleanupManager
-	StatusUpdater   status.StatusUpdater
-	Validator       validation.Validator
-	EventManager    events.EventManager
+	Client            client.Client
+	Scheme            *runtime.Scheme
+	Log               logr.Logger
+	ResourceManager   resource.ResourceManager
+	TemplateManager   template.TemplateManager
+	CleanupManager    cleanup.CleanupManager
+	Validator         validation.Validator
+	EventManager      events.EventManager
+	IsTestEnvironment bool
 }
 
 const (
@@ -58,8 +58,8 @@ const (
 // +kubebuilder:rbac:groups=kode.jacero.io,resources=kodes,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=kode.jacero.io,resources=kodes/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=kode.jacero.io,resources=kodes/finalizers,verbs=update
-// +kubebuilder:rbac:groups=kode.jacero.io,resources=podtemplates,verbs=get;list;watch
-// +kubebuilder:rbac:groups=kode.jacero.io,resources=clusterpodtemplates,verbs=get;list;watch
+// +kubebuilder:rbac:groups=kode.jacero.io,resources=containertemplates,verbs=get;list;watch
+// +kubebuilder:rbac:groups=kode.jacero.io,resources=clustercontainertemplates,verbs=get;list;watch
 // +kubebuilder:rbac:groups=kode.jacero.io,resources=tofutemplates,verbs=get;list;watch
 // +kubebuilder:rbac:groups=kode.jacero.io,resources=clustertofutemplates,verbs=get;list;watch
 // +kubebuilder:rbac:groups="coordination.k8s.io",resources=leases,verbs=get;list;watch;create;update;patch;delete,namespace=kode-system
@@ -84,29 +84,42 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 			return ctrl.Result{}, err
 		}
 		// Kode not found, likely deleted, nothing to do
+		log.V(1).Info("Kode resource not found, likely deleted")
 		return ctrl.Result{}, nil
 	}
 	log.V(1).Info("Fetched Kode resource", "Name", kode.Name, "Namespace", kode.Namespace, "Generation", kode.Generation, "ObservedGeneration", kode.Status.ObservedGeneration, "Phase", kode.Status.Phase)
 
-	// Handle deletion
-	if !kode.DeletionTimestamp.IsZero() {
-		return r.handleFinalizer(ctx, kode)
-	}
-
-	// Ensure finalizer is present (fallback)
-	if !controllerutil.ContainsFinalizer(kode, common.KodeFinalizerName) {
-		controllerutil.AddFinalizer(kode, common.KodeFinalizerName)
+	// **Add finalizer if not present**
+	if !controllerutil.ContainsFinalizer(kode, constants.KodeFinalizerName) {
+		controllerutil.AddFinalizer(kode, constants.KodeFinalizerName)
 		if err := r.Client.Update(ctx, kode); err != nil {
 			log.Error(err, "Failed to add finalizer")
 			return ctrl.Result{Requeue: true}, err
 		}
 		log.Info("Added finalizer to Kode resource")
+		// Requeue to ensure the updated resource is processed
 		return ctrl.Result{Requeue: true}, nil
 	}
 
-	// Initialize status if it's a new resource
+	// Handle phase transitions
+	var result ctrl.Result
+	var err error
+
+	// Transition to Deleting state if deletion timestamp is set and not already in deleting state
+	if !kode.DeletionTimestamp.IsZero() && kode.Status.Phase != kodev1alpha2.KodePhaseDeleting {
+		result, err = r.transitionTo(ctx, kode, kodev1alpha2.KodePhaseDeleting)
+		return result, err // Early return after transition
+	} else if kode.Generation != kode.Status.ObservedGeneration && kode.Status.Phase != kodev1alpha2.KodePhaseDeleting && kode.Status.Phase != kodev1alpha2.KodePhaseConfiguring { // Transition to Configuring state if generation mismatch
+		log.Info("Generation mismatch, transitioning to Configuring state")
+		result, err = r.transitionTo(ctx, kode, kodev1alpha2.KodePhaseConfiguring)
+		return result, err // Early return after transition
+	}
+
+	// Transition to Pending state if no phase is set
 	if kode.Status.Phase == "" {
-		return r.transitionTo(ctx, kode, kodev1alpha2.KodePhasePending)
+		log.Info("Transitioning to Pending state")
+		result, err := r.transitionTo(ctx, kode, kodev1alpha2.KodePhasePending)
+		return result, err // Early return after transition
 	}
 
 	// Reset retry count if we're not in a failed state
@@ -116,10 +129,6 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 			return ctrl.Result{Requeue: true}, err
 		}
 	}
-
-	// Handle state transition
-	var result ctrl.Result
-	var err error
 
 	switch kode.Status.Phase {
 	case kodev1alpha2.KodePhasePending:
@@ -146,7 +155,8 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		result, err = r.handleUnknownState(ctx, kode)
 	default:
 		log.Info("Unknown phase, transitioning to Unknown", "phase", kode.Status.Phase)
-		return r.transitionTo(ctx, kode, kodev1alpha2.KodePhaseUnknown)
+		result, err = r.transitionTo(ctx, kode, kodev1alpha2.KodePhaseUnknown)
+		return result, err // Early return after transition
 	}
 
 	// Handle errors from state handlers
@@ -154,10 +164,30 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		log.Error(err, "Error handling state", "phase", kode.Status.Phase)
 		if kode.Status.Phase != kodev1alpha2.KodePhaseFailed {
 			// Transition to failed state if not already there
-			return r.transitionTo(ctx, kode, kodev1alpha2.KodePhaseFailed)
+			result, err = r.transitionTo(ctx, kode, kodev1alpha2.KodePhaseFailed)
+			return result, err // Early return after transition
 		}
 		// If already in failed state, just requeue
 		return ctrl.Result{Requeue: true}, nil
+	}
+
+	// Check if the Kode resource still exists before updating status
+	latestKode := &kodev1alpha2.Kode{}
+	if err := r.Client.Get(ctx, req.NamespacedName, latestKode); err != nil {
+		if errors.IsNotFound(err) {
+			// Kode resource has been deleted, nothing to update
+			return ctrl.Result{}, nil
+		}
+		log.Error(err, "Failed to get latest Kode")
+		return ctrl.Result{Requeue: true}, err
+	}
+
+	// Update the whole status if it has changed
+	if !reflect.DeepEqual(latestKode.Status, kode.Status) {
+		if err := r.updateStatus(ctx, kode); err != nil {
+			// If we fail to update the status, requeue
+			return ctrl.Result{Requeue: true}, err
+		}
 	}
 
 	log.V(1).Info("Reconciliation completed", "Phase", kode.Status.Phase, "result", result)
@@ -167,14 +197,10 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 func (r *KodeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&kodev1alpha2.Kode{}).
-		// Owns(&corev1.Service{}).
-		// Owns(&corev1.Secret{}).
-		// Owns(&corev1.PersistentVolumeClaim{}).
-		// Owns(&appsv1.StatefulSet{}).
-		Watches(&kodev1alpha2.PodTemplate{}, &handler.EnqueueRequestForObject{}).
-		Watches(&kodev1alpha2.ClusterPodTemplate{}, &handler.EnqueueRequestForObject{}).
-		Watches(&kodev1alpha2.TofuTemplate{}, &handler.EnqueueRequestForObject{}).
-		Watches(&kodev1alpha2.ClusterTofuTemplate{}, &handler.EnqueueRequestForObject{}).
-		WithOptions(controller.Options{MaxConcurrentReconciles: 1}).
+		// Watches(&kodev1alpha2.ContainerTemplate{}, &handler.EnqueueRequestForObject{}).
+		// Watches(&kodev1alpha2.ClusterContainerTemplate{}, &handler.EnqueueRequestForObject{}).
+		// Watches(&kodev1alpha2.TofuTemplate{}, &handler.EnqueueRequestForObject{}).
+		// Watches(&kodev1alpha2.ClusterTofuTemplate{}, &handler.EnqueueRequestForObject{}).
+		WithOptions(controller.Options{MaxConcurrentReconciles: 2}).
 		Complete(r)
 }

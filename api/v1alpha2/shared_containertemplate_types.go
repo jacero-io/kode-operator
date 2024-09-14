@@ -20,8 +20,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 )
 
-// PodTemplateSharedSpec defines the desired state of KodeContainer
-type PodTemplateSharedSpec struct {
+// ContainerTemplateSharedSpec defines the desired state of KodeContainer
+type ContainerTemplateSharedSpec struct {
 
 	// BaseSharedSpec is the base shared spec.
 	BaseSharedSpec `json:",inline"`
@@ -80,7 +80,7 @@ type PodTemplateSharedSpec struct {
 	InitPlugins []InitPluginSpec `json:"initPlugins,omitempty"`
 }
 
-// PodTemplateSharedStatus defines the observed state for Container
-type PodTemplateSharedStatus struct {
+// ContainerTemplateSharedStatus defines the observed state for Container
+type ContainerTemplateSharedStatus struct {
 	BaseSharedStatus `json:",inline"`
 }

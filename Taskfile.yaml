@@ -42,9 +42,10 @@ vars:
   IMG: '{{.IMG | default "emiljacero/kode-operator:v0.0.0-latest"}}'
 
   CONCAT_DIRECTORY: '{{.ROOT_DIR}}/'
-  CONCAT_INCLUDE_COMMON: 'v1alpha2/common_types.go,common/*,status/*'
-  CONCAT_INCLUDE_KODE: 'v1alpha2/kode_types.go,controllers/kode/reconciler.go,controllers/kode/utils.go,controllers/kode/finalizer.go,controllers/kode/config.go'
-  CONCAT_INCLUDE_ENTRYPOINT: 'v1alpha2/entrypoint_types.go,controllers/entrypoint/reconciler.go,controllers/entrypoint/utils.go,controllers/entrypoint/finalizer.go,controllers/entrypoint/config.go,controllers/entrypoint/ensure_routes.go'
+  CONCAT_INCLUDE_COMMON: 'v1alpha2/common_types.go,common/*,constants/*,cleanup/*'
+  # v1alpha2/kode_types.go,
+  CONCAT_INCLUDE_KODE: 'controllers/kode/reconciler.go,controllers/kode/utils.go,controllers/kode/states.go,controllers/kode/config.go'
+  # CONCAT_INCLUDE_ENTRYPOINT: 'v1alpha2/entrypoint_types.go,controllers/entrypoint/reconciler.go,controllers/entrypoint/utils.go,controllers/entrypoint/states.go,controllers/entrypoint/finalizer.go,controllers/entrypoint/config.go,controllers/entrypoint/ensure_routes.go'
 
   CONCAT_EXCLUDE_PATTERNS: 'zz_generated.deepcopy.go'
   CONCAT_INCLUDE_PATTERNS: '{{.CONCAT_INCLUDE_COMMON}},{{.CONCAT_INCLUDE_KODE}},{{.CONCAT_INCLUDE_ENTRYPOINT}}'

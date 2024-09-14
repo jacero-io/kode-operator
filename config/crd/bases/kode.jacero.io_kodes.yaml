@@ -406,8 +406,8 @@ spec:
                     type: string
                 type: object
               templateRef:
-                description: The reference to a template. Either a PodTemplate, VirtualTemplate
-                  or TofuTemplate.
+                description: The reference to a template. Either a ContainerTemplate,
+                  VirtualTemplate or TofuTemplate.
                 properties:
                   apiVersion:
                     description: API version of the referent.
@@ -506,6 +506,10 @@ spec:
                   - type
                   type: object
                 type: array
+              deletionCycle:
+                description: DeletionCycle keeps track of the number of deletion cycles.
+                  This is used to determine if the resource is deleting.
+                type: integer
               iconUrl:
                 description: The URL to the icon for the Kode.
                 type: string

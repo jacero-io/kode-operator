@@ -405,8 +405,8 @@ spec:
                     type: string
                 type: object
               templateRef:
-                description: The reference to a template. Either a PodTemplate, VirtualTemplate
-                  or TofuTemplate.
+                description: The reference to a template. Either a ContainerTemplate,
+                  VirtualTemplate or TofuTemplate.
                 properties:
                   apiVersion:
                     description: API version of the referent.

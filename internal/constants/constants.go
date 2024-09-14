@@ -14,7 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package common
+package constants
+
+type ConditionType string
 
 const (
 	// General constants
@@ -30,26 +32,26 @@ const (
 
 	// These are the condition types that are used in the status of the Kode and EntryPoint resources
 	// ConditionTypeReady indicates that the resource is fully operational and prepared to serve its intended purpose.
-	ConditionTypeReady = "Ready"
+	ConditionTypeReady ConditionType = "Ready"
 
 	// ConditionTypeAvailable indicates that the resource is accessible and can actively serve requests or perform its function.
-	ConditionTypeAvailable = "Available"
+	ConditionTypeAvailable ConditionType = "Available"
 
 	// ConditionTypeProgressing indicates that the resource is actively working towards a desired state.
-	ConditionTypeProgressing = "Progressing"
+	ConditionTypeProgressing ConditionType = "Progressing"
 
 	// ConditionTypeDegraded indicates that the resource is operational but not functioning optimally or with full capabilities.
-	ConditionTypeDegraded = "Degraded"
+	ConditionTypeDegraded ConditionType = "Degraded"
 
 	// ConditionTypeError indicates that the resource has encountered an error state that requires attention.
-	ConditionTypeError = "Error"
+	ConditionTypeError ConditionType = "Error"
 
 	// ConditionTypeConfigured indicates that the resource has been properly configured with all necessary settings.
-	ConditionTypeConfigured = "Configured"
+	ConditionTypeConfigured ConditionType = "Configured"
 
-	// ConditionTypeHTTPRouteAvailable indicates that the HTTP route is available and can be accessed.
-	ConditionTypeHTTPRouteAvailable = "HTTPRouteAvailable"
+	// ConditionTypeHTTPRouteReady indicates that the HTTP route is available and can be accessed.
+	ConditionTypeHTTPRouteReady ConditionType = "HTTPRouteReady"
 
-	// ConditionTypeHTTPSRouteAvailable indicates that the HTTPS route is available and can be accessed.
-	ConditionTypeHTTPSRouteAvailable = "HTTPSRouteAvailable"
+	// ConditionTypeHTTPSRouteReady indicates that the HTTPS route is available and can be accessed.
+	ConditionTypeHTTPSRouteReady ConditionType = "HTTPSRouteReady"
 )

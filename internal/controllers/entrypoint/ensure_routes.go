@@ -51,14 +51,12 @@ func (r *EntryPointReconciler) ensureHTTPRoutes(ctx context.Context, entrypoint 
 	// routes = append(routes, httpRoute)
 
 	// Construct HTTPS Route
-	// if config.IsHTTPS() {}
 	httpsRoute, err := r.constructHTTPRoute(config, kode, false, kodeHostname, kodeDomain)
 	if err != nil {
 		return false, fmt.Errorf("failed to construct HTTPS route: %v", err)
 	}
 	routes = append(routes, httpsRoute)
 	httpsRouteName = httpsRoute.Name
-
 
 	created := false // Flag to indicate if any HTTPRoute was created
 
@@ -186,7 +184,7 @@ func (r *EntryPointReconciler) constructHTTPRoute(config *common.EntryPointResou
 		}
 	}
 
-	log.Info("Constructed HTTPRoute", "name", routeName, "hostname", kodeHostname, "domain", kodeDomain, "port", kodePort, "isRedirect", isRedirect, "protocol", config.Protocol, "rules", rules)
+	log.V(1).Info("Constructed HTTPRoute", "name", routeName, "hostname", kodeHostname, "domain", kodeDomain, "port", kodePort, "isRedirect", isRedirect, "protocol", config.Protocol, "rules", rules)
 
 	return &gwapiv1.HTTPRoute{
 		ObjectMeta: metav1.ObjectMeta{
