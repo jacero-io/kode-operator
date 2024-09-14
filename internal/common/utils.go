@@ -23,34 +23,26 @@ import (
 
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func GetCurrentTime() metav1.Time {
-	return metav1.NewTime(time.Now())
-}
-
-func GetLatestObject(ctx context.Context, c client.Client, name, namespace string, obj client.Object) error {
-	switch obj.(type) {
-	case *kodev1alpha2.Kode, *kodev1alpha2.EntryPoint:
-		return c.Get(ctx, client.ObjectKey{Name: name, Namespace: namespace}, obj)
-	default:
-		return fmt.Errorf("unsupported object type: %T", obj)
-	}
-}
-
 func GetLatestKode(ctx context.Context, client client.Client, name string, namespace string) (*kodev1alpha2.Kode, error) {
 	kode := &kodev1alpha2.Kode{}
 	err := client.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, kode)
-	return kode, err
+	if err != nil {
+		return nil, err
+	}
+	return kode, nil
 }
 
 func GetLatestEntryPoint(ctx context.Context, client client.Client, name string, namespace string) (*kodev1alpha2.EntryPoint, error) {
 	entryPoint := &kodev1alpha2.EntryPoint{}
 	err := client.Get(ctx, types.NamespacedName{Name: name, Namespace: namespace}, entryPoint)
+	if err != nil {
+		return nil, err
+	}
 	return entryPoint, err
 }
 
