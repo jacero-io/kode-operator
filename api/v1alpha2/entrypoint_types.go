@@ -114,6 +114,12 @@ type EntryPointStatus struct {
 
 	// Represents the current phase of the EntryPointPhase resource.
 	Phase EntryPointPhase `json:"phase" yaml:"phase"`
+
+	// RetryCount keeps track of the number of retry attempts for failed states.
+	RetryCount int `json:"retryCount,omitempty"`
+
+	// DeletionCycle keeps track of the number of deletion cycles. This is used to determine if the resource is deleting.
+	DeletionCycle int `json:"deletionCycle,omitempty"`
 }
 
 // +kubebuilder:object:root=true

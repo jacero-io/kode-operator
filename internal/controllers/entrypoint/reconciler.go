@@ -19,6 +19,7 @@ package entrypoint
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -29,11 +30,13 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	gwapiv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/cleanup"
+	"github.com/jacero-io/kode-operator/internal/constants"
 	"github.com/jacero-io/kode-operator/internal/events"
 	"github.com/jacero-io/kode-operator/internal/resource"
 	"github.com/jacero-io/kode-operator/internal/status"
@@ -83,10 +86,10 @@ func (r *EntryPointReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	switch v := obj.(type) {
 	case *kodev1alpha2.EntryPoint:
 		// Skip reconciliation of EntryPoints because it is not yet implemented
-		// log.V(1).Info("Skipping reconciliation of EntryPoint", "namespace", v.Namespace, "name", v.Name)
-		// return ctrl.Result{}, nil
-		log.V(1).Info("Reconciling EntryPoint", "namespace", v.Namespace, "name", v.Name)
-		return r.reconcileEntryPoint(ctx, v)
+		log.V(1).Info("Skipping reconciliation of EntryPoint", "namespace", v.Namespace, "name", v.Name)
+		return ctrl.Result{}, nil
+		// log.V(1).Info("Reconciling EntryPoint", "namespace", v.Namespace, "name", v.Name)
+		// return r.reconcileEntryPoint(ctx, v)
 	case *kodev1alpha2.Kode:
 		log.V(1).Info("Reconciling Kode", "namespace", v.Namespace, "name", v.Name)
 		return r.reconcileKode(ctx, v)
@@ -99,19 +102,48 @@ func (r *EntryPointReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 func (r *EntryPointReconciler) reconcileEntryPoint(ctx context.Context, entryPoint *kodev1alpha2.EntryPoint) (ctrl.Result, error) {
 	log := r.Log.WithValues("entrypoint", types.NamespacedName{Name: entryPoint.Name, Namespace: entryPoint.Namespace})
 
-	// Handle deletion
-	if !entryPoint.DeletionTimestamp.IsZero() {
-		return r.handleDeletingState(ctx, entryPoint)
-	}
+	log.V(1).Info("Fetched EntryPoint resource", "Name", entryPoint.Name, "Namespace", entryPoint.Namespace, "Generation", entryPoint.Generation, "ObservedGeneration", entryPoint.Status.ObservedGeneration, "Phase", entryPoint.Status.Phase)
 
-	// Initialize status if it's a new resource
-	if entryPoint.Status.Phase == "" {
-		return r.transitionTo(ctx, entryPoint, kodev1alpha2.EntryPointPhasePending)
+	// **Add finalizer if not present**
+	if !controllerutil.ContainsFinalizer(entryPoint, constants.EntryPointFinalizerName) {
+		controllerutil.AddFinalizer(entryPoint, constants.EntryPointFinalizerName)
+		if err := r.Client.Update(ctx, entryPoint); err != nil {
+			log.Error(err, "Failed to add finalizer")
+			return ctrl.Result{Requeue: true}, err
+		}
+		log.Info("Added finalizer to EntryPoint resource")
+		// Requeue to ensure the updated resource is processed
+		return ctrl.Result{Requeue: true}, nil
 	}
 
 	// Handle state transition
 	var result ctrl.Result
 	var err error
+
+	// Transition to Deleting state if deletion timestamp is set and not already in deleting state
+	if !entryPoint.DeletionTimestamp.IsZero() && entryPoint.Status.Phase != kodev1alpha2.EntryPointPhaseDeleting {
+		result, err = r.transitionTo(ctx, entryPoint, kodev1alpha2.EntryPointPhaseDeleting)
+		return result, err // Early return after transition
+	} else if entryPoint.Generation != entryPoint.Status.ObservedGeneration && entryPoint.Status.Phase != kodev1alpha2.EntryPointPhaseDeleting && entryPoint.Status.Phase != kodev1alpha2.EntryPointPhaseConfiguring { // Transition to Configuring state if generation mismatch
+		log.Info("Generation mismatch, transitioning to Configuring state")
+		result, err = r.transitionTo(ctx, entryPoint, kodev1alpha2.EntryPointPhaseConfiguring)
+		return result, err // Early return after transition
+	}
+
+	// Transition to Pending state if no phase is set
+	if entryPoint.Status.Phase == "" {
+		log.Info("Transitioning to Pending state")
+		result, err := r.transitionTo(ctx, entryPoint, kodev1alpha2.EntryPointPhasePending)
+		return result, err // Early return after transition
+	}
+
+	// Reset retry count if we're not in a failed state
+	if entryPoint.Status.Phase != kodev1alpha2.EntryPointPhaseFailed && entryPoint.Status.RetryCount > 0 {
+		if err := r.updateRetryCount(ctx, entryPoint, 0); err != nil {
+			log.Error(err, "Failed to reset retry count")
+			return ctrl.Result{Requeue: true}, err
+		}
+	}
 
 	switch entryPoint.Status.Phase {
 	case kodev1alpha2.EntryPointPhasePending:
@@ -131,17 +163,38 @@ func (r *EntryPointReconciler) reconcileEntryPoint(ctx context.Context, entryPoi
 		return r.transitionTo(ctx, entryPoint, kodev1alpha2.EntryPointPhaseFailed)
 	}
 
+	// Handle errors from state handlers
 	if err != nil {
 		log.Error(err, "Error handling state", "phase", entryPoint.Status.Phase)
-		return r.transitionTo(ctx, entryPoint, kodev1alpha2.EntryPointPhaseFailed)
+		if entryPoint.Status.Phase != kodev1alpha2.EntryPointPhaseFailed {
+			// Transition to failed state if not already there
+			result, err = r.transitionTo(ctx, entryPoint, kodev1alpha2.EntryPointPhaseFailed)
+			return result, err // Early return after transition
+		}
+		// If already in failed state, just requeue
+		return ctrl.Result{Requeue: true}, nil
 	}
 
-	// Update the EntryPoint status
-	if err := r.updateStatus(ctx, entryPoint); err != nil {
-		log.Error(err, "Failed to update EntryPoint status")
+	// Check if the Kode resource still exists before updating status
+	latestEntryPoint := &kodev1alpha2.Kode{}
+	if err := r.Client.Get(ctx, client.ObjectKey{Name: entryPoint.Name, Namespace: entryPoint.Namespace}, latestEntryPoint); err != nil {
+		if errors.IsNotFound(err) {
+			// Kode resource has been deleted, nothing to update
+			return ctrl.Result{}, nil
+		}
+		log.Error(err, "Failed to get latest Kode")
 		return ctrl.Result{Requeue: true}, err
 	}
 
+	// Update the whole status if it has changed
+	if !reflect.DeepEqual(latestEntryPoint.Status, entryPoint.Status) {
+		if err := r.updateStatus(ctx, entryPoint); err != nil {
+			// If we fail to update the status, requeue
+			return ctrl.Result{Requeue: true}, err
+		}
+	}
+
+	log.V(1).Info("Reconciliation completed", "Phase", entryPoint.Status.Phase, "result", result)
 	return result, nil
 }
 
@@ -161,7 +214,7 @@ func (r *EntryPointReconciler) reconcileKode(ctx context.Context, kode *kodev1al
 	if err != nil {
 		if errors.IsNotFound(err) {
 			log.Info("EntryPoint not found, requeuing", "error", err)
-			return ctrl.Result{RequeueAfter: 5 * time.Second}, nil
+			return ctrl.Result{RequeueAfter: time.Second}, nil
 		}
 		log.Error(err, "Unable to find EntryPoint for Kode")
 		return r.handleReconcileError(ctx, kode, nil, err, "Unable to find EntryPoint for Kode")

@@ -110,7 +110,7 @@ func (r *KodeReconciler) checkPodResources(ctx context.Context, kode *kodev1alph
 	}
 	log.V(1).Info("All pods are ready")
 
-	log.V(1).Info("All resources are ready", "Phase", kode.Status.Phase)
+	log.V(1).Info("All resources are ready")
 	return true, nil
 }
 

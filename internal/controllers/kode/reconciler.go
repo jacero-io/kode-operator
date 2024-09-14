@@ -19,7 +19,6 @@ package kode
 import (
 	"context"
 	"reflect"
-	"time"
 
 	"github.com/go-logr/logr"
 
@@ -50,10 +49,6 @@ type KodeReconciler struct {
 	EventManager      events.EventManager
 	IsTestEnvironment bool
 }
-
-const (
-	RequeueInterval = 250 * time.Millisecond
-)
 
 // +kubebuilder:rbac:groups=kode.jacero.io,resources=kodes,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=kode.jacero.io,resources=kodes/status,verbs=get;update;patch

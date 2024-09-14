@@ -112,6 +112,10 @@ func (r *EntryPointReconciler) updateStatus(ctx context.Context, entryPoint *kod
 		// Fetch the latest version of the EntryPoint
 		latestEntryPoint, err := common.GetLatestEntryPoint(ctx, r.Client, entryPoint.Name, entryPoint.Namespace)
 		if err != nil {
+			if errors.IsNotFound(err) {
+				// Kode resource has been deleted, nothing to update
+				return nil
+			}
 			return err
 		}
 
@@ -127,6 +131,19 @@ func (r *EntryPointReconciler) updateStatus(ctx context.Context, entryPoint *kod
 			return err
 		}
 		return nil
+	})
+}
+
+func (r *EntryPointReconciler) updateRetryCount(ctx context.Context, entryPoint *kodev1alpha2.EntryPoint, count int) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		latestEntryPoint := &kodev1alpha2.Kode{}
+		err := r.Client.Get(ctx, client.ObjectKey{Name: entryPoint.Name, Namespace: entryPoint.Namespace}, latestEntryPoint)
+		if err != nil {
+			return err
+		}
+
+		latestEntryPoint.Status.RetryCount = count
+		return r.Client.Status().Update(ctx, latestEntryPoint)
 	})
 }
 

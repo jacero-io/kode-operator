@@ -295,8 +295,8 @@ func (r *KodeReconciler) handleDeletingState(ctx context.Context, kode *kodev1al
 	}
 
 	if !childResourcesDeleted {
-		log.Info("Child resources still exist")
 		if kode.Status.DeletionCycle == 0 {
+			kode.Status.DeletionCycle = 1
 			log.Info("Initiating cleanup")
 			cleanupResource := NewKodeCleanupResource(kode)
 			result, err := r.CleanupManager.Cleanup(ctx, cleanupResource)
@@ -307,6 +307,12 @@ func (r *KodeReconciler) handleDeletingState(ctx context.Context, kode *kodev1al
 			}
 			return result, nil
 		}
+
+		log.Info("Child resources still exist")
+
+		log.V(1).Info("Incrementing deletion cycle")
+		kode.Status.DeletionCycle++
+
 		return ctrl.Result{RequeueAfter: time.Second}, nil
 	}
 	log.V(1).Info("All child resources are deleted")

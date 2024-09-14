@@ -31,7 +31,7 @@ import (
 )
 
 // ensureGateway ensures that the Gateway exists for the EntryPoint instance
-func (r *EntryPointReconciler) ensureGateway(ctx context.Context, entryPoint *kodev1alpha2.EntryPoint, config *common.EntryPointResourceConfig) (*gwapiv1.Gateway, error) {
+func (r *EntryPointReconciler) ensureGatewayResources(ctx context.Context, entryPoint *kodev1alpha2.EntryPoint, config *common.EntryPointResourceConfig) error {
 	log := r.Log.WithName("GatewayEnsurer").WithValues("entrypoint", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	ctx, cancel := common.ContextWithTimeout(ctx, 30) // 30 seconds timeout
@@ -44,10 +44,10 @@ func (r *EntryPointReconciler) ensureGateway(ctx context.Context, entryPoint *ko
 		gateway := &gwapiv1.Gateway{}
 		err := r.Client.Get(ctx, types.NamespacedName{Name: string(entryPoint.Spec.GatewaySpec.ExistingGatewayRef.Name), Namespace: entryPoint.Namespace}, gateway)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get existing Gateway: %w", err)
+			return fmt.Errorf("failed to get existing Gateway: %w", err)
 		}
 
-		return gateway, nil
+		return nil
 	}
 
 	gateway := &gwapiv1.Gateway{
@@ -71,10 +71,10 @@ func (r *EntryPointReconciler) ensureGateway(ctx context.Context, entryPoint *ko
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("failed to create or patch Gateway: %w", err)
+		return fmt.Errorf("failed to create or patch Gateway: %w", err)
 	}
 
-	return gateway, nil
+	return nil
 }
 
 // constructGateway constructs a Gateway for the EntryPoint instance
