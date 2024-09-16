@@ -57,7 +57,7 @@ tasks:
       - lint:fmt
       - lint:vet
       - build:docker-buildx
-      - clusters:kind-create
+      - clusters:kind-ensure
       - clusters:kind-load-images
 
   all:
