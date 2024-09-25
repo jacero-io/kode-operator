@@ -31,8 +31,8 @@ import (
 
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/cleanup"
-	"github.com/jacero-io/kode-operator/internal/constants"
-	"github.com/jacero-io/kode-operator/internal/events"
+	"github.com/jacero-io/kode-operator/internal/constant"
+	"github.com/jacero-io/kode-operator/internal/event"
 	"github.com/jacero-io/kode-operator/internal/resource"
 	"github.com/jacero-io/kode-operator/internal/template"
 	"github.com/jacero-io/kode-operator/internal/validation"
@@ -46,7 +46,7 @@ type KodeReconciler struct {
 	TemplateManager   template.TemplateManager
 	CleanupManager    cleanup.CleanupManager
 	Validator         validation.Validator
-	EventManager      events.EventManager
+	EventManager      event.EventManager
 	IsTestEnvironment bool
 }
 
@@ -65,7 +65,7 @@ type KodeReconciler struct {
 // +kubebuilder:rbac:groups="",resources=persistentvolumeclaims,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups="",resources=events,verbs=create;patch;update
+// +kubebuilder:rbac:groups="",resources=event,verbs=create;patch;update
 
 func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("kode", req.NamespacedName)
@@ -85,8 +85,8 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	log.V(1).Info("Fetched Kode resource", "Name", kode.Name, "Namespace", kode.Namespace, "Generation", kode.Generation, "ObservedGeneration", kode.Status.ObservedGeneration, "Phase", kode.Status.Phase)
 
 	// **Add finalizer if not present**
-	if !controllerutil.ContainsFinalizer(kode, constants.KodeFinalizerName) {
-		controllerutil.AddFinalizer(kode, constants.KodeFinalizerName)
+	if !controllerutil.ContainsFinalizer(kode, constant.KodeFinalizerName) {
+		controllerutil.AddFinalizer(kode, constant.KodeFinalizerName)
 		if err := r.Client.Update(ctx, kode); err != nil {
 			log.Error(err, "Failed to add finalizer")
 			return ctrl.Result{Requeue: true}, err

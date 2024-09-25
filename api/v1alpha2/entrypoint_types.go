@@ -20,7 +20,7 @@ import (
 	"time"
 
 	egv1alpha1 "github.com/envoyproxy/gateway/api/v1alpha1"
-	"github.com/jacero-io/kode-operator/internal/constants"
+	"github.com/jacero-io/kode-operator/internal/constant"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	gwapiv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
@@ -208,7 +208,7 @@ func init() {
 	SchemeBuilder.Register(&EntryPoint{}, &EntryPointList{})
 }
 
-func (k *EntryPoint) SetCondition(conditionType constants.ConditionType, status metav1.ConditionStatus, reason, message string) {
+func (k *EntryPoint) SetCondition(conditionType constant.ConditionType, status metav1.ConditionStatus, reason, message string) {
 	newCondition := metav1.Condition{
 		Type:               string(conditionType),
 		Status:             status,
@@ -230,7 +230,7 @@ func (k *EntryPoint) SetCondition(conditionType constants.ConditionType, status 
 	k.Status.Conditions = append(k.Status.Conditions, newCondition)
 }
 
-func (k *EntryPoint) GetCondition(conditionType constants.ConditionType) *metav1.Condition {
+func (k *EntryPoint) GetCondition(conditionType constant.ConditionType) *metav1.Condition {
 	for _, condition := range k.Status.Conditions {
 		if condition.Type == string(conditionType) {
 			return &condition
@@ -239,7 +239,7 @@ func (k *EntryPoint) GetCondition(conditionType constants.ConditionType) *metav1
 	return nil
 }
 
-func (k *EntryPoint) DeleteCondition(conditionType constants.ConditionType) {
+func (k *EntryPoint) DeleteCondition(conditionType constant.ConditionType) {
 	conditions := []metav1.Condition{}
 	for _, condition := range k.Status.Conditions {
 		if condition.Type != string(conditionType) {

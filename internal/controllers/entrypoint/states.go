@@ -29,7 +29,7 @@ import (
 
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
-	"github.com/jacero-io/kode-operator/internal/constants"
+	"github.com/jacero-io/kode-operator/internal/constant"
 )
 
 func (r *EntryPointReconciler) handlePendingState(ctx context.Context, entryPoint *kodev1alpha2.EntryPoint) (ctrl.Result, error) {
@@ -41,7 +41,7 @@ func (r *EntryPointReconciler) handlePendingState(ctx context.Context, entryPoin
 		log.Error(err, "EntryPoint validation failed")
 
 		// Update status to reflect validation failure
-		entryPoint.SetCondition(constants.ConditionTypeReady, metav1.ConditionFalse, "ValidationFailed", fmt.Sprintf("EntryPoint validation failed: %v", err))
+		entryPoint.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "ValidationFailed", fmt.Sprintf("EntryPoint validation failed: %v", err))
 		entryPoint.Status.Phase = kodev1alpha2.EntryPointPhaseFailed
 		entryPoint.Status.LastError = common.StringPtr(err.Error())
 		entryPoint.Status.LastErrorTime = &metav1.Time{Time: time.Now()}
@@ -55,7 +55,7 @@ func (r *EntryPointReconciler) handlePendingState(ctx context.Context, entryPoin
 			log.Error(err, "GatewayClass check failed")
 
 			// Update status to reflect resource error
-			entryPoint.SetCondition(constants.ConditionTypeReady, metav1.ConditionFalse, "GatewayClassNotFound", fmt.Sprintf("GatewayClass not found: %v", err))
+			entryPoint.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "GatewayClassNotFound", fmt.Sprintf("GatewayClass not found: %v", err))
 			entryPoint.Status.Phase = kodev1alpha2.EntryPointPhaseFailed
 			entryPoint.Status.LastError = common.StringPtr(err.Error())
 			entryPoint.Status.LastErrorTime = &metav1.Time{Time: time.Now()}
@@ -65,12 +65,12 @@ func (r *EntryPointReconciler) handlePendingState(ctx context.Context, entryPoin
 	}
 
 	// Set conditions for Pending state
-	entryPoint.SetCondition(constants.ConditionTypeReady, metav1.ConditionFalse, "Pending", "EntryPoint resource is pending configuration")
-	entryPoint.SetCondition(constants.ConditionTypeAvailable, metav1.ConditionFalse, "Pending", "EntryPoint resource is not yet available")
-	entryPoint.SetCondition(constants.ConditionTypeProgressing, metav1.ConditionTrue, "Configuring", "EntryPoint resource is being configured")
+	entryPoint.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "Pending", "EntryPoint resource is pending configuration")
+	entryPoint.SetCondition(constant.ConditionTypeAvailable, metav1.ConditionFalse, "Pending", "EntryPoint resource is not yet available")
+	entryPoint.SetCondition(constant.ConditionTypeProgressing, metav1.ConditionTrue, "Configuring", "EntryPoint resource is being configured")
 
 	// Remove any error conditions if present
-	entryPoint.DeleteCondition(constants.ConditionTypeError)
+	entryPoint.DeleteCondition(constant.ConditionTypeError)
 
 	// Clear any previous error
 	entryPoint.Status.LastError = nil
@@ -90,7 +90,7 @@ func (r *EntryPointReconciler) handleConfiguringState(ctx context.Context, entry
 	// Ensure all necessary resources are created
 	if err := r.ensureGatewayResources(ctx, entryPoint, config); err != nil {
 		log.Error(err, "Failed to ensure gateway resources")
-		entryPoint.SetCondition(constants.ConditionTypeReady, metav1.ConditionFalse, "ResourceCreationFailed", fmt.Sprintf("Failed to create resources: %v", err))
+		entryPoint.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "ResourceCreationFailed", fmt.Sprintf("Failed to create resources: %v", err))
 		entryPoint.Status.LastError = common.StringPtr(err.Error())
 		entryPoint.Status.LastErrorTime = &metav1.Time{Time: time.Now()}
 		entryPoint.Status.Phase = kodev1alpha2.EntryPointPhaseFailed
@@ -104,9 +104,9 @@ func (r *EntryPointReconciler) handleConfiguringState(ctx context.Context, entry
 	}
 
 	// Update conditions
-	entryPoint.SetCondition(constants.ConditionTypeReady, metav1.ConditionFalse, "Configuring", "EntryPoint resources are being configured")
-	entryPoint.SetCondition(constants.ConditionTypeAvailable, metav1.ConditionFalse, "Configuring", "EntryPoint is not yet available")
-	entryPoint.SetCondition(constants.ConditionTypeProgressing, metav1.ConditionTrue, "Configuring", "EntryPoint resources are being configured")
+	entryPoint.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "Configuring", "EntryPoint resources are being configured")
+	entryPoint.SetCondition(constant.ConditionTypeAvailable, metav1.ConditionFalse, "Configuring", "EntryPoint is not yet available")
+	entryPoint.SetCondition(constant.ConditionTypeProgressing, metav1.ConditionTrue, "Configuring", "EntryPoint resources are being configured")
 
 	// Clear any previous error
 	entryPoint.Status.LastError = nil
@@ -122,7 +122,7 @@ func (r *EntryPointReconciler) handleProvisioningState(ctx context.Context, entr
 
 	// When the observed generation is not equal to the generation, it needs to be reconfigured
 	if entryPoint.Generation != entryPoint.Status.ObservedGeneration {
-		entryPoint.SetCondition(constants.ConditionTypeProgressing, metav1.ConditionTrue, "Reconfiguring", "EntryPoint resource is being reconfigured")
+		entryPoint.SetCondition(constant.ConditionTypeProgressing, metav1.ConditionTrue, "Reconfiguring", "EntryPoint resource is being reconfigured")
 		return r.transitionTo(ctx, entryPoint, kodev1alpha2.EntryPointPhaseConfiguring)
 	}
 
@@ -133,7 +133,7 @@ func (r *EntryPointReconciler) handleProvisioningState(ctx context.Context, entr
 	ready, err := r.checkGatewayResources(ctx, entryPoint, config)
 	if err != nil {
 		log.Error(err, "Failed to check resource readiness")
-		entryPoint.SetCondition(constants.ConditionTypeReady, metav1.ConditionFalse, "ResourceCheckFailed", fmt.Sprintf("Failed to check resource readiness: %v", err))
+		entryPoint.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "ResourceCheckFailed", fmt.Sprintf("Failed to check resource readiness: %v", err))
 		entryPoint.Status.LastError = common.StringPtr(err.Error())
 		entryPoint.Status.LastErrorTime = &metav1.Time{Time: time.Now()}
 		entryPoint.Status.Phase = kodev1alpha2.EntryPointPhaseFailed
@@ -144,9 +144,9 @@ func (r *EntryPointReconciler) handleProvisioningState(ctx context.Context, entr
 		log.Info("Resources are ready, transitioning to Active state")
 
 		// Set conditions for ready state
-		entryPoint.SetCondition(constants.ConditionTypeReady, metav1.ConditionTrue, "ResourcesReady", "All EntryPoint resources are ready")
-		entryPoint.SetCondition(constants.ConditionTypeAvailable, metav1.ConditionFalse, "ResourcesReady", "EntryPoint is waiting for the URL to be available")
-		entryPoint.SetCondition(constants.ConditionTypeProgressing, metav1.ConditionFalse, "ResourcesReady", "EntryPoint resources are fully provisioned")
+		entryPoint.SetCondition(constant.ConditionTypeReady, metav1.ConditionTrue, "ResourcesReady", "All EntryPoint resources are ready")
+		entryPoint.SetCondition(constant.ConditionTypeAvailable, metav1.ConditionFalse, "ResourcesReady", "EntryPoint is waiting for the URL to be available")
+		entryPoint.SetCondition(constant.ConditionTypeProgressing, metav1.ConditionFalse, "ResourcesReady", "EntryPoint resources are fully provisioned")
 
 		// Clear any previous error
 		entryPoint.Status.LastError = nil
@@ -157,9 +157,9 @@ func (r *EntryPointReconciler) handleProvisioningState(ctx context.Context, entr
 	}
 
 	// Resources are not ready yet, update conditions and requeue
-	entryPoint.SetCondition(constants.ConditionTypeReady, metav1.ConditionFalse, "Provisioning", "EntryPoint resources are still being provisioned")
-	entryPoint.SetCondition(constants.ConditionTypeAvailable, metav1.ConditionFalse, "Provisioning", "EntryPoint is not yet available")
-	entryPoint.SetCondition(constants.ConditionTypeProgressing, metav1.ConditionTrue, "Provisioning", "EntryPoint resources are being provisioned")
+	entryPoint.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "Provisioning", "EntryPoint resources are still being provisioned")
+	entryPoint.SetCondition(constant.ConditionTypeAvailable, metav1.ConditionFalse, "Provisioning", "EntryPoint is not yet available")
+	entryPoint.SetCondition(constant.ConditionTypeProgressing, metav1.ConditionTrue, "Provisioning", "EntryPoint resources are being provisioned")
 
 	// Requeue to check again
 	return ctrl.Result{RequeueAfter: time.Second}, nil
@@ -171,7 +171,7 @@ func (r *EntryPointReconciler) handleActiveState(ctx context.Context, entryPoint
 
 	// When the observed generation is not equal to the generation, it needs to be reconfigured
 	if entryPoint.Generation != entryPoint.Status.ObservedGeneration {
-		entryPoint.SetCondition(constants.ConditionTypeProgressing, metav1.ConditionTrue, "Reconfiguring", "EntryPoint resource is being reconfigured")
+		entryPoint.SetCondition(constant.ConditionTypeProgressing, metav1.ConditionTrue, "Reconfiguring", "EntryPoint resource is being reconfigured")
 		return r.transitionTo(ctx, entryPoint, kodev1alpha2.EntryPointPhaseConfiguring)
 	}
 
@@ -182,7 +182,7 @@ func (r *EntryPointReconciler) handleActiveState(ctx context.Context, entryPoint
 	ready, err := r.checkGatewayResources(ctx, entryPoint, config)
 	if err != nil {
 		log.Error(err, "Failed to check resource readiness")
-		entryPoint.SetCondition(constants.ConditionTypeReady, metav1.ConditionFalse, "ResourceCheckFailed", fmt.Sprintf("Failed to check resource readiness: %v", err))
+		entryPoint.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "ResourceCheckFailed", fmt.Sprintf("Failed to check resource readiness: %v", err))
 		entryPoint.Status.LastError = common.StringPtr(err.Error())
 		entryPoint.Status.LastErrorTime = &metav1.Time{Time: time.Now()}
 		entryPoint.Status.Phase = kodev1alpha2.EntryPointPhaseFailed
@@ -191,16 +191,16 @@ func (r *EntryPointReconciler) handleActiveState(ctx context.Context, entryPoint
 
 	if !ready {
 		log.Info("Resources not ready, transitioning back to Configuring state")
-		entryPoint.SetCondition(constants.ConditionTypeReady, metav1.ConditionFalse, "ResourcesNotReady", "EntryPoint resources are no longer ready")
-		entryPoint.SetCondition(constants.ConditionTypeAvailable, metav1.ConditionFalse, "ResourcesNotReady", "EntryPoint is no longer available")
-		entryPoint.SetCondition(constants.ConditionTypeProgressing, metav1.ConditionTrue, "Reconfiguring", "EntryPoint is being reconfigured")
+		entryPoint.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "ResourcesNotReady", "EntryPoint resources are no longer ready")
+		entryPoint.SetCondition(constant.ConditionTypeAvailable, metav1.ConditionFalse, "ResourcesNotReady", "EntryPoint is no longer available")
+		entryPoint.SetCondition(constant.ConditionTypeProgressing, metav1.ConditionTrue, "Reconfiguring", "EntryPoint is being reconfigured")
 		return r.transitionTo(ctx, entryPoint, kodev1alpha2.EntryPointPhaseConfiguring)
 	}
 
 	// Update conditions to ensure they reflect the current state
-	entryPoint.SetCondition(constants.ConditionTypeReady, metav1.ConditionTrue, "ResourcesReady", "All EntryPoint resources are ready")
-	entryPoint.SetCondition(constants.ConditionTypeAvailable, metav1.ConditionTrue, "ResourcesReady", "EntryPoint is available")
-	entryPoint.SetCondition(constants.ConditionTypeProgressing, metav1.ConditionFalse, "Stable", "EntryPoint is stable and not progressing")
+	entryPoint.SetCondition(constant.ConditionTypeReady, metav1.ConditionTrue, "ResourcesReady", "All EntryPoint resources are ready")
+	entryPoint.SetCondition(constant.ConditionTypeAvailable, metav1.ConditionTrue, "ResourcesReady", "EntryPoint is available")
+	entryPoint.SetCondition(constant.ConditionTypeProgressing, metav1.ConditionFalse, "Stable", "EntryPoint is stable and not progressing")
 
 	// Clear any previous error
 	entryPoint.Status.LastError = nil
@@ -215,9 +215,9 @@ func (r *EntryPointReconciler) handleDeletingState(ctx context.Context, entryPoi
 	log.Info("Handling Deleting state")
 
 	// Set conditions for deleting state
-	entryPoint.SetCondition(constants.ConditionTypeReady, metav1.ConditionFalse, "Deleting", "EntryPoint resource is being deleted")
-	entryPoint.SetCondition(constants.ConditionTypeAvailable, metav1.ConditionFalse, "Deleting", "EntryPoint resource is being deleted")
-	entryPoint.SetCondition(constants.ConditionTypeProgressing, metav1.ConditionTrue, "Deleting", "EntryPoint resource is being deleted")
+	entryPoint.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "Deleting", "EntryPoint resource is being deleted")
+	entryPoint.SetCondition(constant.ConditionTypeAvailable, metav1.ConditionFalse, "Deleting", "EntryPoint resource is being deleted")
+	entryPoint.SetCondition(constant.ConditionTypeProgressing, metav1.ConditionTrue, "Deleting", "EntryPoint resource is being deleted")
 
 	// Check if all child resources are deleted
 	log.V(1).Info("Checking if child resources are deleted")
@@ -234,7 +234,7 @@ func (r *EntryPointReconciler) handleDeletingState(ctx context.Context, entryPoi
 			result, err := r.CleanupManager.Cleanup(ctx, cleanupResource)
 			if err != nil {
 				log.Error(err, "Failed to initiate cleanup")
-				entryPoint.SetCondition(constants.ConditionTypeError, metav1.ConditionTrue, "CleanupFailed", fmt.Sprintf("Failed to initiate cleanup: %v", err))
+				entryPoint.SetCondition(constant.ConditionTypeError, metav1.ConditionTrue, "CleanupFailed", fmt.Sprintf("Failed to initiate cleanup: %v", err))
 				return result, err
 			}
 			return result, nil
@@ -250,12 +250,12 @@ func (r *EntryPointReconciler) handleDeletingState(ctx context.Context, entryPoi
 	log.V(1).Info("All child resources are deleted")
 
 	// Remove finalizer
-	if controllerutil.ContainsFinalizer(entryPoint, constants.EntryPointFinalizerName) {
+	if controllerutil.ContainsFinalizer(entryPoint, constant.EntryPointFinalizerName) {
 		log.Info("Removing finalizer")
-		controllerutil.RemoveFinalizer(entryPoint, constants.EntryPointFinalizerName)
+		controllerutil.RemoveFinalizer(entryPoint, constant.EntryPointFinalizerName)
 		if err := r.Client.Update(ctx, entryPoint); err != nil {
 			log.Error(err, "Failed to remove finalizer")
-			entryPoint.SetCondition(constants.ConditionTypeError, metav1.ConditionTrue, "FinalizerRemovalFailed", fmt.Sprintf("Failed to remove finalizer: %v", err))
+			entryPoint.SetCondition(constant.ConditionTypeError, metav1.ConditionTrue, "FinalizerRemovalFailed", fmt.Sprintf("Failed to remove finalizer: %v", err))
 			return ctrl.Result{Requeue: true}, err
 		}
 	}

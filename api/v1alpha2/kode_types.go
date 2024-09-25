@@ -21,7 +21,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/jacero-io/kode-operator/internal/constants"
+	"github.com/jacero-io/kode-operator/internal/constant"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -213,7 +213,7 @@ func init() {
 	SchemeBuilder.Register(&Kode{}, &KodeList{})
 }
 
-func (k *Kode) SetCondition(conditionType constants.ConditionType, status metav1.ConditionStatus, reason, message string) {
+func (k *Kode) SetCondition(conditionType constant.ConditionType, status metav1.ConditionStatus, reason, message string) {
 	newCondition := metav1.Condition{
 		Type:               string(conditionType),
 		Status:             status,
@@ -235,7 +235,7 @@ func (k *Kode) SetCondition(conditionType constants.ConditionType, status metav1
 	k.Status.Conditions = append(k.Status.Conditions, newCondition)
 }
 
-func (k *Kode) GetCondition(conditionType constants.ConditionType) *metav1.Condition {
+func (k *Kode) GetCondition(conditionType constant.ConditionType) *metav1.Condition {
 	for _, condition := range k.Status.Conditions {
 		if condition.Type == string(conditionType) {
 			return &condition
@@ -244,7 +244,7 @@ func (k *Kode) GetCondition(conditionType constants.ConditionType) *metav1.Condi
 	return nil
 }
 
-func (k *Kode) DeleteCondition(conditionType constants.ConditionType) {
+func (k *Kode) DeleteCondition(conditionType constant.ConditionType) {
 	conditions := []metav1.Condition{}
 	for _, condition := range k.Status.Conditions {
 		if condition.Type != string(conditionType) {

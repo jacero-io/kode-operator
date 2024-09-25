@@ -32,7 +32,7 @@ import (
 
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
-	"github.com/jacero-io/kode-operator/internal/events"
+	"github.com/jacero-io/kode-operator/internal/event"
 )
 
 func (r *EntryPointReconciler) findEntryPointForKode(ctx context.Context, kode *kodev1alpha2.Kode) (*kodev1alpha2.EntryPoint, error) {
@@ -83,22 +83,22 @@ func (r *EntryPointReconciler) transitionTo(ctx context.Context, entryPoint *kod
 		// Empty case - does nothing
 
 	case kodev1alpha2.EntryPointPhaseConfiguring:
-		if err := r.EventManager.Record(ctx, entryPoint, events.EventTypeNormal, events.ReasonEntryPointConfiguring, "EntryPoint is being configured"); err != nil {
+		if err := r.EventManager.Record(ctx, entryPoint, event.EventTypeNormal, event.ReasonEntryPointConfiguring, "EntryPoint is being configured"); err != nil {
 			log.Error(err, "Failed to record EntryPoint configuring event")
 		}
 
 	case kodev1alpha2.EntryPointPhaseProvisioning:
-		if err := r.EventManager.Record(ctx, entryPoint, events.EventTypeNormal, events.ReasonEntryPointProvisioning, "EntryPoint is being provisioned"); err != nil {
+		if err := r.EventManager.Record(ctx, entryPoint, event.EventTypeNormal, event.ReasonEntryPointProvisioning, "EntryPoint is being provisioned"); err != nil {
 			log.Error(err, "Failed to record EntryPoint provisioning event")
 		}
 
 	case kodev1alpha2.EntryPointPhaseActive:
-		if err := r.EventManager.Record(ctx, entryPoint, events.EventTypeNormal, events.ReasonEntryPointActive, "EntryPoint is now active"); err != nil {
+		if err := r.EventManager.Record(ctx, entryPoint, event.EventTypeNormal, event.ReasonEntryPointActive, "EntryPoint is now active"); err != nil {
 			log.Error(err, "Failed to record EntryPoint active event")
 		}
 
 	case kodev1alpha2.EntryPointPhaseFailed:
-		if err := r.EventManager.Record(ctx, entryPoint, events.EventTypeWarning, events.ReasonEntryPointFailed, "EntryPoint has entered Failed state"); err != nil {
+		if err := r.EventManager.Record(ctx, entryPoint, event.EventTypeWarning, event.ReasonEntryPointFailed, "EntryPoint has entered Failed state"); err != nil {
 			log.Error(err, "Failed to record EntryPoint failed event")
 		}
 

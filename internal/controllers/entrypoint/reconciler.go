@@ -36,8 +36,8 @@ import (
 
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/cleanup"
-	"github.com/jacero-io/kode-operator/internal/constants"
-	"github.com/jacero-io/kode-operator/internal/events"
+	"github.com/jacero-io/kode-operator/internal/constant"
+	"github.com/jacero-io/kode-operator/internal/event"
 	"github.com/jacero-io/kode-operator/internal/resource"
 	"github.com/jacero-io/kode-operator/internal/status"
 	"github.com/jacero-io/kode-operator/internal/template"
@@ -53,7 +53,7 @@ type EntryPointReconciler struct {
 	CleanupManager  cleanup.CleanupManager
 	StatusUpdater   status.StatusUpdater
 	Validator       validation.Validator
-	EventManager    events.EventManager
+	EventManager    event.EventManager
 }
 
 const (
@@ -67,7 +67,7 @@ const (
 // +kubebuilder:rbac:groups=kode.jacero.io,resources=kodes/status,verbs=get;update;patch
 // +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=httproutes,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=gateway.networking.k8s.io,resources=gateways,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups="",resources=events,verbs=create;patch;update
+// +kubebuilder:rbac:groups="",resources=event,verbs=create;patch;update
 
 func (r *EntryPointReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("resource", req.NamespacedName)
@@ -105,8 +105,8 @@ func (r *EntryPointReconciler) reconcileEntryPoint(ctx context.Context, entryPoi
 	log.V(1).Info("Fetched EntryPoint resource", "Name", entryPoint.Name, "Namespace", entryPoint.Namespace, "Generation", entryPoint.Generation, "ObservedGeneration", entryPoint.Status.ObservedGeneration, "Phase", entryPoint.Status.Phase)
 
 	// **Add finalizer if not present**
-	if !controllerutil.ContainsFinalizer(entryPoint, constants.EntryPointFinalizerName) {
-		controllerutil.AddFinalizer(entryPoint, constants.EntryPointFinalizerName)
+	if !controllerutil.ContainsFinalizer(entryPoint, constant.EntryPointFinalizerName) {
+		controllerutil.AddFinalizer(entryPoint, constant.EntryPointFinalizerName)
 		if err := r.Client.Update(ctx, entryPoint); err != nil {
 			log.Error(err, "Failed to add finalizer")
 			return ctrl.Result{Requeue: true}, err
@@ -253,7 +253,7 @@ func (r *EntryPointReconciler) reconcileKode(ctx context.Context, kode *kodev1al
 	if kodeUrl != "" {
 		kode.UpdateUrl(ctx, r.Client, kodeUrl)
 		// TODO: Rewrite status handling to work with SetCondition
-		// kode.SetCondition(constants.ConditionTypeAvailable, metav1.ConditionTrue, "ResourcesReady", "Kode is available and ready to use")
+		// kode.SetCondition(constant.ConditionTypeAvailable, metav1.ConditionTrue, "ResourcesReady", "Kode is available and ready to use")
 	}
 
 	log.Info("HTTPRoute configuration successful", "created", created, "kodeUrl", kodeUrl)

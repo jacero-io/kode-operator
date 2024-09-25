@@ -23,7 +23,7 @@ import (
 
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
-	"github.com/jacero-io/kode-operator/internal/constants"
+	"github.com/jacero-io/kode-operator/internal/constant"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -243,12 +243,12 @@ func constructVolumesAndMounts(mountPath string, config *common.KodeResourceConf
 		}
 
 		volume := corev1.Volume{
-			Name:         constants.KodeVolumeStorageName,
+			Name:         constant.KodeVolumeStorageName,
 			VolumeSource: volumeSource,
 		}
 
 		volumeMount := corev1.VolumeMount{
-			Name:      constants.KodeVolumeStorageName,
+			Name:      constant.KodeVolumeStorageName,
 			MountPath: mountPath,
 		}
 

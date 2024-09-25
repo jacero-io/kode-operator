@@ -25,7 +25,7 @@ import (
 
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
-	"github.com/jacero-io/kode-operator/internal/events"
+	"github.com/jacero-io/kode-operator/internal/event"
 )
 
 func (r *KodeReconciler) ensurePodResources(ctx context.Context, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig) error {
@@ -63,7 +63,7 @@ func (r *KodeReconciler) ensurePodResources(ctx context.Context, kode *kodev1alp
 			if err != nil {
 				log.Error(err, "Failed to check CSI resize capability")
 				eventMessage := "Failed to check CSI resize capability"
-				if recordErr := r.EventManager.Record(ctx, latestKode, events.EventTypeWarning, events.ReasonKodeCSIResizeCapabilityCheckFailed, eventMessage); recordErr != nil {
+				if recordErr := r.EventManager.Record(ctx, latestKode, event.EventTypeWarning, event.ReasonKodeCSIResizeCapabilityCheckFailed, eventMessage); recordErr != nil {
 					log.Error(recordErr, "Failed to record CSI resize check failure event")
 				}
 				return err
@@ -87,7 +87,7 @@ func (r *KodeReconciler) ensurePodResources(ctx context.Context, kode *kodev1alp
 		if err != nil {
 			log.Error(err, "Failed to get PVC for CSI resize check")
 			eventMessage := "Failed to check CSI resize capability after PVC creation"
-			if recordErr := r.EventManager.Record(ctx, latestKode, events.EventTypeWarning, events.ReasonKodeCSIResizeCapabilityCheckFailed, eventMessage); recordErr != nil {
+			if recordErr := r.EventManager.Record(ctx, latestKode, event.EventTypeWarning, event.ReasonKodeCSIResizeCapabilityCheckFailed, eventMessage); recordErr != nil {
 				log.Error(recordErr, "Failed to record CSI resize check failure event")
 			}
 			return err

@@ -45,7 +45,7 @@ import (
 	"github.com/jacero-io/kode-operator/internal/cleanup"
 	entrypointctrl "github.com/jacero-io/kode-operator/internal/controllers/entrypoint"
 	kodectrl "github.com/jacero-io/kode-operator/internal/controllers/kode"
-	"github.com/jacero-io/kode-operator/internal/events"
+	"github.com/jacero-io/kode-operator/internal/event"
 	"github.com/jacero-io/kode-operator/internal/resource"
 	"github.com/jacero-io/kode-operator/internal/status"
 	"github.com/jacero-io/kode-operator/internal/template"
@@ -150,7 +150,7 @@ var _ = BeforeSuite(func() {
 		TemplateManager:   template.NewDefaultTemplateManager(k8sClient, ctrl.Log.WithName("Kode").WithName("TemplateManager")),
 		CleanupManager:    cleanup.NewDefaultCleanupManager(k8sClient, ctrl.Log.WithName("Kode").WithName("CleanupManager")),
 		Validator:         validation.NewDefaultValidator(),
-		EventManager:      events.NewEventManager(k8sClient, ctrl.Log.WithName("Kode").WithName("EventManager"), k8sManager.GetScheme(), k8sManager.GetEventRecorderFor("kode-controller")),
+		EventManager:      event.NewEventManager(k8sClient, ctrl.Log.WithName("Kode").WithName("EventManager"), k8sManager.GetScheme(), k8sManager.GetEventRecorderFor("kode-controller")),
 		IsTestEnvironment: true,
 	}
 
@@ -163,7 +163,7 @@ var _ = BeforeSuite(func() {
 		CleanupManager:  cleanup.NewDefaultCleanupManager(k8sClient, ctrl.Log.WithName("EntryPoint").WithName("CleanupManager")),
 		StatusUpdater:   status.NewDefaultStatusUpdater(k8sClient, ctrl.Log.WithName("EntryPoint").WithName("StatusUpdater")),
 		Validator:       validation.NewDefaultValidator(),
-		EventManager:    events.NewEventManager(k8sClient, ctrl.Log.WithName("Kode").WithName("EventManager"), k8sManager.GetScheme(), k8sManager.GetEventRecorderFor("entrypoint-controller")),
+		EventManager:    event.NewEventManager(k8sClient, ctrl.Log.WithName("Kode").WithName("EventManager"), k8sManager.GetScheme(), k8sManager.GetEventRecorderFor("entrypoint-controller")),
 	}
 
 	err = reconciler.SetupWithManager(k8sManager)

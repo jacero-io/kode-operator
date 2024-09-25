@@ -28,7 +28,7 @@ import (
 
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
-	"github.com/jacero-io/kode-operator/internal/constants"
+	"github.com/jacero-io/kode-operator/internal/constant"
 )
 
 func (r *KodeReconciler) handlePendingState(ctx context.Context, kode *kodev1alpha2.Kode) (ctrl.Result, error) {
@@ -40,7 +40,7 @@ func (r *KodeReconciler) handlePendingState(ctx context.Context, kode *kodev1alp
 		log.Error(err, "Kode validation failed")
 
 		// Update status to reflect validation failure
-		kode.SetCondition(constants.ConditionTypeReady, metav1.ConditionFalse, "ValidationFailed", fmt.Sprintf("Kode validation failed: %v", err))
+		kode.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "ValidationFailed", fmt.Sprintf("Kode validation failed: %v", err))
 		kode.Status.Phase = kodev1alpha2.KodePhaseFailed
 		kode.Status.LastError = common.StringPtr(err.Error())
 		kode.Status.LastErrorTime = &metav1.Time{Time: time.Now()}
@@ -49,12 +49,12 @@ func (r *KodeReconciler) handlePendingState(ctx context.Context, kode *kodev1alp
 	}
 
 	// Set conditions for Pending state
-	kode.SetCondition(constants.ConditionTypeReady, metav1.ConditionFalse, "Pending", "Kode resource is pending configuration")
-	kode.SetCondition(constants.ConditionTypeAvailable, metav1.ConditionFalse, "Pending", "Kode resource is not yet available")
-	kode.SetCondition(constants.ConditionTypeProgressing, metav1.ConditionTrue, "Configuring", "Kode resource is being configured")
+	kode.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "Pending", "Kode resource is pending configuration")
+	kode.SetCondition(constant.ConditionTypeAvailable, metav1.ConditionFalse, "Pending", "Kode resource is not yet available")
+	kode.SetCondition(constant.ConditionTypeProgressing, metav1.ConditionTrue, "Configuring", "Kode resource is being configured")
 
 	// Remove any error conditions if present
-	kode.DeleteCondition(constants.ConditionTypeError)
+	kode.DeleteCondition(constant.ConditionTypeError)
 
 	// Clear any previous error
 	kode.Status.LastError = nil
@@ -72,7 +72,7 @@ func (r *KodeReconciler) handleConfiguringState(ctx context.Context, kode *kodev
 	template, err := r.fetchTemplatesWithRetry(ctx, kode)
 	if err != nil {
 		log.Error(err, "Failed to fetch template")
-		kode.SetCondition(constants.ConditionTypeReady, metav1.ConditionFalse, "TemplateFetchFailed", fmt.Sprintf("Failed to fetch template: %v", err))
+		kode.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "TemplateFetchFailed", fmt.Sprintf("Failed to fetch template: %v", err))
 		kode.Status.LastError = common.StringPtr(err.Error())
 		kode.Status.LastErrorTime = &metav1.Time{Time: time.Now()}
 		return r.transitionTo(ctx, kode, kodev1alpha2.KodePhaseFailed)
@@ -82,7 +82,7 @@ func (r *KodeReconciler) handleConfiguringState(ctx context.Context, kode *kodev
 	// Ensure all necessary resources are created
 	if err := r.ensurePodResources(ctx, kode, config); err != nil {
 		log.Error(err, "Failed to ensure pod resources")
-		kode.SetCondition(constants.ConditionTypeReady, metav1.ConditionFalse, "ResourceCreationFailed", fmt.Sprintf("Failed to create resources: %v", err))
+		kode.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "ResourceCreationFailed", fmt.Sprintf("Failed to create resources: %v", err))
 		kode.Status.LastError = common.StringPtr(err.Error())
 		kode.Status.LastErrorTime = &metav1.Time{Time: time.Now()}
 		return r.transitionTo(ctx, kode, kodev1alpha2.KodePhaseFailed)
@@ -95,9 +95,9 @@ func (r *KodeReconciler) handleConfiguringState(ctx context.Context, kode *kodev
 	}
 
 	// Update conditions
-	kode.SetCondition(constants.ConditionTypeReady, metav1.ConditionFalse, "Configuring", "Kode resources are being configured")
-	kode.SetCondition(constants.ConditionTypeAvailable, metav1.ConditionFalse, "Configuring", "Kode is not yet available")
-	kode.SetCondition(constants.ConditionTypeProgressing, metav1.ConditionTrue, "Configuring", "Kode resources are being configured")
+	kode.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "Configuring", "Kode resources are being configured")
+	kode.SetCondition(constant.ConditionTypeAvailable, metav1.ConditionFalse, "Configuring", "Kode is not yet available")
+	kode.SetCondition(constant.ConditionTypeProgressing, metav1.ConditionTrue, "Configuring", "Kode resources are being configured")
 
 	// Clear any previous error
 	kode.Status.LastError = nil
@@ -113,7 +113,7 @@ func (r *KodeReconciler) handleProvisioningState(ctx context.Context, kode *kode
 
 	// When the observed generation is not equal to the generation, it needs to be reconfigured
 	if kode.Generation != kode.Status.ObservedGeneration {
-		kode.SetCondition(constants.ConditionTypeProgressing, metav1.ConditionTrue, "Reconfiguring", "Kode resource is being reconfigured")
+		kode.SetCondition(constant.ConditionTypeProgressing, metav1.ConditionTrue, "Reconfiguring", "Kode resource is being reconfigured")
 		return r.transitionTo(ctx, kode, kodev1alpha2.KodePhaseConfiguring)
 	}
 
@@ -121,7 +121,7 @@ func (r *KodeReconciler) handleProvisioningState(ctx context.Context, kode *kode
 	template, err := r.fetchTemplatesWithRetry(ctx, kode)
 	if err != nil {
 		log.Error(err, "Failed to fetch template")
-		kode.SetCondition(constants.ConditionTypeReady, metav1.ConditionFalse, "TemplateFetchFailed", fmt.Sprintf("Failed to fetch template: %v", err))
+		kode.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "TemplateFetchFailed", fmt.Sprintf("Failed to fetch template: %v", err))
 		kode.Status.LastError = common.StringPtr(err.Error())
 		kode.Status.LastErrorTime = &metav1.Time{Time: time.Now()}
 		return r.transitionTo(ctx, kode, kodev1alpha2.KodePhaseFailed)
@@ -132,7 +132,7 @@ func (r *KodeReconciler) handleProvisioningState(ctx context.Context, kode *kode
 	ready, err := r.checkPodResources(ctx, kode, config)
 	if err != nil {
 		log.Error(err, "Failed to check resource readiness")
-		kode.SetCondition(constants.ConditionTypeReady, metav1.ConditionFalse, "ResourceCheckFailed", fmt.Sprintf("Failed to check resource readiness: %v", err))
+		kode.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "ResourceCheckFailed", fmt.Sprintf("Failed to check resource readiness: %v", err))
 		kode.Status.LastError = common.StringPtr(err.Error())
 		kode.Status.LastErrorTime = &metav1.Time{Time: time.Now()}
 		return r.transitionTo(ctx, kode, kodev1alpha2.KodePhaseFailed)
@@ -142,17 +142,17 @@ func (r *KodeReconciler) handleProvisioningState(ctx context.Context, kode *kode
 		// Update the port status
 		if err := kode.UpdatePort(ctx, r.Client, template.Port); err != nil {
 			log.Error(err, "Failed to update port status")
-			kode.SetCondition(constants.ConditionTypeReady, metav1.ConditionFalse, "PortUpdateFailed", fmt.Sprintf("Failed to update port status: %v", err))
-			kode.SetCondition(constants.ConditionTypeAvailable, metav1.ConditionFalse, "PortUpdateFailed", "Kode is not available due to port update failure")
+			kode.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "PortUpdateFailed", fmt.Sprintf("Failed to update port status: %v", err))
+			kode.SetCondition(constant.ConditionTypeAvailable, metav1.ConditionFalse, "PortUpdateFailed", "Kode is not available due to port update failure")
 			return ctrl.Result{Requeue: true}, nil
 		}
 
 		log.Info("Resources are ready, transitioning to Active state")
 
 		// Set conditions for ready state
-		kode.SetCondition(constants.ConditionTypeReady, metav1.ConditionTrue, "ResourcesReady", "All Kode resources are ready")
-		kode.SetCondition(constants.ConditionTypeAvailable, metav1.ConditionFalse, "ResourcesReady", "Kode is waiting for the url to be available")
-		kode.SetCondition(constants.ConditionTypeProgressing, metav1.ConditionFalse, "ResourcesReady", "Kode resources are fully provisioned")
+		kode.SetCondition(constant.ConditionTypeReady, metav1.ConditionTrue, "ResourcesReady", "All Kode resources are ready")
+		kode.SetCondition(constant.ConditionTypeAvailable, metav1.ConditionFalse, "ResourcesReady", "Kode is waiting for the url to be available")
+		kode.SetCondition(constant.ConditionTypeProgressing, metav1.ConditionFalse, "ResourcesReady", "Kode resources are fully provisioned")
 
 		// Clear any previous error
 		kode.Status.LastError = nil
@@ -163,9 +163,9 @@ func (r *KodeReconciler) handleProvisioningState(ctx context.Context, kode *kode
 	}
 
 	// Resources are not ready yet, update conditions and requeue
-	kode.SetCondition(constants.ConditionTypeReady, metav1.ConditionFalse, "Provisioning", "Kode resources are still being provisioned")
-	kode.SetCondition(constants.ConditionTypeAvailable, metav1.ConditionFalse, "Provisioning", "Kode is not yet available")
-	kode.SetCondition(constants.ConditionTypeProgressing, metav1.ConditionTrue, "Provisioning", "Kode resources are being provisioned")
+	kode.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "Provisioning", "Kode resources are still being provisioned")
+	kode.SetCondition(constant.ConditionTypeAvailable, metav1.ConditionFalse, "Provisioning", "Kode is not yet available")
+	kode.SetCondition(constant.ConditionTypeProgressing, metav1.ConditionTrue, "Provisioning", "Kode resources are being provisioned")
 
 	// Requeue to check again
 	return ctrl.Result{RequeueAfter: time.Second}, nil
@@ -177,7 +177,7 @@ func (r *KodeReconciler) handleActiveState(ctx context.Context, kode *kodev1alph
 
 	// When the observed generation is not equal to the generation, it needs to be reconfigured
 	if kode.Generation != kode.Status.ObservedGeneration {
-		kode.SetCondition(constants.ConditionTypeProgressing, metav1.ConditionTrue, "Reconfiguring", "Kode resource is being reconfigured")
+		kode.SetCondition(constant.ConditionTypeProgressing, metav1.ConditionTrue, "Reconfiguring", "Kode resource is being reconfigured")
 		return r.transitionTo(ctx, kode, kodev1alpha2.KodePhaseConfiguring)
 	}
 
@@ -185,7 +185,7 @@ func (r *KodeReconciler) handleActiveState(ctx context.Context, kode *kodev1alph
 	template, err := r.fetchTemplatesWithRetry(ctx, kode)
 	if err != nil {
 		log.Error(err, "Failed to fetch template")
-		kode.SetCondition(constants.ConditionTypeReady, metav1.ConditionFalse, "TemplateFetchFailed", fmt.Sprintf("Failed to fetch template: %v", err))
+		kode.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "TemplateFetchFailed", fmt.Sprintf("Failed to fetch template: %v", err))
 		kode.Status.LastError = common.StringPtr(err.Error())
 		kode.Status.LastErrorTime = &metav1.Time{Time: time.Now()}
 		return r.transitionTo(ctx, kode, kodev1alpha2.KodePhaseFailed)
@@ -196,7 +196,7 @@ func (r *KodeReconciler) handleActiveState(ctx context.Context, kode *kodev1alph
 	ready, err := r.checkPodResources(ctx, kode, config)
 	if err != nil {
 		log.Error(err, "Failed to check resource readiness")
-		kode.SetCondition(constants.ConditionTypeReady, metav1.ConditionFalse, "ResourceCheckFailed", fmt.Sprintf("Failed to check resource readiness: %v", err))
+		kode.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "ResourceCheckFailed", fmt.Sprintf("Failed to check resource readiness: %v", err))
 		kode.Status.LastError = common.StringPtr(err.Error())
 		kode.Status.LastErrorTime = &metav1.Time{Time: time.Now()}
 		return r.transitionTo(ctx, kode, kodev1alpha2.KodePhaseFailed)
@@ -204,9 +204,9 @@ func (r *KodeReconciler) handleActiveState(ctx context.Context, kode *kodev1alph
 
 	if !ready {
 		log.Info("Resources not ready, transitioning back to Configuring state")
-		kode.SetCondition(constants.ConditionTypeReady, metav1.ConditionFalse, "ResourcesNotReady", "Kode resources are no longer ready")
-		kode.SetCondition(constants.ConditionTypeAvailable, metav1.ConditionFalse, "ResourcesNotReady", "Kode is no longer available")
-		kode.SetCondition(constants.ConditionTypeProgressing, metav1.ConditionTrue, "Reconfiguring", "Kode is being reconfigured")
+		kode.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "ResourcesNotReady", "Kode resources are no longer ready")
+		kode.SetCondition(constant.ConditionTypeAvailable, metav1.ConditionFalse, "ResourcesNotReady", "Kode is no longer available")
+		kode.SetCondition(constant.ConditionTypeProgressing, metav1.ConditionTrue, "Reconfiguring", "Kode is being reconfigured")
 		return r.transitionTo(ctx, kode, kodev1alpha2.KodePhaseConfiguring)
 	}
 
@@ -214,9 +214,9 @@ func (r *KodeReconciler) handleActiveState(ctx context.Context, kode *kodev1alph
 	// TODO: Write checks for inactivity
 
 	// Update conditions to ensure they reflect the current state
-	kode.SetCondition(constants.ConditionTypeReady, metav1.ConditionTrue, "ResourcesReady", "All Kode resources are ready")
-	kode.SetCondition(constants.ConditionTypeAvailable, metav1.ConditionTrue, "ResourcesReady", "Kode is available")
-	kode.SetCondition(constants.ConditionTypeProgressing, metav1.ConditionFalse, "Stable", "Kode is stable and not progressing")
+	kode.SetCondition(constant.ConditionTypeReady, metav1.ConditionTrue, "ResourcesReady", "All Kode resources are ready")
+	kode.SetCondition(constant.ConditionTypeAvailable, metav1.ConditionTrue, "ResourcesReady", "Kode is available")
+	kode.SetCondition(constant.ConditionTypeProgressing, metav1.ConditionFalse, "Stable", "Kode is stable and not progressing")
 
 	// Clear any previous error
 	kode.Status.LastError = nil
@@ -241,9 +241,9 @@ func (r *KodeReconciler) handleSuspendingState(ctx context.Context, kode *kodev1
 	log.V(1).Info("Handling Suspending state")
 
 	// Update conditions
-	kode.SetCondition(constants.ConditionTypeReady, metav1.ConditionFalse, "Suspending", "Kode is being suspended")
-	kode.SetCondition(constants.ConditionTypeAvailable, metav1.ConditionFalse, "Suspending", "Kode is not available during suspension")
-	kode.SetCondition(constants.ConditionTypeProgressing, metav1.ConditionTrue, "Suspending", "Kode is being suspended")
+	kode.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "Suspending", "Kode is being suspended")
+	kode.SetCondition(constant.ConditionTypeAvailable, metav1.ConditionFalse, "Suspending", "Kode is not available during suspension")
+	kode.SetCondition(constant.ConditionTypeProgressing, metav1.ConditionTrue, "Suspending", "Kode is being suspended")
 
 	// Transition to Suspended state
 	return r.transitionTo(ctx, kode, kodev1alpha2.KodePhaseSuspended)
@@ -255,9 +255,9 @@ func (r *KodeReconciler) handleSuspendedState(ctx context.Context, kode *kodev1a
 	log.V(1).Info("Handling Suspended state")
 
 	// Update conditions
-	kode.SetCondition(constants.ConditionTypeReady, metav1.ConditionFalse, "Suspended", "Kode is suspended")
-	kode.SetCondition(constants.ConditionTypeAvailable, metav1.ConditionFalse, "Suspended", "Kode is not available while suspended")
-	kode.SetCondition(constants.ConditionTypeProgressing, metav1.ConditionFalse, "Suspended", "Kode is suspended and not progressing")
+	kode.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "Suspended", "Kode is suspended")
+	kode.SetCondition(constant.ConditionTypeAvailable, metav1.ConditionFalse, "Suspended", "Kode is not available while suspended")
+	kode.SetCondition(constant.ConditionTypeProgressing, metav1.ConditionFalse, "Suspended", "Kode is suspended and not progressing")
 
 	// No state transition needed, return without error
 	return ctrl.Result{}, nil
@@ -269,9 +269,9 @@ func (r *KodeReconciler) handleResumingState(ctx context.Context, kode *kodev1al
 	log.V(1).Info("Handling Resuming state")
 
 	// Update conditions
-	kode.SetCondition(constants.ConditionTypeReady, metav1.ConditionFalse, "Resuming", "Kode is being resumed")
-	kode.SetCondition(constants.ConditionTypeAvailable, metav1.ConditionFalse, "Resuming", "Kode is not yet available")
-	kode.SetCondition(constants.ConditionTypeProgressing, metav1.ConditionTrue, "Resuming", "Kode is being resumed")
+	kode.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "Resuming", "Kode is being resumed")
+	kode.SetCondition(constant.ConditionTypeAvailable, metav1.ConditionFalse, "Resuming", "Kode is not yet available")
+	kode.SetCondition(constant.ConditionTypeProgressing, metav1.ConditionTrue, "Resuming", "Kode is being resumed")
 
 	// Transition to Configuring state to ensure everything is properly set up
 	return r.transitionTo(ctx, kode, kodev1alpha2.KodePhaseConfiguring)
@@ -282,9 +282,9 @@ func (r *KodeReconciler) handleDeletingState(ctx context.Context, kode *kodev1al
 	log.V(1).Info("Handling Deleting state")
 
 	// Set conditions for deleting state
-	kode.SetCondition(constants.ConditionTypeReady, metav1.ConditionFalse, "Deleting", "Kode resource is being deleted")
-	kode.SetCondition(constants.ConditionTypeAvailable, metav1.ConditionFalse, "Deleting", "Kode resource is being deleted")
-	kode.SetCondition(constants.ConditionTypeProgressing, metav1.ConditionTrue, "Deleting", "Kode resource is being deleted")
+	kode.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "Deleting", "Kode resource is being deleted")
+	kode.SetCondition(constant.ConditionTypeAvailable, metav1.ConditionFalse, "Deleting", "Kode resource is being deleted")
+	kode.SetCondition(constant.ConditionTypeProgressing, metav1.ConditionTrue, "Deleting", "Kode resource is being deleted")
 
 	// Check if all child resources are deleted
 	log.V(1).Info("Checking if child resources are deleted")
@@ -302,7 +302,7 @@ func (r *KodeReconciler) handleDeletingState(ctx context.Context, kode *kodev1al
 			result, err := r.CleanupManager.Cleanup(ctx, cleanupResource)
 			if err != nil {
 				log.Error(err, "Failed to initiate cleanup")
-				kode.SetCondition(constants.ConditionTypeError, metav1.ConditionTrue, "CleanupFailed", fmt.Sprintf("Failed to initiate cleanup: %v", err))
+				kode.SetCondition(constant.ConditionTypeError, metav1.ConditionTrue, "CleanupFailed", fmt.Sprintf("Failed to initiate cleanup: %v", err))
 				return result, err
 			}
 			return result, nil
@@ -318,12 +318,12 @@ func (r *KodeReconciler) handleDeletingState(ctx context.Context, kode *kodev1al
 	log.V(1).Info("All child resources are deleted")
 
 	// All resources are deleted, remove finalizer
-	if controllerutil.ContainsFinalizer(kode, constants.KodeFinalizerName) {
+	if controllerutil.ContainsFinalizer(kode, constant.KodeFinalizerName) {
 		log.Info("Removing finalizer")
-		controllerutil.RemoveFinalizer(kode, constants.KodeFinalizerName)
+		controllerutil.RemoveFinalizer(kode, constant.KodeFinalizerName)
 		if err := r.Client.Update(ctx, kode); err != nil {
 			log.Error(err, "Failed to remove finalizer")
-			kode.SetCondition(constants.ConditionTypeError, metav1.ConditionTrue, "FinalizerRemovalFailed", fmt.Sprintf("Failed to remove finalizer: %v", err))
+			kode.SetCondition(constant.ConditionTypeError, metav1.ConditionTrue, "FinalizerRemovalFailed", fmt.Sprintf("Failed to remove finalizer: %v", err))
 			return ctrl.Result{Requeue: true}, err
 		}
 	}
@@ -340,23 +340,23 @@ func (r *KodeReconciler) handleFailedState(ctx context.Context, kode *kodev1alph
 	kode.Status.RetryCount++
 
 	// Set conditions for failed state
-	kode.SetCondition(constants.ConditionTypeReady, metav1.ConditionFalse, "Failed", "Kode resource is in a failed state")
-	kode.SetCondition(constants.ConditionTypeAvailable, metav1.ConditionFalse, "Failed", "Kode resource is not available due to failure")
-	kode.SetCondition(constants.ConditionTypeProgressing, metav1.ConditionFalse, "Failed", "Kode resource progression halted due to failure")
+	kode.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "Failed", "Kode resource is in a failed state")
+	kode.SetCondition(constant.ConditionTypeAvailable, metav1.ConditionFalse, "Failed", "Kode resource is not available due to failure")
+	kode.SetCondition(constant.ConditionTypeProgressing, metav1.ConditionFalse, "Failed", "Kode resource progression halted due to failure")
 
 	// Check if max retries exceeded
 	if kode.Status.RetryCount > 10 {
 		log.Info("Max retries exceeded, manual intervention required")
-		kode.SetCondition(constants.ConditionTypeError, metav1.ConditionTrue, "MaxRetriesExceeded", "Maximum retry attempts reached. Manual intervention required.")
+		kode.SetCondition(constant.ConditionTypeError, metav1.ConditionTrue, "MaxRetriesExceeded", "Maximum retry attempts reached. Manual intervention required.")
 		return ctrl.Result{}, nil
 	}
 
 	// Attempt to recover by transitioning back to Pending state
 	log.Info("Attempting recovery", "retryCount", kode.Status.RetryCount)
-	kode.SetCondition(constants.ConditionTypeProgressing, metav1.ConditionTrue, "Recovering", "Attempting to recover from failed state")
+	kode.SetCondition(constant.ConditionTypeProgressing, metav1.ConditionTrue, "Recovering", "Attempting to recover from failed state")
 
 	// Clear error conditions as we're attempting recovery
-	kode.DeleteCondition(constants.ConditionTypeError)
+	kode.DeleteCondition(constant.ConditionTypeError)
 	kode.Status.LastError = nil
 	kode.Status.LastErrorTime = nil
 

@@ -31,7 +31,7 @@ import (
 	client "sigs.k8s.io/controller-runtime/pkg/client"
 
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
-	"github.com/jacero-io/kode-operator/internal/events"
+	"github.com/jacero-io/kode-operator/internal/event"
 )
 
 func (r *KodeReconciler) transitionTo(ctx context.Context, kode *kodev1alpha2.Kode, newPhase kodev1alpha2.KodePhase) (ctrl.Result, error) {
@@ -59,46 +59,46 @@ func (r *KodeReconciler) transitionTo(ctx context.Context, kode *kodev1alpha2.Ko
 		// Empty case, requeue immediately
 
 	case kodev1alpha2.KodePhaseConfiguring:
-		err := r.EventManager.Record(ctx, kode, events.EventTypeNormal, events.ReasonKodeConfiguring, "Kode is being configured")
+		err := r.EventManager.Record(ctx, kode, event.EventTypeNormal, event.ReasonKodeConfiguring, "Kode is being configured")
 		if err != nil {
 			log.Error(err, "Failed to record Kode configuring event")
 		}
 
 	case kodev1alpha2.KodePhaseProvisioning:
-		err := r.EventManager.Record(ctx, kode, events.EventTypeNormal, events.ReasonKodeProvisioning, "Kode is being provisioned")
+		err := r.EventManager.Record(ctx, kode, event.EventTypeNormal, event.ReasonKodeProvisioning, "Kode is being provisioned")
 		if err != nil {
 			log.Error(err, "Failed to record Kode provisioning event")
 		}
 
 	case kodev1alpha2.KodePhaseActive:
-		if err := r.EventManager.Record(ctx, kode, events.EventTypeNormal, events.ReasonKodeActive, "Kode is now active"); err != nil {
+		if err := r.EventManager.Record(ctx, kode, event.EventTypeNormal, event.ReasonKodeActive, "Kode is now active"); err != nil {
 			log.Error(err, "Failed to record Kode active event")
 		}
 
 	case kodev1alpha2.KodePhaseSuspending:
-		if err := r.EventManager.Record(ctx, kode, events.EventTypeNormal, events.ReasonKodeSuspended, "Kode is being suspended"); err != nil {
+		if err := r.EventManager.Record(ctx, kode, event.EventTypeNormal, event.ReasonKodeSuspended, "Kode is being suspended"); err != nil {
 			log.Error(err, "Failed to record Kode suspended event")
 		}
 
 	case kodev1alpha2.KodePhaseSuspended:
-		if err := r.EventManager.Record(ctx, kode, events.EventTypeNormal, events.ReasonKodeSuspended, "Kode has been suspended"); err != nil {
+		if err := r.EventManager.Record(ctx, kode, event.EventTypeNormal, event.ReasonKodeSuspended, "Kode has been suspended"); err != nil {
 			log.Error(err, "Failed to record Kode suspended event")
 		}
 
 	case kodev1alpha2.KodePhaseResuming:
-		err := r.EventManager.Record(ctx, kode, events.EventTypeNormal, events.ReasonKodeResuming, "Kode is resuming")
+		err := r.EventManager.Record(ctx, kode, event.EventTypeNormal, event.ReasonKodeResuming, "Kode is resuming")
 		if err != nil {
 			log.Error(err, "Failed to record Kode resuming event")
 		}
 
 	case kodev1alpha2.KodePhaseDeleting:
-		err := r.EventManager.Record(ctx, kode, events.EventTypeNormal, events.ReasonKodeDeleting, "Kode is being deleted")
+		err := r.EventManager.Record(ctx, kode, event.EventTypeNormal, event.ReasonKodeDeleting, "Kode is being deleted")
 		if err != nil {
 			log.Error(err, "Failed to record Kode deleting event")
 		}
 
 	case kodev1alpha2.KodePhaseFailed:
-		if err := r.EventManager.Record(ctx, kode, events.EventTypeWarning, events.ReasonKodeFailed, "Kode has entered Failed state"); err != nil {
+		if err := r.EventManager.Record(ctx, kode, event.EventTypeWarning, event.ReasonKodeFailed, "Kode has entered Failed state"); err != nil {
 			log.Error(err, "Failed to record Kode failed event")
 		}
 
@@ -107,7 +107,7 @@ func (r *KodeReconciler) transitionTo(ctx context.Context, kode *kodev1alpha2.Ko
 
 	case kodev1alpha2.KodePhaseUnknown:
 		// Record unknown state event
-		if err := r.EventManager.Record(ctx, kode, events.EventTypeWarning, events.ReasonKodeUnknown, "Kode has entered Unknown state"); err != nil {
+		if err := r.EventManager.Record(ctx, kode, event.EventTypeWarning, event.ReasonKodeUnknown, "Kode has entered Unknown state"); err != nil {
 			log.Error(err, "Failed to record Kode unknown state event")
 		}
 

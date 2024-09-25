@@ -22,7 +22,7 @@ import (
 	"time"
 
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
-	"github.com/jacero-io/kode-operator/internal/constants"
+	"github.com/jacero-io/kode-operator/internal/constant"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
@@ -39,7 +39,7 @@ func (r *EntryPointReconciler) updatePhaseFailed(ctx context.Context, entryPoint
 	// Define default conditions
 	defaultConditions := []metav1.Condition{
 		{
-			Type:               string(constants.ConditionTypeError),
+			Type:               string(constant.ConditionTypeError),
 			Status:             metav1.ConditionTrue,
 			Reason:             "ResourceFailed",
 			Message:            fmt.Sprintf("EntryPoint resource failed: %s", errorMessage),
@@ -47,7 +47,7 @@ func (r *EntryPointReconciler) updatePhaseFailed(ctx context.Context, entryPoint
 			ObservedGeneration: entryPoint.Generation,
 		},
 		{
-			Type:               string(constants.ConditionTypeReady),
+			Type:               string(constant.ConditionTypeReady),
 			Status:             metav1.ConditionFalse,
 			Reason:             "ResourceNotReady",
 			Message:            "Resource is not ready due to failure",
@@ -55,7 +55,7 @@ func (r *EntryPointReconciler) updatePhaseFailed(ctx context.Context, entryPoint
 			ObservedGeneration: entryPoint.Generation,
 		},
 		{
-			Type:               string(constants.ConditionTypeAvailable),
+			Type:               string(constant.ConditionTypeAvailable),
 			Status:             metav1.ConditionFalse,
 			Reason:             "ResourceUnavailable",
 			Message:            "Resource is not available due to failure",
@@ -63,7 +63,7 @@ func (r *EntryPointReconciler) updatePhaseFailed(ctx context.Context, entryPoint
 			ObservedGeneration: entryPoint.Generation,
 		},
 		{
-			Type:               string(constants.ConditionTypeProgressing),
+			Type:               string(constant.ConditionTypeProgressing),
 			Status:             metav1.ConditionFalse,
 			Reason:             "ProgressHalted",
 			Message:            "Progress halted due to resource failure",
@@ -100,7 +100,7 @@ func (r EntryPointReconciler) updatePhaseActive(ctx context.Context, entryPoint 
 	phase := kodev1alpha2.EntryPointPhaseActive
 	conditions := []metav1.Condition{
 		{
-			Type:               string(constants.ConditionTypeReady),
+			Type:               string(constant.ConditionTypeReady),
 			Status:             metav1.ConditionTrue,
 			Reason:             "ResourceReady",
 			Message:            "Resource is ready and active",
@@ -108,7 +108,7 @@ func (r EntryPointReconciler) updatePhaseActive(ctx context.Context, entryPoint 
 			ObservedGeneration: entryPoint.Generation,
 		},
 		{
-			Type:               string(constants.ConditionTypeAvailable),
+			Type:               string(constant.ConditionTypeAvailable),
 			Status:             metav1.ConditionTrue,
 			Reason:             "ResourceAvailable",
 			Message:            "Resource is available",
@@ -116,7 +116,7 @@ func (r EntryPointReconciler) updatePhaseActive(ctx context.Context, entryPoint 
 			ObservedGeneration: entryPoint.Generation,
 		},
 		{
-			Type:               string(constants.ConditionTypeProgressing),
+			Type:               string(constant.ConditionTypeProgressing),
 			Status:             metav1.ConditionFalse,
 			Reason:             "ResourceStable",
 			Message:            "Resource is stable and not progressing",
@@ -125,7 +125,7 @@ func (r EntryPointReconciler) updatePhaseActive(ctx context.Context, entryPoint 
 		},
 	}
 
-	conditionsToRemove := []string{string(constants.ConditionTypeError)}
+	conditionsToRemove := []string{string(constant.ConditionTypeError)}
 
 	return r.StatusUpdater.UpdateStatusEntryPoint(ctx, entryPoint, phase, conditions, conditionsToRemove, "", nil)
 }

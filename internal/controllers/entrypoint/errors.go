@@ -26,8 +26,8 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
-	"github.com/jacero-io/kode-operator/internal/constants"
-	"github.com/jacero-io/kode-operator/internal/events"
+	"github.com/jacero-io/kode-operator/internal/constant"
+	"github.com/jacero-io/kode-operator/internal/event"
 )
 
 // handleReconcileError updates the Kode status with the error and returns a Result for requeuing
@@ -41,25 +41,25 @@ func (r *EntryPointReconciler) handleReconcileError(ctx context.Context, kode *k
 	if entryPoint != nil {
 		entryPointUpdateErr := r.updatePhaseFailed(ctx, entryPoint, err, []metav1.Condition{
 			{
-				Type:    string(constants.ConditionTypeError),
+				Type:    string(constant.ConditionTypeError),
 				Status:  metav1.ConditionTrue,
 				Reason:  "ReconciliationFailed",
 				Message: fmt.Sprintf("%s: %v", message, err),
 			},
 			{
-				Type:    string(constants.ConditionTypeReady),
+				Type:    string(constant.ConditionTypeReady),
 				Status:  metav1.ConditionFalse,
 				Reason:  "ResourceNotReady",
 				Message: "Resource is not ready due to reconciliation failure",
 			},
 			{
-				Type:    string(constants.ConditionTypeAvailable),
+				Type:    string(constant.ConditionTypeAvailable),
 				Status:  metav1.ConditionFalse,
 				Reason:  "ResourceUnavailable",
 				Message: "Resource is not available due to reconciliation failure",
 			},
 			{
-				Type:    string(constants.ConditionTypeProgressing),
+				Type:    string(constant.ConditionTypeProgressing),
 				Status:  metav1.ConditionFalse,
 				Reason:  "ProgressHalted",
 				Message: "Progress halted due to resource reconciliation failure",
@@ -74,14 +74,14 @@ func (r *EntryPointReconciler) handleReconcileError(ctx context.Context, kode *k
 		log.V(1).Info("EntryPoint is nil, skipping EntryPoint status update")
 	}
 
-	err = r.EventManager.Record(ctx, entryPoint, events.EventTypeWarning, events.ReasonFailed, fmt.Sprintf("Failed to reconcile Entrypoint: %v", err))
+	err = r.EventManager.Record(ctx, entryPoint, event.EventTypeWarning, event.ReasonFailed, fmt.Sprintf("Failed to reconcile Entrypoint: %v", err))
 	if err != nil {
 		log.Error(err, "Failed to record event")
 	}
 
 	// Update Kode status
 	kodeUpdateErr := r.updateKodeStatus(ctx, kode, kodev1alpha2.KodePhaseFailed, []metav1.Condition{{
-		Type:               string(constants.ConditionTypeError),
+		Type:               string(constant.ConditionTypeError),
 		Status:             metav1.ConditionTrue,
 		Reason:             "ReconciliationFailed",
 		Message:            fmt.Sprintf("%s: %v", message, err),
@@ -94,7 +94,7 @@ func (r *EntryPointReconciler) handleReconcileError(ctx context.Context, kode *k
 		return ctrl.Result{RequeueAfter: 5 * time.Second}, fmt.Errorf("primary error: %v, kode status update error: %v", err, kodeUpdateErr)
 	}
 
-	err = r.EventManager.Record(ctx, kode, events.EventTypeWarning, events.ReasonFailed, fmt.Sprintf("Failed to reconcile Kode: %v", err))
+	err = r.EventManager.Record(ctx, kode, event.EventTypeWarning, event.ReasonFailed, fmt.Sprintf("Failed to reconcile Kode: %v", err))
 	if err != nil {
 		log.Error(err, "Failed to record event")
 	}
@@ -110,7 +110,7 @@ func (r *EntryPointReconciler) handleValidationError(ctx context.Context, entryP
 	// Update status with validation error
 	if updateErr := r.StatusUpdater.UpdateStatusEntryPoint(ctx, entryPoint, kodev1alpha2.EntryPointPhaseFailed, []metav1.Condition{
 		{
-			Type:    string(constants.ConditionTypeError),
+			Type:    string(constant.ConditionTypeError),
 			Status:  metav1.ConditionTrue,
 			Reason:  "ValidationFailed",
 			Message: fmt.Sprintf("EntryPoint validation failed: %v", err),
@@ -121,7 +121,7 @@ func (r *EntryPointReconciler) handleValidationError(ctx context.Context, entryP
 	}
 
 	// Record an event for the validation failure
-	if eventErr := r.EventManager.Record(ctx, entryPoint, events.EventTypeWarning, events.ReasonEntryPointValidationFailed, fmt.Sprintf("EntryPoint validation failed: %v", err)); eventErr != nil {
+	if eventErr := r.EventManager.Record(ctx, entryPoint, event.EventTypeWarning, event.ReasonEntryPointValidationFailed, fmt.Sprintf("EntryPoint validation failed: %v", err)); eventErr != nil {
 		log.Error(eventErr, "Failed to record validation failure event")
 	}
 
@@ -136,7 +136,7 @@ func (r *EntryPointReconciler) handleResourceError(ctx context.Context, entryPoi
 	// Update status with resource error
 	if updateErr := r.StatusUpdater.UpdateStatusEntryPoint(ctx, entryPoint, kodev1alpha2.EntryPointPhaseFailed, []metav1.Condition{
 		{
-			Type:    string(constants.ConditionTypeError),
+			Type:    string(constant.ConditionTypeError),
 			Status:  metav1.ConditionTrue,
 			Reason:  reason,
 			Message: fmt.Sprintf("Resource check failed: %v", err),
@@ -147,7 +147,7 @@ func (r *EntryPointReconciler) handleResourceError(ctx context.Context, entryPoi
 	}
 
 	// Record an event for the resource failure
-	if eventErr := r.EventManager.Record(ctx, entryPoint, events.EventTypeWarning, events.ReasonEntryPointResourceCheckFailed, fmt.Sprintf("Resource check failed: %v", err)); eventErr != nil {
+	if eventErr := r.EventManager.Record(ctx, entryPoint, event.EventTypeWarning, event.ReasonEntryPointResourceCheckFailed, fmt.Sprintf("Resource check failed: %v", err)); eventErr != nil {
 		log.Error(eventErr, "Failed to record resource failure event")
 	}
 

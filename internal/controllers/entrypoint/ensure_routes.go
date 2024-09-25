@@ -29,7 +29,7 @@ import (
 
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
-	"github.com/jacero-io/kode-operator/internal/events"
+	event "github.com/jacero-io/kode-operator/internal/event"
 )
 
 func (r *EntryPointReconciler) ensureHTTPRoutes(ctx context.Context, entrypoint *kodev1alpha2.EntryPoint, kode *kodev1alpha2.Kode, config *common.EntryPointResourceConfig, kodeHostname kodev1alpha2.KodeHostname, kodeDomain kodev1alpha2.KodeDomain) (bool, error) {
@@ -78,7 +78,7 @@ func (r *EntryPointReconciler) ensureHTTPRoutes(ctx context.Context, entrypoint 
 
 		// Record event for created HTTPRoute on the Kode resource
 		message := fmt.Sprintf("HTTPRoute created, %s", route.Name)
-		err = r.EventManager.Record(ctx, kode, events.EventTypeNormal, events.ReasonCreated, message)
+		err = r.EventManager.Record(ctx, kode, event.EventTypeNormal, event.ReasonCreated, message)
 		if err != nil {
 			log.Error(err, "Failed to record event")
 			return created, err
@@ -111,7 +111,7 @@ func (r *EntryPointReconciler) ensureHTTPRoutes(ctx context.Context, entrypoint 
 
 		// Record event for created SecurityPolicy on the Kode resource
 		message := fmt.Sprintf("SecurityPolicy created, %s", policy.Name)
-		err = r.EventManager.Record(ctx, kode, events.EventTypeNormal, events.ReasonCreated, message)
+		err = r.EventManager.Record(ctx, kode, event.EventTypeNormal, event.ReasonCreated, message)
 		if err != nil {
 			log.Error(err, "Failed to record event")
 			return created, err
