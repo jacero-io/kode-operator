@@ -10,7 +10,6 @@ vars:
   MINIKUBE_MEMORY: 6144
   MINIKUBE_CPUS: 4
   MINIKUBE_DRIVER: docker
-  KUBERNETES_VERSION: v1.30.5
   MINIKUBE_COMMAND: minikube start --profile={{.MINIKUBE_PROFILE}} --memory={{.MINIKUBE_MEMORY}} --cpus={{.MINIKUBE_CPUS}} --driver={{.MINIKUBE_DRIVER}} --kubernetes-version={{.KUBERNETES_VERSION}}
 
 tasks:
@@ -61,7 +60,7 @@ tasks:
           echo "Ensuring kubectl context is set to the Minikube cluster..."
           kubectl config use-context {{.MINIKUBE_PROFILE}}
         fi
-    silent: false
+    silent: true
 
   minikube-destroy:
     desc: Delete the Minikube cluster
@@ -146,7 +145,7 @@ tasks:
     cmds:
       - echo "Undeploying from Minikube cluster..."
       - task: set-context
-      - '{{.KUBECTL}} delete --ignore-not-found={{.IGNORE_NOT_FOUND}} -f {{.ROOT_DIR}}/dist/install.yaml'
+      - '{{.KUBECTL_CMD}} delete --ignore-not-found={{.IGNORE_NOT_FOUND}} -f {{.ROOT_DIR}}/dist/install.yaml'
 
   deploy-remote:
     internal: true
@@ -155,17 +154,17 @@ tasks:
       - build:build-installer
     cmds:
       - echo "Using remote cluster. Ensure the image is built."
-      - '{{.KUBECTL}} apply -f {{.ROOT_DIR}}/dist/install.yaml'
+      - '{{.KUBECTL_CMD}} apply -f {{.ROOT_DIR}}/dist/install.yaml'
 
   undeploy-remote:
     internal: true
     cmds:
       - echo "Undeploying from remote cluster..."
-      - '{{.KUBECTL}} delete --ignore-not-found={{.IGNORE_NOT_FOUND}} -f {{.ROOT_DIR}}/dist/install.yaml'
+      - '{{.KUBECTL_CMD}} delete --ignore-not-found={{.IGNORE_NOT_FOUND}} -f {{.ROOT_DIR}}/dist/install.yaml'
 
   logs:
     cmds:
-      - '{{.KUBECTL}} logs -f deployment/controller-manager -n kode-system'
+      - '{{.KUBECTL_CMD}} logs -f deployment/controller-manager -n kode-system'
 
   minikube-dashboard:
     desc: Open Minikube dashboard
@@ -188,3 +187,4 @@ tasks:
       - task: minikube-ensure
       - task: set-context
       - echo "Minikube setup complete. You can now use 'kubectl' to interact with the cluster."
+    silent: true

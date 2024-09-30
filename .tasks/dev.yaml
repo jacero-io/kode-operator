@@ -20,21 +20,47 @@ includes:
     taskfile: envoy.yaml
     internal: true
 
-vars:
-  KUSTOMIZE_CMD: '{{.LOCALBIN}}/kustomize-{{.KUSTOMIZE_VERSION}}'
-  CONTROLLER_GEN_CMD: '{{.LOCALBIN}}/controller-gen-{{.CONTROLLER_TOOLS_VERSION}}'
-  SETUP_ENVTEST_CMD: '{{.LOCALBIN}}/setup-envtest-{{.ENVTEST_VERSION}}'
-  GOLANGCI_LINT_CMD: '{{.LOCALBIN}}/golangci-lint-{{.GOLANGCI_LINT_VERSION}}'
-  HELMIFY_CMD: '{{.LOCALBIN}}/helmify-{{.HELMIFY_VERSION}}'
-
 tasks:
   generate-manifests:
-    desc: Generate RBAC manifests
+    desc: Generate controller manifests
     cmds:
       - task: build:manifests
       - task: build:generate
     deps:
       - tools:controller-gen
+
+  install:
+    desc: Install CRDs into the cluster (Minikube by default, or existing kubecontext)
+    deps:
+      - tools:kustomize
+    cmds:
+      - task: clusters:set-context
+      - '{{.KUSTOMIZE_CMD}} build {{.ROOT_DIR}}/config/crd | {{.KUBECTL_CMD}} apply -f -'
+      - echo "CRDs installed successfully"
+    silent: true
+
+  uninstall:
+    desc: Uninstall CRDs from the cluster (Minikube by default, or existing kubecontext)
+    cmds:
+      - task: clusters:set-context
+      - '{{.KUSTOMIZE_CMD}} build {{.ROOT_DIR}}/config/crd | {{.KUBECTL_CMD}} delete --ignore-not-found={{.IGNORE_NOT_FOUND}} -f -'
+
+  deploy:
+    desc: Deploy controller to the specified cluster (Minikube or remote)
+    deps:
+      - build:build-installer
+      - build:docker-build
+    vars:
+      DEPLOY_TYPE: '{{if eq .USE_MINIKUBE_CONTEXT "true"}}minikube{{else}}remote{{end}}'
+    cmds:
+      - task: clusters:deploy-{{.DEPLOY_TYPE}}
+
+  undeploy:
+    desc: Undeploy controller from the specified cluster
+    vars:
+      DEPLOY_TYPE: '{{if eq .USE_MINIKUBE_CONTEXT "true"}}minikube{{else}}remote{{end}}'
+    cmds:
+      - task: clusters:undeploy-{{.DEPLOY_TYPE}}
 
   run-controller:
     desc: Run the controller
@@ -49,50 +75,3 @@ tasks:
       - task: generate-manifests
       - task: install
       - task: run-controller
-
-  install:
-    desc: Install CRDs into the cluster (Kind by default, or existing kubecontext)
-    deps:
-      - build:build-installer
-      - tools:kustomize
-    cmds:
-      - task: clusters:set-context
-      - '{{.KUSTOMIZE_CMD}} build {{.ROOT_DIR}}/config/crd | {{.KUBECTL}} apply -f -'
-
-  uninstall:
-    desc: Uninstall CRDs from the cluster (Kind by default, or existing kubecontext)
-    cmds:
-      - task: clusters:set-context
-      - '{{.KUSTOMIZE_CMD}} build {{.ROOT_DIR}}/config/crd | {{.KUBECTL}} delete --ignore-not-found={{.IGNORE_NOT_FOUND}} -f -'
-
-  deploy:
-    desc: Deploy controller to the specified cluster (Kind or remote)
-    deps:
-      - build:build-installer
-      - build:docker-build
-    vars:
-      DEPLOY_TYPE: '{{if eq .USE_MINIKUBE_CONTEXT "true"}}kind{{else}}remote{{end}}'
-    cmds:
-      - task: clusters:deploy-{{.DEPLOY_TYPE}}
-
-  undeploy:
-    desc: Undeploy controller from the specified cluster
-    vars:
-      DEPLOY_TYPE: '{{if eq .USE_MINIKUBE_CONTEXT "true"}}kind{{else}}remote{{end}}'
-    cmds:
-      - task: clusters:undeploy-{{.DEPLOY_TYPE}}
-
-  setup:
-    desc: Set up the complete development environment
-    cmds:
-      - task: clusters:kind-ensure
-      # - task: flux:deploy
-      - task: envoy:deploy
-      - task: envoy:install
-      - echo "Development environment is ready!"
-
-  teardown:
-    desc: Tear down the complete development environment
-    cmds:
-      - task: clusters:kind-destroy
-      - echo "Development environment has been torn down."

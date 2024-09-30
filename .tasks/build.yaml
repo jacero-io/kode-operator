@@ -9,11 +9,6 @@ includes:
     internal: true
 
 vars:
-  KUSTOMIZE_CMD: '{{.LOCALBIN}}/kustomize-{{.KUSTOMIZE_VERSION}}'
-  CONTROLLER_GEN_CMD: '{{.LOCALBIN}}/controller-gen-{{.CONTROLLER_TOOLS_VERSION}}'
-  SETUP_ENVTEST_CMD: '{{.LOCALBIN}}/setup-envtest-{{.ENVTEST_VERSION}}'
-  GOLANGCI_LINT_CMD: '{{.LOCALBIN}}/golangci-lint-{{.GOLANGCI_LINT_VERSION}}'
-  HELMIFY_CMD: '{{.LOCALBIN}}/helmify-{{.HELMIFY_VERSION}}'
   BUILDER_NAME: "project-v3-builder"
 
 tasks:
@@ -21,6 +16,7 @@ tasks:
     desc: Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects
     cmds:
       - '{{.CONTROLLER_GEN_CMD}} rbac:roleName=manager-role crd webhook paths="{{.ROOT_DIR}}/..." output:crd:artifacts:config={{.ROOT_DIR}}/config/crd/bases'
+      - echo "Manifests generated successfully"
     sources:
       - '{{.ROOT_DIR}}/api/**/*.go'
       - '{{.ROOT_DIR}}/controllers/**/*.go'
@@ -30,6 +26,7 @@ tasks:
       - '{{.ROOT_DIR}}/config/rbac/role.yaml'
     deps:
       - tools:controller-gen
+    silent: true
 
   generate:
     desc: |
@@ -43,8 +40,10 @@ tasks:
         Generated code will be integrated into the existing codebase.
     cmds:
       - '{{.CONTROLLER_GEN_CMD}} object:headerFile="{{.ROOT_DIR}}/hack/boilerplate.go.txt" paths="{{.ROOT_DIR}}/..."'
+      - echo "Files generated successfully"
     deps:
       - tools:controller-gen
+    silent: true
 
   lint:
     desc: Run linters
@@ -52,10 +51,11 @@ tasks:
       - task: lint:fmt
       - task: lint:vet
 
-  build-package:
+  build-binary:
     desc: Build manager binary
     cmds:
       - go build -o {{.ROOT_DIR}}/bin/manager {{.ROOT_DIR}}/cmd/main.go
+      - echo "Manager binary built successfully"
     sources:
       - '{{.ROOT_DIR}}/cmd/**/*.go'
       - '{{.ROOT_DIR}}/api/**/*.go'
@@ -66,6 +66,7 @@ tasks:
     deps:
       - manifests
       - generate
+    silent: true
 
   build-installer:
     desc: Generate a consolidated YAML with CRDs and deployment manifests
@@ -76,6 +77,8 @@ tasks:
       - tools:kustomize
     cmds:
       - '{{.KUSTOMIZE_CMD}} build {{.ROOT_DIR}}/config/installer > {{.ROOT_DIR}}/dist/install.yaml'
+      - echo "Installer generated successfully"
+    silent: true
 
   docker-build-base:
     internal: true

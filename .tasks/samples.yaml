@@ -11,25 +11,25 @@ tasks:
     vars:
       DEPLOY_TYPE: '{{if eq .USE_MINIKUBE_CONTEXT "true"}}kind{{else}}remote{{end}}'
     cmds:
-      - '{{.KUBECTL}} get -k {{.ROOT_DIR}}/config/samples/containertemplate/'
-      - '{{.KUBECTL}} get -k {{.ROOT_DIR}}/config/samples/entrypoint/'
-      - '{{.KUBECTL}} get -k {{.ROOT_DIR}}/config/samples/kode/'
+      - '{{.KUBECTL_CMD}} get -k {{.ROOT_DIR}}/config/samples/containertemplate/'
+      - '{{.KUBECTL_CMD}} get -k {{.ROOT_DIR}}/config/samples/entrypoint/'
+      - '{{.KUBECTL_CMD}} get -k {{.ROOT_DIR}}/config/samples/kode/'
 
   base-apply:
     internal: true
     desc: Apply Kubernetes resources
     cmds:
-      - '{{.KUBECTL}} apply -k {{.ROOT_DIR}}/config/samples/containertemplate/'
-      - '{{.KUBECTL}} apply -k {{.ROOT_DIR}}/config/samples/entrypoint/'
-      - '{{.KUBECTL}} apply -k {{.ROOT_DIR}}/config/samples/kode/'
+      - '{{.KUBECTL_CMD}} apply -k {{.ROOT_DIR}}/config/samples/containertemplate/'
+      - '{{.KUBECTL_CMD}} apply -k {{.ROOT_DIR}}/config/samples/entrypoint/'
+      - '{{.KUBECTL_CMD}} apply -k {{.ROOT_DIR}}/config/samples/kode/'
 
   base-delete:
     internal: true
     desc: Apply Kubernetes resources
     cmds:
-      - '{{.KUBECTL}} delete -k {{.ROOT_DIR}}/config/samples/containertemplate/'
-      - '{{.KUBECTL}} delete -k {{.ROOT_DIR}}/config/samples/entrypoint/'
-      - '{{.KUBECTL}} delete -k {{.ROOT_DIR}}/config/samples/kode/'
+      - '{{.KUBECTL_CMD}} delete -k {{.ROOT_DIR}}/config/samples/containertemplate/'
+      - '{{.KUBECTL_CMD}} delete -k {{.ROOT_DIR}}/config/samples/entrypoint/'
+      - '{{.KUBECTL_CMD}} delete -k {{.ROOT_DIR}}/config/samples/kode/'
 
   apply-kind:
     internal: true
