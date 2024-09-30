@@ -10,7 +10,7 @@ vars:
   MINIKUBE_MEMORY: 6144
   MINIKUBE_CPUS: 4
   MINIKUBE_DRIVER: docker
-  MINIKUBE_COMMAND: minikube start --profile={{.MINIKUBE_PROFILE}} --memory={{.MINIKUBE_MEMORY}} --cpus={{.MINIKUBE_CPUS}} --driver={{.MINIKUBE_DRIVER}} --kubernetes-version={{.KUBERNETES_VERSION}}
+  MINIKUBE_COMMAND: minikube start --profile={{.MINIKUBE_PROFILE}} --memory={{.MINIKUBE_MEMORY}} --cpus={{.MINIKUBE_CPUS}} --driver={{.MINIKUBE_DRIVER}} --kubernetes-version={{.KUBERNETES_VERSION}} --cni=cilium --container-runtime=containerd --docker-opt containerd=/var/run/containerd/containerd.sock
 
 tasks:
   set-context:
@@ -48,11 +48,11 @@ tasks:
       Note:
         This task will set the kubectl context to the newly created or existing Minikube cluster.
     cmds:
-      - task: set-context
       - |
         if ! minikube status -p {{.MINIKUBE_PROFILE}} &>/dev/null; then
           echo "Creating Minikube cluster '{{.MINIKUBE_PROFILE}}'..."
           {{ .MINIKUBE_COMMAND }}
+          minikube addons enable gvisor --profile={{.MINIKUBE_PROFILE}}
           echo "Setting kubectl context to the new Minikube cluster..."
           kubectl config use-context {{.MINIKUBE_PROFILE}}
         else
@@ -60,6 +60,7 @@ tasks:
           echo "Ensuring kubectl context is set to the Minikube cluster..."
           kubectl config use-context {{.MINIKUBE_PROFILE}}
         fi
+      - task: set-context
     silent: true
 
   minikube-destroy:
