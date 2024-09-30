@@ -71,14 +71,14 @@ tasks:
       - build:build-installer
       - build:docker-build
     vars:
-      DEPLOY_TYPE: '{{if eq .USE_KIND_CONTEXT "true"}}kind{{else}}remote{{end}}'
+      DEPLOY_TYPE: '{{if eq .USE_MINIKUBE_CONTEXT "true"}}kind{{else}}remote{{end}}'
     cmds:
       - task: clusters:deploy-{{.DEPLOY_TYPE}}
 
   undeploy:
     desc: Undeploy controller from the specified cluster
     vars:
-      DEPLOY_TYPE: '{{if eq .USE_KIND_CONTEXT "true"}}kind{{else}}remote{{end}}'
+      DEPLOY_TYPE: '{{if eq .USE_MINIKUBE_CONTEXT "true"}}kind{{else}}remote{{end}}'
     cmds:
       - task: clusters:undeploy-{{.DEPLOY_TYPE}}
 

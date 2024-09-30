@@ -9,7 +9,7 @@ tasks:
   get:
     desc: Get Kubernetes resources defined in config/samples/ from the cluster
     vars:
-      DEPLOY_TYPE: '{{if eq .USE_KIND_CONTEXT "true"}}kind{{else}}remote{{end}}'
+      DEPLOY_TYPE: '{{if eq .USE_MINIKUBE_CONTEXT "true"}}kind{{else}}remote{{end}}'
     cmds:
       - '{{.KUBECTL}} get -k {{.ROOT_DIR}}/config/samples/containertemplate/'
       - '{{.KUBECTL}} get -k {{.ROOT_DIR}}/config/samples/entrypoint/'
@@ -60,13 +60,13 @@ tasks:
   apply:
     desc: Apply Kubernetes resources defined in config/samples/ to the cluster
     vars:
-      DEPLOY_TYPE: '{{if eq .USE_KIND_CONTEXT "true"}}kind{{else}}remote{{end}}'
+      DEPLOY_TYPE: '{{if eq .USE_MINIKUBE_CONTEXT "true"}}kind{{else}}remote{{end}}'
     cmds:
       - task: apply-{{.DEPLOY_TYPE}}
 
   delete:
     desc: Delete Kubernetes resources defined in config/samples/ from the cluster
     vars:
-      DEPLOY_TYPE: '{{if eq .USE_KIND_CONTEXT "true"}}kind{{else}}remote{{end}}'
+      DEPLOY_TYPE: '{{if eq .USE_MINIKUBE_CONTEXT "true"}}kind{{else}}remote{{end}}'
     cmds:
       - task: delete-{{.DEPLOY_TYPE}}

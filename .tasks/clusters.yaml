@@ -4,80 +4,83 @@ includes:
   build: 
     taskfile: build.yaml
     internal: true
-  sysbox: 
-    taskfile: sysbox.yaml
-    internal: true
 
 vars:
-  KIND_VERSION: 1.29.8
-  KIND_CONFIG: '{{.ROOT_DIR}}/hack/development/kind-config.yaml'
+  MINIKUBE_PROFILE: minikube-kode
+  MINIKUBE_MEMORY: 6144
+  MINIKUBE_CPUS: 4
+  MINIKUBE_DRIVER: docker
+  KUBERNETES_VERSION: v1.30.5
+  MINIKUBE_COMMAND: minikube start --profile={{.MINIKUBE_PROFILE}} --memory={{.MINIKUBE_MEMORY}} --cpus={{.MINIKUBE_CPUS}} --driver={{.MINIKUBE_DRIVER}} --kubernetes-version={{.KUBERNETES_VERSION}}
 
 tasks:
   set-context:
     internal: true
     cmds:
       - |
-        if [ "{{.USE_KIND_CONTEXT}}" = "true" ]; then
-          echo "Checking Kind context..."
-          if kubectl config get-contexts {{.KIND_CONTEXT}} &>/dev/null; then
-            echo "Using Kind context..."
-            kubectl config use-context {{.KIND_CONTEXT}}
+        if [ "{{.USE_MINIKUBE_CONTEXT}}" = "true" ]; then
+          echo "Checking Minikube context..."
+          if kubectl config get-contexts {{.MINIKUBE_PROFILE}} &>/dev/null; then
+            echo "Using Minikube context..."
+            kubectl config use-context {{.MINIKUBE_PROFILE}}
           else
-            echo "Kind context does not exist. It will be created if necessary."
+            echo "Minikube context does not exist. It will be created if necessary."
           fi
         else
           echo "Using existing kubecontext..."
         fi
     silent: true
 
-  kind-ensure:
+  minikube-ensure:
     desc: |
-      Ensure a Kind cluster exists, creating it if necessary.
-      This task checks for the existence of a Kind cluster with the specified name and creates one if it doesn't exist.
+      Ensure a Minikube cluster exists, creating it if necessary.
+      This task checks for the existence of a Minikube cluster with the specified profile and creates one if it doesn't exist.
       
       Usage:
-        task kind-ensure
+        task minikube-ensure
       
       Variables:
-        KIND_CLUSTER_NAME: Name of the Kind cluster (default defined in Taskfile)
-        ENVTEST_K8S_VERSION: Kubernetes version to use for the cluster
-        KIND_CONFIG: Path to the Kind configuration file
+        MINIKUBE_PROFILE: Name of the Minikube profile (default: minikube-kode)
+        MINIKUBE_MEMORY: Memory allocation for Minikube VM (default: 6144MB)
+        MINIKUBE_CPUS: Number of CPUs for Minikube VM (default: 4)
+        MINIKUBE_DRIVER: VM driver for Minikube (default: docker)
+        KUBERNETES_VERSION: Kubernetes version to use for the cluster (default: v1.30.5)
       
       Note:
-        This task will set the kubectl context to the newly created or existing Kind cluster.
+        This task will set the kubectl context to the newly created or existing Minikube cluster.
     cmds:
       - task: set-context
       - |
-        if ! kind get clusters | grep -q '^{{.KIND_CLUSTER_NAME}}$'; then
-          echo "Creating Kind cluster '{{.KIND_CLUSTER_NAME}}' with config from {{.KIND_CONFIG}}..."
-          kind create cluster --name {{.KIND_CLUSTER_NAME}} --image kindest/node:v{{.KIND_VERSION}} --config {{.KIND_CONFIG}}
-          echo "Setting kubectl context to the new Kind cluster..."
-          kubectl config use-context kind-{{.KIND_CLUSTER_NAME}}
+        if ! minikube status -p {{.MINIKUBE_PROFILE}} &>/dev/null; then
+          echo "Creating Minikube cluster '{{.MINIKUBE_PROFILE}}'..."
+          {{ .MINIKUBE_COMMAND }}
+          echo "Setting kubectl context to the new Minikube cluster..."
+          kubectl config use-context {{.MINIKUBE_PROFILE}}
         else
-          echo "Kind cluster '{{.KIND_CLUSTER_NAME}}' already exists."
-          echo "Ensuring kubectl context is set to the Kind cluster..."
-          kubectl config use-context kind-{{.KIND_CLUSTER_NAME}}
+          echo "Minikube cluster '{{.MINIKUBE_PROFILE}}' already exists."
+          echo "Ensuring kubectl context is set to the Minikube cluster..."
+          kubectl config use-context {{.MINIKUBE_PROFILE}}
         fi
     silent: false
 
-  kind-destroy:
-    desc: Delete the Kind cluster
+  minikube-destroy:
+    desc: Delete the Minikube cluster
     cmds:
       - task: set-context
-      - kind delete cluster --name {{.KIND_CLUSTER_NAME}}
+      - minikube delete -p {{.MINIKUBE_PROFILE}}
 
-  kind-start:
-    desc: Start the Kind cluster
+  minikube-start:
+    desc: Start the Minikube cluster
     cmds:
-      - docker start {{.KIND_CONTROL_PLANE}} || true
+      - task: minikube-ensure
 
-  kind-stop:
-    desc: Stop the Kind cluster
+  minikube-stop:
+    desc: Stop the Minikube cluster
     cmds:
-      - docker stop {{.KIND_CONTROL_PLANE}} || true
+      - minikube stop -p {{.MINIKUBE_PROFILE}}
 
-  kind-load-image:
-    desc: Load a Docker image into the Kind cluster
+  minikube-load-image:
+    desc: Load a Docker image into the Minikube cluster
     cmds:
       - task: set-context
       - |
@@ -86,22 +89,22 @@ tasks:
           exit 1
         fi
       - |
-        if ! kind get clusters | grep -q '^{{.KIND_CLUSTER_NAME}}$'; then
-          echo "Error: Kind cluster '{{.KIND_CLUSTER_NAME}}' not found. Please create the cluster first."
+        if ! minikube status -p {{.MINIKUBE_PROFILE}} &>/dev/null; then
+          echo "Error: Minikube cluster '{{.MINIKUBE_PROFILE}}' not found. Please create the cluster first."
           exit 1
         fi
       - |
-        echo "Loading image {{.IMG}} into Kind cluster '{{.KIND_CLUSTER_NAME}}'..."
-        if kind load docker-image {{.IMG}} --name {{.KIND_CLUSTER_NAME}}; then
+        echo "Loading image {{.IMG}} into Minikube cluster '{{.MINIKUBE_PROFILE}}'..."
+        if minikube image load {{.IMG}} -p {{.MINIKUBE_PROFILE}}; then
           echo "Image loaded successfully."
         else
-          echo "Error: Failed to load image into the Kind cluster."
+          echo "Error: Failed to load image into the Minikube cluster."
           exit 1
         fi
     silent: false
 
-  kind-load-images:
-    desc: Load internal and external Docker images into Kind cluster
+  minikube-load-images:
+    desc: Load internal and external Docker images into Minikube cluster
     vars:
       INT_IMAGES_TO_LOAD: 
         sh: echo {{.IMG}}
@@ -112,36 +115,36 @@ tasks:
     cmds:
       - task: set-context
       - |
-        if [ "{{.USE_KIND_CONTEXT}}" = "true" ]; then
-          echo "Using Kind context..."
+        if [ "{{.USE_MINIKUBE_CONTEXT}}" = "true" ]; then
+          echo "Using Minikube context..."
           for img in {{.INT_IMAGES_TO_LOAD}}; do
             echo "Loading $img";
-            kind load docker-image $img --name {{.KIND_CLUSTER_NAME}};
+            minikube image load $img -p {{.MINIKUBE_PROFILE}};
           done
           for img in {{range .EXT_IMAGES_TO_LOAD}}"{{.}}" {{end}}; do
             echo "Pulling $img";
             {{.CONTAINER_TOOL}} pull $img;
             echo "Loading $img";
-            kind load docker-image $img --name {{.KIND_CLUSTER_NAME}};
+            minikube image load $img -p {{.MINIKUBE_PROFILE}};
           done
         else
-          echo "Skipping image load for non-Kind context"
+          echo "Skipping image load for non-Minikube context"
         fi
 
-  deploy-kind:
+  deploy-minikube:
     internal: true
     deps:
       - build:docker-build
       - build:build-installer
     cmds:
       - task: set-context
-      - echo "Deploying to Kind cluster..."
+      - echo "Deploying to Minikube cluster..."
       - 'kubectl apply -f {{.ROOT_DIR}}/dist/install.yaml'
 
-  undeploy-kind:
+  undeploy-minikube:
     internal: true
     cmds:
-      - echo "Undeploying from Kind cluster..."
+      - echo "Undeploying from Minikube cluster..."
       - task: set-context
       - '{{.KUBECTL}} delete --ignore-not-found={{.IGNORE_NOT_FOUND}} -f {{.ROOT_DIR}}/dist/install.yaml'
 
@@ -163,3 +166,25 @@ tasks:
   logs:
     cmds:
       - '{{.KUBECTL}} logs -f deployment/controller-manager -n kode-system'
+
+  minikube-dashboard:
+    desc: Open Minikube dashboard
+    cmds:
+      - minikube dashboard -p {{.MINIKUBE_PROFILE}}
+
+  minikube-tunnel:
+    desc: Start Minikube tunnel for LoadBalancer services
+    cmds:
+      - minikube tunnel -p {{.MINIKUBE_PROFILE}}
+
+  minikube-docker-env:
+    desc: Print Docker environment variables for Minikube
+    cmds:
+      - minikube docker-env -p {{.MINIKUBE_PROFILE}}
+
+  minikube-setup:
+    desc: Start Minikube and set up the environment
+    cmds:
+      - task: minikube-ensure
+      - task: set-context
+      - echo "Minikube setup complete. You can now use 'kubectl' to interact with the cluster."
