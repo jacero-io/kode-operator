@@ -43,17 +43,19 @@ resources:
 - api:
     crdVersion: v1
     namespaced: true
+  controller: true
   domain: jacero.io
   group: kode
-  kind: PodTemplate
+  kind: ContainerTemplate
   path: github.com/jacero-io/kode-operator/api/v1alpha2
   version: v1alpha2
 - api:
     crdVersion: v1
-    namespaced: false
+    namespaced: true
+  controller: true
   domain: jacero.io
   group: kode
-  kind: ClusterPodTemplate
+  kind: ClusterContainerTemplate
   path: github.com/jacero-io/kode-operator/api/v1alpha2
   version: v1alpha2
 version: "3"

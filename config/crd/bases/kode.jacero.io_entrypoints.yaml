@@ -1933,6 +1933,10 @@ spec:
                   - type
                   type: object
                 type: array
+              deletionCycle:
+                description: DeletionCycle keeps track of the number of deletion cycles.
+                  This is used to determine if the resource is deleting.
+                type: integer
               lastError:
                 description: Contains the last error message encountered during reconciliation.
                 type: string
@@ -1948,6 +1952,10 @@ spec:
               phase:
                 description: Represents the current phase of the EntryPointPhase resource.
                 type: string
+              retryCount:
+                description: RetryCount keeps track of the number of retry attempts
+                  for failed states.
+                type: integer
             required:
             - phase
             type: object

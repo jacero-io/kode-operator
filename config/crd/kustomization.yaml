@@ -6,8 +6,8 @@ resources:
 - bases/kode.jacero.io_entrypoints.yaml
 - bases/kode.jacero.io_tofutemplates.yaml
 - bases/kode.jacero.io_clustertofutemplates.yaml
-- bases/kode.jacero.io_podtemplates.yaml
-- bases/kode.jacero.io_clusterpodtemplates.yaml
+- bases/kode.jacero.io_containertemplates.yaml
+- bases/kode.jacero.io_clustercontainertemplates.yaml
 #+kubebuilder:scaffold:crdkustomizeresource
 
 # patches:
@@ -21,8 +21,8 @@ resources:
 #- path: patches/cainjection_in_entrypoints.yaml
 #- path: patches/cainjection_in_tofutemplates.yaml
 #- path: patches/cainjection_in_clustertofutemplates.yaml
-#- path: patches/cainjection_in_podtemplates.yaml
-#- path: patches/cainjection_in_clusterpodtemplates.yaml
+#- path: patches/cainjection_in_containertemplates.yaml
+#- path: patches/cainjection_in_clustercontainertemplates.yaml
 #+kubebuilder:scaffold:crdkustomizecainjectionpatch
 
 # [WEBHOOK] To enable webhook, uncomment the following section

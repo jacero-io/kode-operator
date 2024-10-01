@@ -1,0 +1,3 @@
+resources:
+- kode_v1alpha2_containertemplate_codeserver.yaml
+- kode_v1alpha2_containertemplate_webtop.yaml

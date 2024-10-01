@@ -13,8 +13,8 @@ spec:
     password: password1
     enableBuiltinAuth: true
   templateRef:
-    kind: PodTemplate
-    name: podtemplate-codeserver-sample
+    kind: ContainerTemplate
+    name: containertemplate-codeserver-sample
     namespace: default
   storage:
     existingVolumeClaim: kode1-existing-pvc
@@ -33,7 +33,7 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
-  storageClassName: openebs-hostpath-home-media
+  storageClassName: standard
   resources:
     requests:
       storage: 50Gi

@@ -72,7 +72,7 @@ type BaseSharedStatus struct {
 
 // Template represents a unified structure for different types of Kode templates
 type Template struct {
-	// Kind specifies the type of template (e.g., "PodTemplate", "ClusterPodTemplate", "TofuTemplate", "ClusterTofuTemplate")
+	// Kind specifies the type of template (e.g., "ContainerTemplate", "ClusterContainerTemplate", "TofuTemplate", "ClusterTofuTemplate")
 	Kind Kind `json:"kind" yaml:"kind"`
 
 	// Name is the name of the template resource
@@ -84,12 +84,23 @@ type Template struct {
 	// Port is the port to expose the kode instance
 	Port Port `json:"port" yaml:"port"`
 
-	// PodTemplateSpec is a reference to a PodTemplate or ClusterPodTemplate
-	PodTemplateSpec *PodTemplateSharedSpec `json:"container,omitempty" yaml:"container,omitempty"`
+	// ContainerTemplateSpec is a reference to a ContainerTemplate or ClusterContainerTemplate
+	ContainerTemplateSpec *ContainerTemplateSharedSpec `json:"container,omitempty" yaml:"container,omitempty"`
 
 	// TofuTemplateSpec is a reference to a TofuTemplate or ClusterTofuTemplate
 	TofuTemplateSpec *TofuSharedSpec `json:"tofu,omitempty" yaml:"tofu,omitempty"`
 }
+
+type TemplateKind string
+
+const (
+	TemplateKindContainerTemplate        TemplateKind = "ContainerTemplate"
+	TemplateKindClusterContainerTemplate TemplateKind = "ClusterContainerTemplate"
+	TemplateKindVirtualTemplate          TemplateKind = "VirtualTemplate"
+	TemplateKindClusterVirtualTemplate   TemplateKind = "ClusterVirtualTemplate"
+	TemplateKindTofuTemplate             TemplateKind = "TofuTemplate"
+	TemplateKindClusterTofuTemplate      TemplateKind = "ClusterTofuTemplate"
+)
 
 // Port for the service. Used by EnvoyProxy to expose the container. Defaults to '8000'.
 // +kubebuilder:validation:Minimum=1

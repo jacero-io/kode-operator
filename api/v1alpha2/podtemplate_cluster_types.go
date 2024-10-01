@@ -20,38 +20,38 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// ClusterPodTemplateSpec defines the desired state of ClusterKodeContainer
-type ClusterPodTemplateSpec struct {
-	PodTemplateSharedSpec `json:",inline" yaml:",inline"`
+// ClusterContainerTemplateSpec defines the desired state of ClusterKodeContainer
+type ClusterContainerTemplateSpec struct {
+	ContainerTemplateSharedSpec `json:",inline" yaml:",inline"`
 }
 
-// ClusterPodTemplateStatus defines the observed state of ClusterKodeContainer
-type ClusterPodTemplateStatus struct {
-	PodTemplateSharedStatus `json:",inline" yaml:",inline"`
+// ClusterContainerTemplateStatus defines the observed state of ClusterKodeContainer
+type ClusterContainerTemplateStatus struct {
+	ContainerTemplateSharedStatus `json:",inline" yaml:",inline"`
 }
 
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
 // +kubebuilder:resource:scope=Cluster
 
-// ClusterPodTemplate is the Schema for the clusterpodtemplates API
-type ClusterPodTemplate struct {
+// ClusterContainerTemplate is the Schema for the clusterContainerTemplates API
+type ClusterContainerTemplate struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   ClusterPodTemplateSpec   `json:"spec,omitempty"`
-	Status ClusterPodTemplateStatus `json:"status,omitempty"`
+	Spec   ClusterContainerTemplateSpec   `json:"spec,omitempty"`
+	Status ClusterContainerTemplateStatus `json:"status,omitempty"`
 }
 
 // +kubebuilder:object:root=true
 
-// ClusterPodTemplateList contains a list of ClusterPodTemplate
-type ClusterPodTemplateList struct {
+// ClusterContainerTemplateList contains a list of ClusterContainerTemplate
+type ClusterContainerTemplateList struct {
 	metav1.TypeMeta `json:",inline"`
 	metav1.ListMeta `json:"metadata,omitempty"`
-	Items           []ClusterPodTemplate `json:"items"`
+	Items           []ClusterContainerTemplate `json:"items"`
 }
 
 func init() {
-	SchemeBuilder.Register(&ClusterPodTemplate{}, &ClusterPodTemplateList{})
+	SchemeBuilder.Register(&ClusterContainerTemplate{}, &ClusterContainerTemplateList{})
 }

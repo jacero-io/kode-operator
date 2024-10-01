@@ -15,7 +15,7 @@ metadata:
 spec:
   gatewayClassName: eg
   listeners:
-  - name: http
-    port: 80
-    protocol: HTTP
-    hostname: "*.localhost"
+    - name: http
+      port: 8080
+      protocol: HTTP
+      hostname: "*.dev"

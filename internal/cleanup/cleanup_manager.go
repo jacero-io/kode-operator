@@ -19,12 +19,12 @@ package cleanup
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/go-logr/logr"
+
 	"k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/util/wait"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -44,7 +44,7 @@ type CleanupableResource interface {
 
 // CleanupManager defines the interface for cleaning up resources
 type CleanupManager interface {
-	Cleanup(ctx context.Context, resource CleanupableResource) error
+	Cleanup(ctx context.Context, resource CleanupableResource) (ctrl.Result, error)
 }
 
 type defaultCleanupManager struct {
@@ -59,37 +59,38 @@ func NewDefaultCleanupManager(client client.Client, log logr.Logger) CleanupMana
 	}
 }
 
-func (m *defaultCleanupManager) Cleanup(ctx context.Context, resource CleanupableResource) error {
+func (m *defaultCleanupManager) Cleanup(ctx context.Context, resource CleanupableResource) (ctrl.Result, error) {
 	log := m.log.WithValues("cleanup", "manager")
 	log.Info("Starting cleanup of resources")
 
 	resources := resource.GetResources()
-	var wg sync.WaitGroup
+	deletionInitiated := false
 
 	for _, res := range resources {
-		// Check if the resource should be deleted
 		if resource.ShouldDelete(res) {
-			wg.Add(1) // Increment the wait group counter
-			go func(res Resource) {
-				defer wg.Done()
-				if err := m.deleteResourceAsync(ctx, res); err != nil {
+			if err := m.deleteResource(ctx, res); err != nil {
+				if !errors.IsNotFound(err) {
 					log.Error(err, fmt.Sprintf("Failed to delete %s", res.Kind))
+					return ctrl.Result{}, err
 				}
-			}(res)
+			} else {
+				deletionInitiated = true
+			}
 		} else {
 			log.V(1).Info(fmt.Sprintf("Skipping deletion of %s due to condition not met", res.Kind))
 		}
 	}
 
-	go func() {
-		wg.Wait()
-		log.V(1).Info("Resources cleanup initiated successfully")
-	}()
+	if deletionInitiated {
+		log.Info("Resource deletion initiated, requeuing")
+		return ctrl.Result{RequeueAfter: time.Second * 1}, nil
+	}
 
-	return nil
+	log.V(1).Info("No resources to delete or all resources already deleted")
+	return ctrl.Result{}, nil
 }
 
-func (m *defaultCleanupManager) deleteResourceAsync(ctx context.Context, resource Resource) error {
+func (m *defaultCleanupManager) deleteResource(ctx context.Context, resource Resource) error {
 	log := m.log.WithValues(resource.Kind, client.ObjectKey{Name: resource.Name, Namespace: resource.Namespace})
 
 	log.V(1).Info("Attempting to delete resource")
@@ -108,36 +109,6 @@ func (m *defaultCleanupManager) deleteResourceAsync(ctx context.Context, resourc
 		return fmt.Errorf("failed to delete %s: %w", resource.Kind, err)
 	}
 
-	// Start a goroutine to periodically check the deletion status
-	go m.checkDeletionStatus(ctx, resource.Object, resource.Kind)
-
+	log.Info(fmt.Sprintf("%s deletion initiated", resource.Kind))
 	return nil
-}
-
-func (m *defaultCleanupManager) checkDeletionStatus(ctx context.Context, obj client.Object, kind string) {
-	log := m.log.WithValues(kind, client.ObjectKeyFromObject(obj))
-
-	err := wait.PollUntilContextCancel(ctx, 5*time.Second, true, func(ctx context.Context) (bool, error) {
-		err := m.client.Get(ctx, client.ObjectKeyFromObject(obj), obj)
-		if errors.IsNotFound(err) {
-			log.Info(fmt.Sprintf("%s confirmed deleted", kind))
-			return true, nil
-		}
-		if err != nil {
-			log.Error(err, fmt.Sprintf("Error checking %s deletion status", kind))
-			return false, err
-		}
-		log.V(1).Info(fmt.Sprintf("%s still exists, waiting for deletion", kind))
-		return false, nil
-	})
-
-	if err != nil {
-		if err == context.DeadlineExceeded {
-			log.Error(err, fmt.Sprintf("Timeout waiting for %s deletion", kind))
-		} else if err == context.Canceled {
-			log.Info(fmt.Sprintf("Context canceled while waiting for %s deletion", kind))
-		} else {
-			log.Error(err, fmt.Sprintf("Error occurred while waiting for %s deletion", kind))
-		}
-	}
 }

@@ -62,9 +62,9 @@ rules:
 - apiGroups:
   - kode.jacero.io
   resources:
-  - clusterpodtemplates
+  - clustercontainertemplates
   - clustertofutemplates
-  - podtemplates
+  - containertemplates
   - tofutemplates
   verbs:
   - get

@@ -12,8 +12,8 @@ spec:
     password: password1
     enableBuiltinAuth: true
   templateRef:
-    kind: PodTemplate
-    name: podtemplate-webtop-sample
+    kind: ContainerTemplate
+    name: containertemplate-webtop-sample
     namespace: default
   # storage:
   #   accessModes:
