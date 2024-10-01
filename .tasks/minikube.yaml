@@ -30,7 +30,7 @@ tasks:
         fi
     silent: true
 
-  minikube-ensure:
+  ensure:
     desc: |
       Ensure a Minikube cluster exists, creating it if necessary.
       This task checks for the existence of a Minikube cluster with the specified profile and creates one if it doesn't exist.
@@ -63,23 +63,23 @@ tasks:
       - task: set-context
     silent: true
 
-  minikube-destroy:
+  destroy:
     desc: Delete the Minikube cluster
     cmds:
       - task: set-context
       - minikube delete -p {{.MINIKUBE_PROFILE}}
 
-  minikube-start:
+  start:
     desc: Start the Minikube cluster
     cmds:
-      - task: minikube-ensure
+      - task: ensure
 
-  minikube-stop:
+  stop:
     desc: Stop the Minikube cluster
     cmds:
       - minikube stop -p {{.MINIKUBE_PROFILE}}
 
-  minikube-load-image:
+  load-image:
     desc: Load a Docker image into the Minikube cluster
     cmds:
       - task: set-context
@@ -103,7 +103,7 @@ tasks:
         fi
     silent: false
 
-  minikube-load-images:
+  load-images:
     desc: Load internal and external Docker images into Minikube cluster
     vars:
       INT_IMAGES_TO_LOAD: 

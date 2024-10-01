@@ -8,7 +8,7 @@ includes:
     taskfile: lint.yaml
     internal: true
   clusters:
-    taskfile: clusters.yaml
+    taskfile: minikube.yaml
     internal: true
   build:
     taskfile: build.yaml

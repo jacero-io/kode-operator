@@ -2,7 +2,7 @@ version: '3'
 
 includes:
   clusters:
-    taskfile: clusters.yaml
+    taskfile: minikube.yaml
     internal: true
 
 tasks:
@@ -14,6 +14,7 @@ tasks:
       - '{{.KUBECTL_CMD}} get -k {{.ROOT_DIR}}/config/samples/containertemplate/'
       - '{{.KUBECTL_CMD}} get -k {{.ROOT_DIR}}/config/samples/entrypoint/'
       - '{{.KUBECTL_CMD}} get -k {{.ROOT_DIR}}/config/samples/kode/'
+    silent: true
 
   base-apply:
     internal: true
@@ -22,6 +23,7 @@ tasks:
       - '{{.KUBECTL_CMD}} apply -k {{.ROOT_DIR}}/config/samples/containertemplate/'
       - '{{.KUBECTL_CMD}} apply -k {{.ROOT_DIR}}/config/samples/entrypoint/'
       - '{{.KUBECTL_CMD}} apply -k {{.ROOT_DIR}}/config/samples/kode/'
+    silent: true
 
   base-delete:
     internal: true
@@ -30,43 +32,50 @@ tasks:
       - '{{.KUBECTL_CMD}} delete -k {{.ROOT_DIR}}/config/samples/containertemplate/'
       - '{{.KUBECTL_CMD}} delete -k {{.ROOT_DIR}}/config/samples/entrypoint/'
       - '{{.KUBECTL_CMD}} delete -k {{.ROOT_DIR}}/config/samples/kode/'
+    silent: true
 
-  apply-kind:
+  apply-minikube:
     internal: true
     desc: Apply Kubernetes resources defined in config/samples/ to the Kind cluster
     cmds:
       - task: clusters:set-context
       - task: base-apply
+    silent: true
 
-  delete-kind:
+  delete-minikube:
     internal: true
     desc: Apply Kubernetes resources defined in config/samples/ to the Kind cluster
     cmds:
       - task: clusters:set-context
       - task: base-delete
+    silent: true
 
   apply-remote:
     internal: true
     desc: Apply Kubernetes resources defined in config/samples/ to the remote cluster
     cmds:
       - task: base-apply
+    silent: true
 
   delete-remote:
     internal: true
     desc: Apply Kubernetes resources defined in config/samples/ to the remote cluster
     cmds:
       - task: base-delete
+    silent: true
 
   apply:
     desc: Apply Kubernetes resources defined in config/samples/ to the cluster
     vars:
-      DEPLOY_TYPE: '{{if eq .USE_MINIKUBE_CONTEXT "true"}}kind{{else}}remote{{end}}'
+      DEPLOY_TYPE: '{{if eq .USE_MINIKUBE_CONTEXT "true"}}minikube{{else}}remote{{end}}'
     cmds:
       - task: apply-{{.DEPLOY_TYPE}}
+    silent: true
 
   delete:
     desc: Delete Kubernetes resources defined in config/samples/ from the cluster
     vars:
-      DEPLOY_TYPE: '{{if eq .USE_MINIKUBE_CONTEXT "true"}}kind{{else}}remote{{end}}'
+      DEPLOY_TYPE: '{{if eq .USE_MINIKUBE_CONTEXT "true"}}minikube{{else}}remote{{end}}'
     cmds:
       - task: delete-{{.DEPLOY_TYPE}}
+    silent: true

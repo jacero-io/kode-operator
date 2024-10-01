@@ -4,7 +4,7 @@ includes:
   tools: ./.tasks/tools.yaml
   lint: ./.tasks/lint.yaml
   test: ./.tasks/test.yaml
-  cluster: ./.tasks/clusters.yaml
+  cluster: ./.tasks/minikube.yaml
   helm: ./.tasks/helm.yaml
   build: ./.tasks/build.yaml
   dev: ./.tasks/dev.yaml
