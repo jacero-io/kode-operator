@@ -16,7 +16,7 @@ spec:
   #     name: eg
   #     namespace: default
   routingType: "subdomain"
-  baseDomain: "dev"
+  baseDomain: "derp"
   gatewaySpec:
     existingGatewayRef:
       kind: Gateway
