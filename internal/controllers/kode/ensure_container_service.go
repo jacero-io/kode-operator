@@ -45,7 +45,7 @@ func (r *KodeReconciler) ensureService(ctx context.Context, kode *kodev1alpha2.K
 		},
 	}
 
-	err := r.ResourceManager.CreateOrPatch(ctx, service, func() error {
+	_, err := r.Resource.CreateOrPatch(ctx, service, func() error {
 		constructedService, err := r.constructServiceSpec(config)
 		if err != nil {
 			return fmt.Errorf("failed to construct Service spec: %v", err)

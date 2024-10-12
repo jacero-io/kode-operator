@@ -9,7 +9,9 @@ includes:
     internal: true
 
 vars:
+  CONTAINER_TOOL: '{{.CONTAINER_TOOL | default "docker"}}'
   BUILDER_NAME: "project-v3-builder"
+  IMG: '{{.IMG | default "emiljacero/kode-operator:v0.0.0-latest"}}'
 
 tasks:
   manifests:

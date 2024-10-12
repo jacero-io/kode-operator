@@ -6,11 +6,14 @@ includes:
     internal: true
 
 vars:
-  MINIKUBE_PROFILE: minikube-kode
-  MINIKUBE_MEMORY: 6144
-  MINIKUBE_CPUS: 4
-  MINIKUBE_DRIVER: docker
-  MINIKUBE_COMMAND: minikube start --profile={{.MINIKUBE_PROFILE}} --memory={{.MINIKUBE_MEMORY}} --cpus={{.MINIKUBE_CPUS}} --driver={{.MINIKUBE_DRIVER}} --kubernetes-version={{.KUBERNETES_VERSION}} --cni=cilium --container-runtime=containerd --docker-opt containerd=/var/run/containerd/containerd.sock
+  KUBERNETES_VERSION: '{{.KUBERNETES_VERSION | default "v1.30.5"}}'
+  MINIKUBE_PROFILE: "minikube-kode"
+  MINIKUBE_MEMORY: '{{.MINIKUBE_MEMORY | default "6144"}}'
+  MINIKUBE_CPUS: '{{.MINIKUBE_CPUS | default "4"}}'
+  MINIKUBE_DRIVER: '{{.MINIKUBE_DRIVER | default "docker"}}'
+  CONTAINER_TOOL: '{{.CONTAINER_TOOL | default "docker"}}'
+  KUBECTL_CMD: '{{.KUBECTL_CMD | default "kubectl"}}'
+  IMG: '{{.IMG | default "emiljacero/kode-operator:v0.0.0-latest"}}'
 
 tasks:
   set-context:
@@ -29,55 +32,6 @@ tasks:
           echo "Using existing kubecontext..."
         fi
     silent: true
-
-  ensure:
-    desc: |
-      Ensure a Minikube cluster exists, creating it if necessary.
-      This task checks for the existence of a Minikube cluster with the specified profile and creates one if it doesn't exist.
-      
-      Usage:
-        task minikube-ensure
-      
-      Variables:
-        MINIKUBE_PROFILE: Name of the Minikube profile (default: minikube-kode)
-        MINIKUBE_MEMORY: Memory allocation for Minikube VM (default: 6144MB)
-        MINIKUBE_CPUS: Number of CPUs for Minikube VM (default: 4)
-        MINIKUBE_DRIVER: VM driver for Minikube (default: docker)
-        KUBERNETES_VERSION: Kubernetes version to use for the cluster (default: v1.30.5)
-      
-      Note:
-        This task will set the kubectl context to the newly created or existing Minikube cluster.
-    cmds:
-      - |
-        if ! minikube status -p {{.MINIKUBE_PROFILE}} &>/dev/null; then
-          echo "Creating Minikube cluster '{{.MINIKUBE_PROFILE}}'..."
-          {{ .MINIKUBE_COMMAND }}
-          minikube addons enable gvisor --profile={{.MINIKUBE_PROFILE}}
-          echo "Setting kubectl context to the new Minikube cluster..."
-          kubectl config use-context {{.MINIKUBE_PROFILE}}
-        else
-          echo "Minikube cluster '{{.MINIKUBE_PROFILE}}' already exists."
-          echo "Ensuring kubectl context is set to the Minikube cluster..."
-          kubectl config use-context {{.MINIKUBE_PROFILE}}
-        fi
-      - task: set-context
-    silent: true
-
-  destroy:
-    desc: Delete the Minikube cluster
-    cmds:
-      - task: set-context
-      - minikube delete -p {{.MINIKUBE_PROFILE}}
-
-  start:
-    desc: Start the Minikube cluster
-    cmds:
-      - task: ensure
-
-  stop:
-    desc: Stop the Minikube cluster
-    cmds:
-      - minikube stop -p {{.MINIKUBE_PROFILE}}
 
   load-image:
     desc: Load a Docker image into the Minikube cluster
@@ -182,10 +136,71 @@ tasks:
     cmds:
       - minikube docker-env -p {{.MINIKUBE_PROFILE}}
 
-  minikube-setup:
+  ensure:
+    desc: |
+      Ensure a Minikube cluster exists, creating it if necessary.
+      This task checks for the existence of a Minikube cluster with the specified profile and creates one if it doesn't exist.
+      
+      Usage:
+        task minikube-ensure
+      
+      Variables:
+        MINIKUBE_PROFILE: Name of the Minikube profile (default: minikube-kode)
+        MINIKUBE_MEMORY: Memory allocation for Minikube VM (default: 6144MB)
+        MINIKUBE_CPUS: Number of CPUs for Minikube VM (default: 4)
+        MINIKUBE_DRIVER: VM driver for Minikube (default: docker)
+        KUBERNETES_VERSION: Kubernetes version to use for the cluster (default: v1.30.5)
+      
+      Note:
+        This task will set the kubectl context to the newly created or existing Minikube cluster.
+    cmds:
+      - |
+        if ! minikube status -p {{.MINIKUBE_PROFILE}} &>/dev/null; then
+          echo "Creating Minikube cluster '{{.MINIKUBE_PROFILE}}'..."
+          minikube start \
+            --profile={{.MINIKUBE_PROFILE}} \
+            --memory={{.MINIKUBE_MEMORY}} \
+            --cpus={{.MINIKUBE_CPUS}} \
+            --driver={{.MINIKUBE_DRIVER}} \
+            --kubernetes-version={{.KUBERNETES_VERSION}} \
+            --cni=cilium \
+            --container-runtime=containerd \
+            --docker-opt containerd=/var/run/containerd/containerd.sock
+          minikube addons enable gvisor --profile={{.MINIKUBE_PROFILE}}
+          echo "Setting kubectl context to the new Minikube cluster..."
+          kubectl config use-context {{.MINIKUBE_PROFILE}}
+          echo "Minikube cluster '{{.MINIKUBE_PROFILE}}' created successfully."
+          echo "Minikube profile: {{.MINIKUBE_PROFILE}}"
+        else
+          echo "Minikube cluster '{{.MINIKUBE_PROFILE}}' already exists."
+          echo "Ensuring kubectl context is set to the Minikube cluster..."
+          kubectl config use-context {{.MINIKUBE_PROFILE}}
+        fi
+      - task: set-context
+    silent: true
+
+  destroy:
+    desc: Delete the Minikube cluster
+    cmds:
+      - task: set-context
+      - minikube delete -p {{.MINIKUBE_PROFILE}}
+
+  stop:
+    desc: Stop the Minikube cluster
+    cmds:
+      - minikube stop -p {{.MINIKUBE_PROFILE}}
+
+  setup:
     desc: Start Minikube and set up the environment
     cmds:
-      - task: minikube-ensure
+      - task: ensure
       - task: set-context
       - echo "Minikube setup complete. You can now use 'kubectl' to interact with the cluster."
+    silent: true
+
+  teardown:
+    desc: Tear down the Minikube cluster
+    cmds:
+      - task: destroy
+      - echo "Minikube cluster has been torn down."
     silent: true

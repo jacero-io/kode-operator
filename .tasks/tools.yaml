@@ -1,5 +1,19 @@
 version: '3'
 
+vars:
+  KUSTOMIZE_VERSION: '{{.KUSTOMIZE_VERSION | default "v5.4.2"}}'
+  CONTROLLER_TOOLS_VERSION: '{{.CONTROLLER_TOOLS_VERSION | default "v0.16.0"}}'
+  ENVTEST_VERSION: '{{.ENVTEST_VERSION | default "release-0.18"}}'
+  GOLANGCI_LINT_VERSION: '{{.GOLANGCI_LINT_VERSION | default "v1.57.2"}}'
+  HELMIFY_VERSION: '{{.HELMIFY_VERSION | default "v0.4.13"}}'
+  KUBECTL_VERSION: '{{.KUBECTL_VERSION | default "v1.31.1"}}'
+  CONTROLLER_GEN_CMD: '{{.LOCALBIN}}/controller-gen-{{.CONTROLLER_TOOLS_VERSION}}'
+  SETUP_ENVTEST_CMD: '{{.LOCALBIN}}/setup-envtest-{{.ENVTEST_VERSION}}'
+  GOLANGCI_LINT_CMD: '{{.LOCALBIN}}/golangci-lint-{{.GOLANGCI_LINT_VERSION}}'
+  HELMIFY_CMD: '{{.LOCALBIN}}/helmify-{{.HELMIFY_VERSION}}'
+  KUSTOMIZE_CMD: '{{.LOCALBIN}}/kustomize-{{.KUSTOMIZE_VERSION}}'
+  KUBECTL_CMD: '{{.LOCALBIN}}/kubectl-{{.KUBECTL_VERSION}}'
+
 tasks:
   ensure-dir:
     internal: true

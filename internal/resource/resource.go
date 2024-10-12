@@ -33,7 +33,7 @@ import (
 
 // ResourceManager defines the interface for managing Kubernetes resources
 type ResourceManager interface {
-	CreateOrPatch(ctx context.Context, obj client.Object, f controllerutil.MutateFn) error
+	CreateOrPatch(ctx context.Context, obj client.Object, f controllerutil.MutateFn) (controllerutil.OperationResult, error)
 	Delete(ctx context.Context, obj client.Object) error
 	Get(ctx context.Context, key client.ObjectKey, obj client.Object) error
 	List(ctx context.Context, list client.ObjectList, opts ...client.ListOption) error
@@ -53,10 +53,10 @@ func NewDefaultResourceManager(client client.Client, log logr.Logger, scheme *ru
 	}
 }
 
-func (m *defaultResourceManager) CreateOrPatch(ctx context.Context, obj client.Object, f controllerutil.MutateFn) error {
+func (m *defaultResourceManager) CreateOrPatch(ctx context.Context, obj client.Object, f controllerutil.MutateFn) (controllerutil.OperationResult, error) {
 	// Add type information to the object
 	if err := common.AddTypeInformationToObject(m.Scheme, obj); err != nil {
-		return fmt.Errorf("failed to add type information to object: %w", err)
+		return controllerutil.OperationResultNone, fmt.Errorf("failed to add type information to object: %w", err)
 	}
 	log := m.Log.WithValues(
 		"kind", obj.GetObjectKind().GroupVersionKind().Kind,
@@ -72,11 +72,11 @@ func (m *defaultResourceManager) CreateOrPatch(ctx context.Context, obj client.O
 	result, err := controllerutil.CreateOrPatch(ctx, m.Client, obj, f)
 	if err != nil {
 		log.Error(err, "Failed to create or patch resource")
-		return err
+		return result, err
 	}
 
 	log.V(1).Info("Resource operation completed", "Result", result)
-	return nil
+	return result, nil
 }
 
 func (m *defaultResourceManager) Delete(ctx context.Context, obj client.Object) error {

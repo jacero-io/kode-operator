@@ -20,7 +20,7 @@ package v1alpha2
 type TofuSharedSpec struct {
 
 	// BaseSharedSpec is the base shared spec.
-	BaseSharedSpec `json:",inline"`
+	CommonSpec `json:",inline"`
 
 	// Desired state of the entrypoint.
 	EntryPointRef CrossNamespaceObjectReference `json:"entryPointRef,omitempty" yaml:"entryPointRef,omitempty"`
@@ -31,5 +31,5 @@ type TofuSharedSpec struct {
 
 // TofuSharedStatus defines the observed state for Tofu
 type TofuSharedStatus struct {
-	BaseSharedStatus `json:",inline"`
+	CommonStatus `json:",inline"`
 }

@@ -29,7 +29,7 @@ import (
 
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
-	"github.com/jacero-io/kode-operator/internal/constant"
+	"github.com/jacero-io/kode-operator/pkg/constant"
 )
 
 func (r *EntryPointReconciler) handlePendingState(ctx context.Context, entryPoint *kodev1alpha2.EntryPoint) (ctrl.Result, error) {
@@ -37,7 +37,7 @@ func (r *EntryPointReconciler) handlePendingState(ctx context.Context, entryPoin
 	log.Info("Handling Pending state")
 
 	// Validate EntryPoint configuration
-	if err := r.Validator.ValidateEntryPoint(ctx, entryPoint); err != nil {
+	if err := r.Validator.Validate(ctx, entryPoint); err != nil {
 		log.Error(err, "EntryPoint validation failed")
 
 		// Update status to reflect validation failure

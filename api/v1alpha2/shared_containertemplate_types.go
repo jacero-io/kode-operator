@@ -24,11 +24,15 @@ import (
 type ContainerTemplateSharedSpec struct {
 
 	// BaseSharedSpec is the base shared spec.
-	BaseSharedSpec `json:",inline"`
+	CommonSpec `json:",inline"`
 
 	// Type is the type of container to use. Can be one of 'code-server', 'webtop', 'devcontainers', 'jupyter'.
 	// +kubebuilder:validation:Enum=code-server;webtop
 	Type string `json:"type,omitempty"`
+
+	// Runtime is the runtime for the service.
+	// +kubebuilder:validation:Enum=gvisor
+	Runtime RuntimeType `json:"runtime,omitempty"`
 
 	// Image is the container image for the service.
 	// +kubebuilder:validation:MinLength=1
@@ -82,5 +86,5 @@ type ContainerTemplateSharedSpec struct {
 
 // ContainerTemplateSharedStatus defines the observed state for Container
 type ContainerTemplateSharedStatus struct {
-	BaseSharedStatus `json:",inline"`
+	CommonStatus `json:",inline"`
 }

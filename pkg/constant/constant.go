@@ -25,10 +25,12 @@ const (
 	PVCFinalizerName        = "kode.jacero.io/kode-pvc-finalizer"
 
 	// Resource related constants
-	KodeVolumeStorageName = "kode-storage"
+	DefaultKodeVolumeStorageName = "kode-storage"
+
+	TemplateKindTofu	  = "Tofu"
 
 	// Credential related constants
-	Username = "abc"
+	DefaultUsername = "abc"
 
 	// These are the condition types that are used in the status of the Kode and EntryPoint resources
 	// ConditionTypeReady indicates that the resource is fully operational and prepared to serve its intended purpose.

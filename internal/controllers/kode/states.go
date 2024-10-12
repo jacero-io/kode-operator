@@ -28,7 +28,7 @@ import (
 
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
-	"github.com/jacero-io/kode-operator/internal/constant"
+	"github.com/jacero-io/kode-operator/pkg/constant"
 )
 
 func (r *KodeReconciler) handlePendingState(ctx context.Context, kode *kodev1alpha2.Kode) (ctrl.Result, error) {
@@ -36,7 +36,7 @@ func (r *KodeReconciler) handlePendingState(ctx context.Context, kode *kodev1alp
 	log.V(1).Info("Handling Pending state")
 
 	// Validate the Kode resource
-	if err := r.Validator.ValidateKode(ctx, kode); err != nil {
+	if err := r.Validator.Validate(ctx, kode); err != nil {
 		log.Error(err, "Kode validation failed")
 
 		// Update status to reflect validation failure
@@ -71,27 +71,16 @@ func (r *KodeReconciler) handleConfiguringState(ctx context.Context, kode *kodev
 	// Fetch the template
 	template, err := r.fetchTemplatesWithRetry(ctx, kode)
 	if err != nil {
-		log.Error(err, "Failed to fetch template")
-		kode.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "TemplateFetchFailed", fmt.Sprintf("Failed to fetch template: %v", err))
-		kode.Status.LastError = common.StringPtr(err.Error())
-		kode.Status.LastErrorTime = &metav1.Time{Time: time.Now()}
-		return r.transitionTo(ctx, kode, kodev1alpha2.KodePhaseFailed)
+		return r.handleReconcileError(ctx, kode, err, "Failed to fetch template")
 	}
 	config := InitKodeResourcesConfig(kode, template)
 
 	// Ensure all necessary resources are created
-	if err := r.ensurePodResources(ctx, kode, config); err != nil {
-		log.Error(err, "Failed to ensure pod resources")
-		kode.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "ResourceCreationFailed", fmt.Sprintf("Failed to create resources: %v", err))
-		kode.Status.LastError = common.StringPtr(err.Error())
-		kode.Status.LastErrorTime = &metav1.Time{Time: time.Now()}
-		return r.transitionTo(ctx, kode, kodev1alpha2.KodePhaseFailed)
-	}
-
-	// Update ObservedGeneration if it's out of sync
-	if kode.Generation != kode.Status.ObservedGeneration {
-		kode.Status.ObservedGeneration = kode.Generation
-		log.V(1).Info("Updated ObservedGeneration", "Generation", kode.Generation, "ObservedGeneration", kode.Status.ObservedGeneration)
+	if template.Kind == kodev1alpha2.Kind(kodev1alpha2.TemplateKindContainerTemplate) || template.Kind == kodev1alpha2.Kind(kodev1alpha2.TemplateKindClusterContainerTemplate) {
+		err := r.ensurePodResources(ctx, kode, config)
+		if err != nil {
+			return r.handleReconcileError(ctx, kode, err, "Failed to ensure pod resources")
+		}
 	}
 
 	// Update conditions
@@ -111,40 +100,23 @@ func (r *KodeReconciler) handleProvisioningState(ctx context.Context, kode *kode
 	log := r.Log.WithValues("kode", client.ObjectKeyFromObject(kode), "phase", kode.Status.Phase)
 	log.V(1).Info("Handling Provisioning state")
 
-	// When the observed generation is not equal to the generation, it needs to be reconfigured
-	if kode.Generation != kode.Status.ObservedGeneration {
-		kode.SetCondition(constant.ConditionTypeProgressing, metav1.ConditionTrue, "Reconfiguring", "Kode resource is being reconfigured")
-		return r.transitionTo(ctx, kode, kodev1alpha2.KodePhaseConfiguring)
-	}
-
 	// Fetch the template
 	template, err := r.fetchTemplatesWithRetry(ctx, kode)
 	if err != nil {
-		log.Error(err, "Failed to fetch template")
-		kode.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "TemplateFetchFailed", fmt.Sprintf("Failed to fetch template: %v", err))
-		kode.Status.LastError = common.StringPtr(err.Error())
-		kode.Status.LastErrorTime = &metav1.Time{Time: time.Now()}
-		return r.transitionTo(ctx, kode, kodev1alpha2.KodePhaseFailed)
+		return r.handleReconcileError(ctx, kode, err, "Failed to fetch template")
 	}
 	config := InitKodeResourcesConfig(kode, template)
 
 	// Check if all resources are ready
 	ready, err := r.checkPodResources(ctx, kode, config)
 	if err != nil {
-		log.Error(err, "Failed to check resource readiness")
-		kode.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "ResourceCheckFailed", fmt.Sprintf("Failed to check resource readiness: %v", err))
-		kode.Status.LastError = common.StringPtr(err.Error())
-		kode.Status.LastErrorTime = &metav1.Time{Time: time.Now()}
-		return r.transitionTo(ctx, kode, kodev1alpha2.KodePhaseFailed)
+		return r.handleReconcileError(ctx, kode, err, "Failed to check resource readiness")
 	}
 
 	if ready {
 		// Update the port status
 		if err := kode.UpdatePort(ctx, r.Client, template.Port); err != nil {
-			log.Error(err, "Failed to update port status")
-			kode.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "PortUpdateFailed", fmt.Sprintf("Failed to update port status: %v", err))
-			kode.SetCondition(constant.ConditionTypeAvailable, metav1.ConditionFalse, "PortUpdateFailed", "Kode is not available due to port update failure")
-			return ctrl.Result{Requeue: true}, nil
+			return r.handleReconcileError(ctx, kode, err, "Failed to update port status")
 		}
 
 		log.Info("Resources are ready, transitioning to Active state")
@@ -175,31 +147,17 @@ func (r *KodeReconciler) handleActiveState(ctx context.Context, kode *kodev1alph
 	log := r.Log.WithValues("kode", client.ObjectKeyFromObject(kode), "phase", kode.Status.Phase)
 	log.V(1).Info("Handling Active state")
 
-	// When the observed generation is not equal to the generation, it needs to be reconfigured
-	if kode.Generation != kode.Status.ObservedGeneration {
-		kode.SetCondition(constant.ConditionTypeProgressing, metav1.ConditionTrue, "Reconfiguring", "Kode resource is being reconfigured")
-		return r.transitionTo(ctx, kode, kodev1alpha2.KodePhaseConfiguring)
-	}
-
 	// Fetch the template
 	template, err := r.fetchTemplatesWithRetry(ctx, kode)
 	if err != nil {
-		log.Error(err, "Failed to fetch template")
-		kode.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "TemplateFetchFailed", fmt.Sprintf("Failed to fetch template: %v", err))
-		kode.Status.LastError = common.StringPtr(err.Error())
-		kode.Status.LastErrorTime = &metav1.Time{Time: time.Now()}
-		return r.transitionTo(ctx, kode, kodev1alpha2.KodePhaseFailed)
+		return r.handleReconcileError(ctx, kode, err, "Failed to fetch template")
 	}
 	config := InitKodeResourcesConfig(kode, template)
 
 	// Check if resources are still ready
 	ready, err := r.checkPodResources(ctx, kode, config)
 	if err != nil {
-		log.Error(err, "Failed to check resource readiness")
-		kode.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "ResourceCheckFailed", fmt.Sprintf("Failed to check resource readiness: %v", err))
-		kode.Status.LastError = common.StringPtr(err.Error())
-		kode.Status.LastErrorTime = &metav1.Time{Time: time.Now()}
-		return r.transitionTo(ctx, kode, kodev1alpha2.KodePhaseFailed)
+		return r.handleReconcileError(ctx, kode, err, "Failed to check resource readiness")
 	}
 
 	if !ready {
@@ -210,9 +168,6 @@ func (r *KodeReconciler) handleActiveState(ctx context.Context, kode *kodev1alph
 		return r.transitionTo(ctx, kode, kodev1alpha2.KodePhaseConfiguring)
 	}
 
-	// Check if the Kode should be suspended due to inactivity
-	// TODO: Write checks for inactivity
-
 	// Update conditions to ensure they reflect the current state
 	kode.SetCondition(constant.ConditionTypeReady, metav1.ConditionTrue, "ResourcesReady", "All Kode resources are ready")
 	kode.SetCondition(constant.ConditionTypeAvailable, metav1.ConditionTrue, "ResourcesReady", "Kode is available")
@@ -222,7 +177,6 @@ func (r *KodeReconciler) handleActiveState(ctx context.Context, kode *kodev1alph
 	kode.Status.LastError = nil
 	kode.Status.LastErrorTime = nil
 
-	// TODO: Implement level-triggered updates instead of edge-triggered with requeue delay
 	// No state transition needed, return without error
 	return ctrl.Result{RequeueAfter: 10 * time.Minute}, nil
 }
@@ -290,8 +244,7 @@ func (r *KodeReconciler) handleDeletingState(ctx context.Context, kode *kodev1al
 	log.V(1).Info("Checking if child resources are deleted")
 	childResourcesDeleted, err := r.checkResourcesDeleted(ctx, kode)
 	if err != nil {
-		log.Error(err, "Failed to check child resources deletion status")
-		return ctrl.Result{Requeue: true}, err
+		return r.handleReconcileError(ctx, kode, err, "Failed to check child resources deletion status")
 	}
 
 	if !childResourcesDeleted {
@@ -301,20 +254,17 @@ func (r *KodeReconciler) handleDeletingState(ctx context.Context, kode *kodev1al
 			cleanupResource := NewKodeCleanupResource(kode)
 			result, err := r.CleanupManager.Cleanup(ctx, cleanupResource)
 			if err != nil {
-				log.Error(err, "Failed to initiate cleanup")
-				kode.SetCondition(constant.ConditionTypeError, metav1.ConditionTrue, "CleanupFailed", fmt.Sprintf("Failed to initiate cleanup: %v", err))
-				return result, err
+				return r.handleReconcileError(ctx, kode, err, "Failed to initiate cleanup")
 			}
 			return result, nil
 		}
 
 		log.Info("Child resources still exist")
-
 		log.V(1).Info("Incrementing deletion cycle")
 		kode.Status.DeletionCycle++
-
 		return ctrl.Result{RequeueAfter: time.Second}, nil
 	}
+
 	log.V(1).Info("All child resources are deleted")
 
 	// All resources are deleted, remove finalizer
@@ -322,9 +272,7 @@ func (r *KodeReconciler) handleDeletingState(ctx context.Context, kode *kodev1al
 		log.Info("Removing finalizer")
 		controllerutil.RemoveFinalizer(kode, constant.KodeFinalizerName)
 		if err := r.Client.Update(ctx, kode); err != nil {
-			log.Error(err, "Failed to remove finalizer")
-			kode.SetCondition(constant.ConditionTypeError, metav1.ConditionTrue, "FinalizerRemovalFailed", fmt.Sprintf("Failed to remove finalizer: %v", err))
-			return ctrl.Result{Requeue: true}, err
+			return r.handleReconcileError(ctx, kode, err, "Failed to remove finalizer")
 		}
 	}
 
@@ -370,8 +318,7 @@ func (r *KodeReconciler) handleUnknownState(ctx context.Context, kode *kodev1alp
 	// Attempt to determine the correct state
 	currentState, err := r.determineCurrentState(ctx, kode)
 	if err != nil {
-		log.Error(err, "Failed to determine current state")
-		return r.transitionTo(ctx, kode, kodev1alpha2.KodePhaseFailed)
+		return r.handleReconcileError(ctx, kode, err, "Failed to determine current state")
 	}
 
 	// Transition to the determined state

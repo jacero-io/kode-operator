@@ -49,7 +49,7 @@ func (r *KodeReconciler) ensurePersistentVolumeClaim(ctx context.Context, kode *
 	if config.KodeSpec.Storage.ExistingVolumeClaim != nil {
 		log.V(1).Info("ExistingVolumeClaim specified, skipping PVC creation", "ExistingVolumeClaim", config.KodeSpec.Storage.ExistingVolumeClaim)
 		eventMessage := fmt.Sprintf("Using existing PVC %s for Kode %s", *config.KodeSpec.Storage.ExistingVolumeClaim, kode.Name)
-		err := r.EventManager.Record(ctx, kode, event.EventTypeNormal, event.ReasonKodeExistingPVCUsed, eventMessage)
+		err := r.Event.Record(ctx, kode, event.EventTypeNormal, event.ReasonKodeExistingPVCUsed, eventMessage)
 		if err != nil {
 			log.Error(err, "Failed to record event")
 		}
@@ -64,7 +64,7 @@ func (r *KodeReconciler) ensurePersistentVolumeClaim(ctx context.Context, kode *
 		},
 	}
 
-	err := r.ResourceManager.CreateOrPatch(ctx, pvc, func() error {
+	_, err := r.Resource.CreateOrPatch(ctx, pvc, func() error {
 		// Construct the desired PVC spec
 		constructedPVC, err := r.constructPVCSpec(config)
 		if err != nil {
@@ -83,7 +83,7 @@ func (r *KodeReconciler) ensurePersistentVolumeClaim(ctx context.Context, kode *
 
 					// Record event for resize attempt
 					eventMessage := fmt.Sprintf("Attempting to resize PVC %s to %s", pvc.Name, constructedPVC.Spec.Resources.Requests.Storage().String())
-					err := r.EventManager.Record(ctx, kode, event.EventTypeNormal, event.ReasonKodePVCResizeAttempted, eventMessage)
+					err := r.Event.Record(ctx, kode, event.EventTypeNormal, event.ReasonKodePVCResizeAttempted, eventMessage)
 					if err != nil {
 						log.Error(err, "Failed to record event")
 					}
@@ -93,7 +93,7 @@ func (r *KodeReconciler) ensurePersistentVolumeClaim(ctx context.Context, kode *
 
 				// Record event for skipped resize
 				eventMessage := fmt.Sprintf("Skipped resizing PVC %s, CSI driver does not support volume expansion", pvc.Name)
-				err := r.EventManager.Record(ctx, kode, event.EventTypeWarning, event.ReasonKodePVCResizeSkipped, eventMessage)
+				err := r.Event.Record(ctx, kode, event.EventTypeWarning, event.ReasonKodePVCResizeSkipped, eventMessage)
 				if err != nil {
 					log.Error(err, "Failed to record event")
 				}
@@ -112,7 +112,7 @@ func (r *KodeReconciler) ensurePersistentVolumeClaim(ctx context.Context, kode *
 
 			// Record event for PVC creation
 			eventMessage := fmt.Sprintf("Created new PVC %s with size %s", pvc.Name, constructedPVC.Spec.Resources.Requests.Storage().String())
-			err := r.EventManager.Record(ctx, kode, event.EventTypeNormal, event.ReasonKodePVCCreated, eventMessage)
+			err := r.Event.Record(ctx, kode, event.EventTypeNormal, event.ReasonKodePVCCreated, eventMessage)
 			if err != nil {
 				log.Error(err, "Failed to record event")
 			}

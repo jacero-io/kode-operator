@@ -37,25 +37,32 @@ import (
 
 func (r *EntryPointReconciler) findEntryPointForKode(ctx context.Context, kode *kodev1alpha2.Kode) (*kodev1alpha2.EntryPoint, error) {
 	// Fetch the template object
-	template, err := r.TemplateManager.Fetch(ctx, kode.Spec.TemplateRef)
+	template, err := r.Template.Fetch(ctx, kode.Spec.TemplateRef)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch template: %w", err)
 	}
 
-	var entryPointRef kodev1alpha2.CrossNamespaceObjectReference
+	var entryPointRef *kodev1alpha2.CrossNamespaceObjectReference
+
 	switch template.Kind {
-	case kodev1alpha2.Kind(kodev1alpha2.TemplateKindContainerTemplate), kodev1alpha2.Kind(kodev1alpha2.TemplateKindClusterContainerTemplate):
-		if template.ContainerTemplateSpec == nil || template.ContainerTemplateSpec.BaseSharedSpec.EntryPointRef == nil {
-			return nil, fmt.Errorf("invalid ContainerTemplate: missing EntryPointRef")
+	case kodev1alpha2.Kind(kodev1alpha2.TemplateKindContainerTemplate),
+		kodev1alpha2.Kind(kodev1alpha2.TemplateKindClusterContainerTemplate):
+		if template.ContainerTemplateSpec == nil {
+			return nil, fmt.Errorf("invalid ContainerTemplate: missing ContainerTemplateSpec")
 		}
-		entryPointRef = *template.ContainerTemplateSpec.BaseSharedSpec.EntryPointRef
-	case kodev1alpha2.Kind(kodev1alpha2.TemplateKindTofuTemplate), kodev1alpha2.Kind(kodev1alpha2.TemplateKindClusterTofuTemplate):
-		if template.TofuTemplateSpec == nil || template.TofuTemplateSpec.BaseSharedSpec.EntryPointRef == nil {
-			return nil, fmt.Errorf("invalid TofuTemplate: missing EntryPointRef")
+		entryPointRef = template.ContainerTemplateSpec.CommonSpec.EntryPointRef
+	case kodev1alpha2.Kind(kodev1alpha2.TemplateKindTofuTemplate),
+		kodev1alpha2.Kind(kodev1alpha2.TemplateKindClusterTofuTemplate):
+		if template.TofuTemplateSpec == nil {
+			return nil, fmt.Errorf("invalid TofuTemplate: missing TofuTemplateSpec")
 		}
-		entryPointRef = *template.TofuTemplateSpec.BaseSharedSpec.EntryPointRef
+		entryPointRef = template.TofuTemplateSpec.CommonSpec.EntryPointRef
 	default:
 		return nil, fmt.Errorf("unknown template kind: %s", template.Kind)
+	}
+
+	if entryPointRef == nil {
+		return nil, fmt.Errorf("missing EntryPointRef in template")
 	}
 
 	// Fetch the latest EntryPoint object
@@ -83,55 +90,28 @@ func (r *EntryPointReconciler) transitionTo(ctx context.Context, entryPoint *kod
 		// Empty case - does nothing
 
 	case kodev1alpha2.EntryPointPhaseConfiguring:
-		if err := r.EventManager.Record(ctx, entryPoint, event.EventTypeNormal, event.ReasonEntryPointConfiguring, "EntryPoint is being configured"); err != nil {
+		if err := r.Event.Record(ctx, entryPoint, event.EventTypeNormal, event.ReasonEntryPointConfiguring, "EntryPoint is being configured"); err != nil {
 			log.Error(err, "Failed to record EntryPoint configuring event")
 		}
 
 	case kodev1alpha2.EntryPointPhaseProvisioning:
-		if err := r.EventManager.Record(ctx, entryPoint, event.EventTypeNormal, event.ReasonEntryPointProvisioning, "EntryPoint is being provisioned"); err != nil {
+		if err := r.Event.Record(ctx, entryPoint, event.EventTypeNormal, event.ReasonEntryPointProvisioning, "EntryPoint is being provisioned"); err != nil {
 			log.Error(err, "Failed to record EntryPoint provisioning event")
 		}
 
 	case kodev1alpha2.EntryPointPhaseActive:
-		if err := r.EventManager.Record(ctx, entryPoint, event.EventTypeNormal, event.ReasonEntryPointActive, "EntryPoint is now active"); err != nil {
+		if err := r.Event.Record(ctx, entryPoint, event.EventTypeNormal, event.ReasonEntryPointActive, "EntryPoint is now active"); err != nil {
 			log.Error(err, "Failed to record EntryPoint active event")
 		}
 
 	case kodev1alpha2.EntryPointPhaseFailed:
-		if err := r.EventManager.Record(ctx, entryPoint, event.EventTypeWarning, event.ReasonEntryPointFailed, "EntryPoint has entered Failed state"); err != nil {
+		if err := r.Event.Record(ctx, entryPoint, event.EventTypeWarning, event.ReasonEntryPointFailed, "EntryPoint has entered Failed state"); err != nil {
 			log.Error(err, "Failed to record EntryPoint failed event")
 		}
 
 	}
 
 	return ctrl.Result{Requeue: true}, nil
-}
-
-func (r *EntryPointReconciler) updateStatus(ctx context.Context, entryPoint *kodev1alpha2.EntryPoint) error {
-	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		// Fetch the latest version of the EntryPoint
-		latestEntryPoint, err := common.GetLatestEntryPoint(ctx, r.Client, entryPoint.Name, entryPoint.Namespace)
-		if err != nil {
-			if errors.IsNotFound(err) {
-				// Kode resource has been deleted, nothing to update
-				return nil
-			}
-			return err
-		}
-
-		// Create a patch
-		patch := client.MergeFrom(latestEntryPoint.DeepCopy())
-
-		// Update the status
-		latestEntryPoint.Status = entryPoint.Status
-
-		// Apply the patch
-		if err := r.Client.Status().Patch(ctx, latestEntryPoint, patch); err != nil {
-			r.Log.Error(err, "Failed to update EntryPoint status")
-			return err
-		}
-		return nil
-	})
 }
 
 func (r *EntryPointReconciler) updateRetryCount(ctx context.Context, entryPoint *kodev1alpha2.EntryPoint, count int) error {

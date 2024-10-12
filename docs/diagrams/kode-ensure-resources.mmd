@@ -12,12 +12,6 @@ stateDiagram-v2
     EnsurePVC --> EnsureStatefulSet : PVC Created/Updated
     EnsurePVC --> HandleError : Error
 
-    EnsureStatefulSet --> EnsureSidecarContainers : StatefulSet Created/Updated
-    EnsureStatefulSet --> HandleError : Error
-
-    EnsureSidecarContainers --> ResourcesEnsured : Sidecars Ensured
-    EnsureSidecarContainers --> HandleError : Error
-
     HandleError --> [*] : Return Error
 
     ResourcesEnsured --> [*] : All Resources Created/Updated
@@ -53,9 +47,4 @@ stateDiagram-v2
 
     note right of EnsureStatefulSet
         Creates or updates the StatefulSet
-    end note
-
-    note right of EnsureSidecarContainers
-        Ensures sidecar containers
-        (e.g., Envoy) if specified
     end note

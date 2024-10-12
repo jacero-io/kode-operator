@@ -22,7 +22,7 @@ import (
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 )
 
-func (v *validator) ValidateEntryPoint(ctx context.Context, entryPoint *kodev1alpha2.EntryPoint) error {
+func (v *validator) validateEntryPoint(ctx context.Context, entryPoint *kodev1alpha2.EntryPoint) error {
 	if err := v.validateEntryPointSpec(entryPoint); err != nil {
 		return err
 	}

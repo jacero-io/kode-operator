@@ -31,22 +31,23 @@ import (
 
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/cleanup"
-	"github.com/jacero-io/kode-operator/internal/constant"
 	"github.com/jacero-io/kode-operator/internal/event"
 	"github.com/jacero-io/kode-operator/internal/resource"
 	"github.com/jacero-io/kode-operator/internal/template"
-	"github.com/jacero-io/kode-operator/internal/validation"
+
+	"github.com/jacero-io/kode-operator/pkg/constant"
+	"github.com/jacero-io/kode-operator/pkg/validation"
 )
 
 type KodeReconciler struct {
 	Client            client.Client
 	Scheme            *runtime.Scheme
 	Log               logr.Logger
-	ResourceManager   resource.ResourceManager
-	TemplateManager   template.TemplateManager
+	Resource          resource.ResourceManager
+	Template          template.TemplateManager
 	CleanupManager    cleanup.CleanupManager
 	Validator         validation.Validator
-	EventManager      event.EventManager
+	Event             event.EventManager
 	IsTestEnvironment bool
 }
 
@@ -96,6 +97,11 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		return ctrl.Result{Requeue: true}, nil
 	}
 
+	// Check for generation mismatch
+	if kode.Generation != kode.Status.ObservedGeneration {
+		return r.handleGenerationMismatch(ctx, kode)
+	}
+
 	// Handle phase transitions
 	var result ctrl.Result
 	var err error
@@ -103,10 +109,6 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	// Transition to Deleting state if deletion timestamp is set and not already in deleting state
 	if !kode.DeletionTimestamp.IsZero() && kode.Status.Phase != kodev1alpha2.KodePhaseDeleting {
 		result, err = r.transitionTo(ctx, kode, kodev1alpha2.KodePhaseDeleting)
-		return result, err // Early return after transition
-	} else if kode.Generation != kode.Status.ObservedGeneration && kode.Status.Phase != kodev1alpha2.KodePhaseDeleting && kode.Status.Phase != kodev1alpha2.KodePhaseConfiguring { // Transition to Configuring state if generation mismatch
-		log.Info("Generation mismatch, transitioning to Configuring state")
-		result, err = r.transitionTo(ctx, kode, kodev1alpha2.KodePhaseConfiguring)
 		return result, err // Early return after transition
 	}
 
@@ -179,7 +181,9 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 
 	// Update the whole status if it has changed
 	if !reflect.DeepEqual(latestKode.Status, kode.Status) {
-		if err := r.updateStatus(ctx, kode); err != nil {
+		err := latestKode.UpdateStatus(ctx, r.Client)
+		if err != nil {
+			log.Error(err, "Failed to update status")
 			// If we fail to update the status, requeue
 			return ctrl.Result{Requeue: true}, err
 		}
@@ -192,6 +196,7 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 func (r *KodeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&kodev1alpha2.Kode{}).
+		// WithEventFilter(predicate.GenerationChangedPredicate{}).
 		// Watches(&kodev1alpha2.ContainerTemplate{}, &handler.EnqueueRequestForObject{}).
 		// Watches(&kodev1alpha2.ClusterContainerTemplate{}, &handler.EnqueueRequestForObject{}).
 		// Watches(&kodev1alpha2.TofuTemplate{}, &handler.EnqueueRequestForObject{}).

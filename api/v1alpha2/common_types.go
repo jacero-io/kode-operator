@@ -34,8 +34,8 @@ type CredentialsSpec struct {
 	EnableBuiltinAuth bool `json:"enableBuiltinAuth,omitempty" yaml:"enableBuiltinAuth,omitempty"`
 }
 
-// BaseSharedSpec defines the common fields for both Tofu and Container specs
-type BaseSharedSpec struct {
+// CommonSpec defines the common fields for both Tofu and Container specs
+type CommonSpec struct {
 	// Credentials specifies the credentials for the service.
 	Credentials *CredentialsSpec `json:"credentials,omitempty" yaml:"credentials,omitempty"`
 
@@ -55,13 +55,13 @@ type BaseSharedSpec struct {
 	Port *Port `json:"port,omitempty" yaml:"port,omitempty"`
 }
 
-// SharedStatus defines the common observed state
-type BaseSharedStatus struct {
+// CommonStatus defines the common observed state
+type CommonStatus struct {
 	// ObservedGeneration is the last observed generation of the resource.
 	ObservedGeneration int64 `json:"observedGeneration,omitempty" yaml:"observedGeneration,omitempty"`
 
 	// Conditions reflect the current state of the resource
-	Conditions []metav1.Condition `json:"conditions,omitempty" yaml:"conditions,omitempty"`
+	ConditionedStatus `json:",inline" yaml:",inline"`
 
 	// Contains the last error message encountered during reconciliation.
 	LastError *string `json:"lastError,omitempty" yaml:"lastError,omitempty"`

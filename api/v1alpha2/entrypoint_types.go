@@ -17,11 +17,14 @@ limitations under the License.
 package v1alpha2
 
 import (
-	"time"
+	"context"
 
 	egv1alpha1 "github.com/envoyproxy/gateway/api/v1alpha1"
-	"github.com/jacero-io/kode-operator/internal/constant"
+	"github.com/jacero-io/kode-operator/pkg/constant"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/util/retry"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	gwapiv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
@@ -110,7 +113,7 @@ type SecurityPolicySpec struct {
 
 // EntryPointStatus defines the observed state of EntryPoint
 type EntryPointStatus struct {
-	BaseSharedStatus `json:",inline" yaml:",inline"`
+	CommonStatus `json:",inline" yaml:",inline"`
 
 	// Represents the current phase of the EntryPointPhase resource.
 	Phase EntryPointPhase `json:"phase" yaml:"phase"`
@@ -208,45 +211,43 @@ func init() {
 	SchemeBuilder.Register(&EntryPoint{}, &EntryPointList{})
 }
 
-func (k *EntryPoint) SetCondition(conditionType constant.ConditionType, status metav1.ConditionStatus, reason, message string) {
-	newCondition := metav1.Condition{
-		Type:               string(conditionType),
-		Status:             status,
-		Reason:             reason,
-		Message:            message,
-		LastTransitionTime: metav1.NewTime(time.Now()),
-	}
-
-	// Update existing condition if it exists
-	for i, condition := range k.Status.Conditions {
-		if condition.Type == string(conditionType) {
-			if condition.Status != status {
-				k.Status.Conditions[i] = newCondition
+func (k *EntryPoint) UpdateStatus(ctx context.Context, c client.Client) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		// Fetch the latest version of the EntryPoint
+		latestEntryPoint := &EntryPoint{}
+		err := c.Get(ctx, client.ObjectKey{Name: k.Name, Namespace: k.Namespace}, latestEntryPoint)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				// EntryPoint resource has been deleted, nothing to update
+				return nil
 			}
-			return
+			return err
 		}
-	}
 
-	k.Status.Conditions = append(k.Status.Conditions, newCondition)
+		// Create a patch
+		patch := client.MergeFrom(latestEntryPoint.DeepCopy())
+
+		// Update the status
+		latestEntryPoint.Status = k.Status
+
+		// Apply the patch
+		if err := c.Status().Patch(ctx, latestEntryPoint, patch); err != nil {
+			return err
+		}
+		return nil
+	})
+}
+
+func (k *EntryPoint) SetCondition(conditionType constant.ConditionType, status metav1.ConditionStatus, reason, message string) {
+	k.Status.SetCondition(conditionType, status, reason, message)
 }
 
 func (k *EntryPoint) GetCondition(conditionType constant.ConditionType) *metav1.Condition {
-	for _, condition := range k.Status.Conditions {
-		if condition.Type == string(conditionType) {
-			return &condition
-		}
-	}
-	return nil
+	return k.Status.GetCondition(conditionType)
 }
 
 func (k *EntryPoint) DeleteCondition(conditionType constant.ConditionType) {
-	conditions := []metav1.Condition{}
-	for _, condition := range k.Status.Conditions {
-		if condition.Type != string(conditionType) {
-			conditions = append(conditions, condition)
-		}
-	}
-	k.Status.Conditions = conditions
+	k.Status.DeleteCondition(conditionType)
 }
 
 func (e *EntryPoint) IsSubdomainRouting() bool {

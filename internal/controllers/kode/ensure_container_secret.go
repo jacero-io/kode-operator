@@ -47,7 +47,7 @@ func (r *KodeReconciler) ensureSecret(ctx context.Context, kode *kodev1alpha2.Ko
 
 	if config.Credentials != nil && config.Credentials.ExistingSecret != nil {
 		// ExistingSecret is specified, fetch the secret
-		err := r.ResourceManager.Get(ctx, client.ObjectKeyFromObject(secret), secret)
+		err := r.Resource.Get(ctx, client.ObjectKeyFromObject(secret), secret)
 		if err != nil {
 			return fmt.Errorf("failed to get Secret: %w", err)
 		}
@@ -68,7 +68,7 @@ func (r *KodeReconciler) ensureSecret(ctx context.Context, kode *kodev1alpha2.Ko
 			return fmt.Errorf("config.Credentials is nil")
 		}
 		// ExistingSecret is not specified, create or patch the secret
-		err := r.ResourceManager.CreateOrPatch(ctx, secret, func() error {
+		_, err := r.Resource.CreateOrPatch(ctx, secret, func() error {
 			constructedSecret, err := r.constructSecretSpec(config)
 			if err != nil {
 				return fmt.Errorf("failed to construct Secret spec: %v", err)

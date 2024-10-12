@@ -1,8 +1,12 @@
 version: '3'
 
 includes:
-  tools: ./.tasks/tools.yaml
-  lint: ./.tasks/lint.yaml
+  tools:
+    taskfile: ./.tasks/tools.yaml
+    internal: true
+  lint:
+    taskfile: ./.tasks/lint.yaml
+    internal: true
   test: ./.tasks/test.yaml
   cluster: ./.tasks/minikube.yaml
   helm: ./.tasks/helm.yaml
@@ -14,28 +18,19 @@ includes:
 vars:
   # Project-specific variables
   LOCALBIN: '{{.ROOT_DIR}}/bin'
+  GOBIN:
+    sh: echo "${GOBIN:-$(go env GOPATH)/bin}"
+  PLATFORMS: linux/arm64,linux/amd64,linux/s390x,linux/ppc64le
 
   # Tool versions
+  GO_VERSION: '1.22'
   ENVTEST_K8S_VERSION: 1.30.0
   KUBERNETES_VERSION: v1.30.5
-  GO_VERSION: '1.22'
   KUSTOMIZE_VERSION: v5.4.2
   CONTROLLER_TOOLS_VERSION: v0.16.0
   ENVTEST_VERSION: release-0.18
   GOLANGCI_LINT_VERSION: v1.57.2
   HELMIFY_VERSION: v0.4.13
-  GOBIN:
-    sh: echo "${GOBIN:-$(go env GOPATH)/bin}"
-  PLATFORMS: linux/arm64,linux/amd64,linux/s390x,linux/ppc64le
-
-  # Tools
-  CONTAINER_TOOL: docker
-  KUBECTL_CMD: kubectl
-  CONTROLLER_GEN_CMD: '{{.LOCALBIN}}/controller-gen-{{.CONTROLLER_TOOLS_VERSION}}'
-  SETUP_ENVTEST_CMD: '{{.LOCALBIN}}/setup-envtest-{{.ENVTEST_VERSION}}'
-  GOLANGCI_LINT_CMD: '{{.LOCALBIN}}/golangci-lint-{{.GOLANGCI_LINT_VERSION}}'
-  HELMIFY_CMD: '{{.LOCALBIN}}/helmify-{{.HELMIFY_VERSION}}'
-  KUSTOMIZE_CMD: '{{.LOCALBIN}}/kustomize-{{.KUSTOMIZE_VERSION}}'
 
   # Development environment
   ENV: development # Set the environment to 'development' or 'production'
@@ -46,14 +41,13 @@ vars:
 
   # Concatenation
   CONCAT_DIRECTORY: '{{.ROOT_DIR}}/'
-  CONCAT_INCLUDE_COMMON: 'v1alpha2/common_types.go,common/*,constant/*,cleanup/*,event/*,resource/*,template/*,test/integration/*'
-  # CONCAT_INCLUDE_KODE: 'v1alpha2/kode_types.go,controllers/kode/reconciler.go,controllers/kode/utils.go,controllers/kode/states.go,controllers/kode/config.go'
-  # CONCAT_INCLUDE_ENTRYPOINT: 'v1alpha2/entrypoint_types.go,controllers/entrypoint/reconciler.go,controllers/entrypoint/utils.go,controllers/entrypoint/states.go,controllers/entrypoint/config.go,controllers/entrypoint/ensure_routes.go'
-  CONCAT_INCLUDE_TASK: '.tasks/*'
-  CONCAT_INCLUDE_KODE: 'v1alpha2/kode_types.go,controllers/kode/*'
+  CONCAT_INCLUDE_COMMON: 'v1alpha2/common_types.go,v1alpha2/reference_types.go,v1alpha2/shared_containertemplate_types.go,v1alpha2/containertemplate_types.go,common/*,constant/*,cleanup/*,event/*,resource/*,template/*,test/integration/*'
+  CONCAT_INCLUDE_PKG: 'pkg/constant/*,pkg/validation/*'
+  # CONCAT_INCLUDE_TASK: '.tasks/*'
+  CONCAT_INCLUDE_KODE: 'v1alpha2/kode_types.go,v1alpha2/initplugin_types.go,controllers/kode/*'
   CONCAT_INCLUDE_ENTRYPOINT: 'v1alpha2/entrypoint_types.go,controllers/entrypoint/*'
   CONCAT_EXCLUDE_PATTERNS: '*_test.go,zz_generated.deepcopy.go'
-  CONCAT_INCLUDE_PATTERNS: '{{.CONCAT_INCLUDE_COMMON}},{{.CONCAT_INCLUDE_KODE}},{{.CONCAT_INCLUDE_ENTRYPOINT}},{{.CONCAT_INCLUDE_TASK}}'
+  CONCAT_INCLUDE_PATTERNS: '{{.CONCAT_INCLUDE_COMMON}},{{.CONCAT_INCLUDE_KODE}},{{.CONCAT_INCLUDE_ENTRYPOINT}},{{.CONCAT_INCLUDE_TASK}},{{.CONCAT_INCLUDE_PKG}}'
 
 tasks:
   default:
@@ -65,57 +59,32 @@ tasks:
     cmds:
       - task: lint:fmt
 
+  lint:
+    desc: Run go vet
+    cmds:
+      - task: lint:vet
+
   generate:
     desc: Generate code and manifests
     cmds:
       - task: build:generate
       - task: build:manifests
 
-  concat:
-    desc: |
-      Concatenate project files based on include and exclude patterns.
-      
-      This task processes files in the specified directory, filtering them based on
-      include and exclude patterns, and concatenates their contents into a single output file.
-      It also removes multiline comments from the concatenated content.
-
-      Usage:
-        task concat
-
-      To override default patterns or directory:
-        task concat CONCAT_EXCLUDE_PATTERNS='pattern1,pattern2' CONCAT_INCLUDE_PATTERNS='pattern3,pattern4' CONCAT_DIRECTORY='./src/'
-
-      Variables:
-        CONCAT_EXCLUDE_PATTERNS: Comma-separated list of patterns to exclude
-        CONCAT_INCLUDE_PATTERNS: Comma-separated list of patterns to include
-        CONCAT_DIRECTORY: Directory to process (should end with a slash)
-
-      Output:
-        The concatenated content is written to 'concatenated_output.txt' in the current directory.
-
-    cmds:
-      - |
-        CONCAT_EXCLUDE_PATTERNS="{{.CONCAT_EXCLUDE_PATTERNS}}" \
-        CONCAT_INCLUDE_PATTERNS="{{.CONCAT_INCLUDE_PATTERNS}}" \
-        CONCAT_DIRECTORY="{{.CONCAT_DIRECTORY}}" \
-        sh {{.TASKFILE_DIR}}/.tasks/concat.sh
-    silent: false
-
   setup:
+    silent: true
     desc: Setup the development environment
     cmds:
-      - task: cluster:minikube-setup
       - task: tools:setup
+      - task: cluster:ensure
       - task: dev:install
       - echo "Development environment is ready!"
     vars:
       USE_MINIKUBE_CONTEXT: true
-    silent: true
 
   teardown:
     desc: Tear down the complete development environment
     cmds:
-      - task: clusters:kind-destroy
+      - task: cluster:teardown
       - echo "Development environment has been torn down."
     vars:
       USE_MINIKUBE_CONTEXT: true
@@ -146,3 +115,33 @@ tasks:
     desc: Delete manifests from the cluster
     cmds:
       - task: samples:delete
+
+  concat:
+    desc: |
+      Concatenate project files based on include and exclude patterns.
+      
+      This task processes files in the specified directory, filtering them based on
+      include and exclude patterns, and concatenates their contents into a single output file.
+      It also removes multiline comments from the concatenated content.
+
+      Usage:
+        task concat
+
+      To override default patterns or directory:
+        task concat CONCAT_EXCLUDE_PATTERNS='pattern1,pattern2' CONCAT_INCLUDE_PATTERNS='pattern3,pattern4' CONCAT_DIRECTORY='./src/'
+
+      Variables:
+        CONCAT_EXCLUDE_PATTERNS: Comma-separated list of patterns to exclude
+        CONCAT_INCLUDE_PATTERNS: Comma-separated list of patterns to include
+        CONCAT_DIRECTORY: Directory to process (should end with a slash)
+
+      Output:
+        The concatenated content is written to 'concatenated_output.txt' in the current directory.
+
+    cmds:
+      - |
+        CONCAT_EXCLUDE_PATTERNS="{{.CONCAT_EXCLUDE_PATTERNS}}" \
+        CONCAT_INCLUDE_PATTERNS="{{.CONCAT_INCLUDE_PATTERNS}}" \
+        CONCAT_DIRECTORY="{{.CONCAT_DIRECTORY}}" \
+        sh {{.TASKFILE_DIR}}/.tasks/concat.sh
+    silent: false

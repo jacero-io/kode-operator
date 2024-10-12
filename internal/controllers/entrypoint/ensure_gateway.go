@@ -58,7 +58,7 @@ func (r *EntryPointReconciler) ensureGatewayResources(ctx context.Context, entry
 		},
 	}
 
-	err := r.ResourceManager.CreateOrPatch(ctx, gateway, func() error {
+	_, err := r.Resource.CreateOrPatch(ctx, gateway, func() error {
 		constructedGateway, err := r.constructGatewaySpec(entryPoint)
 		if err != nil {
 			return fmt.Errorf("failed to construct Gateway spec: %w", err)
@@ -69,7 +69,6 @@ func (r *EntryPointReconciler) ensureGatewayResources(ctx context.Context, entry
 
 		return controllerutil.SetControllerReference(entryPoint, gateway, r.Scheme)
 	})
-
 	if err != nil {
 		return fmt.Errorf("failed to create or patch Gateway: %w", err)
 	}

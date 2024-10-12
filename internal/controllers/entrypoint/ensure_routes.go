@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	gwapiv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwapiv1a2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
@@ -30,159 +31,128 @@ import (
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
 	event "github.com/jacero-io/kode-operator/internal/event"
+	"github.com/jacero-io/kode-operator/pkg/constant"
 )
 
-func (r *EntryPointReconciler) ensureHTTPRoutes(ctx context.Context, entrypoint *kodev1alpha2.EntryPoint, kode *kodev1alpha2.Kode, config *common.EntryPointResourceConfig, kodeHostname kodev1alpha2.KodeHostname, kodeDomain kodev1alpha2.KodeDomain) (bool, error) {
-	log := r.Log.WithName("HTTPRoutesEnsurer").WithValues("entrypoint", common.ObjectKeyFromConfig(config.CommonConfig))
-
-	ctx, cancel := common.ContextWithTimeout(ctx, 30) // 30 seconds timeout
-	defer cancel()
-
+func (r *EntryPointReconciler) ensureHTTPRoutes(ctx context.Context, entrypoint *kodev1alpha2.EntryPoint, kode *kodev1alpha2.Kode, config *common.EntryPointResourceConfig, kodeHostname kodev1alpha2.KodeHostname, kodeDomain kodev1alpha2.KodeDomain) (ctrl.Result, error) {
+	log := r.Log.WithValues("entrypoint", common.ObjectKeyFromConfig(config.CommonConfig))
 	log.V(1).Info("Ensuring HTTPRoutes")
 
-	var routes []*gwapiv1.HTTPRoute
-	var httpsRouteName string
-
-	// Construct HTTP Route
-	// httpRoute, err := r.constructHTTPRoute(config, kode, true, kodeHostname, kodeDomain)
-	// if err != nil {
-	// 	return false, fmt.Errorf("failed to construct HTTP route: %v", err)
-	// }
-	// routes = append(routes, httpRoute)
-
-	// Construct HTTPS Route
 	httpsRoute, err := r.constructHTTPRoute(config, kode, false, kodeHostname, kodeDomain)
 	if err != nil {
-		return false, fmt.Errorf("failed to construct HTTPS route: %v", err)
-	}
-	routes = append(routes, httpsRoute)
-	httpsRouteName = httpsRoute.Name
-
-	created := false // Flag to indicate if any HTTPRoute was created
-
-	for _, route := range routes {
-		err := r.ResourceManager.CreateOrPatch(ctx, route, func() error {
-			return controllerutil.SetControllerReference(entrypoint, route, r.Scheme)
-		})
-		if err != nil {
-			return false, fmt.Errorf("failed to ensure HTTPRoute: %v", err)
-		}
-
-		created = true
-
-		// Update EntryPoint status on the Kode resource
-		entrypointStatusErr := r.updatePhaseActive(ctx, entrypoint)
-		if entrypointStatusErr != nil {
-			return false, fmt.Errorf("failed to update EntryPoint status: %v", entrypointStatusErr)
-		}
-
-		// Record event for created HTTPRoute on the Kode resource
-		message := fmt.Sprintf("HTTPRoute created, %s", route.Name)
-		err = r.EventManager.Record(ctx, kode, event.EventTypeNormal, event.ReasonCreated, message)
-		if err != nil {
-			log.Error(err, "Failed to record event")
-			return created, err
-		}
+		log.Error(err, "Failed to construct HTTPS route")
+		entrypoint.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "HTTPRouteConstructionFailed", fmt.Sprintf("Failed to construct HTTPS route: %v", err))
+		return ctrl.Result{}, err
 	}
 
-	// Construct Security Policy
+	if err := r.createOrUpdateRoute(ctx, entrypoint, kode, httpsRoute); err != nil {
+		log.Error(err, "Failed to create or update HTTPRoute")
+		entrypoint.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "HTTPRouteCreationFailed", fmt.Sprintf("Failed to create or update HTTPRoute: %v", err))
+		return ctrl.Result{}, err
+	}
+
 	if config.EntryPointSpec.AuthSpec != nil && config.EntryPointSpec.AuthSpec.SecurityPolicySpec != nil && config.Protocol == kodev1alpha2.ProtocolHTTPS {
-
-		policy := &egv1alpha1.SecurityPolicy{}
-		policy, err := r.constructSecurityPolicy(config, kode, httpsRouteName)
-		if err != nil {
-			return false, fmt.Errorf("failed to construct SecurityPolicy: %v", err)
+		if err := r.createOrUpdateSecurityPolicy(ctx, entrypoint, kode, config, httpsRoute.Name); err != nil {
+			log.Error(err, "Failed to create or update SecurityPolicy")
+			entrypoint.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "SecurityPolicyCreationFailed", fmt.Sprintf("Failed to create or update SecurityPolicy: %v", err))
+			return ctrl.Result{}, err
 		}
-
-		err = r.ResourceManager.CreateOrPatch(ctx, policy, func() error {
-			return controllerutil.SetControllerReference(entrypoint, policy, r.Scheme)
-		})
-		if err != nil {
-			return false, fmt.Errorf("failed to ensure SecurityPolicy: %v", err)
-		}
-
-		created = true
-
-		// Update EntryPoint status on the Kode resource
-		entrypointStatusErr := r.updatePhaseActive(ctx, entrypoint)
-		if entrypointStatusErr != nil {
-			return false, fmt.Errorf("failed to update EntryPoint status: %v", entrypointStatusErr)
-		}
-
-		// Record event for created SecurityPolicy on the Kode resource
-		message := fmt.Sprintf("SecurityPolicy created, %s", policy.Name)
-		err = r.EventManager.Record(ctx, kode, event.EventTypeNormal, event.ReasonCreated, message)
-		if err != nil {
-			log.Error(err, "Failed to record event")
-			return created, err
-		}
-
 	}
 
-	return created, nil
+	// Update conditions
+	kode.SetCondition(constant.ConditionTypeReady, metav1.ConditionTrue, "HTTPRoutesEnsured", "HTTPRoutes have been successfully ensured")
+	kode.SetCondition(constant.ConditionTypeAvailable, metav1.ConditionTrue, "HTTPRoutesAvailable", "HTTPRoutes are available")
+	kode.SetCondition(constant.ConditionTypeProgressing, metav1.ConditionFalse, "HTTPRoutesReady", "HTTPRoutes are ready")
+
+	// Clear any previous error
+	kode.Status.LastError = nil
+	kode.Status.LastErrorTime = nil
+
+	err = kode.UpdateStatus(ctx, r.Client)
+	if err != nil {
+		log.Error(err, "Failed to update Kode status")
+		return ctrl.Result{}, err
+	}
+
+	log.Info("HTTPRoutes ensured successfully")
+	return ctrl.Result{}, nil
+}
+
+func (r *EntryPointReconciler) createOrUpdateRoute(ctx context.Context, entrypoint *kodev1alpha2.EntryPoint, kode *kodev1alpha2.Kode, route *gwapiv1.HTTPRoute) error {
+	result, err := r.Resource.CreateOrPatch(ctx, route, func() error {
+		return controllerutil.SetControllerReference(entrypoint, route, r.Scheme)
+	})
+	if err != nil {
+		return fmt.Errorf("failed to ensure HTTPRoute: %w", err)
+	}
+
+	var eventReason event.EventReason
+	var message string
+	switch result {
+	case controllerutil.OperationResultCreated:
+		eventReason = event.ReasonCreated
+		message = fmt.Sprintf("HTTPRoute created, %s", route.Name)
+	case controllerutil.OperationResultUpdated:
+		eventReason = event.ReasonUpdated
+		message = fmt.Sprintf("HTTPRoute updated, %s", route.Name)
+	case controllerutil.OperationResultNone:
+		// No changes were made, so we don't need to record an event
+		return nil
+	}
+
+	if err := r.Event.Record(ctx, kode, event.EventTypeNormal, eventReason, message); err != nil {
+		r.Log.Error(err, "Failed to record event")
+	}
+
+	return nil
+}
+
+func (r *EntryPointReconciler) createOrUpdateSecurityPolicy(ctx context.Context, entrypoint *kodev1alpha2.EntryPoint, kode *kodev1alpha2.Kode, config *common.EntryPointResourceConfig, httpsRouteName string) error {
+	policy, err := r.constructSecurityPolicy(config, kode, httpsRouteName)
+	if err != nil {
+		return fmt.Errorf("failed to construct SecurityPolicy: %w", err)
+	}
+
+	result, err := r.Resource.CreateOrPatch(ctx, policy, func() error {
+		return controllerutil.SetControllerReference(entrypoint, policy, r.Scheme)
+	})
+	if err != nil {
+		return fmt.Errorf("failed to ensure SecurityPolicy: %w", err)
+	}
+
+	var eventReason event.EventReason
+	var message string
+	switch result {
+	case controllerutil.OperationResultCreated:
+		eventReason = event.ReasonCreated
+		message = fmt.Sprintf("SecurityPolicy created, %s", policy.Name)
+	case controllerutil.OperationResultUpdated:
+		eventReason = event.ReasonUpdated
+		message = fmt.Sprintf("SecurityPolicy updated, %s", policy.Name)
+	case controllerutil.OperationResultNone:
+		// No changes were made, so we don't need to record an event
+		return nil
+	}
+
+	if err := r.Event.Record(ctx, kode, event.EventTypeNormal, eventReason, message); err != nil {
+		r.Log.Error(err, "Failed to record event")
+	}
+
+	return nil
 }
 
 func (r *EntryPointReconciler) constructHTTPRoute(config *common.EntryPointResourceConfig, kode *kodev1alpha2.Kode, isRedirect bool, kodeHostname kodev1alpha2.KodeHostname, kodeDomain kodev1alpha2.KodeDomain) (*gwapiv1.HTTPRoute, error) {
 	log := r.Log.WithName("HTTPRouteConstructor").WithValues("entrypoint", common.ObjectKeyFromConfig(config.CommonConfig))
-	log.V(1).Info("Constructing HTTPRoute", "isRedirect", isRedirect)
+	log.Info("Constructing HTTPRoute", "isRedirect", isRedirect)
 
-	// Construct ParentReference
-	namespace := gwapiv1.Namespace(config.GatewayNamespace)
-	gatewayName := gwapiv1.ObjectName(config.GatewayName)
-	parentRef := gwapiv1.ParentReference{
-		Name:      gatewayName,
-		Namespace: &namespace,
-	}
-
-	var routeName string
-	var rules []gwapiv1.HTTPRouteRule
-	if kode.GetPort() == 0 {
+	kodePort := gwapiv1.PortNumber(kode.GetPort())
+	if kodePort == 0 {
 		return nil, fmt.Errorf("kode port is not set")
 	}
-	kodePort := gwapiv1.PortNumber(kode.GetPort())
 
-	if isRedirect {
-		routeName = fmt.Sprintf("%s-tls-redirect", kode.Name)
-		httpsScheme := string(config.Protocol)
-
-		rules = []gwapiv1.HTTPRouteRule{{
-			Filters: []gwapiv1.HTTPRouteFilter{{
-				Type: gwapiv1.HTTPRouteFilterRequestRedirect,
-				RequestRedirect: &gwapiv1.HTTPRequestRedirectFilter{
-					Scheme: &httpsScheme,
-				},
-			}},
-		}}
-	} else {
-		pathMatchType := gwapiv1.PathMatchPathPrefix
-		pathString := "/"
-		service := gwapiv1.Kind("Service")
-		kodeServiceName := kode.GetServiceName()
-
-		log.V(1).Info("HTTPRoute details", "name", kodeServiceName, "port", kodePort)
-
-		routeName = kode.Name
-
-		if kodePort > 0 {
-			rules = []gwapiv1.HTTPRouteRule{{
-				Matches: []gwapiv1.HTTPRouteMatch{{
-					Path: &gwapiv1.HTTPPathMatch{
-						Type:  &pathMatchType,
-						Value: &pathString,
-					},
-				}},
-				BackendRefs: []gwapiv1.HTTPBackendRef{{
-					BackendRef: gwapiv1.BackendRef{
-						BackendObjectReference: gwapiv1.BackendObjectReference{
-							Kind: (*gwapiv1.Kind)(&service),
-							Name: gwapiv1.ObjectName(kodeServiceName),
-							Port: &kodePort,
-						},
-					},
-				}},
-			}}
-		}
-	}
+	parentRef := constructParentReference(config)
+	rules := constructHTTPRouteRules(isRedirect, config, kode, kodePort)
+	routeName := constructRouteName(kode, isRedirect)
 
 	log.V(1).Info("Constructed HTTPRoute", "name", routeName, "hostname", kodeHostname, "domain", kodeDomain, "port", kodePort, "isRedirect", isRedirect, "protocol", config.Protocol, "rules", rules)
 
@@ -198,6 +168,66 @@ func (r *EntryPointReconciler) constructHTTPRoute(config *common.EntryPointResou
 			Rules:           rules,
 		},
 	}, nil
+}
+
+func constructParentReference(config *common.EntryPointResourceConfig) gwapiv1.ParentReference {
+	namespace := gwapiv1.Namespace(config.GatewayNamespace)
+	gatewayName := gwapiv1.ObjectName(config.GatewayName)
+	return gwapiv1.ParentReference{
+		Name:      gatewayName,
+		Namespace: &namespace,
+	}
+}
+
+func constructHTTPRouteRules(isRedirect bool, config *common.EntryPointResourceConfig, kode *kodev1alpha2.Kode, kodePort gwapiv1.PortNumber) []gwapiv1.HTTPRouteRule {
+	if isRedirect {
+		return constructRedirectRule(config)
+	}
+	return constructBackendRule(kode, kodePort)
+}
+
+func constructRedirectRule(config *common.EntryPointResourceConfig) []gwapiv1.HTTPRouteRule {
+	httpsScheme := string(config.Protocol)
+	return []gwapiv1.HTTPRouteRule{{
+		Filters: []gwapiv1.HTTPRouteFilter{{
+			Type: gwapiv1.HTTPRouteFilterRequestRedirect,
+			RequestRedirect: &gwapiv1.HTTPRequestRedirectFilter{
+				Scheme: &httpsScheme,
+			},
+		}},
+	}}
+}
+
+func constructBackendRule(kode *kodev1alpha2.Kode, kodePort gwapiv1.PortNumber) []gwapiv1.HTTPRouteRule {
+	pathMatchType := gwapiv1.PathMatchPathPrefix
+	pathString := "/"
+	service := gwapiv1.Kind("Service")
+	kodeServiceName := kode.GetServiceName()
+
+	return []gwapiv1.HTTPRouteRule{{
+		Matches: []gwapiv1.HTTPRouteMatch{{
+			Path: &gwapiv1.HTTPPathMatch{
+				Type:  &pathMatchType,
+				Value: &pathString,
+			},
+		}},
+		BackendRefs: []gwapiv1.HTTPBackendRef{{
+			BackendRef: gwapiv1.BackendRef{
+				BackendObjectReference: gwapiv1.BackendObjectReference{
+					Kind: (*gwapiv1.Kind)(&service),
+					Name: gwapiv1.ObjectName(kodeServiceName),
+					Port: &kodePort,
+				},
+			},
+		}},
+	}}
+}
+
+func constructRouteName(kode *kodev1alpha2.Kode, isRedirect bool) string {
+	if isRedirect {
+		return fmt.Sprintf("%s-tls-redirect", kode.Name)
+	}
+	return kode.Name
 }
 
 func (r *EntryPointReconciler) constructSecurityPolicy(config *common.EntryPointResourceConfig, kode *kodev1alpha2.Kode, httpsRouteName string) (*egv1alpha1.SecurityPolicy, error) {

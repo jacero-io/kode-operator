@@ -5,6 +5,9 @@ includes:
     taskfile: minikube.yaml
     internal: true
 
+vars:
+  KUBECTL_CMD: '{{.KUBECTL_CMD | default "kubectl"}}'
+
 tasks:
   get:
     desc: Get Kubernetes resources defined in config/samples/ from the cluster

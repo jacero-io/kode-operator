@@ -22,7 +22,7 @@ import (
 	. "github.com/onsi/ginkgo/v2"
 	. "github.com/onsi/gomega"
 
-	"github.com/jacero-io/kode-operator/internal/constant"
+	"github.com/jacero-io/kode-operator/pkg/constant"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -98,13 +98,13 @@ var _ = Describe("Kode Controller ContainerTemplate Integration", Ordered, func(
 
 			// Check if the PVC is mounted in the StatefulSet
 			volumeMount := corev1.VolumeMount{
-				Name:      constant.KodeVolumeStorageName,
+				Name:      constant.DefaultKodeVolumeStorageName,
 				MountPath: "/config",
 			}
 			Expect(createdStatefulSet.Spec.Template.Spec.Containers[0].VolumeMounts).To(ContainElement(volumeMount))
 
 			volume := corev1.Volume{
-				Name: constant.KodeVolumeStorageName,
+				Name: constant.DefaultKodeVolumeStorageName,
 				VolumeSource: corev1.VolumeSource{
 					PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
 						ClaimName: pvcName,
@@ -178,8 +178,8 @@ var _ = Describe("Kode Controller ContainerTemplate Integration", Ordered, func(
 		}, timeout, interval).Should(Succeed())
 
 		// Ensure no PVC-related volume or volumeMount exists
-		Expect(createdStatefulSet.Spec.Template.Spec.Volumes).NotTo(ContainElement(HaveField("Name", constant.KodeVolumeStorageName)))
-		Expect(createdStatefulSet.Spec.Template.Spec.Containers[0].VolumeMounts).NotTo(ContainElement(HaveField("Name", constant.KodeVolumeStorageName)))
+		Expect(createdStatefulSet.Spec.Template.Spec.Volumes).NotTo(ContainElement(HaveField("Name", constant.DefaultKodeVolumeStorageName)))
+		Expect(createdStatefulSet.Spec.Template.Spec.Containers[0].VolumeMounts).NotTo(ContainElement(HaveField("Name", constant.DefaultKodeVolumeStorageName)))
 
 		// Check that PVC doesn't exist
 		pvcName := fmt.Sprintf("%s-pvc", kodeName)
@@ -212,7 +212,7 @@ var _ = Describe("Kode Controller ContainerTemplate Integration", Ordered, func(
 		}, timeout, interval).Should(Succeed())
 
 		Expect(createdSecret.Name).To(Equal(secretName))
-		Expect(createdSecret.Data).To(HaveKeyWithValue("username", []byte(constant.Username)))
+		Expect(createdSecret.Data).To(HaveKeyWithValue("username", []byte(constant.DefaultUsername)))
 
 		// Cleanup
 		Expect(k8sClient.Delete(ctx, kode)).To(Succeed())

@@ -23,7 +23,7 @@ import (
 
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
-	"github.com/jacero-io/kode-operator/internal/constant"
+	"github.com/jacero-io/kode-operator/pkg/constant"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -47,7 +47,7 @@ func (r *KodeReconciler) ensureStatefulSet(ctx context.Context, kode *kodev1alph
 		},
 	}
 
-	err := r.ResourceManager.CreateOrPatch(ctx, statefulSet, func() error {
+	_, err := r.Resource.CreateOrPatch(ctx, statefulSet, func() error {
 		constructedstatefulSet, err := r.constructStatefulSetSpec(config)
 		if err != nil {
 			return fmt.Errorf("failed to construct StatefulSet spec: %v", err)
@@ -157,6 +157,12 @@ func (r *KodeReconciler) constructStatefulSetSpec(config *common.KodeResourceCon
 		},
 	}
 
+	// Set RuntimeClass if defined
+	if config.Template.ContainerTemplateSpec.Runtime != "" {
+		runtimeClassName := string(config.Template.ContainerTemplateSpec.Runtime)
+		statefulSet.Spec.Template.Spec.RuntimeClassName = &runtimeClassName
+	}
+
 	return statefulSet, nil
 }
 
@@ -243,12 +249,12 @@ func constructVolumesAndMounts(mountPath string, config *common.KodeResourceConf
 		}
 
 		volume := corev1.Volume{
-			Name:         constant.KodeVolumeStorageName,
+			Name:         constant.DefaultKodeVolumeStorageName,
 			VolumeSource: volumeSource,
 		}
 
 		volumeMount := corev1.VolumeMount{
-			Name:      constant.KodeVolumeStorageName,
+			Name:      constant.DefaultKodeVolumeStorageName,
 			MountPath: mountPath,
 		}
 

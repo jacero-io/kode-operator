@@ -8,6 +8,10 @@ metadata:
   name: containertemplate-webtop-sample
   namespace: default
 spec:
+  entryPointRef:
+    kind: EntryPoint
+    name: entrypoint-sample
+    namespace: default
   type: code-server
   image: linuxserver/webtop:debian-xfce
   tz: "Europe/Stockholm"

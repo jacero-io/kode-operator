@@ -1,111 +1,71 @@
 stateDiagram-v2
-    [*] --> ReconciliationRequest : Controller Loop Triggered
-
-    ReconciliationRequest --> FetchLatestKode : Get Kode Resource
+    [*] --> ReconciliationRequest
+    ReconciliationRequest --> FetchLatestKode
     FetchLatestKode --> CheckDeletionTimestamp
-
-    CheckDeletionTimestamp --> HandleFinalizer : DeletionTimestamp Set
-
-    HandleFinalizer --> CleanupResources : Remove Controlled Resources
-    CleanupResources --> RemoveFinalizer : Cleanup Complete
-    RemoveFinalizer --> ReturnResult : Finalizer Handled
-
-    CheckDeletionTimestamp --> ResetRetryCount : DeletionTimestamp Not Set
-    ResetRetryCount --> AssessCurrentPhase
-
-    AssessCurrentPhase --> HandlePendingState : Pending
-    AssessCurrentPhase --> HandleConfiguringState : Configuring
-    AssessCurrentPhase --> HandleProvisioningState : Provisioning
-    AssessCurrentPhase --> HandleActiveState : Active
-    AssessCurrentPhase --> HandleInactiveState : Inactive
-    AssessCurrentPhase --> HandleFailedState : Failed
-    AssessCurrentPhase --> HandleUnknownState : Unknown
-    AssessCurrentPhase --> HandleSuspendingState : Suspending
-    AssessCurrentPhase --> HandleSuspendedState : Suspended
-    AssessCurrentPhase --> HandleResumingState : Resuming
-    AssessCurrentPhase --> HandleDeletingState : Deleting
-
-    HandlePendingState --> ValidateKode
-    ValidateKode --> FetchTemplate : Validation Passed
-    FetchTemplate --> InitializeConfig : Template Found
-    FetchTemplate --> TransitionTo : Template Not Found
-    InitializeConfig --> TransitionTo
-    ValidateKode --> TransitionTo : Validation Failed
-
-    HandleConfiguringState --> FetchTemplate
-    FetchTemplate --> EnsureResources : Template Found
-    FetchTemplate --> TransitionTo : Template Not Found
-    EnsureResources --> UpdateConfiguringStatus : Resources Ensured
-    EnsureResources --> TransitionTo : Error Occurred
-    UpdateConfiguringStatus --> TransitionTo
-
-    HandleProvisioningState --> CheckResourceReadiness
-    CheckResourceReadiness --> UpdateProvisioningStatus : Not Ready
-    CheckResourceReadiness --> UpdatePort
-    UpdatePort --> TransitionTo : All Ready
-    UpdateProvisioningStatus --> ReturnResult : Requeue
-
-    HandleActiveState --> CheckResourceHealth
-    CheckResourceHealth --> TransitionTo : Unhealthy
-    CheckResourceHealth --> UpdateActiveStatus : Healthy
-    UpdateActiveStatus --> ReturnResult : Requeue
-
-    HandleFailedState --> IncrementRetryCount
+    CheckDeletionTimestamp --> HandleDeletingState: DeletionTimestamp Set
+    CheckDeletionTimestamp --> CheckGenerationMismatch: DeletionTimestamp Not Set
+    CheckGenerationMismatch --> AssessCurrentPhase: No Mismatch
+    CheckGenerationMismatch --> Configuring: Mismatch Detected
+    AssessCurrentPhase --> Pending: New or Unknown
+    AssessCurrentPhase --> Configuring
+    AssessCurrentPhase --> Provisioning
+    AssessCurrentPhase --> Active
+    AssessCurrentPhase --> Inactive
+    AssessCurrentPhase --> Failed
+    AssessCurrentPhase --> Suspending
+    AssessCurrentPhase --> Suspended
+    AssessCurrentPhase --> Resuming
+    Pending --> ValidateKode
+    ValidateKode --> FetchTemplate: Validation Passed
+    ValidateKode --> Failed: Validation Failed
+    FetchTemplate --> Configuring: Template Found
+    FetchTemplate --> Failed: Template Not Found
+    Configuring --> EnsureResources
+    EnsureResources --> Provisioning: Resources Created
+    EnsureResources --> Failed: Error
+    Provisioning --> CheckResourceReadiness
+    CheckResourceReadiness --> Provisioning: Resources Not Ready
+    CheckResourceReadiness --> Active: Resources Ready
+    CheckResourceReadiness --> Failed: Error
+    Active --> CheckResourceHealth
+    CheckResourceHealth --> Configuring: Resources Not Ready
+    CheckResourceHealth --> Active: Resources Healthy
+    Active --> Inactive: Inactivity Detected
+    Inactive --> Suspending: Suspension Initiated
+    Suspending --> Suspended: Suspension Complete
+    Suspended --> Resuming: Resume Initiated
+    Resuming --> Configuring: Resume Complete
+    Failed --> IncrementRetryCount
     IncrementRetryCount --> CheckMaxRetries
-    CheckMaxRetries --> TransitionTo : Retry
-    CheckMaxRetries --> UpdateFailedStatus : Max Retries Exceeded
-    UpdateFailedStatus --> ReturnResult : Requeue
+    CheckMaxRetries --> Pending: Retry
+    CheckMaxRetries --> Failed: Max Retries Exceeded
+    HandleDeletingState --> CleanupResources
+    CleanupResources --> RemoveFinalizer: Cleanup Complete
+    RemoveFinalizer --> [*]: Finalizer Removed
 
-    HandleUnknownState --> DetermineCurrentState
-    DetermineCurrentState --> TransitionTo
-
-    HandleDeletingState --> UpdateDeletingStatus
-    UpdateDeletingStatus --> CheckDeletionComplete
-    CheckDeletionComplete --> TransitionTo : Deletion Not Complete
-    CheckDeletionComplete --> ReturnResult : Deletion Complete
-
-    state TransitionTo {
-        [*] --> CheckIfTransitionRequired
-        CheckIfTransitionRequired --> UpdateStatus : Transition Required
-        CheckIfTransitionRequired --> [*] : No Transition Required
-        UpdateStatus --> RecordEvent
-        RecordEvent --> SetRequeueTimer
-        SetRequeueTimer --> [*] : Return and Requeue
+    state CheckGenerationMismatch {
+        [*] --> CompareGenerations
+        CompareGenerations --> MismatchDetected: Generation Changed
+        CompareGenerations --> NoMismatch: Generation Unchanged
+        MismatchDetected --> UpdateObservedGeneration
+        UpdateObservedGeneration --> [*]
+        NoMismatch --> [*]
     }
 
-    TransitionTo --> ReturnResult : Requeue
+    NewKodeCreated --> Pending
+    SpecChanged --> CheckGenerationMismatch
+    ResourceStatusChanged --> CheckGenerationMismatch
+    PeriodicReconciliation --> CheckGenerationMismatch
+    ManualAction --> Suspended
+    ManualAction --> Failed
+    DeletionTimestampSet --> HandleDeletingState
 
-    ReturnResult --> EndReconciliation : No Requeue
-    ReturnResult --> Requeue : Requeue Requested
-    Requeue --> [*] : Wait for Next Reconciliation
-    EndReconciliation --> [*] : End Current Cycle
+    classDef state fill:#4CAF50,stroke:#333,stroke-width:2px,color:#fff;
+    classDef special fill:#FFC107,stroke:#333,stroke-width:2px,color:#333;
+    classDef reconcileOrigin fill:#FF4081,stroke:#333,stroke-width:2px,color:#fff;
+    classDef initialState fill:#3F51B5,stroke:#333,stroke-width:4px,color:#fff;
 
-    note right of TransitionTo
-        Handles all state transitions,
-        updates status, and manages events
-    end note
-
-    note right of ReturnResult
-        ctrl.Result determines
-        requeue or end
-    end note
-
-    note left of Requeue
-        Resource added back to
-        reconciliation queue
-    end note
-
-    note left of DetermineCurrentState
-        Attempts to determine the actual
-        state based on resource conditions
-    end note
-
-    note right of EnsureResources
-        See separate EnsureResources diagram
-        for detailed resource creation process
-    end note
-
-    note right of FetchTemplate
-        See separate FetchTemplate diagram
-        for detailed template fetch process
-    end note
+    class Pending,Configuring,Provisioning,Active,Inactive,Failed,Suspending,Suspended,Resuming state
+    class CheckGenerationMismatch special
+    class NewKodeCreated,SpecChanged,ResourceStatusChanged,PeriodicReconciliation,ManualAction,DeletionTimestampSet reconcileOrigin
+    class ReconciliationRequest initialState

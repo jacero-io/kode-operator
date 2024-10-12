@@ -18,18 +18,29 @@ package validation
 
 import (
 	"context"
+	"fmt"
 
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 )
 
 // Validator defines the interface for validating Kode resources
 type Validator interface {
-	ValidateKode(ctx context.Context, kode *kodev1alpha2.Kode) error
-	ValidateEntryPoint(ctx context.Context, entryPoint *kodev1alpha2.EntryPoint) error
+	Validate(ctx context.Context, obj interface{}) error
 }
 
 type validator struct{}
 
-func NewDefaultValidator() Validator {
+func NewValidator() Validator {
 	return &validator{}
+}
+
+func (v *validator) Validate(ctx context.Context, obj interface{}) error {
+	switch obj := obj.(type) {
+	case *kodev1alpha2.Kode:
+		return v.validateKode(ctx, obj)
+	case *kodev1alpha2.EntryPoint:
+		return v.validateEntryPoint(ctx, obj)
+	default:
+		return fmt.Errorf("unsupported type: %T", obj)
+	}
 }

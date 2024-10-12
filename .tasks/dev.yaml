@@ -20,6 +20,9 @@ includes:
     taskfile: envoy.yaml
     internal: true
 
+vars:
+  KUBECTL_CMD: '{{.KUBECTL_CMD | default "kubectl"}}'
+
 tasks:
   generate-manifests:
     desc: Generate controller manifests

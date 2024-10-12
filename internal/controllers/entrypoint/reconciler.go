@@ -25,6 +25,7 @@ import (
 	"github.com/go-logr/logr"
 
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -36,24 +37,24 @@ import (
 
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/cleanup"
-	"github.com/jacero-io/kode-operator/internal/constant"
+	"github.com/jacero-io/kode-operator/internal/common"
 	"github.com/jacero-io/kode-operator/internal/event"
 	"github.com/jacero-io/kode-operator/internal/resource"
-	"github.com/jacero-io/kode-operator/internal/status"
 	"github.com/jacero-io/kode-operator/internal/template"
-	"github.com/jacero-io/kode-operator/internal/validation"
+
+	"github.com/jacero-io/kode-operator/pkg/constant"
+	"github.com/jacero-io/kode-operator/pkg/validation"
 )
 
 type EntryPointReconciler struct {
-	Client          client.Client
-	Scheme          *runtime.Scheme
-	Log             logr.Logger
-	ResourceManager resource.ResourceManager
-	TemplateManager template.TemplateManager
-	CleanupManager  cleanup.CleanupManager
-	StatusUpdater   status.StatusUpdater
-	Validator       validation.Validator
-	EventManager    event.EventManager
+	Client         client.Client
+	Scheme         *runtime.Scheme
+	Log            logr.Logger
+	Resource       resource.ResourceManager
+	Template       template.TemplateManager
+	CleanupManager cleanup.CleanupManager
+	Validator      validation.Validator
+	Event          event.EventManager
 }
 
 const (
@@ -188,8 +189,9 @@ func (r *EntryPointReconciler) reconcileEntryPoint(ctx context.Context, entryPoi
 
 	// Update the whole status if it has changed
 	if !reflect.DeepEqual(latestEntryPoint.Status, entryPoint.Status) {
-		if err := r.updateStatus(ctx, entryPoint); err != nil {
-			// If we fail to update the status, requeue
+		err := latestEntryPoint.UpdateStatus(ctx, r.Client)
+		if err != nil {
+			log.Error(err, "Failed to update EntryPoint status")
 			return ctrl.Result{Requeue: true}, err
 		}
 	}
@@ -217,7 +219,19 @@ func (r *EntryPointReconciler) reconcileKode(ctx context.Context, kode *kodev1al
 			return ctrl.Result{RequeueAfter: time.Second}, nil
 		}
 		log.Error(err, "Unable to find EntryPoint for Kode")
-		return r.handleReconcileError(ctx, kode, nil, err, "Unable to find EntryPoint for Kode")
+
+		// Update Kode status with error
+		kode.SetCondition(constant.ConditionTypeError, metav1.ConditionTrue, "ReconciliationFailed", fmt.Sprintf("Unable to find EntryPoint for Kode: %v", err))
+		kode.Status.Phase = kodev1alpha2.KodePhaseFailed
+		kode.Status.LastError = common.StringPtr(err.Error())
+		kode.Status.LastErrorTime = &metav1.Time{Time: time.Now()}
+		if updateErr := kode.UpdateStatus(ctx, r.Client); updateErr != nil {
+			log.Error(updateErr, "Failed to update Kode status")
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, fmt.Errorf("primary error: %v, kode status update error: %v", err, updateErr)
+		}
+
+		r.Event.Record(ctx, kode, event.EventTypeWarning, event.ReasonFailed, fmt.Sprintf("Failed to reconcile Kode: %v", err))
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, err
 	}
 
 	config := InitEntryPointResourcesConfig(entryPoint)
@@ -225,7 +239,20 @@ func (r *EntryPointReconciler) reconcileKode(ctx context.Context, kode *kodev1al
 	// Construct Kode URL
 	kodeHostname, kodeDomain, kodeUrl, kodePath, err := kode.GenerateKodeUrlForEntryPoint(entryPoint.Spec.RoutingType, entryPoint.Spec.BaseDomain, kode.Name, config.Protocol)
 	if err != nil {
-		return r.handleReconcileError(ctx, kode, entryPoint, err, "Failed to construct Kode URL")
+		log.Error(err, "Failed to construct Kode URL")
+
+		// Update Kode status with error
+		kode.SetCondition(constant.ConditionTypeError, metav1.ConditionTrue, "ReconciliationFailed", fmt.Sprintf("Failed to construct Kode URL: %v", err))
+		kode.Status.Phase = kodev1alpha2.KodePhaseFailed
+		kode.Status.LastError = common.StringPtr(err.Error())
+		kode.Status.LastErrorTime = &metav1.Time{Time: time.Now()}
+		if updateErr := kode.UpdateStatus(ctx, r.Client); updateErr != nil {
+			log.Error(updateErr, "Failed to update Kode status")
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, fmt.Errorf("primary error: %v, kode status update error: %v", err, updateErr)
+		}
+
+		r.Event.Record(ctx, kode, event.EventTypeWarning, event.ReasonFailed, fmt.Sprintf("Failed to reconcile Kode: %v", err))
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, err
 	}
 	log.V(1).Info("Constructed Kode URL", "hostname", kodeHostname, "domain", kodeDomain, "url", kodeUrl, "path", kodePath, "protocol", config.Protocol)
 
@@ -246,14 +273,29 @@ func (r *EntryPointReconciler) reconcileKode(ctx context.Context, kode *kodev1al
 	created, err := r.ensureHTTPRoutes(ctx, entryPoint, kode, config, kodeHostname, kodeDomain)
 	if err != nil {
 		log.Error(err, "Failed to ensure HTTPRoute for Kode", "namespace", kode.Namespace, "name", kode.Name)
-		return r.handleReconcileError(ctx, kode, entryPoint, err, "Failed to ensure HTTPRoute")
+
+		// Update Kode status with error
+		kode.SetCondition(constant.ConditionTypeError, metav1.ConditionTrue, "ReconciliationFailed", fmt.Sprintf("Failed to ensure HTTPRoute: %v", err))
+		kode.Status.Phase = kodev1alpha2.KodePhaseFailed
+		kode.Status.LastError = common.StringPtr(err.Error())
+		kode.Status.LastErrorTime = &metav1.Time{Time: time.Now()}
+		if updateErr := kode.UpdateStatus(ctx, r.Client); updateErr != nil {
+			log.Error(updateErr, "Failed to update Kode status")
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, fmt.Errorf("primary error: %v, kode status update error: %v", err, updateErr)
+		}
+
+		r.Event.Record(ctx, kode, event.EventTypeWarning, event.ReasonFailed, fmt.Sprintf("Failed to reconcile Kode: %v", err))
+		return ctrl.Result{RequeueAfter: 5 * time.Second}, err
 	}
 
 	// Update kode URL
 	if kodeUrl != "" {
-		kode.UpdateUrl(ctx, r.Client, kodeUrl)
-		// TODO: Rewrite status handling to work with SetCondition
-		// kode.SetCondition(constant.ConditionTypeAvailable, metav1.ConditionTrue, "ResourcesReady", "Kode is available and ready to use")
+		kode.Status.KodeUrl = kodeUrl
+		kode.SetCondition(constant.ConditionTypeAvailable, metav1.ConditionTrue, "ResourcesReady", "Kode is available and ready to use")
+		if err := kode.UpdateStatus(ctx, r.Client); err != nil {
+			log.Error(err, "Failed to update Kode status")
+			return ctrl.Result{RequeueAfter: 5 * time.Second}, fmt.Errorf("failed to update Kode URL: %w", err)
+		}
 	}
 
 	log.Info("HTTPRoute configuration successful", "created", created, "kodeUrl", kodeUrl)
@@ -264,6 +306,7 @@ func (r *EntryPointReconciler) reconcileKode(ctx context.Context, kode *kodev1al
 func (r *EntryPointReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&kodev1alpha2.EntryPoint{}).
+		// WithEventFilter(predicate.GenerationChangedPredicate{}).
 		Owns(&gwapiv1.HTTPRoute{}).
 		Owns(&gwapiv1.Gateway{}).
 		Watches(&kodev1alpha2.Kode{}, &handler.EnqueueRequestForObject{}).
