@@ -34,8 +34,8 @@ type CredentialsSpec struct {
 	EnableBuiltinAuth bool `json:"enableBuiltinAuth,omitempty" yaml:"enableBuiltinAuth,omitempty"`
 }
 
-// BaseSharedSpec defines the common fields for both Tofu and Container specs
-type BaseSharedSpec struct {
+// CommonSpec defines the common fields for both Tofu and Container specs
+type CommonSpec struct {
 	// Credentials specifies the credentials for the service.
 	Credentials *CredentialsSpec `json:"credentials,omitempty" yaml:"credentials,omitempty"`
 
@@ -55,13 +55,13 @@ type BaseSharedSpec struct {
 	Port *Port `json:"port,omitempty" yaml:"port,omitempty"`
 }
 
-// SharedStatus defines the common observed state
-type BaseSharedStatus struct {
+// CommonStatus defines the common observed state
+type CommonStatus struct {
 	// ObservedGeneration is the last observed generation of the resource.
 	ObservedGeneration int64 `json:"observedGeneration,omitempty" yaml:"observedGeneration,omitempty"`
 
 	// Conditions reflect the current state of the resource
-	Conditions []metav1.Condition `json:"conditions,omitempty" yaml:"conditions,omitempty"`
+	ConditionedStatus `json:",inline" yaml:",inline"`
 
 	// Contains the last error message encountered during reconciliation.
 	LastError *string `json:"lastError,omitempty" yaml:"lastError,omitempty"`
@@ -72,7 +72,7 @@ type BaseSharedStatus struct {
 
 // Template represents a unified structure for different types of Kode templates
 type Template struct {
-	// Kind specifies the type of template (e.g., "PodTemplate", "ClusterPodTemplate", "TofuTemplate", "ClusterTofuTemplate")
+	// Kind specifies the type of template (e.g., "ContainerTemplate", "ClusterContainerTemplate", "TofuTemplate", "ClusterTofuTemplate")
 	Kind Kind `json:"kind" yaml:"kind"`
 
 	// Name is the name of the template resource
@@ -84,12 +84,23 @@ type Template struct {
 	// Port is the port to expose the kode instance
 	Port Port `json:"port" yaml:"port"`
 
-	// PodTemplateSpec is a reference to a PodTemplate or ClusterPodTemplate
-	PodTemplateSpec *PodTemplateSharedSpec `json:"container,omitempty" yaml:"container,omitempty"`
+	// ContainerTemplateSpec is a reference to a ContainerTemplate or ClusterContainerTemplate
+	ContainerTemplateSpec *ContainerTemplateSharedSpec `json:"container,omitempty" yaml:"container,omitempty"`
 
 	// TofuTemplateSpec is a reference to a TofuTemplate or ClusterTofuTemplate
 	TofuTemplateSpec *TofuSharedSpec `json:"tofu,omitempty" yaml:"tofu,omitempty"`
 }
+
+type TemplateKind string
+
+const (
+	TemplateKindContainerTemplate        TemplateKind = "ContainerTemplate"
+	TemplateKindClusterContainerTemplate TemplateKind = "ClusterContainerTemplate"
+	TemplateKindVirtualTemplate          TemplateKind = "VirtualTemplate"
+	TemplateKindClusterVirtualTemplate   TemplateKind = "ClusterVirtualTemplate"
+	TemplateKindTofuTemplate             TemplateKind = "TofuTemplate"
+	TemplateKindClusterTofuTemplate      TemplateKind = "ClusterTofuTemplate"
+)
 
 // Port for the service. Used by EnvoyProxy to expose the container. Defaults to '8000'.
 // +kubebuilder:validation:Minimum=1

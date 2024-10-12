@@ -23,8 +23,8 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -32,30 +32,37 @@ import (
 
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
-	"github.com/jacero-io/kode-operator/internal/events"
+	"github.com/jacero-io/kode-operator/internal/event"
 )
 
 func (r *EntryPointReconciler) findEntryPointForKode(ctx context.Context, kode *kodev1alpha2.Kode) (*kodev1alpha2.EntryPoint, error) {
 	// Fetch the template object
-	template, err := r.TemplateManager.Fetch(ctx, kode.Spec.TemplateRef)
+	template, err := r.Template.Fetch(ctx, kode.Spec.TemplateRef)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch template: %w", err)
 	}
 
-	var entryPointRef kodev1alpha2.CrossNamespaceObjectReference
+	var entryPointRef *kodev1alpha2.CrossNamespaceObjectReference
+
 	switch template.Kind {
-	case kodev1alpha2.Kind(kodev1alpha2.TemplateKindPodTemplate), kodev1alpha2.Kind(kodev1alpha2.TemplateKindClusterPodTemplate):
-		if template.PodTemplateSpec == nil || template.PodTemplateSpec.BaseSharedSpec.EntryPointRef == nil {
-			return nil, fmt.Errorf("invalid PodTemplate: missing EntryPointRef")
+	case kodev1alpha2.Kind(kodev1alpha2.TemplateKindContainerTemplate),
+		kodev1alpha2.Kind(kodev1alpha2.TemplateKindClusterContainerTemplate):
+		if template.ContainerTemplateSpec == nil {
+			return nil, fmt.Errorf("invalid ContainerTemplate: missing ContainerTemplateSpec")
 		}
-		entryPointRef = *template.PodTemplateSpec.BaseSharedSpec.EntryPointRef
-	case kodev1alpha2.Kind(kodev1alpha2.TemplateKindTofuTemplate), kodev1alpha2.Kind(kodev1alpha2.TemplateKindClusterTofuTemplate):
-		if template.TofuTemplateSpec == nil || template.TofuTemplateSpec.BaseSharedSpec.EntryPointRef == nil {
-			return nil, fmt.Errorf("invalid TofuTemplate: missing EntryPointRef")
+		entryPointRef = template.ContainerTemplateSpec.CommonSpec.EntryPointRef
+	case kodev1alpha2.Kind(kodev1alpha2.TemplateKindTofuTemplate),
+		kodev1alpha2.Kind(kodev1alpha2.TemplateKindClusterTofuTemplate):
+		if template.TofuTemplateSpec == nil {
+			return nil, fmt.Errorf("invalid TofuTemplate: missing TofuTemplateSpec")
 		}
-		entryPointRef = *template.TofuTemplateSpec.BaseSharedSpec.EntryPointRef
+		entryPointRef = template.TofuTemplateSpec.CommonSpec.EntryPointRef
 	default:
 		return nil, fmt.Errorf("unknown template kind: %s", template.Kind)
+	}
+
+	if entryPointRef == nil {
+		return nil, fmt.Errorf("missing EntryPointRef in template")
 	}
 
 	// Fetch the latest EntryPoint object
@@ -68,162 +75,56 @@ func (r *EntryPointReconciler) findEntryPointForKode(ctx context.Context, kode *
 }
 
 func (r *EntryPointReconciler) transitionTo(ctx context.Context, entryPoint *kodev1alpha2.EntryPoint, newPhase kodev1alpha2.EntryPointPhase) (ctrl.Result, error) {
-	log := r.Log.WithValues("entrypoint", client.ObjectKeyFromObject(entryPoint))
+	log := r.Log.WithValues("entrypoint", types.NamespacedName{Name: entryPoint.Name, Namespace: entryPoint.Namespace})
 
 	if entryPoint.Status.Phase == newPhase {
-		// No transition needed
-		return ctrl.Result{}, nil
+		return ctrl.Result{RequeueAfter: 10 * time.Minute}, nil
 	}
 
 	log.V(1).Info("Transitioning EntryPoint state", "from", entryPoint.Status.Phase, "to", newPhase)
 
-	// Create a deep copy of the entryPoint object to avoid modifying the cache
-	entryPointCopy := entryPoint.DeepCopy()
+	entryPoint.Status.Phase = newPhase
 
-	// Update the phase
-	entryPointCopy.Status.Phase = newPhase
-
-	// Perform any additional actions based on the new state
-	var requeueAfter time.Duration
 	switch newPhase {
 	case kodev1alpha2.EntryPointPhasePending:
-		if err := r.StatusUpdater.UpdateStatusEntryPoint(ctx, entryPointCopy, kodev1alpha2.EntryPointPhasePending, []metav1.Condition{
-			{
-				Type:    string(common.ConditionTypeReady),
-				Status:  metav1.ConditionFalse,
-				Reason:  "Pending",
-				Message: "EntryPoint resource is pending configuration.",
-			},
-			{
-				Type:    string(common.ConditionTypeAvailable),
-				Status:  metav1.ConditionFalse,
-				Reason:  "Pending",
-				Message: "EntryPoint resource is pending configuration.",
-			},
-			{
-				Type:    string(common.ConditionTypeProgressing),
-				Status:  metav1.ConditionTrue,
-				Reason:  "Pending",
-				Message: "EntryPoint resource is pending configuration.",
-			},
-		}, nil, "", nil); err != nil {
-			log.Error(err, "Failed to update status for Pending state")
-			return ctrl.Result{Requeue: true}, err
-		}
+		// Empty case - does nothing
 
 	case kodev1alpha2.EntryPointPhaseConfiguring:
-		removeConditions := []string{"Pending"}
-		if err := r.StatusUpdater.UpdateStatusEntryPoint(ctx, entryPointCopy, kodev1alpha2.EntryPointPhaseConfiguring, []metav1.Condition{
-			{
-				Type:    string(common.ConditionTypeReady),
-				Status:  metav1.ConditionFalse,
-				Reason:  "Configuring",
-				Message: "EntryPoint resource is being configured.",
-			},
-			{
-				Type:    string(common.ConditionTypeAvailable),
-				Status:  metav1.ConditionFalse,
-				Reason:  "Configuring",
-				Message: "EntryPoint resource is being configured.",
-			},
-			{
-				Type:    string(common.ConditionTypeProgressing),
-				Status:  metav1.ConditionTrue,
-				Reason:  "Configuring",
-				Message: "EntryPoint resource is being configured.",
-			},
-		}, removeConditions, "", nil); err != nil {
-			log.Error(err, "Failed to update status for Configuring state")
-			return ctrl.Result{Requeue: true}, err
-		}
-
-		if err := r.EventManager.Record(ctx, entryPoint, events.EventTypeNormal, events.ReasonEntryPointConfiguring, "EntryPoint is being configured"); err != nil {
+		if err := r.Event.Record(ctx, entryPoint, event.EventTypeNormal, event.ReasonEntryPointConfiguring, "EntryPoint is being configured"); err != nil {
 			log.Error(err, "Failed to record EntryPoint configuring event")
 		}
 
 	case kodev1alpha2.EntryPointPhaseProvisioning:
-		removeConditions := []string{"Configuring", "Pending"}
-		if err := r.StatusUpdater.UpdateStatusEntryPoint(ctx, entryPointCopy, kodev1alpha2.EntryPointPhaseProvisioning, []metav1.Condition{
-			{
-				Type:    string(common.ConditionTypeReady),
-				Status:  metav1.ConditionFalse,
-				Reason:  "Provisioning",
-				Message: "EntryPoint resource is being provisioned.",
-			},
-			{
-				Type:    string(common.ConditionTypeAvailable),
-				Status:  metav1.ConditionFalse,
-				Reason:  "Provisioning",
-				Message: "EntryPoint resource is being provisioned.",
-			},
-			{
-				Type:    string(common.ConditionTypeProgressing),
-				Status:  metav1.ConditionTrue,
-				Reason:  "Provisioning",
-				Message: "EntryPoint resource is being provisioned.",
-			},
-		}, removeConditions, "", nil); err != nil {
-			log.Error(err, "Failed to update status for Provisioning state")
-			return ctrl.Result{Requeue: true}, err
-		}
-
-		if err := r.EventManager.Record(ctx, entryPoint, events.EventTypeNormal, events.ReasonEntryPointProvisioning, "EntryPoint is being provisioned"); err != nil {
+		if err := r.Event.Record(ctx, entryPoint, event.EventTypeNormal, event.ReasonEntryPointProvisioning, "EntryPoint is being provisioned"); err != nil {
 			log.Error(err, "Failed to record EntryPoint provisioning event")
 		}
 
 	case kodev1alpha2.EntryPointPhaseActive:
-		removeConditions := []string{"Configuring", "Pending", "Provisioning"}
-		if err := r.StatusUpdater.UpdateStatusEntryPoint(ctx, entryPointCopy, kodev1alpha2.EntryPointPhaseActive, []metav1.Condition{
-			{
-				Type:    string(common.ConditionTypeReady),
-				Status:  metav1.ConditionTrue,
-				Reason:  "EnteredActiveState",
-				Message: "EntryPoint is now active and ready.",
-			},
-			{
-				Type:    string(common.ConditionTypeAvailable),
-				Status:  metav1.ConditionTrue,
-				Reason:  "EnteredActiveState",
-				Message: "EntryPoint is now active and available.",
-			},
-			{
-				Type:    string(common.ConditionTypeProgressing),
-				Status:  metav1.ConditionFalse,
-				Reason:  "EnteredActiveState",
-				Message: "EntryPoint is now active.",
-			},
-		}, removeConditions, "", nil); err != nil {
-			log.Error(err, "Failed to update status for Active state")
-			return ctrl.Result{Requeue: true}, err
-		}
-
-		if err := r.EventManager.Record(ctx, entryPoint, events.EventTypeNormal, events.ReasonEntryPointActive, "EntryPoint is now active"); err != nil {
+		if err := r.Event.Record(ctx, entryPoint, event.EventTypeNormal, event.ReasonEntryPointActive, "EntryPoint is now active"); err != nil {
 			log.Error(err, "Failed to record EntryPoint active event")
 		}
 
-	case kodev1alpha2.EntryPointPhaseDeleting:
-		if err := r.EventManager.Record(ctx, entryPoint, events.EventTypeNormal, events.ReasonEntryPointDeleting, "EntryPoint is being deleted"); err != nil {
-			log.Error(err, "Failed to record EntryPoint deleting event")
-		}
-
 	case kodev1alpha2.EntryPointPhaseFailed:
-		if err := r.EventManager.Record(ctx, entryPoint, events.EventTypeWarning, events.ReasonEntryPointFailed, "EntryPoint has entered Failed state"); err != nil {
+		if err := r.Event.Record(ctx, entryPoint, event.EventTypeWarning, event.ReasonEntryPointFailed, "EntryPoint has entered Failed state"); err != nil {
 			log.Error(err, "Failed to record EntryPoint failed event")
 		}
-		requeueAfter = 5 * time.Minute
 
-	case kodev1alpha2.EntryPointPhaseUnknown:
-		if err := r.EventManager.Record(ctx, entryPoint, events.EventTypeWarning, events.ReasonEntryPointUnknown, "EntryPoint has entered Unknown state"); err != nil {
-			log.Error(err, "Failed to record EntryPoint unknown state event")
-		}
-		requeueAfter = 1 * time.Minute
 	}
 
-	// Requeue to handle the new state
-	if requeueAfter > 0 {
-		return ctrl.Result{RequeueAfter: requeueAfter}, nil
-	}
 	return ctrl.Result{Requeue: true}, nil
+}
+
+func (r *EntryPointReconciler) updateRetryCount(ctx context.Context, entryPoint *kodev1alpha2.EntryPoint, count int) error {
+	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
+		latestEntryPoint := &kodev1alpha2.Kode{}
+		err := r.Client.Get(ctx, client.ObjectKey{Name: entryPoint.Name, Namespace: entryPoint.Namespace}, latestEntryPoint)
+		if err != nil {
+			return err
+		}
+
+		latestEntryPoint.Status.RetryCount = count
+		return r.Client.Status().Update(ctx, latestEntryPoint)
+	})
 }
 
 func (r *EntryPointReconciler) checkGatewayClassExists(ctx context.Context, gatewayClassName string) error {

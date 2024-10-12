@@ -1,0 +1,206 @@
+version: '3'
+
+includes:
+  build: 
+    taskfile: build.yaml
+    internal: true
+
+vars:
+  KUBERNETES_VERSION: '{{.KUBERNETES_VERSION | default "v1.30.5"}}'
+  MINIKUBE_PROFILE: "minikube-kode"
+  MINIKUBE_MEMORY: '{{.MINIKUBE_MEMORY | default "6144"}}'
+  MINIKUBE_CPUS: '{{.MINIKUBE_CPUS | default "4"}}'
+  MINIKUBE_DRIVER: '{{.MINIKUBE_DRIVER | default "docker"}}'
+  CONTAINER_TOOL: '{{.CONTAINER_TOOL | default "docker"}}'
+  KUBECTL_CMD: '{{.KUBECTL_CMD | default "kubectl"}}'
+  IMG: '{{.IMG | default "emiljacero/kode-operator:v0.0.0-latest"}}'
+
+tasks:
+  set-context:
+    internal: true
+    cmds:
+      - |
+        if [ "{{.USE_MINIKUBE_CONTEXT}}" = "true" ]; then
+          echo "Checking Minikube context..."
+          if kubectl config get-contexts {{.MINIKUBE_PROFILE}} &>/dev/null; then
+            echo "Using Minikube context..."
+            kubectl config use-context {{.MINIKUBE_PROFILE}}
+          else
+            echo "Minikube context does not exist. It will be created if necessary."
+          fi
+        else
+          echo "Using existing kubecontext..."
+        fi
+    silent: true
+
+  load-image:
+    desc: Load a Docker image into the Minikube cluster
+    cmds:
+      - task: set-context
+      - |
+        if ! docker image inspect {{.IMG}} &> /dev/null; then
+          echo "Error: Image {{.IMG}} not found locally. Please build or pull the image first."
+          exit 1
+        fi
+      - |
+        if ! minikube status -p {{.MINIKUBE_PROFILE}} &>/dev/null; then
+          echo "Error: Minikube cluster '{{.MINIKUBE_PROFILE}}' not found. Please create the cluster first."
+          exit 1
+        fi
+      - |
+        echo "Loading image {{.IMG}} into Minikube cluster '{{.MINIKUBE_PROFILE}}'..."
+        if minikube image load {{.IMG}} -p {{.MINIKUBE_PROFILE}}; then
+          echo "Image loaded successfully."
+        else
+          echo "Error: Failed to load image into the Minikube cluster."
+          exit 1
+        fi
+    silent: false
+
+  load-images:
+    desc: Load internal and external Docker images into Minikube cluster
+    vars:
+      INT_IMAGES_TO_LOAD: 
+        sh: echo {{.IMG}}
+      EXT_IMAGES_TO_LOAD: 
+        - envoyproxy/envoy:v1.31-latest
+        - linuxserver/code-server:latest
+        - linuxserver/webtop:debian-xfce
+    cmds:
+      - task: set-context
+      - |
+        if [ "{{.USE_MINIKUBE_CONTEXT}}" = "true" ]; then
+          echo "Using Minikube context..."
+          for img in {{.INT_IMAGES_TO_LOAD}}; do
+            echo "Loading $img";
+            minikube image load $img -p {{.MINIKUBE_PROFILE}};
+          done
+          for img in {{range .EXT_IMAGES_TO_LOAD}}"{{.}}" {{end}}; do
+            echo "Pulling $img";
+            {{.CONTAINER_TOOL}} pull $img;
+            echo "Loading $img";
+            minikube image load $img -p {{.MINIKUBE_PROFILE}};
+          done
+        else
+          echo "Skipping image load for non-Minikube context"
+        fi
+
+  deploy-minikube:
+    internal: true
+    deps:
+      - build:docker-build
+      - build:build-installer
+    cmds:
+      - task: set-context
+      - echo "Deploying to Minikube cluster..."
+      - 'kubectl apply -f {{.ROOT_DIR}}/dist/install.yaml'
+
+  undeploy-minikube:
+    internal: true
+    cmds:
+      - echo "Undeploying from Minikube cluster..."
+      - task: set-context
+      - '{{.KUBECTL_CMD}} delete --ignore-not-found={{.IGNORE_NOT_FOUND}} -f {{.ROOT_DIR}}/dist/install.yaml'
+
+  deploy-remote:
+    internal: true
+    deps:
+      - build:docker-build
+      - build:build-installer
+    cmds:
+      - echo "Using remote cluster. Ensure the image is built."
+      - '{{.KUBECTL_CMD}} apply -f {{.ROOT_DIR}}/dist/install.yaml'
+
+  undeploy-remote:
+    internal: true
+    cmds:
+      - echo "Undeploying from remote cluster..."
+      - '{{.KUBECTL_CMD}} delete --ignore-not-found={{.IGNORE_NOT_FOUND}} -f {{.ROOT_DIR}}/dist/install.yaml'
+
+  logs:
+    cmds:
+      - '{{.KUBECTL_CMD}} logs -f deployment/controller-manager -n kode-system'
+
+  minikube-dashboard:
+    desc: Open Minikube dashboard
+    cmds:
+      - minikube dashboard -p {{.MINIKUBE_PROFILE}}
+
+  minikube-tunnel:
+    desc: Start Minikube tunnel for LoadBalancer services
+    cmds:
+      - minikube tunnel -p {{.MINIKUBE_PROFILE}}
+
+  minikube-docker-env:
+    desc: Print Docker environment variables for Minikube
+    cmds:
+      - minikube docker-env -p {{.MINIKUBE_PROFILE}}
+
+  ensure:
+    desc: |
+      Ensure a Minikube cluster exists, creating it if necessary.
+      This task checks for the existence of a Minikube cluster with the specified profile and creates one if it doesn't exist.
+      
+      Usage:
+        task minikube-ensure
+      
+      Variables:
+        MINIKUBE_PROFILE: Name of the Minikube profile (default: minikube-kode)
+        MINIKUBE_MEMORY: Memory allocation for Minikube VM (default: 6144MB)
+        MINIKUBE_CPUS: Number of CPUs for Minikube VM (default: 4)
+        MINIKUBE_DRIVER: VM driver for Minikube (default: docker)
+        KUBERNETES_VERSION: Kubernetes version to use for the cluster (default: v1.30.5)
+      
+      Note:
+        This task will set the kubectl context to the newly created or existing Minikube cluster.
+    cmds:
+      - |
+        if ! minikube status -p {{.MINIKUBE_PROFILE}} &>/dev/null; then
+          echo "Creating Minikube cluster '{{.MINIKUBE_PROFILE}}'..."
+          minikube start \
+            --profile={{.MINIKUBE_PROFILE}} \
+            --memory={{.MINIKUBE_MEMORY}} \
+            --cpus={{.MINIKUBE_CPUS}} \
+            --driver={{.MINIKUBE_DRIVER}} \
+            --kubernetes-version={{.KUBERNETES_VERSION}} \
+            --cni=cilium \
+            --container-runtime=containerd \
+            --docker-opt containerd=/var/run/containerd/containerd.sock
+          minikube addons enable gvisor --profile={{.MINIKUBE_PROFILE}}
+          echo "Setting kubectl context to the new Minikube cluster..."
+          kubectl config use-context {{.MINIKUBE_PROFILE}}
+          echo "Minikube cluster '{{.MINIKUBE_PROFILE}}' created successfully."
+          echo "Minikube profile: {{.MINIKUBE_PROFILE}}"
+        else
+          echo "Minikube cluster '{{.MINIKUBE_PROFILE}}' already exists."
+          echo "Ensuring kubectl context is set to the Minikube cluster..."
+          kubectl config use-context {{.MINIKUBE_PROFILE}}
+        fi
+      - task: set-context
+    silent: true
+
+  destroy:
+    desc: Delete the Minikube cluster
+    cmds:
+      - task: set-context
+      - minikube delete -p {{.MINIKUBE_PROFILE}}
+
+  stop:
+    desc: Stop the Minikube cluster
+    cmds:
+      - minikube stop -p {{.MINIKUBE_PROFILE}}
+
+  setup:
+    desc: Start Minikube and set up the environment
+    cmds:
+      - task: ensure
+      - task: set-context
+      - echo "Minikube setup complete. You can now use 'kubectl' to interact with the cluster."
+    silent: true
+
+  teardown:
+    desc: Tear down the Minikube cluster
+    cmds:
+      - task: destroy
+      - echo "Minikube cluster has been torn down."
+    silent: true

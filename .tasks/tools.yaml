@@ -1,5 +1,19 @@
 version: '3'
 
+vars:
+  KUSTOMIZE_VERSION: '{{.KUSTOMIZE_VERSION | default "v5.4.2"}}'
+  CONTROLLER_TOOLS_VERSION: '{{.CONTROLLER_TOOLS_VERSION | default "v0.16.0"}}'
+  ENVTEST_VERSION: '{{.ENVTEST_VERSION | default "release-0.18"}}'
+  GOLANGCI_LINT_VERSION: '{{.GOLANGCI_LINT_VERSION | default "v1.57.2"}}'
+  HELMIFY_VERSION: '{{.HELMIFY_VERSION | default "v0.4.13"}}'
+  KUBECTL_VERSION: '{{.KUBECTL_VERSION | default "v1.31.1"}}'
+  CONTROLLER_GEN_CMD: '{{.LOCALBIN}}/controller-gen-{{.CONTROLLER_TOOLS_VERSION}}'
+  SETUP_ENVTEST_CMD: '{{.LOCALBIN}}/setup-envtest-{{.ENVTEST_VERSION}}'
+  GOLANGCI_LINT_CMD: '{{.LOCALBIN}}/golangci-lint-{{.GOLANGCI_LINT_VERSION}}'
+  HELMIFY_CMD: '{{.LOCALBIN}}/helmify-{{.HELMIFY_VERSION}}'
+  KUSTOMIZE_CMD: '{{.LOCALBIN}}/kustomize-{{.KUSTOMIZE_VERSION}}'
+  KUBECTL_CMD: '{{.LOCALBIN}}/kubectl-{{.KUBECTL_VERSION}}'
+
 tasks:
   ensure-dir:
     internal: true
@@ -7,6 +21,9 @@ tasks:
     cmds:
       - mkdir -p {{.LOCALBIN}}
       - mkdir -p {{.ROOT_DIR}}/dist
+    status:
+      - test -d {{.LOCALBIN}}
+      - test -d {{.ROOT_DIR}}/dist
     silent: true
 
   kustomize:
@@ -15,17 +32,31 @@ tasks:
     cmds:
       - go install sigs.k8s.io/kustomize/kustomize/v5@{{.KUSTOMIZE_VERSION}}
       - mv {{.GOBIN}}/kustomize {{.KUSTOMIZE_CMD}}
+      - echo "Installed Kustomize version {{.KUSTOMIZE_VERSION}}"
+    sources:
+      - go.mod
+      - go.sum
+    generates:
+      - '{{.KUSTOMIZE_CMD}}'
+    status:
+      - test -f {{.KUSTOMIZE_CMD}}
+    silent: true
 
   controller-gen:
-    desc: Download controller-gen locally if necessary and create/update symlink
+    desc: Download controller-gen locally if necessary
     deps: [ensure-dir]
     cmds:
-      - |
-        if [ ! -f {{.CONTROLLER_GEN_CMD}} ]; then
-          echo "Downloading controller-gen {{.CONTROLLER_TOOLS_VERSION}}..."
-          go install sigs.k8s.io/controller-tools/cmd/controller-gen@{{.CONTROLLER_TOOLS_VERSION}}
-          mv $(go env GOPATH)/bin/controller-gen {{.CONTROLLER_GEN_CMD}}
-        fi
+      - go install sigs.k8s.io/controller-tools/cmd/controller-gen@{{.CONTROLLER_TOOLS_VERSION}}
+      - mv {{.GOBIN}}/controller-gen {{.CONTROLLER_GEN_CMD}}
+      - echo "Installed Controller-gen version {{.CONTROLLER_TOOLS_VERSION}}"
+    sources:
+      - go.mod
+      - go.sum
+    generates:
+      - '{{.CONTROLLER_GEN_CMD}}'
+    status:
+      - test -f {{.CONTROLLER_GEN_CMD}}
+    silent: true
 
   envtest:
     desc: Download setup-envtest locally if necessary
@@ -33,6 +64,15 @@ tasks:
     cmds:
       - go install sigs.k8s.io/controller-runtime/tools/setup-envtest@{{.ENVTEST_VERSION}}
       - mv {{.GOBIN}}/setup-envtest {{.SETUP_ENVTEST_CMD}}
+      - echo "Installed Envtest version {{.ENVTEST_K8S_VERSION}}"
+    sources:
+      - go.mod
+      - go.sum
+    generates:
+      - '{{.SETUP_ENVTEST_CMD}}'
+    status:
+      - test -f {{.SETUP_ENVTEST_CMD}}
+    silent: true
 
   golangci-lint:
     desc: Download golangci-lint locally if necessary
@@ -40,6 +80,15 @@ tasks:
     cmds:
       - go install github.com/golangci/golangci-lint/cmd/golangci-lint@{{.GOLANGCI_LINT_VERSION}}
       - mv {{.GOBIN}}/golangci-lint {{.GOLANGCI_LINT_CMD}}
+      - echo "Installed Golangci-lint version {{.GOLANGCI_LINT_VERSION}}"
+    sources:
+      - go.mod
+      - go.sum
+    generates:
+      - '{{.GOLANGCI_LINT_CMD}}'
+    status:
+      - test -f {{.GOLANGCI_LINT_CMD}}
+    silent: true
 
   helmify:
     desc: Download helmify locally if necessary
@@ -47,3 +96,29 @@ tasks:
     cmds:
       - go install github.com/arttor/helmify/cmd/helmify@{{.HELMIFY_VERSION}}
       - mv {{.GOBIN}}/helmify {{.HELMIFY_CMD}}
+      - echo "Installed Helmify version {{.HELMIFY_VERSION}}"
+    sources:
+      - go.mod
+      - go.sum
+    generates:
+      - '{{.HELMIFY_CMD}}'
+    status:
+      - test -f {{.HELMIFY_CMD}}
+    silent: true
+
+  setup: 
+    desc: Setup the development environment
+    cmds:
+      - task: ensure-dir
+      - task: kustomize
+      - task: controller-gen
+      - task: envtest
+      - task: golangci-lint
+      - task: helmify
+
+  cleanup:
+    desc: Cleanup the development environment
+    cmds:
+      - rm -rf {{.LOCALBIN}}
+    status:
+      - test ! -d {{.LOCALBIN}}

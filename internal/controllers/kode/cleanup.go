@@ -45,6 +45,12 @@ func (k *KodeCleanupResource) GetResources() []cleanup.Resource {
 			Kind:      "Service",
 			Object:    &corev1.Service{},
 		},
+		{
+			Name:      k.Kode.GetSecretName(),
+			Namespace: k.Kode.Namespace,
+			Kind:      "Secret",
+			Object:    &corev1.Secret{},
+		},
 	}
 
 	// Add PVC to resources only if it's not using an existing claim

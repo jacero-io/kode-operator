@@ -1,0 +1,22 @@
+---
+apiVersion: kode.jacero.io/v1alpha2
+kind: ContainerTemplate
+metadata:
+  labels:
+    app.kubernetes.io/name: kode-operator
+    app.kubernetes.io/managed-by: kustomize
+  name: containertemplate-codeserver-sample
+  namespace: default
+spec:
+  entryPointRef:
+    kind: EntryPoint
+    name: entrypoint-sample
+    namespace: default
+  type: code-server
+  runtime: gvisor
+  image: linuxserver/code-server:latest
+  tz: "Europe/Stockholm"
+  puid: 1000
+  pgid: 1000
+  defaultHome: /config
+  defaultWorkspace: workspace

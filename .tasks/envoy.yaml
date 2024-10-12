@@ -11,23 +11,23 @@ tasks:
     cmds:
       - mkdir -p {{.ROOT_DIR}}/hack/certs
       - |
-        if [ ! -f {{.ROOT_DIR}}/hack/certs/localhost.crt ] || [ ! -f {{.ROOT_DIR}}/hack/certs/localhost.key ]; then
+        if [ ! -f {{.ROOT_DIR}}/hack/certs/dev.crt ] || [ ! -f {{.ROOT_DIR}}/hack/certs/dev.key ]; then
           echo "Certificate files don't exist. Creating new certificate..."
-          openssl req -x509 -nodes -days 365 -newkey rsa:2048 -keyout {{.ROOT_DIR}}/hack/certs/localhost.key -out {{.ROOT_DIR}}/hack/certs/localhost.crt -subj "/CN=*.localhost"
+          openssl req -x509 -nodes -days 365 -newkey rsa:4096 -keyout {{.ROOT_DIR}}/hack/certs/dev.key -out {{.ROOT_DIR}}/hack/certs/dev.crt -subj "/CN=*.dev"
         else
           echo "Certificate files already exist. Skipping creation."
         fi
       - |
-        cat <<EOF > {{.ROOT_DIR}}/hack/certs/localhost-secret.yaml
+        cat <<EOF > {{.ROOT_DIR}}/hack/certs/dev-secret.yaml
         apiVersion: v1
         kind: Secret
         metadata:
-          name: localhost
+          name: dev
           namespace: default
         type: kubernetes.io/tls
         data:
-          tls.crt: $(base64 -w 0 < {{.ROOT_DIR}}/hack/certs/localhost.crt)
-          tls.key: $(base64 -w 0 < {{.ROOT_DIR}}/hack/certs/localhost.key)
+          tls.crt: $(base64 -w 0 < {{.ROOT_DIR}}/hack/certs/dev.crt)
+          tls.key: $(base64 -w 0 < {{.ROOT_DIR}}/hack/certs/dev.key)
         EOF
       - echo "Certificate and Secret YAML created/updated in {{.ROOT_DIR}}/hack/certs/"
     silent: true
@@ -37,7 +37,7 @@ tasks:
     deps:
       - create-dev-cert
     cmds:
-      - kubectl apply -f {{.ROOT_DIR}}/hack/certs/localhost-secret.yaml
+      - kubectl apply -f {{.ROOT_DIR}}/hack/certs/dev-secret.yaml
     silent: true
 
   deploy:

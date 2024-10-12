@@ -19,9 +19,9 @@ Kode is a cloud-native development environment hosted inside a kubernetes cluste
 
 Kode-Operator is a Kubernetes operator that manages the entire lifecycle of various ephemeral and semi-ephemeral development environments. It integrates a comprehensive suite of security tools (Falco, Envoy proxy) and observability standards (OpenTelemetry), ensuring robust security and transparency.
 
-Currently, Kode-Operator supports Code-server, Webtop environments, with plans to support more in the future (eg. Jupyter). It is also easily extendable to support other environments and tools beyond those listed.
+Currently, Kode-Operator supports Code-server, Webtop environments, with plans to support more in the future (eg. Jupyter). It is also relatively easily extendable to support other environments and tools beyond those listed. It supports containerd as kubernetes runtime with plans to include kata containers in the future.
 
-The project has planned to manage in-cluster virtual machines using [Virtink](https://github.com/smartxworks/virtink) or external resources with Tofu/Terraform using [tofu-controller](https://github.com/flux-iac/tofu-controller)
+The project has planned to manage in-cluster virtual machines using [Virtink](https://github.com/smartxworks/virtink) or [KubeVirt](https://kubevirt.io/) or external resources with Tofu/Terraform using [tofu-controller](https://github.com/flux-iac/tofu-controller).
 
 ## Description
 
@@ -32,8 +32,9 @@ Kode-Operator simplifies the setup and management of development environments on
 * Define your development environments using CRDs for consistent and repeatable setups.
 * Integrated security tools like Falco and Envoy proxy protect your environments.
 * OpenTelemetry standards provide deep insights.
-* Manage a variety of development environments such as Code-server, Webtop, Jupyter.
-* Easily extendable to support additional environments and tools beyond the current offerings.
+* Manage a variety of development environments such as Code-server, Webtop, and Jupyter.
+* Easily choose between different runtimes (e.g. containerd, kata/firecracker, or kubevirt)
+* Easily extendable to support additional environments and tools beyond the current ones.
 * Customize your development environment beforehand by building your own images or inject scripts into the Kode instance using [init plugins]().
 
 ## Key Concepts
@@ -54,7 +55,7 @@ spec:
     password: mypassword
     enableBuiltinAuth: true
   templateRef:
-    kind: PodTemplate
+    kind: ContainerTemplate
     name: my-kode-template
   home: /home/myuser
   workspace: my-workspace
@@ -67,15 +68,15 @@ spec:
         storage: 5Gi
 ```
 
-### PodTemplate & ClusterPodTemplate
+### ContainerTemplate & ClusterContainerTemplate
 
 These are cluster scoped and namespace scoped templates. A template contains an image and some default configuration for that image. You can also include an Envoy Proxy configuration that is then applied to the sidecar of the resulting Kode instance.
 
-**Example for PodTemplate:**
+**Example for ContainerTemplate:**
 
 ```yaml
 apiVersion: kode.jacero.io/v1alpha2
-kind: PodTemplate
+kind: ContainerTemplate
 metadata:
   name: my-kode-template
   namespace: default
@@ -87,11 +88,11 @@ spec:
   defaultWorkspace: workspace
 ```
 
-**Example for ClusterPodTemplate:**
+**Example for ClusterContainerTemplate:**
 
 ```yaml
 apiVersion: kode.jacero.io/v1alpha2
-kind: ClusterPodTemplate
+kind: ClusterContainerTemplate
 metadata:
   name: my-kode-cluster-template
 spec:
@@ -125,7 +126,7 @@ spec:
 
 ### Features
 
-* [x] PodTemplate - Deploying `code-server`, `webtop`, and `jupyter` directly into kubernetes accessing them through your browser.
+* [x] ContainerTemplate - Deploying `code-server`, `webtop`, and `jupyter` directly into kubernetes accessing them through your browser.
 * [ ] TofuTemplate - Deploying anything you can imagine in using Tofu.
 * [ ] Authentication - Enforce `Basic auth`, `OIDC`, `JWT`, or `x509` authentication.
 * [ ] Authorization - Make sure only you have access to your stuff!
@@ -140,11 +141,11 @@ spec:
 
 You want to set up a VSCode-like development environment using Code-server for your team. This setup allows developers to access their development environment from any browser.
 
-**1. Create a PodTemplate for code-server:**
+**1. Create a ContainerTemplate for code-server:**
 
 ```yaml
 apiVersion: v1alpha2
-kind: PodTemplate
+kind: ContainerTemplate
 metadata:
   name: code-server-template
 spec:
@@ -165,7 +166,7 @@ spec:
   credentials:
     username: devuser
   templateRef:
-    kind: PodTemplate
+    kind: ContainerTemplate
     name: code-server-template
   workspace: my-project # Overrides the template workspace
 ```

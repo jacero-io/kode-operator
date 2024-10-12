@@ -95,10 +95,10 @@ func (m *DefaultTemplateManager) fetchTemplate(ctx context.Context, ref kodev1al
 
 	var err error
 	switch ref.Kind {
-	case kodev1alpha2.Kind(kodev1alpha2.TemplateKindPodTemplate):
-		err = m.fetchPodTemplate(ctx, template, ref)
-	case kodev1alpha2.Kind(kodev1alpha2.TemplateKindClusterPodTemplate):
-		err = m.fetchClusterPodTemplate(ctx, template, ref)
+	case kodev1alpha2.Kind(kodev1alpha2.TemplateKindContainerTemplate):
+		err = m.fetchContainerTemplate(ctx, template, ref)
+	case kodev1alpha2.Kind(kodev1alpha2.TemplateKindClusterContainerTemplate):
+		err = m.fetchClusterContainerTemplate(ctx, template, ref)
 	case kodev1alpha2.Kind(kodev1alpha2.TemplateKindTofuTemplate):
 		err = m.fetchTofuTemplate(ctx, template, ref)
 	case kodev1alpha2.Kind(kodev1alpha2.TemplateKindClusterTofuTemplate):
@@ -115,25 +115,25 @@ func (m *DefaultTemplateManager) fetchTemplate(ctx context.Context, ref kodev1al
 	return template, nil
 }
 
-func (m *DefaultTemplateManager) fetchPodTemplate(ctx context.Context, template *kodev1alpha2.Template, ref kodev1alpha2.CrossNamespaceObjectReference) error {
-	podTemplate := &kodev1alpha2.PodTemplate{}
-	err := m.Client.Get(ctx, types.NamespacedName{Name: string(ref.Name), Namespace: string(template.Namespace)}, podTemplate)
+func (m *DefaultTemplateManager) fetchContainerTemplate(ctx context.Context, template *kodev1alpha2.Template, ref kodev1alpha2.CrossNamespaceObjectReference) error {
+	containerTemplate := &kodev1alpha2.ContainerTemplate{}
+	err := m.Client.Get(ctx, types.NamespacedName{Name: string(ref.Name), Namespace: string(template.Namespace)}, containerTemplate)
 	if err != nil {
 		return handleNotFoundError(err, ref)
 	}
-	template.PodTemplateSpec = &podTemplate.Spec.PodTemplateSharedSpec
-	template.Port = *podTemplate.Spec.Port
+	template.ContainerTemplateSpec = &containerTemplate.Spec.ContainerTemplateSharedSpec
+	template.Port = *containerTemplate.Spec.Port
 	return nil
 }
 
-func (m *DefaultTemplateManager) fetchClusterPodTemplate(ctx context.Context, template *kodev1alpha2.Template, ref kodev1alpha2.CrossNamespaceObjectReference) error {
-	clusterPodTemplate := &kodev1alpha2.ClusterPodTemplate{}
-	err := m.Client.Get(ctx, types.NamespacedName{Name: string(ref.Name)}, clusterPodTemplate)
+func (m *DefaultTemplateManager) fetchClusterContainerTemplate(ctx context.Context, template *kodev1alpha2.Template, ref kodev1alpha2.CrossNamespaceObjectReference) error {
+	clusterContainerTemplate := &kodev1alpha2.ClusterContainerTemplate{}
+	err := m.Client.Get(ctx, types.NamespacedName{Name: string(ref.Name)}, clusterContainerTemplate)
 	if err != nil {
 		return handleNotFoundError(err, ref)
 	}
-	template.PodTemplateSpec = &clusterPodTemplate.Spec.PodTemplateSharedSpec
-	template.Port = *clusterPodTemplate.Spec.Port
+	template.ContainerTemplateSpec = &clusterContainerTemplate.Spec.ContainerTemplateSharedSpec
+	template.Port = *clusterContainerTemplate.Spec.Port
 	return nil
 }
 

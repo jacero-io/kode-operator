@@ -19,6 +19,7 @@ package kode
 import (
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
+	"github.com/jacero-io/kode-operator/pkg/constant"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -34,13 +35,13 @@ func InitKodeResourcesConfig(
 	// If ExistingSecret is specified, use it
 	if kode.Spec.Credentials != nil && kode.Spec.Credentials.ExistingSecret != nil {
 		secretName = *kode.Spec.Credentials.ExistingSecret
-	} else { // If ExistingSecret is not specified, use Kode.Name
+	} else { // If ExistingSecret is not specified, use Kode secret name
 		secretName = kode.GetSecretName()
 	}
 
 	if kode.Spec.Credentials == nil {
 		credentials = &kodev1alpha2.CredentialsSpec{
-			Username: common.Username,
+			Username: constant.DefaultUsername,
 		}
 	} else {
 		credentials = kode.Spec.Credentials

@@ -44,11 +44,11 @@ package integration
 
 // 		// Create Kode resources
 // 		By("Creating a Kode resource with subdomain routing")
-// 		kodeSubdomain = createKode("kode-subdomain", namespace.Name, podTemplateSubdomain.Name, credentials, nil)
+// 		kodeSubdomain = createKode("kode-subdomain", namespace.Name, containerTemplateSubdomain.Name, credentials, nil)
 // 		Expect(k8sClient.Create(ctx, kodeSubdomain)).To(Succeed())
 
 // 		By("Creating a Kode resource with path routing")
-// 		kodePath = createKode("kode-path", namespace.Name, podTemplatePath.Name, credentials, nil)
+// 		kodePath = createKode("kode-path", namespace.Name, containerTemplatePath.Name, credentials, nil)
 // 		Expect(k8sClient.Create(ctx, kodePath)).To(Succeed())
 
 // 		// Check StatefulSet

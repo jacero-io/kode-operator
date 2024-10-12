@@ -11,8 +11,11 @@ includes:
     taskfile: lint.yaml
     internal: true
   clusters:
-    taskfile: clusters.yaml
+    taskfile: minikube.yaml
     internal: true
+
+vars:
+  TEST_VERBOSITY: -v
 
 tasks:
   unit:
@@ -20,7 +23,8 @@ tasks:
     cmds:
       - rm -rf coverage
       - mkdir -p coverage
-      - go test {{.TEST_VERBOSITY}} -tags=unit {{.ROOT_DIR}}/...
+      - go test {{.ROOT_DIR}}/api/...
+      - go test {{.ROOT_DIR}}/internal/...
     deps:
       - build:manifests
       - build:generate
@@ -28,7 +32,7 @@ tasks:
       - lint:vet
 
   integration:
-    desc: Run integration tests with coverage
+    desc: Run integration tests
     cmds:
       - rm -rf coverage
       - mkdir -p coverage
@@ -45,7 +49,7 @@ tasks:
   e2e:
     desc: Run end-to-end tests with Kind cluster
     cmds:
-      - go test {{.TEST_VERBOSITY}} -tags=e2e {{.ROOT_DIR}}/test/e2e/...
+      - go test {{.TEST_VERBOSITY}}n {{.ROOT_DIR}}/test/e2e/...
       - task: kind-delete-cluster
     deps:
       - build:manifests
@@ -53,7 +57,7 @@ tasks:
       - lint:fmt
       - lint:vet
       - build:docker-buildx
-      - clusters:kind-create
+      - clusters:kind-ensure
       - clusters:kind-load-images
 
   all:

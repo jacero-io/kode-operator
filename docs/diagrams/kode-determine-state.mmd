@@ -1,0 +1,30 @@
+graph TD
+    A[Start] --> B{Is Kode being deleted?}
+    B -->|Yes| C[Return KodePhaseDeleting]
+    B -->|No| D[Fetch template]
+    D --> E{Template fetch successful?}
+    E -->|No| F[Return KodePhaseFailed]
+    E -->|Yes| G[Initialize KodeResourcesConfig]
+    G --> H[Check if resources exist]
+    H --> I{Resources exist?}
+    I -->|No| J[Return KodePhasePending]
+    I -->|Yes| K[Check if pod resources are ready]
+    K --> L{Resources ready?}
+    L -->|No| M[Return KodePhaseConfiguring]
+    L -->|Yes| N[Return KodePhaseActive]
+    F --> O[End]
+    C --> O
+    J --> O
+    M --> O
+    N --> O
+
+    classDef state fill:#4CAF50,stroke:#333,stroke-width:2px,color:#fff;
+    classDef special fill:#FFC107,stroke:#333,stroke-width:2px,color:#333;
+    classDef reconcileOrigin fill:#FF4081,stroke:#333,stroke-width:2px,color:#fff;
+    classDef initialState fill:#3F51B5,stroke:#333,stroke-width:4px,color:#fff;
+
+    class A reconcileOrigin;
+    class B,E,I,L initialState;
+    class C,F,J,M,N state;
+    class D,G,H,K special;
+    class O reconcileOrigin;
