@@ -35,10 +35,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        task tools:kustomize
-        task tools:controller-gen
-        task tools:envtest
-        task tools:golangci-lint
+        task tools:setup-github-actions
 
     - name: Run tests
       env:
