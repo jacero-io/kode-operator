@@ -76,7 +76,7 @@ func (r *KodeReconciler) handleConfiguringState(ctx context.Context, kode *kodev
 	config := InitKodeResourcesConfig(kode, template)
 
 	// Ensure all necessary resources are created
-	if template.Kind == kodev1alpha2.Kind(kodev1alpha2.TemplateKindContainerTemplate) || template.Kind == kodev1alpha2.Kind(kodev1alpha2.TemplateKindClusterContainerTemplate) {
+	if template.Kind == kodev1alpha2.Kind(kodev1alpha2.TemplateKindContainer) || template.Kind == kodev1alpha2.Kind(kodev1alpha2.TemplateKindClusterContainer) {
 		err := r.ensurePodResources(ctx, kode, config)
 		if err != nil {
 			return r.handleReconcileError(ctx, kode, err, "Failed to ensure pod resources")

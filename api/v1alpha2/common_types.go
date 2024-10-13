@@ -94,12 +94,12 @@ type Template struct {
 type TemplateKind string
 
 const (
-	TemplateKindContainerTemplate        TemplateKind = "ContainerTemplate"
-	TemplateKindClusterContainerTemplate TemplateKind = "ClusterContainerTemplate"
-	TemplateKindVirtualTemplate          TemplateKind = "VirtualTemplate"
-	TemplateKindClusterVirtualTemplate   TemplateKind = "ClusterVirtualTemplate"
-	TemplateKindTofuTemplate             TemplateKind = "TofuTemplate"
-	TemplateKindClusterTofuTemplate      TemplateKind = "ClusterTofuTemplate"
+	TemplateKindContainer        TemplateKind = "ContainerTemplate"
+	TemplateKindClusterContainer TemplateKind = "ClusterContainerTemplate"
+	TemplateKindVirtual          TemplateKind = "VirtualTemplate"
+	TemplateKindClusterVirtual   TemplateKind = "ClusterVirtualTemplate"
+	TemplateKindTofu             TemplateKind = "TofuTemplate"
+	TemplateKindClusterTofu      TemplateKind = "ClusterTofuTemplate"
 )
 
 // Port for the service. Used by EnvoyProxy to expose the container. Defaults to '8000'.

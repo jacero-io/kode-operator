@@ -192,10 +192,10 @@ func (r *KodeReconciler) fetchTemplatesWithRetry(ctx context.Context, kode *kode
 	}
 
 	// Update Runtime
-	if kodev1alpha2.TemplateKind(kode.Spec.TemplateRef.Kind) == kodev1alpha2.TemplateKindContainerTemplate || kodev1alpha2.TemplateKind(kode.Spec.TemplateRef.Kind) == kodev1alpha2.TemplateKindClusterContainerTemplate {
+	if kodev1alpha2.TemplateKind(kode.Spec.TemplateRef.Kind) == kodev1alpha2.TemplateKindContainer || kodev1alpha2.TemplateKind(kode.Spec.TemplateRef.Kind) == kodev1alpha2.TemplateKindClusterContainer {
 		runtime := kodev1alpha2.Runtime{
 			Runtime: kodev1alpha2.RuntimeContainer,
-			Type: template.ContainerTemplateSpec.Runtime,
+			Type:    template.ContainerTemplateSpec.Runtime,
 		}
 		kode.SetRuntime(runtime, ctx, r.Client)
 	}

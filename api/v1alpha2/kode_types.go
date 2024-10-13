@@ -197,7 +197,7 @@ const (
 type Runtime struct {
 	// KodeRuntime is the runtime for the Kode resource. Can be one of 'container', 'virtual', 'tofu'.
 	// +kubebuilder:validation:Enum=container;virtual;tofu
-	Runtime	KodeRuntime `json:"kodeRuntime"`
+	Runtime KodeRuntime `json:"kodeRuntime"`
 
 	// Type is the container runtime for Kode resource.
 	Type RuntimeType `json:"type,omitempty"`

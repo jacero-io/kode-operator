@@ -43,7 +43,7 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - events
+  - event
   verbs:
   - create
   - patch

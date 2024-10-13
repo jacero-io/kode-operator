@@ -121,7 +121,6 @@ spec:
             description: TofuTemplateStatus defines the observed state of KodeTofu
             properties:
               conditions:
-                description: Conditions reflect the current state of the resource
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.

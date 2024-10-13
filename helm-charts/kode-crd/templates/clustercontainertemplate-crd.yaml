@@ -631,6 +631,11 @@ spec:
                       More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
                     type: object
                 type: object
+              runtime:
+                description: Runtime is the runtime for the service.
+                enum:
+                - gvisor
+                type: string
               type:
                 description: Type is the type of container to use. Can be one of 'code-server',
                   'webtop', 'devcontainers', 'jupyter'.
@@ -648,7 +653,6 @@ spec:
               ClusterKodeContainer
             properties:
               conditions:
-                description: Conditions reflect the current state of the resource
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.

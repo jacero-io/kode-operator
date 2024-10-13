@@ -21,8 +21,12 @@ spec:
       name: Status
       type: string
     - description: Runtime of the Kode
-      jsonPath: .status.runtime
+      jsonPath: .status.runtime.kodeRuntime
       name: Runtime
+      type: string
+    - description: Runtime type of the Kode
+      jsonPath: .status.runtime.type
+      name: Runtime-Type
       type: string
     - description: URL to access the Kode
       jsonPath: .status.kodeUrl
@@ -449,7 +453,6 @@ spec:
             description: KodeStatus defines the observed state of Kode
             properties:
               conditions:
-                description: Conditions reflect the current state of the resource
                 items:
                   description: Condition contains details for one aspect of the current
                     state of this API Resource.
@@ -505,6 +508,10 @@ spec:
                   - type
                   type: object
                 type: array
+              deletionCycle:
+                description: DeletionCycle keeps track of the number of deletion cycles.
+                  This is used to determine if the resource is deleting.
+                type: integer
               iconUrl:
                 description: The URL to the icon for the Kode.
                 type: string
@@ -540,9 +547,22 @@ spec:
                   for failed states.
                 type: integer
               runtime:
-                description: The runtime for the kode. Can be one of 'pod', 'virtual',
-                  'tofu'.
-                type: string
+                description: The runtime for the Kode.
+                properties:
+                  kodeRuntime:
+                    description: KodeRuntime is the runtime for the Kode resource. Can
+                      be one of 'container', 'virtual', 'tofu'.
+                    enum:
+                    - container
+                    - virtual
+                    - tofu
+                    type: string
+                  type:
+                    description: Type is the container runtime for Kode resource.
+                    type: string
+                required:
+                - kodeRuntime
+                type: object
             required:
             - phase
             type: object

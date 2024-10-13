@@ -45,14 +45,14 @@ func (r *EntryPointReconciler) findEntryPointForKode(ctx context.Context, kode *
 	var entryPointRef *kodev1alpha2.CrossNamespaceObjectReference
 
 	switch template.Kind {
-	case kodev1alpha2.Kind(kodev1alpha2.TemplateKindContainerTemplate),
-		kodev1alpha2.Kind(kodev1alpha2.TemplateKindClusterContainerTemplate):
+	case kodev1alpha2.Kind(kodev1alpha2.TemplateKindContainer),
+		kodev1alpha2.Kind(kodev1alpha2.TemplateKindClusterContainer):
 		if template.ContainerTemplateSpec == nil {
 			return nil, fmt.Errorf("invalid ContainerTemplate: missing ContainerTemplateSpec")
 		}
 		entryPointRef = template.ContainerTemplateSpec.CommonSpec.EntryPointRef
-	case kodev1alpha2.Kind(kodev1alpha2.TemplateKindTofuTemplate),
-		kodev1alpha2.Kind(kodev1alpha2.TemplateKindClusterTofuTemplate):
+	case kodev1alpha2.Kind(kodev1alpha2.TemplateKindTofu),
+		kodev1alpha2.Kind(kodev1alpha2.TemplateKindClusterTofu):
 		if template.TofuTemplateSpec == nil {
 			return nil, fmt.Errorf("invalid TofuTemplate: missing TofuTemplateSpec")
 		}

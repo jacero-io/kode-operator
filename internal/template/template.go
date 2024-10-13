@@ -95,13 +95,13 @@ func (m *DefaultTemplateManager) fetchTemplate(ctx context.Context, ref kodev1al
 
 	var err error
 	switch ref.Kind {
-	case kodev1alpha2.Kind(kodev1alpha2.TemplateKindContainerTemplate):
+	case kodev1alpha2.Kind(kodev1alpha2.TemplateKindContainer):
 		err = m.fetchContainerTemplate(ctx, template, ref)
-	case kodev1alpha2.Kind(kodev1alpha2.TemplateKindClusterContainerTemplate):
+	case kodev1alpha2.Kind(kodev1alpha2.TemplateKindClusterContainer):
 		err = m.fetchClusterContainerTemplate(ctx, template, ref)
-	case kodev1alpha2.Kind(kodev1alpha2.TemplateKindTofuTemplate):
+	case kodev1alpha2.Kind(kodev1alpha2.TemplateKindTofu):
 		err = m.fetchTofuTemplate(ctx, template, ref)
-	case kodev1alpha2.Kind(kodev1alpha2.TemplateKindClusterTofuTemplate):
+	case kodev1alpha2.Kind(kodev1alpha2.TemplateKindClusterTofu):
 		err = m.fetchClusterTofuTemplate(ctx, template, ref)
 	default:
 		return nil, fmt.Errorf("unknown template kind: %s", ref.Kind)

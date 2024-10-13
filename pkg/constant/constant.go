@@ -27,8 +27,6 @@ const (
 	// Resource related constants
 	DefaultKodeVolumeStorageName = "kode-storage"
 
-	TemplateKindTofu	  = "Tofu"
-
 	// Credential related constants
 	DefaultUsername = "abc"
 
