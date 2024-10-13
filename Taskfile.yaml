@@ -37,7 +37,7 @@ vars:
   LOG_LEVEL: debug
   USE_MINIKUBE_CONTEXT: '{{.USE_MINIKUBE_CONTEXT | default "true"}}'
   IGNORE_NOT_FOUND: '{{.IGNORE_NOT_FOUND | default "false"}}'
-  IMG: '{{.IMG | default "emiljacero/kode-operator:v0.0.0-latest"}}'
+  IMG: '{{.IMG | default "jaceroio/kode-operator:v0.0.0-latest"}}'
 
   # Concatenation
   CONCAT_DIRECTORY: '{{.ROOT_DIR}}/'
