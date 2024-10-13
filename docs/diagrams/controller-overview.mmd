@@ -1,0 +1,58 @@
+graph TD
+    A[User] -->|Creates/Manages| B[Kode CR]
+    A -->|Creates/Manages| C[EntryPoint CR]
+    A -->|Creates/Manages| D[ContainerTemplate CR]
+    A -->|Creates/Manages| V[TofuTemplate CR]
+    A -->|Creates/Manages| W[ClusterContainerTemplate CR]
+    A -->|Creates/Manages| X[ClusterTofuTemplate CR]
+
+    subgraph "Kode Operator"
+        E[Kode Controller] -->|Watches| B
+        F[EntryPoint Controller] -->|Watches| C
+        G[Template Manager] -->|Fetches| D
+        G -->|Fetches| V
+        G -->|Fetches| W
+        G -->|Fetches| X
+        H[Resource Manager] -->|Creates/Updates/Deletes| I[Kubernetes Resources]
+        J[Cleanup Manager] -->|Initiates Cleanup| H
+        K[Event Manager] -->|Records Events| L[Kubernetes Events]
+        M[Validator] -->|Validates| B
+        M -->|Validates| C
+    end
+
+    E -->|Uses| G
+    E -->|Uses| H
+    E -->|Uses| J
+    E -->|Uses| K
+    E -->|Uses| M
+
+    F -->|Uses| H
+    F -->|Uses| J
+    F -->|Uses| K
+    F -->|Uses| M
+
+    subgraph "Kubernetes Cluster"
+        L[Kubernetes Events]
+        subgraph "Kubernetes Resources"
+            I[Managed Resources]
+            N[StatefulSet]
+            O[Service]
+            P[PersistentVolumeClaim]
+            Q[Secret]
+            R[Gateway]
+            S[HTTPRoute]
+            T[SecurityPolicy]
+        end
+    end
+
+    I --- N
+    I --- O
+    I --- P
+    I --- Q
+    I --- R
+    I --- S
+    I --- T
+
+    U[Envoy Gateway] -->|Implements| R
+    U -->|Implements| S
+    U -->|Implements| T
