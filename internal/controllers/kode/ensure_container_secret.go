@@ -22,6 +22,8 @@ import (
 
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
+	"github.com/jacero-io/kode-operator/internal/resource"
+	"github.com/jacero-io/kode-operator/internal/statemachine"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	client "sigs.k8s.io/controller-runtime/pkg/client"
@@ -29,8 +31,8 @@ import (
 )
 
 // ensureSecret ensures that the Secret exists for the Kode instance
-func (r *KodeReconciler) ensureSecret(ctx context.Context, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig) error {
-	log := r.Log.WithName("SecretEnsurer").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
+func ensureSecret(ctx context.Context, r statemachine.ReconcilerInterface, resource resource.ResourceManager, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig) error {
+	log := r.GetLog().WithName("SecretEnsurer").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	ctx, cancel := common.ContextWithTimeout(ctx, 30) // 30 seconds timeout
 	defer cancel()
@@ -47,7 +49,7 @@ func (r *KodeReconciler) ensureSecret(ctx context.Context, kode *kodev1alpha2.Ko
 
 	if config.Credentials != nil && config.Credentials.ExistingSecret != nil {
 		// ExistingSecret is specified, fetch the secret
-		err := r.Resource.Get(ctx, client.ObjectKeyFromObject(secret), secret)
+		err := resource.Get(ctx, client.ObjectKeyFromObject(secret), secret)
 		if err != nil {
 			return fmt.Errorf("failed to get Secret: %w", err)
 		}
@@ -68,8 +70,8 @@ func (r *KodeReconciler) ensureSecret(ctx context.Context, kode *kodev1alpha2.Ko
 			return fmt.Errorf("config.Credentials is nil")
 		}
 		// ExistingSecret is not specified, create or patch the secret
-		_, err := r.Resource.CreateOrPatch(ctx, secret, func() error {
-			constructedSecret, err := r.constructSecretSpec(config)
+		_, err := resource.CreateOrPatch(ctx, secret, func() error {
+			constructedSecret, err := constructSecretSpec(r, config)
 			if err != nil {
 				return fmt.Errorf("failed to construct Secret spec: %v", err)
 			}
@@ -77,7 +79,7 @@ func (r *KodeReconciler) ensureSecret(ctx context.Context, kode *kodev1alpha2.Ko
 			// Update metadata for the secret
 			secret.Data = constructedSecret.Data
 
-			return controllerutil.SetControllerReference(kode, secret, r.Scheme)
+			return controllerutil.SetControllerReference(kode, secret, r.GetScheme())
 		})
 
 		if err != nil {
@@ -89,8 +91,8 @@ func (r *KodeReconciler) ensureSecret(ctx context.Context, kode *kodev1alpha2.Ko
 }
 
 // constructSecret constructs a Secret for the Kode instance
-func (r *KodeReconciler) constructSecretSpec(config *common.KodeResourceConfig) (*corev1.Secret, error) {
-	log := r.Log.WithName("SecretConstructor").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
+func constructSecretSpec(r statemachine.ReconcilerInterface, config *common.KodeResourceConfig) (*corev1.Secret, error) {
+	log := r.GetLog().WithName("SecretConstructor").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	secret := &corev1.Secret{
 		Data: map[string][]byte{

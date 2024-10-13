@@ -23,6 +23,8 @@ import (
 
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
+	"github.com/jacero-io/kode-operator/internal/resource"
+	"github.com/jacero-io/kode-operator/internal/statemachine"
 	"github.com/jacero-io/kode-operator/pkg/constant"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -31,8 +33,8 @@ import (
 )
 
 // ensureStatefulSet ensures that the StatefulSet exists for the Kode instance
-func (r *KodeReconciler) ensureStatefulSet(ctx context.Context, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig) error {
-	log := r.Log.WithName("StatefulSetEnsurer").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
+func ensureStatefulSet(ctx context.Context, r statemachine.ReconcilerInterface, resource resource.ResourceManager, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig) error {
+	log := r.GetLog().WithName("StatefulSetEnsurer").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	ctx, cancel := common.ContextWithTimeout(ctx, 30) // 30 seconds timeout
 	defer cancel()
@@ -47,15 +49,15 @@ func (r *KodeReconciler) ensureStatefulSet(ctx context.Context, kode *kodev1alph
 		},
 	}
 
-	_, err := r.Resource.CreateOrPatch(ctx, statefulSet, func() error {
-		constructedstatefulSet, err := r.constructStatefulSetSpec(config)
+	_, err := resource.CreateOrPatch(ctx, statefulSet, func() error {
+		constructedstatefulSet, err := constructStatefulSetSpec(r, config)
 		if err != nil {
 			return fmt.Errorf("failed to construct StatefulSet spec: %v", err)
 		}
 
 		statefulSet.Spec = constructedstatefulSet.Spec
 
-		return controllerutil.SetControllerReference(kode, statefulSet, r.Scheme)
+		return controllerutil.SetControllerReference(kode, statefulSet, r.GetScheme())
 	})
 
 	if err != nil {
@@ -69,8 +71,8 @@ func (r *KodeReconciler) ensureStatefulSet(ctx context.Context, kode *kodev1alph
 }
 
 // constructStatefulSetSpec constructs a StatefulSet for the Kode instance
-func (r *KodeReconciler) constructStatefulSetSpec(config *common.KodeResourceConfig) (*appsv1.StatefulSet, error) {
-	log := r.Log.WithName("SatefulSetConstructor").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
+func constructStatefulSetSpec(r statemachine.ReconcilerInterface, config *common.KodeResourceConfig) (*appsv1.StatefulSet, error) {
+	log := r.GetLog().WithName("SatefulSetConstructor").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	replicas := int32(1)
 	templateSpec := config.Template.ContainerTemplateSpec

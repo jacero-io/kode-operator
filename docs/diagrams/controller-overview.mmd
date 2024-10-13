@@ -2,8 +2,10 @@ graph TD
     A[User] -->|Creates/Manages| B[Kode CR]
     A -->|Creates/Manages| C[EntryPoint CR]
     A -->|Creates/Manages| D[ContainerTemplate CR]
+    A -->|Creates/Manages| D[VirtualTemplate CR]
     A -->|Creates/Manages| V[TofuTemplate CR]
     A -->|Creates/Manages| W[ClusterContainerTemplate CR]
+    A -->|Creates/Manages| W[ClusterVirtualTemplate CR]
     A -->|Creates/Manages| X[ClusterTofuTemplate CR]
 
     subgraph "Kode Operator"

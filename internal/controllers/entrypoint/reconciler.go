@@ -19,7 +19,6 @@ package entrypoint
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -40,26 +39,24 @@ import (
 	"github.com/jacero-io/kode-operator/internal/common"
 	"github.com/jacero-io/kode-operator/internal/event"
 	"github.com/jacero-io/kode-operator/internal/resource"
+	"github.com/jacero-io/kode-operator/internal/statemachine"
 	"github.com/jacero-io/kode-operator/internal/template"
 
 	"github.com/jacero-io/kode-operator/pkg/constant"
-	"github.com/jacero-io/kode-operator/pkg/validation"
 )
 
 type EntryPointReconciler struct {
-	Client         client.Client
-	Scheme         *runtime.Scheme
-	Log            logr.Logger
-	Resource       resource.ResourceManager
-	Template       template.TemplateManager
-	CleanupManager cleanup.CleanupManager
-	Validator      validation.Validator
-	Event          event.EventManager
+	Client                client.Client
+	Scheme                *runtime.Scheme
+	Log                   logr.Logger
+	Resource              resource.ResourceManager
+	Template              template.TemplateManager
+	CleanupManager        cleanup.CleanupManager
+	EventManager          event.EventManager
+	IsTestEnvironment     bool
+	ReconcileInterval     time.Duration
+	LongReconcileInterval time.Duration
 }
-
-const (
-	RequeueInterval = 250 * time.Millisecond
-)
 
 // +kubebuilder:rbac:groups=kode.jacero.io,resources=entrypoints,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=kode.jacero.io,resources=entrypoints/status,verbs=get;update;patch
@@ -100,103 +97,77 @@ func (r *EntryPointReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 }
 
-func (r *EntryPointReconciler) reconcileEntryPoint(ctx context.Context, entryPoint *kodev1alpha2.EntryPoint) (ctrl.Result, error) {
-	log := r.Log.WithValues("entrypoint", types.NamespacedName{Name: entryPoint.Name, Namespace: entryPoint.Namespace})
+func (r *EntryPointReconciler) reconcileEntryPoint(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
+	log := r.Log.WithValues("entrypoint", req.NamespacedName)
+	log.V(1).Info("Starting reconciliation")
 
-	log.V(1).Info("Fetched EntryPoint resource", "Name", entryPoint.Name, "Namespace", entryPoint.Namespace, "Generation", entryPoint.Generation, "ObservedGeneration", entryPoint.Status.ObservedGeneration, "Phase", entryPoint.Status.Phase)
-
-	// **Add finalizer if not present**
-	if !controllerutil.ContainsFinalizer(entryPoint, constant.EntryPointFinalizerName) {
-		controllerutil.AddFinalizer(entryPoint, constant.EntryPointFinalizerName)
-		if err := r.Client.Update(ctx, entryPoint); err != nil {
-			log.Error(err, "Failed to add finalizer")
-			return ctrl.Result{Requeue: true}, err
+	entryPoint := &kodev1alpha2.EntryPoint{}
+	if err := r.Resource.Get(ctx, req.NamespacedName, entryPoint); err != nil {
+		if client.IgnoreNotFound(err) != nil {
+			log.Error(err, "Unable to fetch Kode")
+			return ctrl.Result{}, client.IgnoreNotFound(err)
 		}
-		log.Info("Added finalizer to EntryPoint resource")
-		// Requeue to ensure the updated resource is processed
-		return ctrl.Result{Requeue: true}, nil
+		return ctrl.Result{}, nil
 	}
+	log.V(1).Info("Fetched Kode resource", "Name", entryPoint.Name, "Namespace", entryPoint.Namespace, "Generation", entryPoint.Generation, "ObservedGeneration", entryPoint.Status.ObservedGeneration, "Phase", entryPoint.Status.Phase)
 
-	// Handle state transition
-	var result ctrl.Result
-	var err error
+	sm := statemachine.NewStateMachine(r.Client, r.Log)
+	// sm.RegisterHandler(kodev1alpha2.PhasePending, handlePendingState)
+	// sm.RegisterHandler(kodev1alpha2.PhaseConfiguring, handleConfiguringState)
+	// sm.RegisterHandler(kodev1alpha2.PhaseProvisioning, handleProvisioningState)
+	// sm.RegisterHandler(kodev1alpha2.PhaseActive, handleActiveState)
+	// sm.RegisterHandler(kodev1alpha2.PhaseUpdating, handleUpdatingState)
+	// sm.RegisterHandler(kodev1alpha2.PhaseDeleting, handleDeletingState)
+	// sm.RegisterHandler(kodev1alpha2.PhaseFailed, handleFailedState)
+	// sm.RegisterHandler(kodev1alpha2.PhaseUnknown, handleUnknownState)
 
-	// Transition to Deleting state if deletion timestamp is set and not already in deleting state
-	if !entryPoint.DeletionTimestamp.IsZero() && entryPoint.Status.Phase != kodev1alpha2.EntryPointPhaseDeleting {
-		result, err = r.transitionTo(ctx, entryPoint, kodev1alpha2.EntryPointPhaseDeleting)
-		return result, err // Early return after transition
-	} else if entryPoint.Generation != entryPoint.Status.ObservedGeneration && entryPoint.Status.Phase != kodev1alpha2.EntryPointPhaseDeleting && entryPoint.Status.Phase != kodev1alpha2.EntryPointPhaseConfiguring { // Transition to Configuring state if generation mismatch
-		log.Info("Generation mismatch, transitioning to Configuring state")
-		result, err = r.transitionTo(ctx, entryPoint, kodev1alpha2.EntryPointPhaseConfiguring)
-		return result, err // Early return after transition
-	}
-
-	// Transition to Pending state if no phase is set
-	if entryPoint.Status.Phase == "" {
-		log.Info("Transitioning to Pending state")
-		result, err := r.transitionTo(ctx, entryPoint, kodev1alpha2.EntryPointPhasePending)
-		return result, err // Early return after transition
-	}
-
-	// Reset retry count if we're not in a failed state
-	if entryPoint.Status.Phase != kodev1alpha2.EntryPointPhaseFailed && entryPoint.Status.RetryCount > 0 {
-		if err := r.updateRetryCount(ctx, entryPoint, 0); err != nil {
-			log.Error(err, "Failed to reset retry count")
-			return ctrl.Result{Requeue: true}, err
-		}
-	}
-
-	switch entryPoint.Status.Phase {
-	case kodev1alpha2.EntryPointPhasePending:
-		result, err = r.handlePendingState(ctx, entryPoint)
-	case kodev1alpha2.EntryPointPhaseConfiguring:
-		result, err = r.handleConfiguringState(ctx, entryPoint)
-	case kodev1alpha2.EntryPointPhaseProvisioning:
-		result, err = r.handleProvisioningState(ctx, entryPoint)
-	case kodev1alpha2.EntryPointPhaseActive:
-		result, err = r.handleActiveState(ctx, entryPoint)
-	case kodev1alpha2.EntryPointPhaseDeleting:
-		result, err = r.handleDeletingState(ctx, entryPoint)
-	case kodev1alpha2.EntryPointPhaseFailed:
-		result, err = r.handleFailedState(ctx, entryPoint)
-	default:
-		log.Info("Unknown phase, transitioning to Failed", "phase", entryPoint.Status.Phase)
-		return r.transitionTo(ctx, entryPoint, kodev1alpha2.EntryPointPhaseFailed)
-	}
-
-	// Handle errors from state handlers
-	if err != nil {
-		log.Error(err, "Error handling state", "phase", entryPoint.Status.Phase)
-		if entryPoint.Status.Phase != kodev1alpha2.EntryPointPhaseFailed {
-			// Transition to failed state if not already there
-			result, err = r.transitionTo(ctx, entryPoint, kodev1alpha2.EntryPointPhaseFailed)
-			return result, err // Early return after transition
-		}
-		// If already in failed state, just requeue
-		return ctrl.Result{Requeue: true}, nil
-	}
-
-	// Check if the Kode resource still exists before updating status
-	latestEntryPoint := &kodev1alpha2.Kode{}
-	if err := r.Client.Get(ctx, client.ObjectKey{Name: entryPoint.Name, Namespace: entryPoint.Namespace}, latestEntryPoint); err != nil {
-		if errors.IsNotFound(err) {
-			// Kode resource has been deleted, nothing to update
+	// Handle finalizer
+	if !entryPoint.DeletionTimestamp.IsZero() {
+		if !controllerutil.ContainsFinalizer(entryPoint, constant.EntryPointFinalizerName) {
+			// Consider the resource deleted, do nothing
 			return ctrl.Result{}, nil
 		}
-		log.Error(err, "Failed to get latest Kode")
+		// Change to deleting state
+		entryPoint.Status.Phase = kodev1alpha2.PhaseDeleting
+		if err := entryPoint.UpdateStatus(ctx, r.Client); err != nil {
+			return ctrl.Result{Requeue: true}, err
+		}
+
+		// When the EntryPoint resource is completely new, add the finalizer and transition to Pending state
+	} else if !controllerutil.ContainsFinalizer(entryPoint, constant.EntryPointFinalizerName) {
+		controllerutil.AddFinalizer(entryPoint, constant.EntryPointFinalizerName)
+		log.Info("Added finalizer to EntryPoint resource")
+
+		// Transition to Pending state to begin initialization
+		log.Info("Transitioning to Pending state to begin initialization")
+		entryPoint.Status.Phase = kodev1alpha2.PhasePending
+		if err := entryPoint.UpdateStatus(ctx, r.Client); err != nil {
+			return ctrl.Result{Requeue: true}, err
+		}
+		return ctrl.Result{Requeue: true}, nil
+	}
+
+	// Handle generation mismatch
+	if entryPoint.Generation != entryPoint.Status.ObservedGeneration {
+		return r.handleGenerationMismatch(ctx, entryPoint)
+	}
+
+	// Reset retry count if not in failed state
+	if entryPoint.Status.Phase != kodev1alpha2.PhaseFailed && entryPoint.Status.RetryCount > 0 {
+		entryPoint.Status.RetryCount = 0
+		if err := entryPoint.UpdateStatus(ctx, r.Client); err != nil {
+			return ctrl.Result{Requeue: true}, err
+		}
+	}
+
+	// Run state machine
+	result, err := sm.HandleState(ctx, r, entryPoint)
+	if err != nil {
+		log.Error(err, "Error handling state", "phase", entryPoint.Status.Phase)
 		return ctrl.Result{Requeue: true}, err
 	}
 
-	// Update the whole status if it has changed
-	if !reflect.DeepEqual(latestEntryPoint.Status, entryPoint.Status) {
-		err := latestEntryPoint.UpdateStatus(ctx, r.Client)
-		if err != nil {
-			log.Error(err, "Failed to update EntryPoint status")
-			return ctrl.Result{Requeue: true}, err
-		}
-	}
-
-	log.V(1).Info("Reconciliation completed", "Phase", entryPoint.Status.Phase, "result", result)
+	log.V(1).Info("Reconciliation completed", "phase", entryPoint.Status.Phase)
 	return result, nil
 }
 
@@ -206,7 +177,7 @@ func (r *EntryPointReconciler) reconcileKode(ctx context.Context, kode *kodev1al
 	)
 
 	// Only reconcile if Kode is in Active phase
-	if kode.Status.Phase != kodev1alpha2.KodePhaseActive {
+	if kode.Status.Phase != kodev1alpha2.PhaseActive {
 		log.V(1).Info("Kode is not in Active phase, skipping reconciliation", "phase", kode.Status.Phase)
 		return ctrl.Result{}, nil
 	}
@@ -222,7 +193,7 @@ func (r *EntryPointReconciler) reconcileKode(ctx context.Context, kode *kodev1al
 
 		// Update Kode status with error
 		kode.SetCondition(constant.ConditionTypeError, metav1.ConditionTrue, "ReconciliationFailed", fmt.Sprintf("Unable to find EntryPoint for Kode: %v", err))
-		kode.Status.Phase = kodev1alpha2.KodePhaseFailed
+		kode.Status.Phase = kodev1alpha2.PhaseFailed
 		kode.Status.LastError = common.StringPtr(err.Error())
 		kode.Status.LastErrorTime = &metav1.Time{Time: time.Now()}
 		if updateErr := kode.UpdateStatus(ctx, r.Client); updateErr != nil {
@@ -230,7 +201,7 @@ func (r *EntryPointReconciler) reconcileKode(ctx context.Context, kode *kodev1al
 			return ctrl.Result{RequeueAfter: 5 * time.Second}, fmt.Errorf("primary error: %v, kode status update error: %v", err, updateErr)
 		}
 
-		r.Event.Record(ctx, kode, event.EventTypeWarning, event.ReasonFailed, fmt.Sprintf("Failed to reconcile Kode: %v", err))
+		r.GetEventRecorder().Record(ctx, kode, event.EventTypeWarning, event.ReasonFailed, fmt.Sprintf("Failed to reconcile Kode: %v", err))
 		return ctrl.Result{RequeueAfter: 5 * time.Second}, err
 	}
 
@@ -243,7 +214,7 @@ func (r *EntryPointReconciler) reconcileKode(ctx context.Context, kode *kodev1al
 
 		// Update Kode status with error
 		kode.SetCondition(constant.ConditionTypeError, metav1.ConditionTrue, "ReconciliationFailed", fmt.Sprintf("Failed to construct Kode URL: %v", err))
-		kode.Status.Phase = kodev1alpha2.KodePhaseFailed
+		kode.Status.Phase = kodev1alpha2.PhaseFailed
 		kode.Status.LastError = common.StringPtr(err.Error())
 		kode.Status.LastErrorTime = &metav1.Time{Time: time.Now()}
 		if updateErr := kode.UpdateStatus(ctx, r.Client); updateErr != nil {
@@ -251,7 +222,7 @@ func (r *EntryPointReconciler) reconcileKode(ctx context.Context, kode *kodev1al
 			return ctrl.Result{RequeueAfter: 5 * time.Second}, fmt.Errorf("primary error: %v, kode status update error: %v", err, updateErr)
 		}
 
-		r.Event.Record(ctx, kode, event.EventTypeWarning, event.ReasonFailed, fmt.Sprintf("Failed to reconcile Kode: %v", err))
+		r.GetEventRecorder().Record(ctx, kode, event.EventTypeWarning, event.ReasonFailed, fmt.Sprintf("Failed to reconcile Kode: %v", err))
 		return ctrl.Result{RequeueAfter: 5 * time.Second}, err
 	}
 	log.V(1).Info("Constructed Kode URL", "hostname", kodeHostname, "domain", kodeDomain, "url", kodeUrl, "path", kodePath, "protocol", config.Protocol)
@@ -276,7 +247,7 @@ func (r *EntryPointReconciler) reconcileKode(ctx context.Context, kode *kodev1al
 
 		// Update Kode status with error
 		kode.SetCondition(constant.ConditionTypeError, metav1.ConditionTrue, "ReconciliationFailed", fmt.Sprintf("Failed to ensure HTTPRoute: %v", err))
-		kode.Status.Phase = kodev1alpha2.KodePhaseFailed
+		kode.Status.Phase = kodev1alpha2.PhaseFailed
 		kode.Status.LastError = common.StringPtr(err.Error())
 		kode.Status.LastErrorTime = &metav1.Time{Time: time.Now()}
 		if updateErr := kode.UpdateStatus(ctx, r.Client); updateErr != nil {
@@ -284,7 +255,7 @@ func (r *EntryPointReconciler) reconcileKode(ctx context.Context, kode *kodev1al
 			return ctrl.Result{RequeueAfter: 5 * time.Second}, fmt.Errorf("primary error: %v, kode status update error: %v", err, updateErr)
 		}
 
-		r.Event.Record(ctx, kode, event.EventTypeWarning, event.ReasonFailed, fmt.Sprintf("Failed to reconcile Kode: %v", err))
+		r.GetEventRecorder().Record(ctx, kode, event.EventTypeWarning, event.ReasonFailed, fmt.Sprintf("Failed to reconcile Kode: %v", err))
 		return ctrl.Result{RequeueAfter: 5 * time.Second}, err
 	}
 
@@ -312,4 +283,44 @@ func (r *EntryPointReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Watches(&kodev1alpha2.Kode{}, &handler.EnqueueRequestForObject{}).
 		WithOptions(controller.Options{MaxConcurrentReconciles: 1}).
 		Complete(r)
+}
+
+func (r *EntryPointReconciler) GetClient() client.Client {
+	return r.Client
+}
+
+func (r *EntryPointReconciler) GetScheme() *runtime.Scheme {
+	return r.Scheme
+}
+
+func (r *EntryPointReconciler) GetLog() logr.Logger {
+	return r.Log
+}
+
+func (r *EntryPointReconciler) GetResourceManager() resource.ResourceManager {
+	return r.Resource
+}
+
+func (r *EntryPointReconciler) GetEventRecorder() event.EventManager {
+	return r.EventManager
+}
+
+func (r *EntryPointReconciler) GetTemplateManager() template.TemplateManager {
+	return r.Template
+}
+
+func (r *EntryPointReconciler) GetCleanupManager() cleanup.CleanupManager {
+	return r.CleanupManager
+}
+
+func (r *EntryPointReconciler) GetIsTestEnvironment() bool {
+	return r.IsTestEnvironment
+}
+
+func (r *EntryPointReconciler) GetReconcileInterval() time.Duration {
+	return r.ReconcileInterval
+}
+
+func (r *EntryPointReconciler) GetLongReconcileInterval() time.Duration {
+	return r.LongReconcileInterval
 }

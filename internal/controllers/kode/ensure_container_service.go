@@ -22,6 +22,8 @@ import (
 
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
+	"github.com/jacero-io/kode-operator/internal/resource"
+	"github.com/jacero-io/kode-operator/internal/statemachine"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/intstr"
@@ -29,8 +31,8 @@ import (
 )
 
 // ensureService ensures that the Service exists for the Kode instance
-func (r *KodeReconciler) ensureService(ctx context.Context, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig) error {
-	log := r.Log.WithName("ServiceEnsurer").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
+func ensureService(ctx context.Context, r statemachine.ReconcilerInterface, resource resource.ResourceManager, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig) error {
+	log := r.GetLog().WithName("ServiceEnsurer").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	ctx, cancel := common.ContextWithTimeout(ctx, 30) // 30 seconds timeout
 	defer cancel()
@@ -45,8 +47,8 @@ func (r *KodeReconciler) ensureService(ctx context.Context, kode *kodev1alpha2.K
 		},
 	}
 
-	_, err := r.Resource.CreateOrPatch(ctx, service, func() error {
-		constructedService, err := r.constructServiceSpec(config)
+	_, err := resource.CreateOrPatch(ctx, service, func() error {
+		constructedService, err := constructServiceSpec(r, config)
 		if err != nil {
 			return fmt.Errorf("failed to construct Service spec: %v", err)
 		}
@@ -54,7 +56,7 @@ func (r *KodeReconciler) ensureService(ctx context.Context, kode *kodev1alpha2.K
 		service.Spec = constructedService.Spec
 		service.ObjectMeta.Labels = constructedService.ObjectMeta.Labels
 
-		return controllerutil.SetControllerReference(kode, service, r.Scheme)
+		return controllerutil.SetControllerReference(kode, service, r.GetScheme())
 	})
 
 	if err != nil {
@@ -65,8 +67,8 @@ func (r *KodeReconciler) ensureService(ctx context.Context, kode *kodev1alpha2.K
 }
 
 // constructService constructs a Service for the Kode instance
-func (r *KodeReconciler) constructServiceSpec(config *common.KodeResourceConfig) (*corev1.Service, error) {
-	log := r.Log.WithName("ServiceConstructor").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
+func constructServiceSpec(r statemachine.ReconcilerInterface, config *common.KodeResourceConfig) (*corev1.Service, error) {
+	log := r.GetLog().WithName("ServiceConstructor").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	service := &corev1.Service{
 		Spec: corev1.ServiceSpec{

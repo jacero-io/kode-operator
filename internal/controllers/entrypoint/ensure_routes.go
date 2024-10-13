@@ -64,10 +64,6 @@ func (r *EntryPointReconciler) ensureHTTPRoutes(ctx context.Context, entrypoint 
 	kode.SetCondition(constant.ConditionTypeAvailable, metav1.ConditionTrue, "HTTPRoutesAvailable", "HTTPRoutes are available")
 	kode.SetCondition(constant.ConditionTypeProgressing, metav1.ConditionFalse, "HTTPRoutesReady", "HTTPRoutes are ready")
 
-	// Clear any previous error
-	kode.Status.LastError = nil
-	kode.Status.LastErrorTime = nil
-
 	err = kode.UpdateStatus(ctx, r.Client)
 	if err != nil {
 		log.Error(err, "Failed to update Kode status")
@@ -100,7 +96,7 @@ func (r *EntryPointReconciler) createOrUpdateRoute(ctx context.Context, entrypoi
 		return nil
 	}
 
-	if err := r.Event.Record(ctx, kode, event.EventTypeNormal, eventReason, message); err != nil {
+	if err := r.GetEventRecorder().Record(ctx, kode, event.EventTypeNormal, eventReason, message); err != nil {
 		r.Log.Error(err, "Failed to record event")
 	}
 
@@ -134,7 +130,7 @@ func (r *EntryPointReconciler) createOrUpdateSecurityPolicy(ctx context.Context,
 		return nil
 	}
 
-	if err := r.Event.Record(ctx, kode, event.EventTypeNormal, eventReason, message); err != nil {
+	if err := r.GetEventRecorder().Record(ctx, kode, event.EventTypeNormal, eventReason, message); err != nil {
 		r.Log.Error(err, "Failed to record event")
 	}
 

@@ -48,8 +48,6 @@ import (
 	"github.com/jacero-io/kode-operator/internal/event"
 	"github.com/jacero-io/kode-operator/internal/resource"
 	"github.com/jacero-io/kode-operator/internal/template"
-
-	"github.com/jacero-io/kode-operator/pkg/validation"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -149,20 +147,19 @@ var _ = BeforeSuite(func() {
 		Resource:          resource.NewDefaultResourceManager(k8sClient, ctrl.Log.WithName("Kode").WithName("ResourceManager"), k8sManager.GetScheme()),
 		Template:          template.NewDefaultTemplateManager(k8sClient, ctrl.Log.WithName("Kode").WithName("TemplateManager")),
 		CleanupManager:    cleanup.NewDefaultCleanupManager(k8sClient, ctrl.Log.WithName("Kode").WithName("CleanupManager")),
-		Validator:         validation.NewValidator(),
-		Event:             event.NewEventManager(k8sClient, ctrl.Log.WithName("Kode").WithName("EventManager"), k8sManager.GetScheme(), k8sManager.GetEventRecorderFor("kode-controller")),
+		EventManager:      event.NewEventManager(k8sClient, ctrl.Log.WithName("Kode").WithName("EventManager"), k8sManager.GetScheme(), k8sManager.GetEventRecorderFor("kode-controller")),
 		IsTestEnvironment: true,
 	}
 
 	entrypointReconciler = &entrypointctrl.EntryPointReconciler{
-		Client:         k8sClient,
-		Scheme:         k8sManager.GetScheme(),
-		Log:            ctrl.Log.WithName("EntryPoint").WithName("Reconcile"),
-		Resource:       resource.NewDefaultResourceManager(k8sClient, ctrl.Log.WithName("EntryPoint").WithName("ResourceManager"), k8sManager.GetScheme()),
-		Template:       template.NewDefaultTemplateManager(k8sClient, ctrl.Log.WithName("EntryPoint").WithName("TemplateManager")),
-		CleanupManager: cleanup.NewDefaultCleanupManager(k8sClient, ctrl.Log.WithName("EntryPoint").WithName("CleanupManager")),
-		Validator:      validation.NewValidator(),
-		Event:          event.NewEventManager(k8sClient, ctrl.Log.WithName("Kode").WithName("EventManager"), k8sManager.GetScheme(), k8sManager.GetEventRecorderFor("entrypoint-controller")),
+		Client:            k8sClient,
+		Scheme:            k8sManager.GetScheme(),
+		Log:               ctrl.Log.WithName("EntryPoint").WithName("Reconcile"),
+		Resource:          resource.NewDefaultResourceManager(k8sClient, ctrl.Log.WithName("EntryPoint").WithName("ResourceManager"), k8sManager.GetScheme()),
+		Template:          template.NewDefaultTemplateManager(k8sClient, ctrl.Log.WithName("EntryPoint").WithName("TemplateManager")),
+		CleanupManager:    cleanup.NewDefaultCleanupManager(k8sClient, ctrl.Log.WithName("EntryPoint").WithName("CleanupManager")),
+		EventManager:      event.NewEventManager(k8sClient, ctrl.Log.WithName("Kode").WithName("EventManager"), k8sManager.GetScheme(), k8sManager.GetEventRecorderFor("entrypoint-controller")),
+		IsTestEnvironment: true,
 	}
 
 	err = reconciler.SetupWithManager(k8sManager)

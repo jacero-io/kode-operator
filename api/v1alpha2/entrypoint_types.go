@@ -21,7 +21,6 @@ import (
 
 	egv1alpha1 "github.com/envoyproxy/gateway/api/v1alpha1"
 	"github.com/jacero-io/kode-operator/pkg/constant"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -115,9 +114,6 @@ type SecurityPolicySpec struct {
 type EntryPointStatus struct {
 	CommonStatus `json:",inline" yaml:",inline"`
 
-	// Represents the current phase of the EntryPointPhase resource.
-	Phase EntryPointPhase `json:"phase" yaml:"phase"`
-
 	// RetryCount keeps track of the number of retry attempts for failed states.
 	RetryCount int `json:"retryCount,omitempty"`
 
@@ -163,38 +159,6 @@ const (
 	AuthTypeAuthorization AuthType = "authorization"
 )
 
-// EntryPointPhase defines the phase of the EntryPoint
-type EntryPointPhase string
-
-const (
-	// EntryPointPhasePending indicates that the EntryPoint resource is pending.
-	// The Gateway and other resources are not created yet.
-	EntryPointPhasePending EntryPointPhase = "Pending"
-
-	// EntryPointPhaseConfiguring indicates that the EntryPoint resource is configuring.
-	// The Gateway and other resources are being created.
-	EntryPointPhaseConfiguring EntryPointPhase = "Configuring"
-
-	// EntryPointPhaseProvisioning indicates that the EntryPoint resource is provisioning.
-	// The Gateway and other resources are being provisioned.
-	// The EntryPoint is not ready to serve traffic.
-	EntryPointPhaseProvisioning EntryPointPhase = "Provisioning"
-
-	// EntryPointPhaseActive indicates that the EntryPoint resource is fully operational.
-	// The Gateway and other resources have been created and the EntryPoint is ready to serve traffic.
-	EntryPointPhaseActive EntryPointPhase = "Active"
-
-	// EntryPointPhaseDeleting indicates that the EntryPoint resource is being deleted.
-	// The Gateway and other resources are being deleted.
-	EntryPointPhaseDeleting EntryPointPhase = "Deleting"
-
-	// EntryPointPhaseFailed indicates that the EntryPoint resource has failed.
-	EntryPointPhaseFailed EntryPointPhase = "Failed"
-
-	// EntryPointPhaseUnknown indicates that the EntryPoint resource is in an unknown state.
-	EntryPointPhaseUnknown EntryPointPhase = "Unknown"
-)
-
 // BaseDomain is the domain name to use either as a suffix in the case of Type=domain or as a prefix/domain in the case of Type=path.
 // TODO: Add validation pattern: "^([a-zA-Z0-9_]+\.)*[a-zA-Z0-9_]+$"
 type BaseDomain string
@@ -211,43 +175,57 @@ func init() {
 	SchemeBuilder.Register(&EntryPoint{}, &EntryPointList{})
 }
 
-func (k *EntryPoint) UpdateStatus(ctx context.Context, c client.Client) error {
+func (e *EntryPoint) GetName() string {
+	return e.Name
+}
+
+func (e *EntryPoint) GetNamespace() string {
+	return e.Namespace
+}
+
+func (e *EntryPoint) GetPhase() Phase {
+	return e.Status.Phase
+}
+
+func (e *EntryPoint) SetPhase(phase Phase) {
+	e.Status.Phase = phase
+}
+
+func (e *EntryPoint) UpdateStatus(ctx context.Context, c client.Client) error {
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		// Fetch the latest version of the EntryPoint
 		latestEntryPoint := &EntryPoint{}
-		err := c.Get(ctx, client.ObjectKey{Name: k.Name, Namespace: k.Namespace}, latestEntryPoint)
-		if err != nil {
-			if errors.IsNotFound(err) {
-				// EntryPoint resource has been deleted, nothing to update
-				return nil
-			}
-			return err
+		if err := c.Get(ctx, client.ObjectKey{Name: e.Name, Namespace: e.Namespace}, latestEntryPoint); err != nil {
+			return client.IgnoreNotFound(err)
 		}
 
 		// Create a patch
 		patch := client.MergeFrom(latestEntryPoint.DeepCopy())
 
 		// Update the status
-		latestEntryPoint.Status = k.Status
+		latestEntryPoint.Status = e.Status
+
+		// When the EntryPoint resource transitions from Failed to another state, reset the LastError and LastErrorTime fields
+		if e.Status.Phase != latestEntryPoint.Status.Phase && latestEntryPoint.Status.Phase != PhaseFailed {
+			e.Status.LastError = nil
+			e.Status.LastErrorTime = nil
+		}
 
 		// Apply the patch
-		if err := c.Status().Patch(ctx, latestEntryPoint, patch); err != nil {
-			return err
-		}
-		return nil
+		return c.Status().Patch(ctx, latestEntryPoint, patch)
 	})
 }
 
-func (k *EntryPoint) SetCondition(conditionType constant.ConditionType, status metav1.ConditionStatus, reason, message string) {
-	k.Status.SetCondition(conditionType, status, reason, message)
+func (e *EntryPoint) SetCondition(conditionType constant.ConditionType, status metav1.ConditionStatus, reason, message string) {
+	e.Status.SetCondition(conditionType, status, reason, message)
 }
 
-func (k *EntryPoint) GetCondition(conditionType constant.ConditionType) *metav1.Condition {
-	return k.Status.GetCondition(conditionType)
+func (e *EntryPoint) GetCondition(conditionType constant.ConditionType) *metav1.Condition {
+	return e.Status.GetCondition(conditionType)
 }
 
-func (k *EntryPoint) DeleteCondition(conditionType constant.ConditionType) {
-	k.Status.DeleteCondition(conditionType)
+func (e *EntryPoint) DeleteCondition(conditionType constant.ConditionType) {
+	e.Status.DeleteCondition(conditionType)
 }
 
 func (e *EntryPoint) IsSubdomainRouting() bool {

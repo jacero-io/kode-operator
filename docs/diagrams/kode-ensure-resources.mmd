@@ -12,6 +12,9 @@ stateDiagram-v2
     EnsurePVC --> EnsureStatefulSet : PVC Created/Updated
     EnsurePVC --> HandleError : Error
 
+    EnsureStatefulSet --> ResourcesEnsured : StatefulSet Created/Updated
+    EnsureStatefulSet --> HandleError : Error
+
     HandleError --> [*] : Return Error
 
     ResourcesEnsured --> [*] : All Resources Created/Updated

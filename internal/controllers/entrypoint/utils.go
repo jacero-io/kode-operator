@@ -19,10 +19,10 @@ package entrypoint
 import (
 	"context"
 	"fmt"
-	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -32,7 +32,7 @@ import (
 
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
-	"github.com/jacero-io/kode-operator/internal/event"
+	"github.com/jacero-io/kode-operator/pkg/constant"
 )
 
 func (r *EntryPointReconciler) findEntryPointForKode(ctx context.Context, kode *kodev1alpha2.Kode) (*kodev1alpha2.EntryPoint, error) {
@@ -74,45 +74,45 @@ func (r *EntryPointReconciler) findEntryPointForKode(ctx context.Context, kode *
 	return latestEntryPoint, nil
 }
 
-func (r *EntryPointReconciler) transitionTo(ctx context.Context, entryPoint *kodev1alpha2.EntryPoint, newPhase kodev1alpha2.EntryPointPhase) (ctrl.Result, error) {
-	log := r.Log.WithValues("entrypoint", types.NamespacedName{Name: entryPoint.Name, Namespace: entryPoint.Namespace})
+// func (r *EntryPointReconciler) transitionTo(ctx context.Context, entryPoint *kodev1alpha2.EntryPoint, newPhase kodev1alpha2.EntryPointPhase) (ctrl.Result, error) {
+// 	log := r.Log.WithValues("entrypoint", types.NamespacedName{Name: entryPoint.Name, Namespace: entryPoint.Namespace})
 
-	if entryPoint.Status.Phase == newPhase {
-		return ctrl.Result{RequeueAfter: 10 * time.Minute}, nil
-	}
+// 	if entryPoint.Status.Phase == newPhase {
+// 		return ctrl.Result{RequeueAfter: 10 * time.Minute}, nil
+// 	}
 
-	log.V(1).Info("Transitioning EntryPoint state", "from", entryPoint.Status.Phase, "to", newPhase)
+// 	log.V(1).Info("Transitioning EntryPoint state", "from", entryPoint.Status.Phase, "to", newPhase)
 
-	entryPoint.Status.Phase = newPhase
+// 	entryPoint.Status.Phase = newPhase
 
-	switch newPhase {
-	case kodev1alpha2.EntryPointPhasePending:
-		// Empty case - does nothing
+// 	switch newPhase {
+// 	case kodev1alpha2.EntryPointPhasePending:
+// 		// Empty case - does nothing
 
-	case kodev1alpha2.EntryPointPhaseConfiguring:
-		if err := r.Event.Record(ctx, entryPoint, event.EventTypeNormal, event.ReasonEntryPointConfiguring, "EntryPoint is being configured"); err != nil {
-			log.Error(err, "Failed to record EntryPoint configuring event")
-		}
+// 	case kodev1alpha2.EntryPointPhaseConfiguring:
+// 		if err := r.Event.Record(ctx, entryPoint, event.EventTypeNormal, event.ReasonEntryPointConfiguring, "EntryPoint is being configured"); err != nil {
+// 			log.Error(err, "Failed to record EntryPoint configuring event")
+// 		}
 
-	case kodev1alpha2.EntryPointPhaseProvisioning:
-		if err := r.Event.Record(ctx, entryPoint, event.EventTypeNormal, event.ReasonEntryPointProvisioning, "EntryPoint is being provisioned"); err != nil {
-			log.Error(err, "Failed to record EntryPoint provisioning event")
-		}
+// 	case kodev1alpha2.EntryPointPhaseProvisioning:
+// 		if err := r.Event.Record(ctx, entryPoint, event.EventTypeNormal, event.ReasonEntryPointProvisioning, "EntryPoint is being provisioned"); err != nil {
+// 			log.Error(err, "Failed to record EntryPoint provisioning event")
+// 		}
 
-	case kodev1alpha2.EntryPointPhaseActive:
-		if err := r.Event.Record(ctx, entryPoint, event.EventTypeNormal, event.ReasonEntryPointActive, "EntryPoint is now active"); err != nil {
-			log.Error(err, "Failed to record EntryPoint active event")
-		}
+// 	case kodev1alpha2.EntryPointPhaseActive:
+// 		if err := r.Event.Record(ctx, entryPoint, event.EventTypeNormal, event.ReasonEntryPointActive, "EntryPoint is now active"); err != nil {
+// 			log.Error(err, "Failed to record EntryPoint active event")
+// 		}
 
-	case kodev1alpha2.EntryPointPhaseFailed:
-		if err := r.Event.Record(ctx, entryPoint, event.EventTypeWarning, event.ReasonEntryPointFailed, "EntryPoint has entered Failed state"); err != nil {
-			log.Error(err, "Failed to record EntryPoint failed event")
-		}
+// 	case kodev1alpha2.EntryPointPhaseFailed:
+// 		if err := r.Event.Record(ctx, entryPoint, event.EventTypeWarning, event.ReasonEntryPointFailed, "EntryPoint has entered Failed state"); err != nil {
+// 			log.Error(err, "Failed to record EntryPoint failed event")
+// 		}
 
-	}
+// 	}
 
-	return ctrl.Result{Requeue: true}, nil
-}
+// 	return ctrl.Result{Requeue: true}, nil
+// }
 
 func (r *EntryPointReconciler) updateRetryCount(ctx context.Context, entryPoint *kodev1alpha2.EntryPoint, count int) error {
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
@@ -125,6 +125,34 @@ func (r *EntryPointReconciler) updateRetryCount(ctx context.Context, entryPoint 
 		latestEntryPoint.Status.RetryCount = count
 		return r.Client.Status().Update(ctx, latestEntryPoint)
 	})
+}
+
+func (r *EntryPointReconciler) handleGenerationMismatch(ctx context.Context, entryPoint *kodev1alpha2.EntryPoint) (ctrl.Result, error) {
+	log := r.Log.WithValues("entrypoint", client.ObjectKeyFromObject(entryPoint))
+	log.Info("Generation mismatch detected", "Generation", entryPoint.Generation, "ObservedGeneration", entryPoint.Status.ObservedGeneration)
+
+	// Update the ObservedGeneration
+	entryPoint.Status.ObservedGeneration = entryPoint.Generation
+
+	// Always transition to Updating phase, except when deleting
+	if entryPoint.Status.Phase != kodev1alpha2.PhaseDeleting {
+		entryPoint.Status.Phase = kodev1alpha2.PhaseUpdating
+
+		// Set the condition
+		entryPoint.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "GenerationMismatch", "Generation mismatch detected, resource is being updated")
+		entryPoint.SetCondition(constant.ConditionTypeAvailable, metav1.ConditionFalse, "GenerationMismatch", "Generation mismatch detected, resource is being updated")
+		entryPoint.SetCondition(constant.ConditionTypeProgressing, metav1.ConditionTrue, "GenerationMismatch", "Generation mismatch detected, resource is being updated")
+	}
+
+	// If already in Deleting state, just update the status
+	if err := entryPoint.UpdateStatus(ctx, r.Client); err != nil {
+		log.Error(err, "Unable to update EntryPoint status")
+		// If we fail to update the status, requeue immediately
+		return ctrl.Result{Requeue: true}, err
+	}
+
+	// If everything is fine, requeue immediately
+	return ctrl.Result{Requeue: true}, nil
 }
 
 func (r *EntryPointReconciler) checkGatewayClassExists(ctx context.Context, gatewayClassName string) error {

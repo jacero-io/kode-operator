@@ -21,12 +21,14 @@ import (
 
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
+	"github.com/jacero-io/kode-operator/internal/resource"
+	"github.com/jacero-io/kode-operator/internal/statemachine"
 	// "github.com/jacero-io/kode-operator/internal/envoy"
 )
 
 // ensureSidecarContainers ensures that the Envoy container exists for the Kode instance
-func (r *KodeReconciler) ensureSidecarContainers(ctx context.Context, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig) error {
-	log := r.Log.WithName("SidecarContainerEnsurer").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
+func ensureSidecarContainers(ctx context.Context, r statemachine.ReconcilerInterface, resource resource.ResourceManager, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig) error {
+	log := r.GetLog().WithName("SidecarContainerEnsurer").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	log.V(1).Info("Ensuring sidecar containers")
 
