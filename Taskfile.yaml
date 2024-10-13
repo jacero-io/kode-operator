@@ -81,6 +81,15 @@ tasks:
     vars:
       USE_MINIKUBE_CONTEXT: true
 
+  setup-github-actions: 
+    desc: Setup the github environment
+    cmds:
+      - task: tools:ensure-dir
+      - task: tools:kustomize
+      - task: tools:controller-gen
+      - task: tools:envtest
+      - task: tools:golangci-lint
+
   teardown:
     desc: Tear down the complete development environment
     cmds:

@@ -35,7 +35,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        task tools:setup-github-actions
+        task setup-github-actions
 
     - name: Run tests
       env:
