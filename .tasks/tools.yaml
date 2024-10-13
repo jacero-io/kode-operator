@@ -116,15 +116,6 @@ tasks:
       - task: golangci-lint
       - task: helmify
 
-  setup-github-actions: 
-    desc: Setup the development environment
-    cmds:
-      - task: ensure-dir
-      - task: kustomize
-      - task: controller-gen
-      - task: envtest
-      - task: golangci-lint
-
   cleanup:
     desc: Cleanup the development environment
     cmds:
