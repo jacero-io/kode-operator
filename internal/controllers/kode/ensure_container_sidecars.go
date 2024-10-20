@@ -18,13 +18,18 @@ package kode
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
 	"github.com/jacero-io/kode-operator/internal/resource"
 	"github.com/jacero-io/kode-operator/internal/statemachine"
+
+	"github.com/jacero-io/kode-operator/pkg/envoy"
 )
 
 // ensureSidecarContainers ensures that the Envoy container exists for the Kode instance
@@ -33,10 +38,52 @@ func ensureSidecarContainers(ctx context.Context, r statemachine.ReconcilerInter
 
 	log.V(1).Info("Ensuring sidecar containers")
 
-	return nil
-}
+	useBasicAuth := false
+	if config.Template != nil && config.Template.EntryPointSpec != nil &&
+		config.Template.EntryPointSpec.AuthSpec != nil {
+		useBasicAuth = config.Template.EntryPointSpec.AuthSpec.AuthType == "basicAuth"
+	}
 
-func ensureEnvoySidecar(config *common.KodeResourceConfig, log logr.Logger) error {
+	// Create Envoy config
+	envoyConfigGenerator := envoy.NewBootstrapConfigGenerator(log)
+	envoyConfig, err := envoyConfigGenerator.GenerateEnvoyConfig(config, useBasicAuth)
+	if err != nil {
+		return fmt.Errorf("failed to generate Envoy config: %w", err)
+	}
+
+	// Create sidecar containers
+	envoyConstructor := envoy.NewContainerConstructor(log, envoyConfigGenerator)
+	containers, initContainers, err := envoyConstructor.ConstructEnvoyContainers(config)
+	if err != nil {
+		return fmt.Errorf("failed to construct Envoy containers: %w", err)
+	}
+
+	// Add containers to the Kode resource
+	kode.Spec.InitPlugins = append(kode.Spec.InitPlugins, kodev1alpha2.InitPluginSpec{
+		Name:  "proxy-init",
+		Image: initContainers[0].Image,
+		Args:  initContainers[0].Args,
+	})
+
+	config.Containers = append(config.Containers, containers...)
+
+	// Create ConfigMap for Envoy config
+	envoyConfigMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-envoy-config", kode.Name),
+			Namespace: kode.Namespace,
+		},
+		Data: map[string]string{
+			"envoy.yaml": envoyConfig,
+		},
+	}
+
+	_, err = resource.CreateOrPatch(ctx, envoyConfigMap, func() error {
+		return controllerutil.SetControllerReference(kode, envoyConfigMap, r.GetScheme())
+	})
+	if err != nil {
+		return fmt.Errorf("failed to create or update Envoy ConfigMap: %w", err)
+	}
 
 	return nil
 }
