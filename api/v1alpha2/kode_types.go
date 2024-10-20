@@ -30,7 +30,7 @@ import (
 
 // KodeSpec defines the desired state of Kode
 type KodeSpec struct {
-	// The reference to a template. Either a ContainerTemplate, VirtualTemplate or TofuTemplate.
+	// The reference to a template. Either a ContainerTemplate or VirtualTemplate.
 	// +kubebuilder:validation:Required
 	TemplateRef CrossNamespaceObjectReference `json:"templateRef"`
 
@@ -136,8 +136,8 @@ type KodeList struct {
 }
 
 type Runtime struct {
-	// KodeRuntime is the runtime for the Kode resource. Can be one of 'container', 'virtual', 'tofu'.
-	// +kubebuilder:validation:Enum=container;virtual;tofu
+	// KodeRuntime is the runtime for the Kode resource. Can be one of 'container', 'virtual'.
+	// +kubebuilder:validation:Enum=container;virtual
 	Runtime KodeRuntime `json:"kodeRuntime"`
 
 	// Type is the container runtime for Kode resource.
@@ -145,13 +145,12 @@ type Runtime struct {
 }
 
 // KodeRuntime specifies the runtime for the Kode resource.
-// Can be one of 'container', 'virtual', 'tofu'.
+// Can be one of 'container', 'virtual'.
 type KodeRuntime string
 
 const (
 	RuntimeContainer KodeRuntime = "container"
 	RuntimeVirtual   KodeRuntime = "virtual"
-	RuntimeTofu      KodeRuntime = "tofu"
 )
 
 // RuntimeType specifies the type of the runtime for the Kode resource.

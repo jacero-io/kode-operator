@@ -34,7 +34,7 @@ type CredentialsSpec struct {
 	EnableBuiltinAuth bool `json:"enableBuiltinAuth,omitempty" yaml:"enableBuiltinAuth,omitempty"`
 }
 
-// CommonSpec defines the common fields for both Tofu and Container specs
+// CommonSpec defines the common fields for both Container and Virtualization specs
 type CommonSpec struct {
 	// Credentials specifies the credentials for the service.
 	Credentials *CredentialsSpec `json:"credentials,omitempty" yaml:"credentials,omitempty"`
@@ -101,8 +101,6 @@ const (
 	TemplateKindClusterContainer TemplateKind = "ClusterContainerTemplate"
 	TemplateKindVirtual          TemplateKind = "VirtualTemplate"
 	TemplateKindClusterVirtual   TemplateKind = "ClusterVirtualTemplate"
-	TemplateKindTofu             TemplateKind = "TofuTemplate"
-	TemplateKindClusterTofu      TemplateKind = "ClusterTofuTemplate"
 )
 
 type Phase string

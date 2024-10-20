@@ -1,60 +1,56 @@
 graph TD
     A[User] -->|Creates/Manages| B[Kode CR]
-    A -->|Creates/Manages| C[EntryPoint CR]
-    A -->|Creates/Manages| D[ContainerTemplate CR]
-    A -->|Creates/Manages| D[VirtualTemplate CR]
-    A -->|Creates/Manages| V[TofuTemplate CR]
-    A -->|Creates/Manages| W[ClusterContainerTemplate CR]
-    A -->|Creates/Manages| W[ClusterVirtualTemplate CR]
-    A -->|Creates/Manages| X[ClusterTofuTemplate CR]
+    A[User] -->|Creates/Manages| C[EntryPoint CR]
+    A[User] -->|Creates/Manages| D[ContainerTemplate CR]
+    A[User] -->|Creates/Manages| E[VirtualTemplate CR]
+    A[User] -->|Creates/Manages| F[ClusterContainerTemplate CR]
+    A[User] -->|Creates/Manages| G[ClusterVirtualTemplate CR]
 
     subgraph "Kode Operator"
-        E[Kode Controller] -->|Watches| B
-        F[EntryPoint Controller] -->|Watches| C
-        G[Template Manager] -->|Fetches| D
-        G -->|Fetches| V
-        G -->|Fetches| W
-        G -->|Fetches| X
-        H[Resource Manager] -->|Creates/Updates/Deletes| I[Kubernetes Resources]
-        J[Cleanup Manager] -->|Initiates Cleanup| H
-        K[Event Manager] -->|Records Events| L[Kubernetes Events]
-        M[Validator] -->|Validates| B
-        M -->|Validates| C
+        H[Kode Controller] -->|Watches| B
+        I[EntryPoint Controller] -->|Watches| C
+        J[Template Manager] -->|Fetches| D
+        J[Template Manager] -->|Fetches| E
+        J[Template Manager] -->|Fetches| F
+        J[Template Manager] -->|Fetches| G
+        K[Resource Manager] -->|Creates/Updates/Deletes| L[Managed Resources]
+        M[Cleanup Manager] -->|Initiates Cleanup| L[Managed Resources]
+        N[Validator] -->|Validates| L[Managed Resources]
+        O[Event Manager] -->|Records Events| P[Kubernetes Events]
+
+        H[Kode Controller] -->|Uses| J
+        H[Kode Controller] -->|Uses| K
+        H[Kode Controller] -->|Uses| M
+        H[Kode Controller] -->|Uses| N
+        H[Kode Controller] -->|Uses| O
+
+        I[EntryPoint Controller] -->|Uses| J
+        I[EntryPoint Controller] -->|Uses| K
+        I[EntryPoint Controller] -->|Uses| M
+        I[EntryPoint Controller] -->|Uses| N
+        I[EntryPoint Controller] -->|Uses| O
     end
 
-    E -->|Uses| G
-    E -->|Uses| H
-    E -->|Uses| J
-    E -->|Uses| K
-    E -->|Uses| M
+    subgraph "Kubernetes Resources"
+        2[StatefulSet]
+        3[Service]
+        4[PersistentVolumeClaim]
+        5[Secret]
+        6[Gateway]
+        7[HTTPRoute]
+        8[SecurityPolicy]
 
-    F -->|Uses| H
-    F -->|Uses| J
-    F -->|Uses| K
-    F -->|Uses| M
-
-    subgraph "Kubernetes Cluster"
-        L[Kubernetes Events]
-        subgraph "Kubernetes Resources"
-            I[Managed Resources]
-            N[StatefulSet]
-            O[Service]
-            P[PersistentVolumeClaim]
-            Q[Secret]
-            R[Gateway]
-            S[HTTPRoute]
-            T[SecurityPolicy]
-        end
+        L --->|Manages| 2
+        L --->|Manages| 3
+        L --->|Manages| 4
+        L --->|Manages| 5
+        L --->|Manages| 6
+        L --->|Manages| 7
+        L --->|Manages| 8
     end
 
-    I --- N
-    I --- O
-    I --- P
-    I --- Q
-    I --- R
-    I --- S
-    I --- T
-
-    U[Envoy Gateway] -->|Implements| R
-    U -->|Implements| S
-    U -->|Implements| T
+    subgraph "Envoy Gateway"
+        Q[Envoy Gateway] -->|Implements| 6
+        Q[Envoy Gateway] -->|Implements| 7
+        Q[Envoy Gateway] -->|Implements| 8
+    end
