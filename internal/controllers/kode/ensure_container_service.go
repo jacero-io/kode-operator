@@ -41,7 +41,7 @@ func ensureService(ctx context.Context, r statemachine.ReconcilerInterface, reso
 
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      config.ServiceName,
+			Name:      kode.GetServiceName(),
 			Namespace: config.CommonConfig.Namespace,
 			Labels:    config.CommonConfig.Labels,
 		},
@@ -75,8 +75,8 @@ func constructServiceSpec(r statemachine.ReconcilerInterface, config *common.Kod
 			Selector: config.CommonConfig.Labels,
 			Ports: []corev1.ServicePort{{
 				Protocol:   corev1.ProtocolTCP,
-				Port:       int32(*config.Port),
-				TargetPort: intstr.FromInt(int(*config.Port)),
+				Port:       int32(config.Port),
+				TargetPort: intstr.FromInt(int(config.Port)),
 			}},
 		},
 	}

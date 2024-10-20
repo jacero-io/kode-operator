@@ -99,10 +99,6 @@ func (m *DefaultTemplateManager) fetchTemplate(ctx context.Context, ref kodev1al
 		err = m.fetchContainerTemplate(ctx, template, ref)
 	case kodev1alpha2.Kind(kodev1alpha2.TemplateKindClusterContainer):
 		err = m.fetchClusterContainerTemplate(ctx, template, ref)
-	case kodev1alpha2.Kind(kodev1alpha2.TemplateKindTofu):
-		err = m.fetchTofuTemplate(ctx, template, ref)
-	case kodev1alpha2.Kind(kodev1alpha2.TemplateKindClusterTofu):
-		err = m.fetchClusterTofuTemplate(ctx, template, ref)
 	default:
 		return nil, fmt.Errorf("unknown template kind: %s", ref.Kind)
 	}
@@ -110,6 +106,16 @@ func (m *DefaultTemplateManager) fetchTemplate(ctx context.Context, ref kodev1al
 	if err != nil {
 		return nil, err
 	}
+
+	// Fetch EntryPoint
+	if template.EntryPointRef != nil {
+		entryPoint, err := m.fecthEntryPoint(ctx, *template.EntryPointRef)
+		if err != nil {
+			return nil, err
+		}
+		template.EntryPointSpec = &entryPoint.Spec
+	}
+
 
 	log.V(1).Info("Template fetched successfully", "kind", template.Kind, "port", template.Port)
 	return template, nil
@@ -121,8 +127,13 @@ func (m *DefaultTemplateManager) fetchContainerTemplate(ctx context.Context, tem
 	if err != nil {
 		return handleNotFoundError(err, ref)
 	}
+	
+	if containerTemplate.Spec.ContainerTemplateSharedSpec.EntryPointRef != nil {
+		template.EntryPointRef = containerTemplate.Spec.ContainerTemplateSharedSpec.EntryPointRef
+	}
+
 	template.ContainerTemplateSpec = &containerTemplate.Spec.ContainerTemplateSharedSpec
-	template.Port = *containerTemplate.Spec.Port
+	template.Port = containerTemplate.Spec.Port
 	return nil
 }
 
@@ -132,31 +143,23 @@ func (m *DefaultTemplateManager) fetchClusterContainerTemplate(ctx context.Conte
 	if err != nil {
 		return handleNotFoundError(err, ref)
 	}
+	
+	if clusterContainerTemplate.Spec.ContainerTemplateSharedSpec.EntryPointRef != nil {
+		template.EntryPointRef = clusterContainerTemplate.Spec.ContainerTemplateSharedSpec.EntryPointRef
+	}
+
 	template.ContainerTemplateSpec = &clusterContainerTemplate.Spec.ContainerTemplateSharedSpec
-	template.Port = *clusterContainerTemplate.Spec.Port
+	template.Port = clusterContainerTemplate.Spec.Port
 	return nil
 }
 
-func (m *DefaultTemplateManager) fetchTofuTemplate(ctx context.Context, template *kodev1alpha2.Template, ref kodev1alpha2.CrossNamespaceObjectReference) error {
-	tofuTemplate := &kodev1alpha2.TofuTemplate{}
-	err := m.Client.Get(ctx, types.NamespacedName{Name: string(ref.Name), Namespace: string(template.Namespace)}, tofuTemplate)
+func (m *DefaultTemplateManager) fecthEntryPoint(ctx context.Context, ref kodev1alpha2.CrossNamespaceObjectReference) (*kodev1alpha2.EntryPoint, error) {
+	entryPoint := &kodev1alpha2.EntryPoint{}
+	err := m.Client.Get(ctx, types.NamespacedName{Name: string(ref.Name)}, entryPoint)
 	if err != nil {
-		return handleNotFoundError(err, ref)
+		return nil, err
 	}
-	template.TofuTemplateSpec = &tofuTemplate.Spec.TofuSharedSpec
-	template.Port = *tofuTemplate.Spec.Port
-	return nil
-}
-
-func (m *DefaultTemplateManager) fetchClusterTofuTemplate(ctx context.Context, template *kodev1alpha2.Template, ref kodev1alpha2.CrossNamespaceObjectReference) error {
-	clusterTofuTemplate := &kodev1alpha2.ClusterTofuTemplate{}
-	err := m.Client.Get(ctx, types.NamespacedName{Name: string(ref.Name)}, clusterTofuTemplate)
-	if err != nil {
-		return handleNotFoundError(err, ref)
-	}
-	template.TofuTemplateSpec = &clusterTofuTemplate.Spec.TofuSharedSpec
-	template.Port = *clusterTofuTemplate.Spec.Port
-	return nil
+	return entryPoint, nil
 }
 
 func handleNotFoundError(err error, ref kodev1alpha2.CrossNamespaceObjectReference) error {

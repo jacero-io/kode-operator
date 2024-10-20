@@ -45,6 +45,9 @@ type StateManagedResource interface {
 	SetCondition(conditionType constant.ConditionType, status metav1.ConditionStatus, reason, message string)
 	GetCondition(conditionType constant.ConditionType) *metav1.Condition
 	DeleteCondition(conditionType constant.ConditionType)
+	GetFinalizer() string
+	AddFinalizer(ctx context.Context, c client.Client) error
+	RemoveFinalizer(ctx context.Context, c client.Client) error
 }
 
 // ReconcilerInterface defines the common interface for reconcilers

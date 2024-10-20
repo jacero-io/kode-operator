@@ -52,7 +52,7 @@ type CommonSpec struct {
 
 	// Port is the port for the service process. Used by EnvoyProxy to expose the kode.
 	// +kubebuilder:default=8000
-	Port *Port `json:"port,omitempty" yaml:"port,omitempty"`
+	Port Port `json:"port,omitempty" yaml:"port,omitempty"`
 }
 
 // CommonStatus defines the common observed state
@@ -75,7 +75,7 @@ type CommonStatus struct {
 
 // Template represents a unified structure for different types of Kode templates
 type Template struct {
-	// Kind specifies the type of template (e.g., "ContainerTemplate", "ClusterContainerTemplate", "TofuTemplate", "ClusterTofuTemplate")
+	// Kind specifies the type of template (e.g., "ContainerTemplate", "ClusterContainerTemplate")
 	Kind Kind `json:"kind" yaml:"kind"`
 
 	// Name is the name of the template resource
@@ -89,9 +89,14 @@ type Template struct {
 
 	// ContainerTemplateSpec is a reference to a ContainerTemplate or ClusterContainerTemplate
 	ContainerTemplateSpec *ContainerTemplateSharedSpec `json:"container,omitempty" yaml:"container,omitempty"`
+	
+	// VirtualTemplateSpec is a reference to a VirtualTemplate or ClusterVirtualTemplate
+	// VirtualTemplateSpec *VirtualTemplateSharedSpec `json:"virtual,omitempty" yaml:"virtual,omitempty"`
 
-	// TofuTemplateSpec is a reference to a TofuTemplate or ClusterTofuTemplate
-	TofuTemplateSpec *TofuSharedSpec `json:"tofu,omitempty" yaml:"tofu,omitempty"`
+	// EntryPointSpecRef is a reference to an EntryPointSpec
+	EntryPointRef *CrossNamespaceObjectReference `json:"entryPointSpecRef,omitempty" yaml:"entryPointSpecRef,omitempty"`
+
+	EntryPointSpec *EntryPointSpec `json:"entryPoint,omitempty" yaml:"entryPoint,omitempty"`
 }
 
 type TemplateKind string

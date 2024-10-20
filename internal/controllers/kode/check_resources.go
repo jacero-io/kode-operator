@@ -23,17 +23,27 @@ func checkResourcesReady(ctx context.Context, r statemachine.ReconcilerInterface
 	resource := r.GetResourceManager()
 
 	// Check Secret
-	if err := checkSecretReady(ctx, resource, kode, config); err != nil {
+	ready, err := checkSecretReady(ctx, resource, kode)
+	if err != nil {
 		return false, err
+	}
+	if !ready {
+		log.V(1).Info("Secret not ready")
+		return false, nil
 	}
 
 	// Check Service
-	if err := checkServiceReady(ctx, resource, kode, config); err != nil {
+	ready, err = checkServiceReady(ctx, resource, kode)
+	if err != nil {
 		return false, err
+	}
+	if !ready {
+		log.V(1).Info("Service not ready")
+		return false, nil
 	}
 
 	// Check StatefulSet
-	ready, err := checkStatefulSetReady(ctx, resource, kode, config)
+	ready, err = checkStatefulSetReady(ctx, resource, kode)
 	if err != nil {
 		return false, err
 	}
@@ -44,8 +54,13 @@ func checkResourcesReady(ctx context.Context, r statemachine.ReconcilerInterface
 
 	// Check PVC if storage is specified
 	if !config.KodeSpec.Storage.IsEmpty() {
-		if err := checkPVCReady(ctx, resource, kode, config); err != nil {
+		ready, err = checkPVCReady(ctx, resource, kode)
+		if err != nil {
 			return false, err
+		}
+		if !ready {
+			log.V(1).Info("PVC not ready")
+			return false, nil
 		}
 	}
 
@@ -108,33 +123,33 @@ func checkResourcesDeleted(ctx context.Context, r statemachine.ReconcilerInterfa
 	return true, nil
 }
 
-func checkSecretReady(ctx context.Context, resource resource.ResourceManager, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig) error {
+func checkSecretReady(ctx context.Context, resource resource.ResourceManager, kode *kodev1alpha2.Kode) (bool, error) {
 	secret := &corev1.Secret{}
-	if err := resource.Get(ctx, types.NamespacedName{Name: config.SecretName, Namespace: kode.Namespace}, secret); err != nil {
+	if err := resource.Get(ctx, types.NamespacedName{Name: kode.GetSecretName(), Namespace: kode.Namespace}, secret); err != nil {
 		if errors.IsNotFound(err) {
-			return fmt.Errorf("secret not found")
+			return false, nil
 		}
-		return fmt.Errorf("failed to get Secret: %w", err)
+		return false, fmt.Errorf("failed to get Secret: %w", err)
 	}
-	return nil
+	return true, nil
 }
 
-func checkServiceReady(ctx context.Context, resource resource.ResourceManager, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig) error {
+func checkServiceReady(ctx context.Context, resource resource.ResourceManager, kode *kodev1alpha2.Kode) (bool, error) {
 	service := &corev1.Service{}
-	if err := resource.Get(ctx, types.NamespacedName{Name: config.ServiceName, Namespace: kode.Namespace}, service); err != nil {
+	if err := resource.Get(ctx, types.NamespacedName{Name: kode.GetServiceName(), Namespace: kode.Namespace}, service); err != nil {
 		if errors.IsNotFound(err) {
-			return fmt.Errorf("service not found")
+			return false, nil
 		}
-		return fmt.Errorf("failed to get Service: %w", err)
+		return false, fmt.Errorf("failed to get Service: %w", err)
 	}
-	return nil
+	return true, nil
 }
 
-func checkStatefulSetReady(ctx context.Context, resource resource.ResourceManager, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig) (bool, error) {
+func checkStatefulSetReady(ctx context.Context, resource resource.ResourceManager, kode *kodev1alpha2.Kode) (bool, error) {
 	statefulSet := &appsv1.StatefulSet{}
-	if err := resource.Get(ctx, types.NamespacedName{Name: config.StatefulSetName, Namespace: kode.Namespace}, statefulSet); err != nil {
+	if err := resource.Get(ctx, types.NamespacedName{Name: kode.GetStatefulSetName(), Namespace: kode.Namespace}, statefulSet); err != nil {
 		if errors.IsNotFound(err) {
-			return false, fmt.Errorf("statefulSet not found")
+			return false, nil
 		}
 		return false, fmt.Errorf("failed to get StatefulSet: %w", err)
 	}
@@ -145,19 +160,19 @@ func checkStatefulSetReady(ctx context.Context, resource resource.ResourceManage
 	return true, nil
 }
 
-func checkPVCReady(ctx context.Context, resource resource.ResourceManager, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig) error {
+func checkPVCReady(ctx context.Context, resource resource.ResourceManager, kode *kodev1alpha2.Kode) (bool, error) {
 	pvc := &corev1.PersistentVolumeClaim{}
-	if err := resource.Get(ctx, types.NamespacedName{Name: config.PVCName, Namespace: kode.Namespace}, pvc); err != nil {
+	if err := resource.Get(ctx, types.NamespacedName{Name: kode.GetPVCName(), Namespace: kode.Namespace}, pvc); err != nil {
 		if errors.IsNotFound(err) {
-			return fmt.Errorf("PVC not found")
+			return false, nil
 		}
-		return fmt.Errorf("failed to get PersistentVolumeClaim: %w", err)
+		return false, fmt.Errorf("failed to get PersistentVolumeClaim: %w", err)
 	}
 
 	if pvc.Status.Phase != corev1.ClaimBound {
-		return fmt.Errorf("PVC not bound")
+		return false, fmt.Errorf("PVC not bound")
 	}
-	return nil
+	return true, nil
 }
 
 func checkPodsReady(ctx context.Context, resource resource.ResourceManager, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig) (bool, error) {

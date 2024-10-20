@@ -248,7 +248,7 @@ func createContainerTemplate(name, image, templateType string, entryPointName st
 		Spec: kodev1alpha2.ClusterContainerTemplateSpec{
 			ContainerTemplateSharedSpec: kodev1alpha2.ContainerTemplateSharedSpec{
 				CommonSpec: kodev1alpha2.CommonSpec{
-					Port: &port,
+					Port: port,
 				},
 				Type:  templateType,
 				Image: image,

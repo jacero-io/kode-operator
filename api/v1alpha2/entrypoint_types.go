@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	gwapiv1 "sigs.k8s.io/gateway-api/apis/v1"
 )
 
@@ -42,7 +43,7 @@ type EntryPointSpec struct {
 	// +kubebuilder:validation:Pattern=^([a-zA-Z0-9_]+\.)*[a-zA-Z0-9_]+$
 	BaseDomain string `json:"baseDomain" yaml:"baseDomain"`
 
-	// GatewaySpec defines the GatewaySpec for the EntryPoint. Only one of GatewaySpec or IngressSpec can be set.
+	// GatewaySpec defines the GatewaySpec for the EntryPoint.
 	// +kubebuilder:validation:Optional
 	GatewaySpec *GatewaySpec `json:"gatewaySpec,omitempty" yaml:"gatewaySpec,omitempty"`
 
@@ -75,7 +76,7 @@ type GatewaySpec struct {
 
 type AuthSpec struct {
 	// The Envoy Gateway SecurityPolicy to use for the authentication. Can be either "none", "basicAuth", "jwt", "oidc", "extAuth" or "authorization". Reference: https://gateway.envoyproxy.io/contributions/design/security-policy/
-	// +kubebuilder:validation:Enum=none;basicAuth;jwt;oidc;extAuth
+	// +kubebuilder:validation:Enum=none;extAuth
 	// +kubebuilder:default=none
 	AuthType AuthType `json:"authType" yaml:"authType"`
 
@@ -89,21 +90,6 @@ type AuthSpec struct {
 }
 
 type SecurityPolicySpec struct {
-	// BasicAuth defines the configuration for the HTTP Basic Authentication. Points to a Kubernetes secret which contains the username-password pairs in htpasswd format.
-	// Reference to https://httpd.apache.org/docs/2.4/programs/htpasswd.html for more details.
-	// +optional
-	BasicAuth *egv1alpha1.BasicAuth `json:"basicAuth,omitempty"`
-
-	// JWT defines the configuration for JSON Web Token (JWT) authentication.
-	//
-	// +optional
-	JWT *egv1alpha1.JWT `json:"jwt,omitempty"`
-
-	// OIDC defines the configuration for the OpenID Connect (OIDC) authentication.
-	//
-	// +optional
-	OIDC *egv1alpha1.OIDC `json:"oidc,omitempty"`
-
 	// ExtAuth defines the configuration for External Authorization.
 	//
 	// +optional
@@ -226,6 +212,26 @@ func (e *EntryPoint) GetCondition(conditionType constant.ConditionType) *metav1.
 
 func (e *EntryPoint) DeleteCondition(conditionType constant.ConditionType) {
 	e.Status.DeleteCondition(conditionType)
+}
+
+func (e *EntryPoint) GetFinalizer() string {
+	return constant.KodeFinalizerName
+}
+
+func (e *EntryPoint) AddFinalizer(ctx context.Context, c client.Client) error {
+	controllerutil.AddFinalizer(e, e.GetFinalizer())
+	if err := c.Update(ctx, e); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (e *EntryPoint) RemoveFinalizer(ctx context.Context, c client.Client) error {
+	controllerutil.RemoveFinalizer(e, e.GetFinalizer())
+	if err := c.Update(ctx, e); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (e *EntryPoint) IsSubdomainRouting() bool {

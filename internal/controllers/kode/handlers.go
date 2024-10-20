@@ -30,6 +30,7 @@ import (
 	"github.com/jacero-io/kode-operator/internal/statemachine"
 
 	"github.com/jacero-io/kode-operator/pkg/constant"
+	"github.com/jacero-io/kode-operator/pkg/validation"
 )
 
 func handlePendingState(ctx context.Context, r statemachine.ReconcilerInterface, resource statemachine.StateManagedResource) (kodev1alpha2.Phase, ctrl.Result, error) {
@@ -41,14 +42,12 @@ func handlePendingState(ctx context.Context, r statemachine.ReconcilerInterface,
 	log.Info("Handling Pending state")
 
 	// Validate the Kode resource
-	result := kode.Validate(ctx)
+	result := validation.ValidateKode(ctx, kode)
 	if !result.Valid {
-		var errMsgs []string
-		for _, err := range result.Errors {
-			errMsgs = append(errMsgs, err.Error())
-			log.Error(err, "Kode validation failed")
+		for _, errMsg := range result.Errors {
+			log.Error(fmt.Errorf(errMsg), "Kode validation failed")
 		}
-		combinedErrMsg := strings.Join(errMsgs, "; ")
+		combinedErrMsg := strings.Join(result.Errors, "; ")
 		return handleReconcileError(ctx, r, kode, fmt.Errorf(combinedErrMsg), "Validation failed")
 	}
 
@@ -83,14 +82,19 @@ func handleConfiguringState(ctx context.Context, r statemachine.ReconcilerInterf
 	config := InitKodeResourcesConfig(kode, template)
 
 	// Apply configuration
-	if err := applyConfiguration(ctx, r, kode, config, nil); err != nil {
+	changes := make(map[string]interface{})
+	changes["secret"] = true
+	changes["service"] = true
+	changes["statefulset"] = true
+	changes["pvc"] = true
+	if err := applyConfiguration(ctx, r, kode, config, changes); err != nil {
 		return handleReconcileError(ctx, r, kode, err, "Failed to apply configuration")
 	}
 
 	// Validate configuration
-	if err := validateConfiguration(ctx, r, kode, config); err != nil {
-		return handleReconcileError(ctx, r, kode, err, "Failed to validate configuration")
-	}
+	// if err := validateConfiguration(ctx, r, kode, config); err != nil {
+	// 	return handleReconcileError(ctx, r, kode, err, "Failed to validate configuration")
+	// }
 
 	// Update conditions
 	kode.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "Configuring", "Kode resources are being configured")
@@ -196,6 +200,7 @@ func handleActiveState(ctx context.Context, r statemachine.ReconcilerInterface, 
 	kode.SetCondition(constant.ConditionTypeProgressing, metav1.ConditionFalse, "Stable", "Kode is stable and not progressing")
 
 	// Update status
+	kode.Status.KodePort = template.Port
 	if err := kode.UpdateStatus(ctx, r.GetClient()); err != nil {
 		return handleReconcileError(ctx, r, kode, err, "Failed to update Kode status")
 	}
@@ -334,12 +339,10 @@ func handleDeletingState(ctx context.Context, r statemachine.ReconcilerInterface
 	// Remove finalizer
 	if controllerutil.ContainsFinalizer(kode, constant.KodeFinalizerName) {
 		log.Info("Removing finalizer")
-		controllerutil.RemoveFinalizer(kode, constant.KodeFinalizerName)
-		if err := kode.UpdateStatus(ctx, r.GetClient()); err != nil {
-			if err := r.GetClient().Update(ctx, kode); err != nil {
-				log.Error(err, "Failed to remove finalizer")
-				return handleReconcileError(ctx, r, kode, err, "Failed to remove finalizer")
-			}
+		err = kode.RemoveFinalizer(ctx, r.GetClient())
+		if err != nil {
+			log.Error(err, "Failed to remove finalizer")
+			return handleReconcileError(ctx, r, kode, err, "Failed to remove finalizer")
 		}
 	}
 

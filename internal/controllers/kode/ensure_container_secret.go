@@ -41,7 +41,7 @@ func ensureSecret(ctx context.Context, r statemachine.ReconcilerInterface, resou
 
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      config.SecretName,
+			Name:      kode.GetSecretName(),
 			Namespace: config.CommonConfig.Namespace,
 			Labels:    config.CommonConfig.Labels,
 		},

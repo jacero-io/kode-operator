@@ -50,7 +50,7 @@ func ensureStatefulSet(ctx context.Context, r statemachine.ReconcilerInterface, 
 	}
 
 	_, err := resource.CreateOrPatch(ctx, statefulSet, func() error {
-		constructedstatefulSet, err := constructStatefulSetSpec(r, config)
+		constructedstatefulSet, err := constructStatefulSetSpec(r, kode, config)
 		if err != nil {
 			return fmt.Errorf("failed to construct StatefulSet spec: %v", err)
 		}
@@ -71,7 +71,7 @@ func ensureStatefulSet(ctx context.Context, r statemachine.ReconcilerInterface, 
 }
 
 // constructStatefulSetSpec constructs a StatefulSet for the Kode instance
-func constructStatefulSetSpec(r statemachine.ReconcilerInterface, config *common.KodeResourceConfig) (*appsv1.StatefulSet, error) {
+func constructStatefulSetSpec(r statemachine.ReconcilerInterface, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig) (*appsv1.StatefulSet, error) {
 	log := r.GetLog().WithName("SatefulSetConstructor").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	replicas := int32(1)
@@ -96,17 +96,17 @@ func constructStatefulSetSpec(r statemachine.ReconcilerInterface, config *common
 
 	if templateSpec.Type == "code-server" {
 		log.V(1).Info("Constructing CodeServer containers")
-		containers = constructCodeServerContainers(config, workspace)
+		containers = constructCodeServerContainers(kode, config, workspace)
 		log.V(1).Info("Constructed CodeServer containers", "containers", containers)
 	} else if templateSpec.Type == "webtop" {
 		log.V(1).Info("Constructing Webtop containers")
-		containers = constructWebtopContainers(config)
+		containers = constructWebtopContainers(kode, config)
 		log.V(1).Info("Constructed Webtop containers", "containers", containers)
 	} else {
 		return nil, fmt.Errorf("unknown template type: %s", templateSpec.Type)
 	}
 
-	volumes, volumeMounts := constructVolumesAndMounts(mountPath, config)
+	volumes, volumeMounts := constructVolumesAndMounts(mountPath, kode, config)
 	log.V(1).Info("Constructed volumes and mounts", "volumes", volumes, "volumeMounts", volumeMounts)
 	containers[0].VolumeMounts = volumeMounts
 
@@ -168,12 +168,12 @@ func constructStatefulSetSpec(r statemachine.ReconcilerInterface, config *common
 	return statefulSet, nil
 }
 
-func constructCodeServerContainers(config *common.KodeResourceConfig, workspace string) []corev1.Container {
+func constructCodeServerContainers(kode *kodev1alpha2.Kode, config *common.KodeResourceConfig, workspace string) []corev1.Container {
 	env := []corev1.EnvVar{
 		{Name: "PUID", Value: fmt.Sprintf("%d", config.Template.ContainerTemplateSpec.PUID)},
 		{Name: "PGID", Value: fmt.Sprintf("%d", config.Template.ContainerTemplateSpec.PGID)},
 		{Name: "TZ", Value: config.Template.ContainerTemplateSpec.TZ},
-		{Name: "PORT", Value: fmt.Sprintf("%d", *config.Port)},
+		{Name: "PORT", Value: fmt.Sprintf("%d", config.Port)},
 		{Name: "USERNAME", Value: config.Credentials.Username},
 		{Name: "DEFAULT_WORKSPACE", Value: workspace},
 	}
@@ -184,7 +184,7 @@ func constructCodeServerContainers(config *common.KodeResourceConfig, workspace 
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{
-						Name: config.SecretName,
+						Name: kode.GetSecretName(),
 					},
 					Key: "password",
 				},
@@ -198,17 +198,17 @@ func constructCodeServerContainers(config *common.KodeResourceConfig, workspace 
 		Env:   env,
 		Ports: []corev1.ContainerPort{{
 			Name:          "http",
-			ContainerPort: int32(*config.Port),
+			ContainerPort: int32(config.Port),
 		}},
 	}}
 }
 
-func constructWebtopContainers(config *common.KodeResourceConfig) []corev1.Container {
+func constructWebtopContainers(kode *kodev1alpha2.Kode, config *common.KodeResourceConfig) []corev1.Container {
 	env := []corev1.EnvVar{
 		{Name: "PUID", Value: fmt.Sprintf("%d", config.Template.ContainerTemplateSpec.PUID)},
 		{Name: "PGID", Value: fmt.Sprintf("%d", config.Template.ContainerTemplateSpec.PGID)},
 		{Name: "TZ", Value: config.Template.ContainerTemplateSpec.TZ},
-		{Name: "CUSTOM_PORT", Value: fmt.Sprintf("%d", *config.Port)},
+		{Name: "CUSTOM_PORT", Value: fmt.Sprintf("%d", config.Port)},
 		{Name: "CUSTOM_USER", Value: config.Credentials.Username},
 	}
 
@@ -218,7 +218,7 @@ func constructWebtopContainers(config *common.KodeResourceConfig) []corev1.Conta
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{
-						Name: config.SecretName,
+						Name: kode.GetSecretName(),
 					},
 					Key: "password",
 				},
@@ -232,12 +232,12 @@ func constructWebtopContainers(config *common.KodeResourceConfig) []corev1.Conta
 		Env:   env,
 		Ports: []corev1.ContainerPort{{
 			Name:          "http",
-			ContainerPort: int32(*config.Port),
+			ContainerPort: int32(config.Port),
 		}},
 	}}
 }
 
-func constructVolumesAndMounts(mountPath string, config *common.KodeResourceConfig) ([]corev1.Volume, []corev1.VolumeMount) {
+func constructVolumesAndMounts(mountPath string, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig) ([]corev1.Volume, []corev1.VolumeMount) {
 	volumes := []corev1.Volume{}
 	volumeMounts := []corev1.VolumeMount{}
 
@@ -246,7 +246,7 @@ func constructVolumesAndMounts(mountPath string, config *common.KodeResourceConf
 
 		volumeSource := corev1.VolumeSource{
 			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-				ClaimName: config.PVCName,
+				ClaimName: kode.GetPVCName(),
 			},
 		}
 

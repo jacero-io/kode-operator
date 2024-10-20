@@ -61,7 +61,7 @@ func ensurePersistentVolumeClaim(ctx context.Context, r statemachine.ReconcilerI
 
 	pvc := &corev1.PersistentVolumeClaim{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      config.PVCName,
+			Name:      kode.GetPVCName(),
 			Namespace: config.CommonConfig.Namespace,
 			Labels:    config.CommonConfig.Labels,
 		},

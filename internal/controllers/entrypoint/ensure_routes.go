@@ -252,27 +252,10 @@ func (r *EntryPointReconciler) constructSecurityPolicy(config *common.EntryPoint
 
 	securityPolicySpec := config.EntryPointSpec.AuthSpec.SecurityPolicySpec
 
-	// Handle OIDC configuration
-	if securityPolicySpec.OIDC != nil {
-		spec.OIDC = securityPolicySpec.OIDC
-		configureOIDC(spec.OIDC, config)
-	}
-
-	// Handle JWT configuration
-	if securityPolicySpec.JWT != nil {
-		spec.JWT = securityPolicySpec.JWT
-		configureJWT(spec.JWT, config)
-	}
-
 	// Handle ExtAuth configuration
 	if securityPolicySpec.ExtAuth != nil {
 		spec.ExtAuth = securityPolicySpec.ExtAuth
 		configureExtAuth(spec.ExtAuth, config)
-	}
-
-	// Handle BasicAuth configuration
-	if securityPolicySpec.BasicAuth != nil {
-		spec.BasicAuth = securityPolicySpec.BasicAuth
 	}
 
 	log.Info("Constructed Policy", "name", policyName)
@@ -285,44 +268,6 @@ func (r *EntryPointReconciler) constructSecurityPolicy(config *common.EntryPoint
 		},
 		Spec: *spec,
 	}, nil
-}
-
-func configureOIDC(oidc *egv1alpha1.OIDC, config *common.EntryPointResourceConfig) {
-	if config.HasIdentityReference() && config.EntryPointSpec.AuthSpec.SecurityPolicySpec.ExtAuth != nil {
-		if oidc.Scopes == nil {
-			oidc.Scopes = []string{}
-		}
-		oidc.Scopes = append(oidc.Scopes, "openid", "profile")
-
-		forwardAccessToken := true
-		oidc.ForwardAccessToken = &forwardAccessToken
-	}
-}
-
-func configureJWT(jwt *egv1alpha1.JWT, config *common.EntryPointResourceConfig) {
-	if config.HasIdentityReference() && config.EntryPointSpec.AuthSpec.SecurityPolicySpec.ExtAuth != nil {
-		identityRef := string(*config.IdentityReference)
-
-		// Ensure we have at least one provider
-		if len(jwt.Providers) == 0 {
-			jwt.Providers = []egv1alpha1.JWTProvider{{
-				Name: "default-provider",
-			}}
-		}
-
-		// Configure the first provider (or the only one if there's just one)
-		provider := &jwt.Providers[0]
-
-		// Set up claim to header mapping
-		provider.ClaimToHeaders = append(provider.ClaimToHeaders, egv1alpha1.ClaimToHeader{
-			Header: "x-auth-user-id",
-			Claim:  identityRef,
-		})
-
-		// Enable route recomputation
-		recomputeRoute := true
-		provider.RecomputeRoute = &recomputeRoute
-	}
 }
 
 func configureExtAuth(extAuth *egv1alpha1.ExtAuth, config *common.EntryPointResourceConfig) {

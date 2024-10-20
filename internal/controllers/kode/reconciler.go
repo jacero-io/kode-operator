@@ -59,8 +59,6 @@ type KodeReconciler struct {
 // +kubebuilder:rbac:groups=kode.jacero.io,resources=kodes/finalizers,verbs=update
 // +kubebuilder:rbac:groups=kode.jacero.io,resources=containertemplates,verbs=get;list;watch
 // +kubebuilder:rbac:groups=kode.jacero.io,resources=clustercontainertemplates,verbs=get;list;watch
-// +kubebuilder:rbac:groups=kode.jacero.io,resources=tofutemplates,verbs=get;list;watch
-// +kubebuilder:rbac:groups=kode.jacero.io,resources=clustertofutemplates,verbs=get;list;watch
 // +kubebuilder:rbac:groups="coordination.k8s.io",resources=leases,verbs=get;list;watch;create;update;patch;delete,namespace=kode-system
 // +kubebuilder:rbac:groups="storage.k8s.io",resources=storageclasses,verbs=get;list;watch
 // +kubebuilder:rbac:groups="apps",resources=statefulsets,verbs=get;list;watch;create;update;patch;delete
@@ -85,19 +83,9 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	}
 	log.V(1).Info("Fetched Kode resource", "Name", kode.Name, "Namespace", kode.Namespace, "Generation", kode.Generation, "ObservedGeneration", kode.Status.ObservedGeneration, "Phase", kode.Status.Phase)
 
-	sm := statemachine.NewStateMachine(r.Client, r.Log)
-	sm.RegisterHandler(kodev1alpha2.PhasePending, handlePendingState)
-	sm.RegisterHandler(kodev1alpha2.PhaseConfiguring, handleConfiguringState)
-	sm.RegisterHandler(kodev1alpha2.PhaseProvisioning, handleProvisioningState)
-	sm.RegisterHandler(kodev1alpha2.PhaseActive, handleActiveState)
-	sm.RegisterHandler(kodev1alpha2.PhaseUpdating, handleUpdatingState)
-	sm.RegisterHandler(kodev1alpha2.PhaseDeleting, handleDeletingState)
-	sm.RegisterHandler(kodev1alpha2.PhaseFailed, handleFailedState)
-	sm.RegisterHandler(kodev1alpha2.PhaseUnknown, handleUnknownState)
-
 	// Handle finalizer
 	if !kode.DeletionTimestamp.IsZero() {
-		if !controllerutil.ContainsFinalizer(kode, constant.KodeFinalizerName) {
+		if !controllerutil.ContainsFinalizer(kode, kode.GetFinalizer()) {
 			// Consider the resource deleted, do nothing
 			return ctrl.Result{}, nil
 		}
@@ -106,18 +94,25 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		if err := kode.UpdateStatus(ctx, r.Client); err != nil {
 			return ctrl.Result{Requeue: true}, err
 		}
+	}
 
-		// When the Kode resource is completely new, add the finalizer and transition to Pending state
-	} else if !controllerutil.ContainsFinalizer(kode, constant.KodeFinalizerName) {
-		controllerutil.AddFinalizer(kode, constant.KodeFinalizerName)
-		log.Info("Added finalizer to Kode resource")
+	// Add finalizer and initialize resource if not already done
+	if !controllerutil.ContainsFinalizer(kode, kode.GetFinalizer()) {
+		log.Info("Adding finalizer to Kode resource")
+		err := kode.AddFinalizer(ctx, r.Client)
+		if err != nil {
+			log.Error(err, "Failed to add finalizer")
+			return ctrl.Result{RequeueAfter: r.GetReconcileInterval()}, err
+		}
 
-		// Transition to Pending state to begin initialization
-		log.Info("Transitioning to Pending state to begin initialization")
+		log.Info("Initializing Kode resource")
 		kode.Status.Phase = kodev1alpha2.PhasePending
+		kode.Status.ObservedGeneration = kode.Generation
 		if err := kode.UpdateStatus(ctx, r.Client); err != nil {
 			return ctrl.Result{Requeue: true}, err
 		}
+
+		// Requeue to handle the rest of the reconciliation
 		return ctrl.Result{Requeue: true}, nil
 	}
 
@@ -133,6 +128,16 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 			return ctrl.Result{Requeue: true}, err
 		}
 	}
+
+	sm := statemachine.NewStateMachine(r.Client, r.Log)
+	sm.RegisterHandler(kodev1alpha2.PhasePending, handlePendingState)
+	sm.RegisterHandler(kodev1alpha2.PhaseConfiguring, handleConfiguringState)
+	sm.RegisterHandler(kodev1alpha2.PhaseProvisioning, handleProvisioningState)
+	sm.RegisterHandler(kodev1alpha2.PhaseActive, handleActiveState)
+	sm.RegisterHandler(kodev1alpha2.PhaseUpdating, handleUpdatingState)
+	sm.RegisterHandler(kodev1alpha2.PhaseDeleting, handleDeletingState)
+	sm.RegisterHandler(kodev1alpha2.PhaseFailed, handleFailedState)
+	sm.RegisterHandler(kodev1alpha2.PhaseUnknown, handleUnknownState)
 
 	// Run state machine
 	result, err := sm.HandleState(ctx, r, kode)
@@ -174,8 +179,6 @@ func (r *KodeReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		// WithEventFilter(predicate.GenerationChangedPredicate{}).
 		// Watches(&kodev1alpha2.ContainerTemplate{}, &handler.EnqueueRequestForObject{}).
 		// Watches(&kodev1alpha2.ClusterContainerTemplate{}, &handler.EnqueueRequestForObject{}).
-		// Watches(&kodev1alpha2.TofuTemplate{}, &handler.EnqueueRequestForObject{}).
-		// Watches(&kodev1alpha2.ClusterTofuTemplate{}, &handler.EnqueueRequestForObject{}).
 		WithOptions(controller.Options{MaxConcurrentReconciles: 2}).
 		Complete(r)
 }

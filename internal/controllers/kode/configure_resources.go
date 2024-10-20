@@ -90,7 +90,7 @@ func applyConfiguration(ctx context.Context, r statemachine.ReconcilerInterface,
 
 func detectSecretChanges(ctx context.Context, resource resource.ResourceManager, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig, changes map[string]interface{}) error {
 	existing := &corev1.Secret{}
-	err := resource.Get(ctx, types.NamespacedName{Name: config.SecretName, Namespace: kode.Namespace}, existing)
+	err := resource.Get(ctx, types.NamespacedName{Name: kode.GetSecretName(), Namespace: kode.Namespace}, existing)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			changes["secret"] = true
@@ -137,7 +137,7 @@ func detectServiceChanges(ctx context.Context, r statemachine.ReconcilerInterfac
 
 func detectStatefulSetChanges(ctx context.Context, r statemachine.ReconcilerInterface, resource resource.ResourceManager, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig, changes map[string]interface{}) error {
 	existing := &appsv1.StatefulSet{}
-	err := resource.Get(ctx, types.NamespacedName{Name: config.StatefulSetName, Namespace: kode.Namespace}, existing)
+	err := resource.Get(ctx, types.NamespacedName{Name: kode.GetStatefulSetName(), Namespace: kode.Namespace}, existing)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			changes["statefulset"] = true
@@ -147,7 +147,7 @@ func detectStatefulSetChanges(ctx context.Context, r statemachine.ReconcilerInte
 	}
 
 	// Compare existing statefulset with desired configuration
-	desiredStatefulSet, err := constructStatefulSetSpec(r, config)
+	desiredStatefulSet, err := constructStatefulSetSpec(r, kode, config)
 	if err != nil {
 		return err
 	}
@@ -162,7 +162,7 @@ func detectStatefulSetChanges(ctx context.Context, r statemachine.ReconcilerInte
 
 func detectPVCChanges(ctx context.Context, r statemachine.ReconcilerInterface, resource resource.ResourceManager, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig, changes map[string]interface{}) error {
 	existing := &corev1.PersistentVolumeClaim{}
-	err := resource.Get(ctx, types.NamespacedName{Name: config.PVCName, Namespace: kode.Namespace}, existing)
+	err := resource.Get(ctx, types.NamespacedName{Name: kode.GetPVCName(), Namespace: kode.Namespace}, existing)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			changes["pvc"] = true

@@ -51,12 +51,6 @@ func (r *EntryPointReconciler) findEntryPointForKode(ctx context.Context, kode *
 			return nil, fmt.Errorf("invalid ContainerTemplate: missing ContainerTemplateSpec")
 		}
 		entryPointRef = template.ContainerTemplateSpec.CommonSpec.EntryPointRef
-	case kodev1alpha2.Kind(kodev1alpha2.TemplateKindTofu),
-		kodev1alpha2.Kind(kodev1alpha2.TemplateKindClusterTofu):
-		if template.TofuTemplateSpec == nil {
-			return nil, fmt.Errorf("invalid TofuTemplate: missing TofuTemplateSpec")
-		}
-		entryPointRef = template.TofuTemplateSpec.CommonSpec.EntryPointRef
 	default:
 		return nil, fmt.Errorf("unknown template kind: %s", template.Kind)
 	}

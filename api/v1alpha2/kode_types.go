@@ -24,6 +24,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/jacero-io/kode-operator/pkg/constant"
 )
@@ -228,6 +229,64 @@ func (k *Kode) DeleteCondition(conditionType constant.ConditionType) {
 	k.Status.DeleteCondition(conditionType)
 }
 
+func (k *Kode) GetFinalizer() string {
+	return constant.KodeFinalizerName
+}
+
+func (k *Kode) AddFinalizer(ctx context.Context, c client.Client) error {
+	// Fetch the latest version of the Kode
+	latestKode := &Kode{}
+	if err := c.Get(ctx, client.ObjectKey{Name: k.Name, Namespace: k.Namespace}, latestKode); err != nil {
+		return client.IgnoreNotFound(err)
+	}
+	controllerutil.AddFinalizer(latestKode, k.GetFinalizer())
+	if err := c.Update(ctx, latestKode); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (k *Kode) RemoveFinalizer(ctx context.Context, c client.Client) error {
+	// Fetch the latest version of the Kode
+	latestKode := &Kode{}
+	if err := c.Get(ctx, client.ObjectKey{Name: k.Name, Namespace: k.Namespace}, latestKode); err != nil {
+		return client.IgnoreNotFound(err)
+	}
+	controllerutil.RemoveFinalizer(latestKode, k.GetFinalizer())
+	if err := c.Update(ctx, latestKode); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (k *Kode) GetSecretName() string {
+	if k.Spec.Credentials != nil && k.Spec.Credentials.ExistingSecret != nil {
+		return *k.Spec.Credentials.ExistingSecret
+	} else { // If ExistingSecret is not specified, use Kode secret name
+		return fmt.Sprintf("%s-auth", k.Name)
+	}
+}
+
+func (k *Kode) GetServiceName() string {
+	return k.Name + "-svc"
+}
+
+func (k *Kode) GetStatefulSetName() string {
+	return k.Name
+}
+
+func (k *Kode) GetPVCName() string {
+	if k.Spec.Storage != nil && k.Spec.Storage.ExistingVolumeClaim != nil {
+		return *k.Spec.Storage.ExistingVolumeClaim
+	} else {
+		return k.Name + "-pvc"
+	}
+}
+
+func (k *Kode) GetPort() Port {
+	return k.Status.KodePort
+}
+
 func (k *Kode) SetRuntime(runtime Runtime, ctx context.Context, c client.Client) {
 	k.Status.Runtime = &runtime
 	k.UpdateStatus(ctx, c)
@@ -235,17 +294,6 @@ func (k *Kode) SetRuntime(runtime Runtime, ctx context.Context, c client.Client)
 
 func (k *Kode) GetRuntime() *Runtime {
 	return k.Status.Runtime
-}
-
-func (k *Kode) UpdatePort(ctx context.Context, c client.Client, port Port) error {
-	patch := client.MergeFrom(k.DeepCopy())
-	k.Status.KodePort = port
-
-	err := c.Status().Patch(ctx, k, patch)
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 func (k *Kode) UpdateUrl(ctx context.Context, c client.Client, kodeUrl KodeUrl) error {
@@ -257,22 +305,6 @@ func (k *Kode) UpdateUrl(ctx context.Context, c client.Client, kodeUrl KodeUrl) 
 		return err
 	}
 	return nil
-}
-
-func (k *Kode) GetSecretName() string {
-	return fmt.Sprintf("%s-auth", k.Name)
-}
-
-func (k *Kode) GetServiceName() string {
-	return k.Name + "-svc"
-}
-
-func (k *Kode) GetPVCName() string {
-	return k.Name + "-pvc"
-}
-
-func (k *Kode) GetPort() Port {
-	return k.Status.KodePort
 }
 
 func (k *Kode) GenerateKodeUrlForEntryPoint(
