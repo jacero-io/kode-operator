@@ -16,123 +16,150 @@ limitations under the License.
 
 package envoy
 
-type Port uint32
+import (
+	runtime "k8s.io/apimachinery/pkg/runtime"
+)
 
 type AccessLog struct {
-	Name        string                 `json:"name" yaml:"name"`
-	TypedConfig map[string]interface{} `json:"typed_config" yaml:"typedConfig"`
+	Name        string               `json:"name" yaml:"name"`
+	TypedConfig runtime.RawExtension `json:"typed_config" yaml:"typed_config"`
 }
 
 type SocketAddress struct {
 	Address   string `json:"address" yaml:"address"`
-	PortValue Port   `json:"port_value" yaml:"portValue"`
+	Protocol  string `json:"protocol,omitempty" yaml:"protocol,omitempty"`
+	PortValue uint32 `json:"port_value,omitempty" yaml:"port_value,omitempty"`
+}
+
+type Pipe struct {
+	Path string `json:"path" yaml:"path"`
+	Mode uint32 `json:"mode,omitempty" yaml:"mode,omitempty"`
+}
+
+type EnvoyInternalAddress struct {
+	ServerListenerName string `json:"server_listener_name" yaml:"server_listener_name"`
+	EndpointId         string `json:"endpoint_id,omitempty" yaml:"endpoint_id,omitempty"`
 }
 
 type Address struct {
-	SocketAddress        SocketAddress `json:"socket_address" yaml:"socketAddress"`
-	Pipe                 interface{}   `json:"pipe,omitempty" yaml:"pipe,omitempty"`
-	EnvoyInternalAddress interface{}   `json:"envoy_internal_address,omitempty" yaml:"envoyInternalAddress,omitempty"`
+	SocketAddress        SocketAddress        `json:"socket_address" yaml:"socket_address"`
+	Pipe                 Pipe                 `json:"pipe,omitempty" yaml:"pipe,omitempty"`
+	EnvoyInternalAddress EnvoyInternalAddress `json:"envoy_internal_address,omitempty" yaml:"envoy_internal_address,omitempty"`
+}
+
+type AdditionalAddress struct {
+	Address Address `json:"address" yaml:"address"`
+}
+
+type HealthCheckConfig struct {
+	PortValue                uint32  `json:"port_value" yaml:"port_value"`
+	Hostname                 string  `json:"hostname" yaml:"hostname,omitempty"`
+	Address                  Address `json:"address" yaml:"address,omitempty"`
+	DisableActiveHealthCheck bool    `json:"disable_active_health_check,omitempty" yaml:"disable_active_health_check,omitempty"`
 }
 
 type UpgradeConfig struct {
-	UpgradeType string `json:"upgrade_type" yaml:"upgradeType"`
+	UpgradeType string `json:"upgrade_type" yaml:"upgrade_type"`
+}
+
+type Endpoint struct {
+	Address             Address             `json:"address" yaml:"address"`
+	HealthCheckConfig   HealthCheckConfig   `json:"health_check_config,omitempty" yaml:"health_check_config,omitempty"`
+	Hostname            string              `json:"hostname,omitempty" yaml:"hostname,omitempty"`
+	AdditionalAddresses []AdditionalAddress `json:"additional_addresses,omitempty" yaml:"additional_addresses,omitempty"`
+}
+
+type LbEndpoint struct {
+	Endpoint            Endpoint             `json:"endpoint" yaml:"endpoint"`
+	HealthStatus        string               `json:"health_status,omitempty" yaml:"health_status,omitempty"`
+	Metadata            runtime.RawExtension `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+	LoadBalancingWeight uint32               `json:"load_balancing_weight,omitempty" yaml:"load_balancing_weight,omitempty"`
+}
+
+type Locality struct {
+	Region  string `json:"region,omitempty" yaml:"region,omitempty"`
+	Zone    string `json:"zone,omitempty" yaml:"zone,omitempty"`
+	SubZone string `json:"sub_zone,omitempty" yaml:"sub_zone,omitempty"`
+}
+
+type LocalityLbEndpoints struct {
+	Locality            Locality             `json:"locality,omitempty" yaml:"locality,omitempty"`
+	Metadata            runtime.RawExtension `json:"metadata,omitempty" yaml:"metadata,omitempty"`
+	LbEndpoints         []LbEndpoint         `json:"lb_endpoints" yaml:"lb_endpoints"`
+	LoadBalancingWeight uint32               `json:"load_balancing_weight,omitempty" yaml:"load_balancing_weight,omitempty"`
+	Priority            uint32               `json:"priority,omitempty" yaml:"priority,omitempty"`
+}
+
+type LoadAssignment struct {
+	ClusterName string                `json:"cluster_name" yaml:"cluster_name"`
+	Endpoints   []LocalityLbEndpoints `json:"endpoints" yaml:"endpoints"`
+	Policy      runtime.RawExtension  `json:"policy,omitempty" yaml:"policy,omitempty"`
+}
+
+type HTTPFilter struct {
+	Name        string               `json:"name" yaml:"name"`
+	TypedConfig runtime.RawExtension `json:"typed_config" yaml:"typed_config"`
 }
 
 type Cluster struct {
-	Name                          string         `json:"name" yaml:"name"`
-	ConnectTimeout                string         `json:"connect_timeout" yaml:"connectTimeout"`
-	Type                          string         `json:"type" yaml:"type"`
-	LbPolicy                      string         `json:"lb_policy" yaml:"lbPolicy"`
-	TypedExtensionProtocolOptions interface{}    `json:"typed_extension_protocol_options,omitempty" yaml:"typedExtensionProtocolOptions,omitempty"`
-	LoadAssignment                LoadAssignment `json:"load_assignment" yaml:"loadAssignment"`
+	Name                          string               `json:"name" yaml:"name"`
+	ConnectTimeout                string               `json:"connect_timeout" yaml:"connect_timeout"`
+	Type                          string               `json:"type" yaml:"type"`
+	LbPolicy                      string               `json:"lb_policy" yaml:"lb_policy"`
+	TypedExtensionProtocolOptions runtime.RawExtension `json:"typed_extension_protocol_options,omitempty" yaml:"typed_extension_protocol_options,omitempty"`
+	LoadAssignment                LoadAssignment       `json:"load_assignment" yaml:"load_assignment"`
 }
 
 type Listener struct {
 	Name         string        `json:"name" yaml:"name"`
 	Address      Address       `json:"address" yaml:"address"`
-	FilterChains []FilterChain `json:"filter_chains" yaml:"filterChains"`
-}
-
-type Endpoint struct {
-	Address             Address       `json:"address" yaml:"address"`
-	HealthCheckConfig   interface{}   `json:"health_check_config,omitempty" yaml:"healthCheckConfig,omitempty"`
-	Hostname            string        `json:"hostname,omitempty" yaml:"hostname,omitempty"`
-	AdditionalAddresses []interface{} `json:"additional_addresses,omitempty" yaml:"additionalAddresses,omitempty"`
-}
-
-type LbEndpoint struct {
-	Endpoint            Endpoint    `json:"endpoint" yaml:"endpoint"`
-	HealthStatus        string      `json:"health_status,omitempty" yaml:"healthStatus,omitempty"`
-	Metadata            interface{} `json:"metadata,omitempty" yaml:"metadata,omitempty"`
-	LoadBalancingWeight interface{} `json:"load_balancing_weight,omitempty" yaml:"loadBalancingWeight,omitempty"`
-}
-
-type LocalityLbEndpoints struct {
-	Locality                  interface{}  `json:"locality,omitempty" yaml:"locality,omitempty"`
-	LbEndpoints               []LbEndpoint `json:"lb_endpoints" yaml:"lbEndpoints"`
-	LoadBalancerEndpoints     interface{}  `json:"load_balancer_endpoints,omitempty" yaml:"loadBalancerEndpoints,omitempty"`
-	LedsClusterLocalityConfig interface{}  `json:"leds_cluster_locality_config,omitempty" yaml:"ledsClusterLocalityConfig,omitempty"`
-	LoadBalancingWeight       interface{}  `json:"load_balancing_weight,omitempty" yaml:"loadBalancingWeight,omitempty"`
-	Priority                  uint32       `json:"priority,omitempty" yaml:"priority,omitempty"`
-}
-
-type LoadAssignment struct {
-	ClusterName string                `json:"cluster_name" yaml:"clusterName"`
-	Endpoints   []LocalityLbEndpoints `json:"endpoints" yaml:"endpoints"`
-	Policy      interface{}           `json:"policy,omitempty" yaml:"policy,omitempty"`
-}
-
-type HTTPFilter struct {
-	Name        string                 `json:"name" yaml:"name"`
-	TypedConfig map[string]interface{} `json:"typed_config" yaml:"typedConfig"`
-}
-
-type TypedConfig struct {
-	Type           string          `json:"@type" yaml:"@type"`
-	CodecType      string          `json:"codec_type" yaml:"codecType"`
-	StatPrefix     string          `json:"stat_prefix" yaml:"statPrefix"`
-	AccessLog      []AccessLog     `json:"access_log" yaml:"accessLog"`
-	UpgradeConfigs []UpgradeConfig `json:"upgrade_configs,omitempty" yaml:"upgradeConfigs,omitempty"`
-	RouteConfig    RouteConfig     `json:"route_config" yaml:"routeConfig"`
-	HTTPFilters    []HTTPFilter    `json:"http_filters" yaml:"httpFilters"`
+	FilterChains []FilterChain `json:"filter_chains" yaml:"filter_chains"`
 }
 
 type Filter struct {
-	Name        string      `json:"name" yaml:"name"`
-	TypedConfig TypedConfig `json:"typed_config" yaml:"typedConfig"`
+	Name        string               `json:"name" yaml:"name"`
+	TypedConfig runtime.RawExtension `json:"typed_config" yaml:"typed_config"`
 }
 
 type FilterChain struct {
 	Filters []Filter `json:"filters" yaml:"filters"`
 }
 
+type Match struct {
+	Prefix string `json:"prefix" yaml:"prefix"`
+}
+
+type SingleRoute struct {
+	Cluster       string `json:"cluster" yaml:"cluster"`
+	PrefixRewrite string `json:"prefix_rewrite,omitempty" yaml:"prefix_rewrite,omitempty"`
+}
+
+type Redirect struct {
+	HTTPSRedirect bool `json:"https_redirect" yaml:"https_redirect"`
+}
+
 type Route struct {
-	Match struct {
-		Prefix string `json:"prefix" yaml:"prefix"`
-	} `json:"match" yaml:"match"`
-	Route *struct {
-		Cluster       string `json:"cluster" yaml:"cluster"`
-		PrefixRewrite string `json:"prefix_rewrite,omitempty" yaml:"prefixRewrite,omitempty"`
-	} `json:"route,omitempty" yaml:"route,omitempty"`
-	Redirect *struct {
-		HTTPSRedirect bool `json:"https_redirect" yaml:"httpsRedirect"`
-	} `json:"redirect,omitempty" yaml:"redirect,omitempty"`
-	TypedPerFilterConfig interface{} `json:"typed_per_filter_config,omitempty" yaml:"typedPerFilterConfig,omitempty"`
+	Match                Match                `json:"match" yaml:"match"`
+	Route                *SingleRoute         `json:"route,omitempty" yaml:"route,omitempty"`
+	Redirect             *Redirect            `json:"redirect,omitempty" yaml:"redirect,omitempty"`
+	TypedPerFilterConfig runtime.RawExtension `json:"typed_per_filter_config,omitempty" yaml:"typed_per_filter_config,omitempty"`
+}
+
+type VirtualHost struct {
+	Name    string   `json:"name" yaml:"name"`
+	Domains []string `json:"domains" yaml:"domains"`
+	Routes  []Route  `json:"routes" yaml:"routes"`
 }
 
 type RouteConfig struct {
-	Name         string `json:"name" yaml:"name"`
-	VirtualHosts []struct {
-		Name    string   `json:"name" yaml:"name"`
-		Domains []string `json:"domains" yaml:"domains"`
-		Routes  []Route  `json:"routes" yaml:"routes"`
-	} `json:"virtual_hosts" yaml:"virtualHosts"`
+	Name         string        `json:"name" yaml:"name"`
+	VirtualHosts []VirtualHost `json:"virtual_hosts" yaml:"virtual_hosts"`
 }
 
 type AdminServer struct {
-	AccessLogPath string  `json:"access_log_path" yaml:"accessLogPath"`
+	AccessLogPath string  `json:"access_log_path" yaml:"access_log_path"`
 	Address       Address `json:"address" yaml:"address"`
-	PortValue     Port    `json:"port_value" yaml:"portValue"`
+	PortValue     uint32  `json:"port_value" yaml:"port_value"`
 }
 
 // Slice types

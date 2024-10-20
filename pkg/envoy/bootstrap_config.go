@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/jacero-io/kode-operator/internal/common"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
 type BootstrapConfigGenerator struct {
@@ -17,9 +18,39 @@ func NewBootstrapConfigGenerator(log logr.Logger) *BootstrapConfigGenerator {
 }
 
 func (g *BootstrapConfigGenerator) GenerateEnvoyConfig(config *common.KodeResourceConfig, useBasicAuth bool) (string, error) {
+	httpConnectionManager := map[string]interface{}{
+		"@type":       "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager",
+		"stat_prefix": "ingress_http",
+		"codec_type":  "AUTO",
+		"route_config": map[string]interface{}{
+			"name": "local_route",
+			"virtual_hosts": []map[string]interface{}{
+				{
+					"name":    "local_service",
+					"domains": []string{"*"},
+					"routes": []map[string]interface{}{
+						{
+							"match": map[string]interface{}{
+								"prefix": "/",
+							},
+							"route": map[string]interface{}{
+								"cluster": "local_service",
+							},
+						},
+					},
+				},
+			},
+		},
+		"http_filters": g.getHTTPFilters(useBasicAuth),
+	}
+
+	httpConnectionManagerJSON, err := json.Marshal(httpConnectionManager)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal HTTP connection manager: %w", err)
+	}
+
 	bootstrapConfig := struct {
 		Admin           AdminServer `json:"admin"`
-		StaticClusters  Clusters    `json:"static_clusters"`
 		StaticResources struct {
 			Listeners Listeners `json:"listeners"`
 			Clusters  Clusters  `json:"clusters"`
@@ -44,7 +75,7 @@ func (g *BootstrapConfigGenerator) GenerateEnvoyConfig(config *common.KodeResour
 					Address: Address{
 						SocketAddress: SocketAddress{
 							Address:   "0.0.0.0",
-							PortValue: Port(config.Port),
+							PortValue: uint32(config.Port),
 						},
 					},
 					FilterChains: []FilterChain{
@@ -52,47 +83,8 @@ func (g *BootstrapConfigGenerator) GenerateEnvoyConfig(config *common.KodeResour
 							Filters: []Filter{
 								{
 									Name: "envoy.filters.network.http_connection_manager",
-									TypedConfig: TypedConfig{
-										Type:       "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager",
-										CodecType:  "AUTO",
-										StatPrefix: "ingress_http",
-										AccessLog: []AccessLog{
-											{
-												Name: "envoy.access_loggers.stdout",
-												TypedConfig: map[string]interface{}{
-													"@type": "type.googleapis.com/envoy.extensions.access_loggers.stream.v3.StdoutAccessLog",
-												},
-											},
-										},
-										RouteConfig: RouteConfig{
-											Name: "local_route",
-											VirtualHosts: []struct {
-												Name    string   `json:"name" yaml:"name"`
-												Domains []string `json:"domains" yaml:"domains"`
-												Routes  []Route  `json:"routes" yaml:"routes"`
-											}{
-												{
-													Name:    "local_service",
-													Domains: []string{"*"},
-													Routes: []Route{
-														{
-															Match: struct {
-																Prefix string `json:"prefix" yaml:"prefix"`
-															}{
-																Prefix: "/",
-															},
-															Route: &struct {
-																Cluster       string `json:"cluster" yaml:"cluster"`
-																PrefixRewrite string `json:"prefix_rewrite,omitempty" yaml:"prefixRewrite,omitempty"`
-															}{
-																Cluster: "local_service",
-															},
-														},
-													},
-												},
-											},
-										},
-										HTTPFilters: g.getHTTPFilters(useBasicAuth),
+									TypedConfig: runtime.RawExtension{
+										Raw: httpConnectionManagerJSON,
 									},
 								},
 							},
@@ -113,13 +105,13 @@ func (g *BootstrapConfigGenerator) GenerateEnvoyConfig(config *common.KodeResour
 	return string(jsonConfig), nil
 }
 
-func (g *BootstrapConfigGenerator) getHTTPFilters(useBasicAuth bool) []HTTPFilter {
-	filters := []HTTPFilter{}
+func (g *BootstrapConfigGenerator) getHTTPFilters(useBasicAuth bool) []map[string]interface{} {
+	filters := []map[string]interface{}{}
 
 	if useBasicAuth {
-		filters = append(filters, HTTPFilter{
-			Name: "envoy.filters.http.ext_authz",
-			TypedConfig: map[string]interface{}{
+		filters = append(filters, map[string]interface{}{
+			"name": "envoy.filters.http.ext_authz",
+			"typed_config": map[string]interface{}{
 				"@type": "type.googleapis.com/envoy.extensions.filters.http.ext_authz.v3.ExtAuthz",
 				"grpc_service": map[string]interface{}{
 					"envoy_grpc": map[string]interface{}{
@@ -131,9 +123,9 @@ func (g *BootstrapConfigGenerator) getHTTPFilters(useBasicAuth bool) []HTTPFilte
 		})
 	}
 
-	filters = append(filters, HTTPFilter{
-		Name: "envoy.filters.http.router",
-		TypedConfig: map[string]interface{}{
+	filters = append(filters, map[string]interface{}{
+		"name": "envoy.filters.http.router",
+		"typed_config": map[string]interface{}{
 			"@type": "type.googleapis.com/envoy.extensions.filters.http.router.v3.Router",
 		},
 	})
@@ -141,8 +133,8 @@ func (g *BootstrapConfigGenerator) getHTTPFilters(useBasicAuth bool) []HTTPFilte
 	return filters
 }
 
-func (g *BootstrapConfigGenerator) getClusters(config *common.KodeResourceConfig, useBasicAuth bool) []Cluster {
-	clusters := []Cluster{
+func (g *BootstrapConfigGenerator) getClusters(config *common.KodeResourceConfig, useBasicAuth bool) Clusters {
+	clusters := Clusters{
 		{
 			Name:           "local_service",
 			ConnectTimeout: "0.25s",
@@ -158,7 +150,7 @@ func (g *BootstrapConfigGenerator) getClusters(config *common.KodeResourceConfig
 									Address: Address{
 										SocketAddress: SocketAddress{
 											Address:   "127.0.0.1",
-											PortValue: Port(config.Port),
+											PortValue: uint32(config.Port),
 										},
 									},
 								},
