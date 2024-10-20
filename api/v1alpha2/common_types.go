@@ -89,7 +89,7 @@ type Template struct {
 
 	// ContainerTemplateSpec is a reference to a ContainerTemplate or ClusterContainerTemplate
 	ContainerTemplateSpec *ContainerTemplateSharedSpec `json:"container,omitempty" yaml:"container,omitempty"`
-	
+
 	// VirtualTemplateSpec is a reference to a VirtualTemplate or ClusterVirtualTemplate
 	// VirtualTemplateSpec *VirtualTemplateSharedSpec `json:"virtual,omitempty" yaml:"virtual,omitempty"`
 

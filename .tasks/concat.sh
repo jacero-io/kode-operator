@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # Output file
-output_file="concatenated_output.txt"
+output_file="concatenated_output_kode.txt"
 
 # Create or empty the output file
 > "$output_file"

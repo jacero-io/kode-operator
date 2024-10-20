@@ -14,7 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package v1alpha2
+package envoy
+
+type Port uint32
 
 type AccessLog struct {
 	Name        string                 `json:"name" yaml:"name"`

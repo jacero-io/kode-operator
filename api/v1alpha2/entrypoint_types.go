@@ -75,9 +75,9 @@ type GatewaySpec struct {
 }
 
 type AuthSpec struct {
-	// The Envoy Gateway SecurityPolicy to use for the authentication. Can be either "none", "basicAuth", "jwt", "oidc", "extAuth" or "authorization". Reference: https://gateway.envoyproxy.io/contributions/design/security-policy/
-	// +kubebuilder:validation:Enum=none;extAuth
-	// +kubebuilder:default=none
+	// The Envoy Gateway SecurityPolicy to use for the authentication. Can be either "none", "basicAuth", "oidc", "extAuth". Reference: https://gateway.envoyproxy.io/contributions/design/security-policy/
+	// +kubebuilder:validation:Enum=none;basicAut;extAuth
+	// +kubebuilder:default=basicAuth
 	AuthType AuthType `json:"authType" yaml:"authType"`
 
 	// Defines the SecurityPolicies to be applied to the Route. Reference: https://gateway.envoyproxy.io/contributions/design/security-policy/
@@ -104,7 +104,7 @@ type EntryPointStatus struct {
 	RetryCount int `json:"retryCount,omitempty"`
 
 	// DeletionCycle keeps track of the number of deletion cycles. This is used to determine if the resource is deleting.
-	DeletionCycle int `json:"deletionCycle,omitempty"`
+	DeletionCycle int `json:"deletionCycle,omitempty"` // TODO: Remove this field and use RetryCount instead. Deleting and failure are not executing at the same time.
 }
 
 // +kubebuilder:object:root=true

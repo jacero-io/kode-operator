@@ -116,7 +116,6 @@ func (m *DefaultTemplateManager) fetchTemplate(ctx context.Context, ref kodev1al
 		template.EntryPointSpec = &entryPoint.Spec
 	}
 
-
 	log.V(1).Info("Template fetched successfully", "kind", template.Kind, "port", template.Port)
 	return template, nil
 }
@@ -127,7 +126,7 @@ func (m *DefaultTemplateManager) fetchContainerTemplate(ctx context.Context, tem
 	if err != nil {
 		return handleNotFoundError(err, ref)
 	}
-	
+
 	if containerTemplate.Spec.ContainerTemplateSharedSpec.EntryPointRef != nil {
 		template.EntryPointRef = containerTemplate.Spec.ContainerTemplateSharedSpec.EntryPointRef
 	}
@@ -143,7 +142,7 @@ func (m *DefaultTemplateManager) fetchClusterContainerTemplate(ctx context.Conte
 	if err != nil {
 		return handleNotFoundError(err, ref)
 	}
-	
+
 	if clusterContainerTemplate.Spec.ContainerTemplateSharedSpec.EntryPointRef != nil {
 		template.EntryPointRef = clusterContainerTemplate.Spec.ContainerTemplateSharedSpec.EntryPointRef
 	}

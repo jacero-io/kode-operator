@@ -106,7 +106,7 @@ type KodeStatus struct {
 	RetryCount int `json:"retryCount,omitempty"`
 
 	// DeletionCycle keeps track of the number of deletion cycles. This is used to determine if the resource is deleting.
-	DeletionCycle int `json:"deletionCycle,omitempty"`
+	DeletionCycle int `json:"deletionCycle,omitempty"` // TODO: Remove this field and use RetryCount instead. Deleting and failure are not executing at the same time.
 }
 
 //+kubebuilder:object:root=true

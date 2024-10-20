@@ -41,11 +41,11 @@ vars:
 
   # Concatenation
   CONCAT_DIRECTORY: '{{.ROOT_DIR}}/'
-  # CONCAT_INCLUDE_COMMON: 'v1alpha2/common_types.go,v1alpha2/reference_types.go,v1alpha2/shared_containertemplate_types.go,v1alpha2/containertemplate_types.go,common/*,constant/*,cleanup/*,event/*,resource/*,template/*,test/integration/*'
-  CONCAT_INCLUDE_PKG: 'pkg/constant/*,pkg/validation/*'
+  CONCAT_INCLUDE_COMMON: 'v1alpha2/common_types.go,v1alpha2/reference_types.go,v1alpha2/shared_containertemplate_types.go,v1alpha2/containertemplate_types.go,common/*,constant/*,cleanup/*,event/*,resource/*,template/*,test/integration/*'
+  CONCAT_INCLUDE_PKG: 'pkg/constant/*,pkg/validation/*,pkg/envoy/*'
   # CONCAT_INCLUDE_TASK: '.tasks/*'
   CONCAT_INCLUDE_API: 'v1alpha2/validation.go,v1alpha2/condition.go'
-  CONCAT_INCLUDE_KODE: 'v1alpha2/kode_types.go,v1alpha2/initplugin_types.go,controllers/kode/*'
+  CONCAT_INCLUDE_KODE: 'v1alpha2/kode_types.go,v1alpha2/envoy_types.go,v1alpha2/initplugin_types.go,controllers/kode/*'
   # CONCAT_INCLUDE_ENTRYPOINT: 'v1alpha2/entrypoint_types.go,controllers/entrypoint/*'
   CONCAT_EXCLUDE_PATTERNS: '*_test.go,zz_generated.deepcopy.go'
   CONCAT_INCLUDE_PATTERNS: '{{.CONCAT_INCLUDE_COMMON}},{{.CONCAT_INCLUDE_KODE}},{{.CONCAT_INCLUDE_ENTRYPOINT}},{{.CONCAT_INCLUDE_TASK}},{{.CONCAT_INCLUDE_PKG}},{{.CONCAT_INCLUDE_API}}'
