@@ -54,11 +54,12 @@ spec:
                       - extAuth
                     - enum:
                       - none
+                      - basicAut
                       - extAuth
-                    default: none
+                    default: basicAuth
                     description: 'The Envoy Gateway SecurityPolicy to use for the
-                      authentication. Can be either "none", "basicAuth", "jwt", "oidc",
-                      "extAuth" or "authorization". Reference: https://gateway.envoyproxy.io/contributions/design/security-policy/'
+                      authentication. Can be either "none", "basicAuth", "oidc", "extAuth".
+                      Reference: https://gateway.envoyproxy.io/contributions/design/security-policy/'
                     type: string
                   identityReference:
                     description: Reference to a field in the JWT token of OIDC or
