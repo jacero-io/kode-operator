@@ -22,7 +22,7 @@ import (
 
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
-	"github.com/jacero-io/kode-operator/internal/resource"
+	"github.com/jacero-io/kode-operator/internal/resourcev1"
 	"github.com/jacero-io/kode-operator/internal/statemachine"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,7 +31,7 @@ import (
 )
 
 // ensureService ensures that the Service exists for the Kode instance
-func ensureService(ctx context.Context, r statemachine.ReconcilerInterface, resource resource.ResourceManager, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig) error {
+func ensureService(ctx context.Context, r statemachine.ReconcilerInterface, resource resourcev1.ResourceManager, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig) error {
 	log := r.GetLog().WithName("ServiceEnsurer").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	ctx, cancel := common.ContextWithTimeout(ctx, 30) // 30 seconds timeout

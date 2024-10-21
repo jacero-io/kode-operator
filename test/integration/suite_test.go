@@ -46,7 +46,7 @@ import (
 	entrypointctrl "github.com/jacero-io/kode-operator/internal/controllers/entrypoint"
 	kodectrl "github.com/jacero-io/kode-operator/internal/controllers/kode"
 	"github.com/jacero-io/kode-operator/internal/event"
-	"github.com/jacero-io/kode-operator/internal/resource"
+	"github.com/jacero-io/kode-operator/internal/resourcev1"
 	"github.com/jacero-io/kode-operator/internal/template"
 	//+kubebuilder:scaffold:imports
 )
@@ -144,7 +144,7 @@ var _ = BeforeSuite(func() {
 		Client:            k8sClient,
 		Scheme:            k8sManager.GetScheme(),
 		Log:               ctrl.Log.WithName("Kode").WithName("Reconcile"),
-		Resource:          resource.NewDefaultResourceManager(k8sClient, ctrl.Log.WithName("Kode").WithName("ResourceManager"), k8sManager.GetScheme()),
+		Resource:          resourcev1.NewDefaultResourceManager(k8sClient, ctrl.Log.WithName("Kode").WithName("ResourceManager"), k8sManager.GetScheme()),
 		Template:          template.NewDefaultTemplateManager(k8sClient, ctrl.Log.WithName("Kode").WithName("TemplateManager")),
 		CleanupManager:    cleanup.NewDefaultCleanupManager(k8sClient, ctrl.Log.WithName("Kode").WithName("CleanupManager")),
 		EventManager:      event.NewEventManager(k8sClient, ctrl.Log.WithName("Kode").WithName("EventManager"), k8sManager.GetScheme(), k8sManager.GetEventRecorderFor("kode-controller")),
@@ -155,7 +155,7 @@ var _ = BeforeSuite(func() {
 		Client:            k8sClient,
 		Scheme:            k8sManager.GetScheme(),
 		Log:               ctrl.Log.WithName("EntryPoint").WithName("Reconcile"),
-		Resource:          resource.NewDefaultResourceManager(k8sClient, ctrl.Log.WithName("EntryPoint").WithName("ResourceManager"), k8sManager.GetScheme()),
+		Resource:          resourcev1.NewDefaultResourceManager(k8sClient, ctrl.Log.WithName("EntryPoint").WithName("ResourceManager"), k8sManager.GetScheme()),
 		Template:          template.NewDefaultTemplateManager(k8sClient, ctrl.Log.WithName("EntryPoint").WithName("TemplateManager")),
 		CleanupManager:    cleanup.NewDefaultCleanupManager(k8sClient, ctrl.Log.WithName("EntryPoint").WithName("CleanupManager")),
 		EventManager:      event.NewEventManager(k8sClient, ctrl.Log.WithName("Kode").WithName("EventManager"), k8sManager.GetScheme(), k8sManager.GetEventRecorderFor("entrypoint-controller")),

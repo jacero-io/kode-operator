@@ -76,8 +76,8 @@ type GatewaySpec struct {
 
 type AuthSpec struct {
 	// The Envoy Gateway SecurityPolicy to use for the authentication. Can be either "none", "basicAuth", "oidc", "extAuth". Reference: https://gateway.envoyproxy.io/contributions/design/security-policy/
-	// +kubebuilder:validation:Enum=none;basicAut;extAuth
-	// +kubebuilder:default=basicAuth
+	// +kubebuilder:validation:Enum=none;basicAuth;extAuth
+	// +kubebuilder:default=none
 	AuthType AuthType `json:"authType" yaml:"authType"`
 
 	// Defines the SecurityPolicies to be applied to the Route. Reference: https://gateway.envoyproxy.io/contributions/design/security-policy/

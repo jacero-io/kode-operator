@@ -29,7 +29,7 @@ import (
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/cleanup"
 	"github.com/jacero-io/kode-operator/internal/event"
-	"github.com/jacero-io/kode-operator/internal/resource"
+	"github.com/jacero-io/kode-operator/internal/resourcev1"
 	"github.com/jacero-io/kode-operator/internal/template"
 
 	"github.com/jacero-io/kode-operator/pkg/constant"
@@ -56,7 +56,7 @@ type ReconcilerInterface interface {
 	GetScheme() *runtime.Scheme
 	GetLog() logr.Logger
 	GetEventRecorder() event.EventManager
-	GetResourceManager() resource.ResourceManager
+	GetResourceManager() resourcev1.ResourceManager
 	GetTemplateManager() template.TemplateManager
 	GetCleanupManager() cleanup.CleanupManager
 	GetIsTestEnvironment() bool

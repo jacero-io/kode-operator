@@ -1,56 +1,56 @@
 graph TD
-    A[User] -->|Creates/Manages| B[Kode CR]
-    A[User] -->|Creates/Manages| C[EntryPoint CR]
-    A[User] -->|Creates/Manages| D[ContainerTemplate CR]
-    A[User] -->|Creates/Manages| E[VirtualTemplate CR]
-    A[User] -->|Creates/Manages| F[ClusterContainerTemplate CR]
-    A[User] -->|Creates/Manages| G[ClusterVirtualTemplate CR]
+    User[User] -->|Creates/Manages| Kode[Kode CR]
+    User[User] -->|Creates/Manages| EntryPoint[EntryPoint CR]
+    User[User] -->|Creates/Manages| ContainerTemplate[ContainerTemplate CR]
+    User[User] -->|Creates/Manages| VirtualTemplate[VirtualTemplate CR]
+    User[User] -->|Creates/Manages| ClusterContainerTemplate[ClusterContainerTemplate CR]
+    User[User] -->|Creates/Manages| ClusterVirtualTemplate[ClusterVirtualTemplate CR]
 
     subgraph "Kode Operator"
-        H[Kode Controller] -->|Watches| B
-        I[EntryPoint Controller] -->|Watches| C
-        J[Template Manager] -->|Fetches| D
-        J[Template Manager] -->|Fetches| E
-        J[Template Manager] -->|Fetches| F
-        J[Template Manager] -->|Fetches| G
-        K[Resource Manager] -->|Creates/Updates/Deletes| L[Managed Resources]
-        M[Cleanup Manager] -->|Initiates Cleanup| L[Managed Resources]
-        N[Validator] -->|Validates| L[Managed Resources]
-        O[Event Manager] -->|Records Events| P[Kubernetes Events]
+        H[Kode Controller] -->|Watches| Kode
+        EC[EntryPoint Controller] -->|Watches| EntryPoint
+        TM[Template Manager] -->|Fetches| ContainerTemplate
+        TM[Template Manager] -->|Fetches| VirtualTemplate
+        TM[Template Manager] -->|Fetches| ClusterContainerTemplate
+        TM[Template Manager] -->|Fetches| ClusterVirtualTemplate
+        RM[Resource Manager] -->|Creates/Updates/Deletes| MR[Managed Resources]
+        CM[Cleanup Manager] -->|Initiates Cleanup| MR[Managed Resources]
+        Validator[Validator] -->|Validates| L[Managed Resources]
+        EM[Event Manager] -->|Records Events| P[Kubernetes Events]
 
-        H[Kode Controller] -->|Uses| J
-        H[Kode Controller] -->|Uses| K
-        H[Kode Controller] -->|Uses| M
-        H[Kode Controller] -->|Uses| N
-        H[Kode Controller] -->|Uses| O
+        H[Kode Controller] -->|Uses| TM
+        H[Kode Controller] -->|Uses| RM
+        H[Kode Controller] -->|Uses| CM
+        H[Kode Controller] -->|Uses| Validator
+        H[Kode Controller] -->|Uses| EM
 
-        I[EntryPoint Controller] -->|Uses| J
-        I[EntryPoint Controller] -->|Uses| K
-        I[EntryPoint Controller] -->|Uses| M
-        I[EntryPoint Controller] -->|Uses| N
-        I[EntryPoint Controller] -->|Uses| O
+        EC[EntryPoint Controller] -->|Uses| TM
+        EC[EntryPoint Controller] -->|Uses| RM
+        EC[EntryPoint Controller] -->|Uses| CM
+        EC[EntryPoint Controller] -->|Uses| Validator
+        EC[EntryPoint Controller] -->|Uses| EM
     end
 
     subgraph "Kubernetes Resources"
-        2[StatefulSet]
-        3[Service]
-        4[PersistentVolumeClaim]
-        5[Secret]
-        6[Gateway]
-        7[HTTPRoute]
-        8[SecurityPolicy]
+        StatefulSet[StatefulSet]
+        Service[Service]
+        PVC[PersistentVolumeClaim]
+        Secret[Secret]
+        Gateway[Gateway]
+        HTTPRoute[HTTPRoute]
+        SecurityPolicy[SecurityPolicy]
 
-        L --->|Manages| 2
-        L --->|Manages| 3
-        L --->|Manages| 4
-        L --->|Manages| 5
-        L --->|Manages| 6
-        L --->|Manages| 7
-        L --->|Manages| 8
+        MR --->|Manages| StatefulSet
+        MR --->|Manages| Service
+        MR --->|Manages| PVC
+        MR --->|Manages| Secret
+        MR --->|Manages| Gateway
+        MR --->|Manages| HTTPRoute
+        MR --->|Manages| SecurityPolicy
     end
 
     subgraph "Envoy Gateway"
-        Q[Envoy Gateway] -->|Implements| 6
-        Q[Envoy Gateway] -->|Implements| 7
-        Q[Envoy Gateway] -->|Implements| 8
+        Q[Envoy Gateway] -->|Implements| Gateway
+        Q[Envoy Gateway] -->|Implements| HTTPRoute
+        Q[Envoy Gateway] -->|Implements| SecurityPolicy
     end

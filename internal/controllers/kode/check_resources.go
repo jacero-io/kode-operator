@@ -12,7 +12,7 @@ import (
 
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
-	"github.com/jacero-io/kode-operator/internal/resource"
+	"github.com/jacero-io/kode-operator/internal/resourcev1"
 	"github.com/jacero-io/kode-operator/internal/statemachine"
 )
 
@@ -123,7 +123,7 @@ func checkResourcesDeleted(ctx context.Context, r statemachine.ReconcilerInterfa
 	return true, nil
 }
 
-func checkSecretReady(ctx context.Context, resource resource.ResourceManager, kode *kodev1alpha2.Kode) (bool, error) {
+func checkSecretReady(ctx context.Context, resource resourcev1.ResourceManager, kode *kodev1alpha2.Kode) (bool, error) {
 	secret := &corev1.Secret{}
 	if err := resource.Get(ctx, types.NamespacedName{Name: kode.GetSecretName(), Namespace: kode.Namespace}, secret); err != nil {
 		if errors.IsNotFound(err) {
@@ -134,7 +134,7 @@ func checkSecretReady(ctx context.Context, resource resource.ResourceManager, ko
 	return true, nil
 }
 
-func checkServiceReady(ctx context.Context, resource resource.ResourceManager, kode *kodev1alpha2.Kode) (bool, error) {
+func checkServiceReady(ctx context.Context, resource resourcev1.ResourceManager, kode *kodev1alpha2.Kode) (bool, error) {
 	service := &corev1.Service{}
 	if err := resource.Get(ctx, types.NamespacedName{Name: kode.GetServiceName(), Namespace: kode.Namespace}, service); err != nil {
 		if errors.IsNotFound(err) {
@@ -145,7 +145,7 @@ func checkServiceReady(ctx context.Context, resource resource.ResourceManager, k
 	return true, nil
 }
 
-func checkStatefulSetReady(ctx context.Context, resource resource.ResourceManager, kode *kodev1alpha2.Kode) (bool, error) {
+func checkStatefulSetReady(ctx context.Context, resource resourcev1.ResourceManager, kode *kodev1alpha2.Kode) (bool, error) {
 	statefulSet := &appsv1.StatefulSet{}
 	if err := resource.Get(ctx, types.NamespacedName{Name: kode.GetStatefulSetName(), Namespace: kode.Namespace}, statefulSet); err != nil {
 		if errors.IsNotFound(err) {
@@ -160,7 +160,7 @@ func checkStatefulSetReady(ctx context.Context, resource resource.ResourceManage
 	return true, nil
 }
 
-func checkPVCReady(ctx context.Context, resource resource.ResourceManager, kode *kodev1alpha2.Kode) (bool, error) {
+func checkPVCReady(ctx context.Context, resource resourcev1.ResourceManager, kode *kodev1alpha2.Kode) (bool, error) {
 	pvc := &corev1.PersistentVolumeClaim{}
 	if err := resource.Get(ctx, types.NamespacedName{Name: kode.GetPVCName(), Namespace: kode.Namespace}, pvc); err != nil {
 		if errors.IsNotFound(err) {
@@ -175,7 +175,7 @@ func checkPVCReady(ctx context.Context, resource resource.ResourceManager, kode 
 	return true, nil
 }
 
-func checkPodsReady(ctx context.Context, resource resource.ResourceManager, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig) (bool, error) {
+func checkPodsReady(ctx context.Context, resource resourcev1.ResourceManager, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig) (bool, error) {
 	podList := &corev1.PodList{}
 	if err := resource.List(ctx, podList, client.InNamespace(kode.Namespace), client.MatchingLabels(config.CommonConfig.Labels)); err != nil {
 		return false, fmt.Errorf("failed to list Pods: %w", err)

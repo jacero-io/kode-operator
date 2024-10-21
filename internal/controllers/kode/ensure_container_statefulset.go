@@ -21,19 +21,21 @@ import (
 	"fmt"
 	"path"
 
-	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
-	"github.com/jacero-io/kode-operator/internal/common"
-	"github.com/jacero-io/kode-operator/internal/resource"
-	"github.com/jacero-io/kode-operator/internal/statemachine"
-	"github.com/jacero-io/kode-operator/pkg/constant"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
+	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
+	"github.com/jacero-io/kode-operator/internal/common"
+	"github.com/jacero-io/kode-operator/internal/resourcev1"
+	"github.com/jacero-io/kode-operator/internal/statemachine"
+
+	"github.com/jacero-io/kode-operator/pkg/constant"
 )
 
 // ensureStatefulSet ensures that the StatefulSet exists for the Kode instance
-func ensureStatefulSet(ctx context.Context, r statemachine.ReconcilerInterface, resource resource.ResourceManager, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig) error {
+func ensureStatefulSet(ctx context.Context, r statemachine.ReconcilerInterface, resourcev1 resourcev1.ResourceManager, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig) error {
 	log := r.GetLog().WithName("StatefulSetEnsurer").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	ctx, cancel := common.ContextWithTimeout(ctx, 30) // 30 seconds timeout
@@ -49,13 +51,22 @@ func ensureStatefulSet(ctx context.Context, r statemachine.ReconcilerInterface, 
 		},
 	}
 
-	_, err := resource.CreateOrPatch(ctx, statefulSet, func() error {
-		constructedstatefulSet, err := constructStatefulSetSpec(r, kode, config)
+	_, err := resourcev1.CreateOrPatch(ctx, statefulSet, func() error {
+		constructedStatefulSet, err := constructStatefulSetSpec(r, kode, config)
 		if err != nil {
 			return fmt.Errorf("failed to construct StatefulSet spec: %v", err)
 		}
 
-		statefulSet.Spec = constructedstatefulSet.Spec
+		// Add sidecar containers
+		containers, sidecarInitContainers, err := ensureSidecarContainers(ctx, r, resourcev1, kode, config)
+		if err != nil {
+			return fmt.Errorf("failed to ensure sidecar containers: %v", err)
+		}
+
+		constructedStatefulSet.Spec.Template.Spec.Containers = append(constructedStatefulSet.Spec.Template.Spec.Containers, containers...)
+		constructedStatefulSet.Spec.Template.Spec.InitContainers = append(constructedStatefulSet.Spec.Template.Spec.InitContainers, sidecarInitContainers...)
+
+		statefulSet.Spec = constructedStatefulSet.Spec
 
 		return controllerutil.SetControllerReference(kode, statefulSet, r.GetScheme())
 	})

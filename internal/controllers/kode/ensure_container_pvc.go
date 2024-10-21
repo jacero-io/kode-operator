@@ -29,12 +29,12 @@ import (
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
 	"github.com/jacero-io/kode-operator/internal/event"
-	"github.com/jacero-io/kode-operator/internal/resource"
+	"github.com/jacero-io/kode-operator/internal/resourcev1"
 	"github.com/jacero-io/kode-operator/internal/statemachine"
 )
 
 // ensurePVC ensures that the PersistentVolumeClaim exists for the Kode instance
-func ensurePersistentVolumeClaim(ctx context.Context, r statemachine.ReconcilerInterface, resource resource.ResourceManager, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig, resizeSupported bool) error {
+func ensurePersistentVolumeClaim(ctx context.Context, r statemachine.ReconcilerInterface, resource resourcev1.ResourceManager, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig, resizeSupported bool) error {
 	log := r.GetLog().WithName("PVCEnsurer").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 	er := r.GetEventRecorder()
 

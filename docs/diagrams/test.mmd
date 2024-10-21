@@ -1,0 +1,33 @@
+graph TD
+    Kode[Kode Resource] --> Secret[Secret]
+    Kode --> Service[Service]
+    Kode --> PVC[PersistentVolumeClaim]
+    Kode --> StatefulSet[StatefulSet]
+
+    Secret --> SecretBase[Secret Base Config]
+    Secret --> SecretCredentials[Secret Credentials]
+    SecretBase --> SecretFinal[Secret Final Config]
+    SecretCredentials --> SecretFinal
+
+    Service --> ServiceBase[Service Base Config]
+    Service --> ServicePorts[Service Ports]
+    ServiceBase --> ServiceFinal[Service Final Config]
+    ServicePorts --> ServiceFinal
+
+    PVC --> PVCBase[PVC Base Config]
+    PVC --> PVCStorage[PVC Storage Config]
+    PVCBase --> PVCFinal[PVC Final Config]
+    PVCStorage --> PVCFinal
+
+    StatefulSet --> StatefulSetBase[StatefulSet Base Config]
+    StatefulSet --> StatefulSetVolumes[StatefulSet Volumes]
+    StatefulSet --> StatefulSetContainers[StatefulSet Containers]
+    StatefulSet --> StatefulSetInitContainers[StatefulSet InitContainers]
+    StatefulSetBase --> StatefulSetFinal[StatefulSet Final Config]
+    StatefulSetVolumes --> StatefulSetFinal
+    StatefulSetContainers --> StatefulSetFinal
+    StatefulSetInitContainers --> StatefulSetFinal
+
+    ContainerTemplate[Container Template] -.-> StatefulSetContainers
+    ContainerTemplate -.-> StatefulSetInitContainers
+    ContainerTemplate -.-> PVCStorage

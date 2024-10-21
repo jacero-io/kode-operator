@@ -34,7 +34,7 @@ import (
 	"github.com/jacero-io/kode-operator/internal/cleanup"
 	"github.com/jacero-io/kode-operator/internal/common"
 	"github.com/jacero-io/kode-operator/internal/event"
-	"github.com/jacero-io/kode-operator/internal/resource"
+	"github.com/jacero-io/kode-operator/internal/resourcev1"
 	"github.com/jacero-io/kode-operator/internal/statemachine"
 	"github.com/jacero-io/kode-operator/internal/template"
 
@@ -45,7 +45,7 @@ type KodeReconciler struct {
 	Client                client.Client
 	Scheme                *runtime.Scheme
 	Log                   logr.Logger
-	Resource              resource.ResourceManager
+	Resource              resourcev1.ResourceManager
 	Template              template.TemplateManager
 	CleanupManager        cleanup.CleanupManager
 	EventManager          event.EventManager
@@ -195,7 +195,7 @@ func (r *KodeReconciler) GetLog() logr.Logger {
 	return r.Log
 }
 
-func (r *KodeReconciler) GetResourceManager() resource.ResourceManager {
+func (r *KodeReconciler) GetResourceManager() resourcev1.ResourceManager {
 	return r.Resource
 }
 

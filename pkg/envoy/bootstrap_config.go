@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/jacero-io/kode-operator/internal/common"
+	"gopkg.in/yaml.v2"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 )
 
@@ -50,11 +51,11 @@ func (g *BootstrapConfigGenerator) GenerateEnvoyConfig(config *common.KodeResour
 	}
 
 	bootstrapConfig := struct {
-		Admin           AdminServer `json:"admin"`
+		Admin           AdminServer `yaml:"admin"`
 		StaticResources struct {
-			Listeners Listeners `json:"listeners"`
-			Clusters  Clusters  `json:"clusters"`
-		} `json:"static_resources"`
+			Listeners Listeners `yaml:"listeners"`
+			Clusters  Clusters  `yaml:"clusters"`
+		} `yaml:"static_resources"`
 	}{
 		Admin: AdminServer{
 			AccessLogPath: "/dev/stdout",
@@ -66,8 +67,8 @@ func (g *BootstrapConfigGenerator) GenerateEnvoyConfig(config *common.KodeResour
 			},
 		},
 		StaticResources: struct {
-			Listeners Listeners `json:"listeners"`
-			Clusters  Clusters  `json:"clusters"`
+			Listeners Listeners `yaml:"listeners"`
+			Clusters  Clusters  `yaml:"clusters"`
 		}{
 			Listeners: []Listener{
 				{
@@ -96,13 +97,13 @@ func (g *BootstrapConfigGenerator) GenerateEnvoyConfig(config *common.KodeResour
 		},
 	}
 
-	// Convert the config to JSON
-	jsonConfig, err := json.MarshalIndent(bootstrapConfig, "", "  ")
+	// Convert the config to YAML
+	yamlConfig, err := yaml.Marshal(bootstrapConfig)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal Envoy bootstrap config: %w", err)
+		return "", fmt.Errorf("failed to marshal Envoy bootstrap config to YAML: %w", err)
 	}
 
-	return string(jsonConfig), nil
+	return string(yamlConfig), nil
 }
 
 func (g *BootstrapConfigGenerator) getHTTPFilters(useBasicAuth bool) []map[string]interface{} {

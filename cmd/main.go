@@ -27,7 +27,7 @@ import (
 	entrypointcontroller "github.com/jacero-io/kode-operator/internal/controllers/entrypoint"
 	kodecontroller "github.com/jacero-io/kode-operator/internal/controllers/kode"
 	"github.com/jacero-io/kode-operator/internal/event"
-	"github.com/jacero-io/kode-operator/internal/resource"
+	"github.com/jacero-io/kode-operator/internal/resourcev1"
 	"github.com/jacero-io/kode-operator/internal/template"
 	//+kubebuilder:scaffold:imports
 )
@@ -129,7 +129,7 @@ func main() {
 		Client:                mgr.GetClient(),
 		Scheme:                mgr.GetScheme(),
 		Log:                   ctrl.Log.WithName("Kode").WithName("Reconcile"),
-		Resource:              resource.NewDefaultResourceManager(mgr.GetClient(), ctrl.Log.WithName("Kode").WithName("ResourceManager"), scheme),
+		Resource:              resourcev1.NewDefaultResourceManager(mgr.GetClient(), ctrl.Log.WithName("Kode").WithName("ResourceManager"), scheme),
 		Template:              template.NewDefaultTemplateManager(mgr.GetClient(), ctrl.Log.WithName("Kode").WithName("TemplateManager")),
 		CleanupManager:        cleanup.NewDefaultCleanupManager(mgr.GetClient(), ctrl.Log.WithName("Kode").WithName("CleanupManager")),
 		EventManager:          event.NewEventManager(mgr.GetClient(), ctrl.Log.WithName("Kode").WithName("EventManager"), mgr.GetScheme(), mgr.GetEventRecorderFor("kode-controller")),
@@ -145,7 +145,7 @@ func main() {
 		Client:         mgr.GetClient(),
 		Scheme:         mgr.GetScheme(),
 		Log:            ctrl.Log.WithName("EntryPoint").WithName("Reconcile"),
-		Resource:       resource.NewDefaultResourceManager(mgr.GetClient(), ctrl.Log.WithName("EntryPoint").WithName("ResourceManager"), scheme),
+		Resource:       resourcev1.NewDefaultResourceManager(mgr.GetClient(), ctrl.Log.WithName("EntryPoint").WithName("ResourceManager"), scheme),
 		Template:       template.NewDefaultTemplateManager(mgr.GetClient(), ctrl.Log.WithName("EntryPoint").WithName("TemplateManager")),
 		CleanupManager: cleanup.NewDefaultCleanupManager(mgr.GetClient(), ctrl.Log.WithName("EntryPoint").WithName("CleanupManager")),
 		EventManager:   event.NewEventManager(mgr.GetClient(), ctrl.Log.WithName("EntryPoint").WithName("EventManager"), mgr.GetScheme(), mgr.GetEventRecorderFor("entrypoint-controller")),

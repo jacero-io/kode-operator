@@ -54,9 +54,9 @@ spec:
                       - extAuth
                     - enum:
                       - none
-                      - basicAut
+                      - basicAuth
                       - extAuth
-                    default: basicAuth
+                    default: none
                     description: 'The Envoy Gateway SecurityPolicy to use for the
                       authentication. Can be either "none", "basicAuth", "oidc", "extAuth".
                       Reference: https://gateway.envoyproxy.io/contributions/design/security-policy/'

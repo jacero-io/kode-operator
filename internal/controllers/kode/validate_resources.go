@@ -26,7 +26,7 @@ import (
 
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
-	"github.com/jacero-io/kode-operator/internal/resource"
+	"github.com/jacero-io/kode-operator/internal/resourcev1"
 	"github.com/jacero-io/kode-operator/internal/statemachine"
 )
 
@@ -56,7 +56,7 @@ func validateConfiguration(ctx context.Context, r statemachine.ReconcilerInterfa
 	return nil
 }
 
-func validateSecret(ctx context.Context, resource resource.ResourceManager, kode *kodev1alpha2.Kode) error {
+func validateSecret(ctx context.Context, resource resourcev1.ResourceManager, kode *kodev1alpha2.Kode) error {
 	secret := &corev1.Secret{}
 	err := resource.Get(ctx, types.NamespacedName{Name: kode.GetSecretName(), Namespace: kode.Namespace}, secret)
 	if err != nil {
@@ -66,7 +66,7 @@ func validateSecret(ctx context.Context, resource resource.ResourceManager, kode
 	return nil
 }
 
-func validateService(ctx context.Context, resource resource.ResourceManager, kode *kodev1alpha2.Kode) error {
+func validateService(ctx context.Context, resource resourcev1.ResourceManager, kode *kodev1alpha2.Kode) error {
 	service := &corev1.Service{}
 	err := resource.Get(ctx, types.NamespacedName{Name: kode.GetServiceName(), Namespace: kode.Namespace}, service)
 	if err != nil {
@@ -76,7 +76,7 @@ func validateService(ctx context.Context, resource resource.ResourceManager, kod
 	return nil
 }
 
-func validateStatefulSet(ctx context.Context, resource resource.ResourceManager, kode *kodev1alpha2.Kode) error {
+func validateStatefulSet(ctx context.Context, resource resourcev1.ResourceManager, kode *kodev1alpha2.Kode) error {
 	statefulSet := &appsv1.StatefulSet{}
 	err := resource.Get(ctx, types.NamespacedName{Name: kode.GetStatefulSetName(), Namespace: kode.Namespace}, statefulSet)
 	if err != nil {
@@ -88,7 +88,7 @@ func validateStatefulSet(ctx context.Context, resource resource.ResourceManager,
 	return nil
 }
 
-func validatePVC(ctx context.Context, resource resource.ResourceManager, kode *kodev1alpha2.Kode) error {
+func validatePVC(ctx context.Context, resource resourcev1.ResourceManager, kode *kodev1alpha2.Kode) error {
 	pvc := &corev1.PersistentVolumeClaim{}
 	err := resource.Get(ctx, types.NamespacedName{Name: kode.GetPVCName(), Namespace: kode.Namespace}, pvc)
 	if err != nil {

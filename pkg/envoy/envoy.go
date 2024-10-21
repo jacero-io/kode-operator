@@ -2,10 +2,20 @@ package envoy
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/go-logr/logr"
 	"github.com/jacero-io/kode-operator/internal/common"
 	corev1 "k8s.io/api/core/v1"
+)
+
+const (
+	EnvoyProxyContainerName  = "envoy-proxy"
+	EnvoyProxyContainerImage = "envoyproxy/envoy:v1.31-latest"
+	EnvoyProxyRunAsUser      = 1337
+	ProxyInitContainerName   = "proxy-init"
+	ProxyInitContainerImage  = "openpolicyagent/proxy_init:v8"
+	BasicAuthContainerPort   = 9001
 )
 
 type ContainerConstructor struct {
@@ -57,28 +67,39 @@ func (c *ContainerConstructor) ConstructEnvoyContainers(config *common.KodeResou
 	return containers, initContainers, nil
 }
 
+func (c *ContainerConstructor) createProxySetupContainer(config *common.KodeResourceConfig) corev1.Container {
+	return corev1.Container{
+		Name:  ProxyInitContainerName,
+		Image: ProxyInitContainerImage,
+		Args:  []string{"-p", strconv.Itoa(int(config.Port)), "-u", strconv.FormatInt(EnvoyProxyRunAsUser, 16)},
+		SecurityContext: &corev1.SecurityContext{
+			Capabilities: &corev1.Capabilities{
+				Add: []corev1.Capability{"NET_ADMIN"},
+			},
+			RunAsNonRoot: common.BoolPtr(false),
+			RunAsUser:    common.Int64Ptr(0),
+		},
+	}
+}
+
 func (c *ContainerConstructor) createEnvoyContainer(config *common.KodeResourceConfig, envoyConfig string) corev1.Container {
 	return corev1.Container{
-		Name:  "envoy",
-		Image: "envoyproxy/envoy:v1.22.0",
+		Name:  EnvoyProxyContainerName,
+		Image: EnvoyProxyContainerImage,
+		Args:  []string{"--config-yaml", envoyConfig},
 		Ports: []corev1.ContainerPort{
-			{ContainerPort: 8080, Name: "http"},
-			{ContainerPort: 8443, Name: "https"},
+			{Name: "http", ContainerPort: int32(config.Port)},
 		},
-		VolumeMounts: []corev1.VolumeMount{
-			{
-				Name:      "envoy-config",
-				MountPath: "/etc/envoy",
-			},
+		SecurityContext: &corev1.SecurityContext{
+			RunAsUser: common.Int64Ptr(EnvoyProxyRunAsUser),
 		},
-		Command: []string{"envoy", "-c", "/etc/envoy/envoy.yaml"},
 	}
 }
 
 func (c *ContainerConstructor) createBasicAuthContainer(config *common.KodeResourceConfig) corev1.Container {
 	return corev1.Container{
 		Name:  "basic-auth-sidecar",
-		Image: "your-basic-auth-sidecar-image:latest",
+		Image: "your-basic-auth-sidecar-image:v0.0.0-latest",
 		Ports: []corev1.ContainerPort{
 			{ContainerPort: 9001, Name: "auth"},
 		},
@@ -105,27 +126,6 @@ func (c *ContainerConstructor) createBasicAuthContainer(config *common.KodeResou
 					},
 				},
 			},
-		},
-	}
-}
-
-func (c *ContainerConstructor) createProxySetupContainer(config *common.KodeResourceConfig) corev1.Container {
-	return corev1.Container{
-		Name:  "proxy-setup",
-		Image: "openpolicyagent/proxy_init:v8",
-		Args: []string{
-			"--proxy-uid=1337",
-			"--proxy-name=envoy",
-			"--redirect-inbound=true",
-			"--redirect-outbound=true",
-			"--inbound-ports-to-ignore=8080,8443",
-		},
-		SecurityContext: &corev1.SecurityContext{
-			Capabilities: &corev1.Capabilities{
-				Add: []corev1.Capability{"NET_ADMIN"},
-			},
-			RunAsUser:  common.Int64Ptr(0),
-			RunAsGroup: common.Int64Ptr(0),
 		},
 	}
 }

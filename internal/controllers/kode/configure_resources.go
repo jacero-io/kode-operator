@@ -28,7 +28,7 @@ import (
 
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
-	"github.com/jacero-io/kode-operator/internal/resource"
+	"github.com/jacero-io/kode-operator/internal/resourcev1"
 	"github.com/jacero-io/kode-operator/internal/statemachine"
 )
 
@@ -88,7 +88,7 @@ func applyConfiguration(ctx context.Context, r statemachine.ReconcilerInterface,
 	return nil
 }
 
-func detectSecretChanges(ctx context.Context, resource resource.ResourceManager, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig, changes map[string]interface{}) error {
+func detectSecretChanges(ctx context.Context, resource resourcev1.ResourceManager, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig, changes map[string]interface{}) error {
 	existing := &corev1.Secret{}
 	err := resource.Get(ctx, types.NamespacedName{Name: kode.GetSecretName(), Namespace: kode.Namespace}, existing)
 	if err != nil {
@@ -110,7 +110,7 @@ func detectSecretChanges(ctx context.Context, resource resource.ResourceManager,
 	return nil
 }
 
-func detectServiceChanges(ctx context.Context, r statemachine.ReconcilerInterface, resource resource.ResourceManager, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig, changes map[string]interface{}) error {
+func detectServiceChanges(ctx context.Context, r statemachine.ReconcilerInterface, resource resourcev1.ResourceManager, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig, changes map[string]interface{}) error {
 	existing := &corev1.Service{}
 	err := resource.Get(ctx, types.NamespacedName{Name: config.ServiceName, Namespace: kode.Namespace}, existing)
 	if err != nil {
@@ -135,7 +135,7 @@ func detectServiceChanges(ctx context.Context, r statemachine.ReconcilerInterfac
 	return nil
 }
 
-func detectStatefulSetChanges(ctx context.Context, r statemachine.ReconcilerInterface, resource resource.ResourceManager, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig, changes map[string]interface{}) error {
+func detectStatefulSetChanges(ctx context.Context, r statemachine.ReconcilerInterface, resource resourcev1.ResourceManager, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig, changes map[string]interface{}) error {
 	existing := &appsv1.StatefulSet{}
 	err := resource.Get(ctx, types.NamespacedName{Name: kode.GetStatefulSetName(), Namespace: kode.Namespace}, existing)
 	if err != nil {
@@ -160,7 +160,7 @@ func detectStatefulSetChanges(ctx context.Context, r statemachine.ReconcilerInte
 	return nil
 }
 
-func detectPVCChanges(ctx context.Context, r statemachine.ReconcilerInterface, resource resource.ResourceManager, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig, changes map[string]interface{}) error {
+func detectPVCChanges(ctx context.Context, r statemachine.ReconcilerInterface, resource resourcev1.ResourceManager, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig, changes map[string]interface{}) error {
 	existing := &corev1.PersistentVolumeClaim{}
 	err := resource.Get(ctx, types.NamespacedName{Name: kode.GetPVCName(), Namespace: kode.Namespace}, existing)
 	if err != nil {
