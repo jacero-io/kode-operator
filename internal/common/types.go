@@ -32,18 +32,14 @@ type KodeResourceConfig struct {
 	CommonConfig CommonConfig
 	KodeSpec     kodev1alpha2.KodeSpec
 	Credentials  *kodev1alpha2.CredentialsSpec
-	Port         *kodev1alpha2.Port
-
-	SecretName      string
-	StatefulSetName string
-	PVCName         string
-	ServiceName     string
+	ServiceName  string
 
 	UserInitPlugins []kodev1alpha2.InitPluginSpec
 	Containers      []corev1.Container
 	InitContainers  []corev1.Container
 
 	Template *kodev1alpha2.Template
+	Port     kodev1alpha2.Port
 }
 
 // EntryPointResourceConfig holds configuration for EntryPoint resources

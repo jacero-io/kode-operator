@@ -63,9 +63,7 @@ rules:
   - kode.jacero.io
   resources:
   - clustercontainertemplates
-  - clustertofutemplates
   - containertemplates
-  - tofutemplates
   verbs:
   - get
   - list

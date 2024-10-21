@@ -19,49 +19,27 @@ package validation
 import (
 	"context"
 	"fmt"
-	"strings"
 
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 )
 
-func (v *validator) validateKode(ctx context.Context, kode *kodev1alpha2.Kode) error {
-	if err := v.validateKodeSpec(kode); err != nil {
-		return err
-	}
-	return nil
-}
+func ValidateKode(ctx context.Context, k *kodev1alpha2.Kode) ValidationResult {
+	result := ValidationResult{Valid: true}
 
-func (v *validator) validateKodeSpec(kode *kodev1alpha2.Kode) error {
-	var errors []string
-
-	// Validate InitPlugins (if any)
-	for i, plugin := range kode.Spec.InitPlugins {
+	// Validate InitPlugins
+	for i, plugin := range k.Spec.InitPlugins {
 		if err := validateInitPlugin(plugin, i); err != nil {
-			errors = append(errors, err.Error())
+			result.Valid = false
+			result.Errors = append(result.Errors, err.Error())
 		}
 	}
 
-	if len(errors) > 0 {
-		return fmt.Errorf("kode spec validation failed: %s", strings.Join(errors, "; "))
-	}
-
-	return nil
-}
-
-// Validate exisitingSecret
-func validateExistingSecret(secretName string) error {
-	if secretName == "" {
-		return fmt.Errorf("existingSecret is required")
-	}
-
-	return nil
-
+	return result
 }
 
 func validateInitPlugin(plugin kodev1alpha2.InitPluginSpec, index int) error {
 	if plugin.Image == "" {
 		return fmt.Errorf("initPlugin[%d]: image is required", index)
 	}
-
 	return nil
 }

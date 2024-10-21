@@ -21,18 +21,22 @@ import (
 	"fmt"
 	"path"
 
-	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
-	"github.com/jacero-io/kode-operator/internal/common"
-	"github.com/jacero-io/kode-operator/pkg/constant"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
+	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
+	"github.com/jacero-io/kode-operator/internal/common"
+	"github.com/jacero-io/kode-operator/internal/resourcev1"
+	"github.com/jacero-io/kode-operator/internal/statemachine"
+
+	"github.com/jacero-io/kode-operator/pkg/constant"
 )
 
 // ensureStatefulSet ensures that the StatefulSet exists for the Kode instance
-func (r *KodeReconciler) ensureStatefulSet(ctx context.Context, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig) error {
-	log := r.Log.WithName("StatefulSetEnsurer").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
+func ensureStatefulSet(ctx context.Context, r statemachine.ReconcilerInterface, resourcev1 resourcev1.ResourceManager, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig) error {
+	log := r.GetLog().WithName("StatefulSetEnsurer").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	ctx, cancel := common.ContextWithTimeout(ctx, 30) // 30 seconds timeout
 	defer cancel()
@@ -47,15 +51,24 @@ func (r *KodeReconciler) ensureStatefulSet(ctx context.Context, kode *kodev1alph
 		},
 	}
 
-	_, err := r.Resource.CreateOrPatch(ctx, statefulSet, func() error {
-		constructedstatefulSet, err := r.constructStatefulSetSpec(config)
+	_, err := resourcev1.CreateOrPatch(ctx, statefulSet, func() error {
+		constructedStatefulSet, err := constructStatefulSetSpec(r, kode, config)
 		if err != nil {
 			return fmt.Errorf("failed to construct StatefulSet spec: %v", err)
 		}
 
-		statefulSet.Spec = constructedstatefulSet.Spec
+		// Add sidecar containers
+		containers, sidecarInitContainers, err := ensureSidecarContainers(ctx, r, resourcev1, kode, config)
+		if err != nil {
+			return fmt.Errorf("failed to ensure sidecar containers: %v", err)
+		}
 
-		return controllerutil.SetControllerReference(kode, statefulSet, r.Scheme)
+		constructedStatefulSet.Spec.Template.Spec.Containers = append(constructedStatefulSet.Spec.Template.Spec.Containers, containers...)
+		constructedStatefulSet.Spec.Template.Spec.InitContainers = append(constructedStatefulSet.Spec.Template.Spec.InitContainers, sidecarInitContainers...)
+
+		statefulSet.Spec = constructedStatefulSet.Spec
+
+		return controllerutil.SetControllerReference(kode, statefulSet, r.GetScheme())
 	})
 
 	if err != nil {
@@ -69,8 +82,8 @@ func (r *KodeReconciler) ensureStatefulSet(ctx context.Context, kode *kodev1alph
 }
 
 // constructStatefulSetSpec constructs a StatefulSet for the Kode instance
-func (r *KodeReconciler) constructStatefulSetSpec(config *common.KodeResourceConfig) (*appsv1.StatefulSet, error) {
-	log := r.Log.WithName("SatefulSetConstructor").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
+func constructStatefulSetSpec(r statemachine.ReconcilerInterface, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig) (*appsv1.StatefulSet, error) {
+	log := r.GetLog().WithName("SatefulSetConstructor").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	replicas := int32(1)
 	templateSpec := config.Template.ContainerTemplateSpec
@@ -94,17 +107,17 @@ func (r *KodeReconciler) constructStatefulSetSpec(config *common.KodeResourceCon
 
 	if templateSpec.Type == "code-server" {
 		log.V(1).Info("Constructing CodeServer containers")
-		containers = constructCodeServerContainers(config, workspace)
+		containers = constructCodeServerContainers(kode, config, workspace)
 		log.V(1).Info("Constructed CodeServer containers", "containers", containers)
 	} else if templateSpec.Type == "webtop" {
 		log.V(1).Info("Constructing Webtop containers")
-		containers = constructWebtopContainers(config)
+		containers = constructWebtopContainers(kode, config)
 		log.V(1).Info("Constructed Webtop containers", "containers", containers)
 	} else {
 		return nil, fmt.Errorf("unknown template type: %s", templateSpec.Type)
 	}
 
-	volumes, volumeMounts := constructVolumesAndMounts(mountPath, config)
+	volumes, volumeMounts := constructVolumesAndMounts(mountPath, kode, config)
 	log.V(1).Info("Constructed volumes and mounts", "volumes", volumes, "volumeMounts", volumeMounts)
 	containers[0].VolumeMounts = volumeMounts
 
@@ -166,12 +179,12 @@ func (r *KodeReconciler) constructStatefulSetSpec(config *common.KodeResourceCon
 	return statefulSet, nil
 }
 
-func constructCodeServerContainers(config *common.KodeResourceConfig, workspace string) []corev1.Container {
+func constructCodeServerContainers(kode *kodev1alpha2.Kode, config *common.KodeResourceConfig, workspace string) []corev1.Container {
 	env := []corev1.EnvVar{
 		{Name: "PUID", Value: fmt.Sprintf("%d", config.Template.ContainerTemplateSpec.PUID)},
 		{Name: "PGID", Value: fmt.Sprintf("%d", config.Template.ContainerTemplateSpec.PGID)},
 		{Name: "TZ", Value: config.Template.ContainerTemplateSpec.TZ},
-		{Name: "PORT", Value: fmt.Sprintf("%d", *config.Port)},
+		{Name: "PORT", Value: fmt.Sprintf("%d", config.Port)},
 		{Name: "USERNAME", Value: config.Credentials.Username},
 		{Name: "DEFAULT_WORKSPACE", Value: workspace},
 	}
@@ -182,7 +195,7 @@ func constructCodeServerContainers(config *common.KodeResourceConfig, workspace 
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{
-						Name: config.SecretName,
+						Name: kode.GetSecretName(),
 					},
 					Key: "password",
 				},
@@ -196,17 +209,17 @@ func constructCodeServerContainers(config *common.KodeResourceConfig, workspace 
 		Env:   env,
 		Ports: []corev1.ContainerPort{{
 			Name:          "http",
-			ContainerPort: int32(*config.Port),
+			ContainerPort: int32(config.Port),
 		}},
 	}}
 }
 
-func constructWebtopContainers(config *common.KodeResourceConfig) []corev1.Container {
+func constructWebtopContainers(kode *kodev1alpha2.Kode, config *common.KodeResourceConfig) []corev1.Container {
 	env := []corev1.EnvVar{
 		{Name: "PUID", Value: fmt.Sprintf("%d", config.Template.ContainerTemplateSpec.PUID)},
 		{Name: "PGID", Value: fmt.Sprintf("%d", config.Template.ContainerTemplateSpec.PGID)},
 		{Name: "TZ", Value: config.Template.ContainerTemplateSpec.TZ},
-		{Name: "CUSTOM_PORT", Value: fmt.Sprintf("%d", *config.Port)},
+		{Name: "CUSTOM_PORT", Value: fmt.Sprintf("%d", config.Port)},
 		{Name: "CUSTOM_USER", Value: config.Credentials.Username},
 	}
 
@@ -216,7 +229,7 @@ func constructWebtopContainers(config *common.KodeResourceConfig) []corev1.Conta
 			ValueFrom: &corev1.EnvVarSource{
 				SecretKeyRef: &corev1.SecretKeySelector{
 					LocalObjectReference: corev1.LocalObjectReference{
-						Name: config.SecretName,
+						Name: kode.GetSecretName(),
 					},
 					Key: "password",
 				},
@@ -230,12 +243,12 @@ func constructWebtopContainers(config *common.KodeResourceConfig) []corev1.Conta
 		Env:   env,
 		Ports: []corev1.ContainerPort{{
 			Name:          "http",
-			ContainerPort: int32(*config.Port),
+			ContainerPort: int32(config.Port),
 		}},
 	}}
 }
 
-func constructVolumesAndMounts(mountPath string, config *common.KodeResourceConfig) ([]corev1.Volume, []corev1.VolumeMount) {
+func constructVolumesAndMounts(mountPath string, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig) ([]corev1.Volume, []corev1.VolumeMount) {
 	volumes := []corev1.Volume{}
 	volumeMounts := []corev1.VolumeMount{}
 
@@ -244,7 +257,7 @@ func constructVolumesAndMounts(mountPath string, config *common.KodeResourceConf
 
 		volumeSource := corev1.VolumeSource{
 			PersistentVolumeClaim: &corev1.PersistentVolumeClaimVolumeSource{
-				ClaimName: config.PVCName,
+				ClaimName: kode.GetPVCName(),
 			},
 		}
 

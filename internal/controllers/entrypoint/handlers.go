@@ -14,23 +14,4 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package validation
-
-import (
-	"context"
-
-	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
-)
-
-func (v *validator) validateEntryPoint(ctx context.Context, entryPoint *kodev1alpha2.EntryPoint) error {
-	if err := v.validateEntryPointSpec(entryPoint); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (v *validator) validateEntryPointSpec(entryPoint *kodev1alpha2.EntryPoint) error {
-	// var errors []string
-
-	return nil
-}
+package entrypoint

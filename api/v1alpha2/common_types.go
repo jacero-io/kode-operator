@@ -34,7 +34,7 @@ type CredentialsSpec struct {
 	EnableBuiltinAuth bool `json:"enableBuiltinAuth,omitempty" yaml:"enableBuiltinAuth,omitempty"`
 }
 
-// CommonSpec defines the common fields for both Tofu and Container specs
+// CommonSpec defines the common fields for both Container and Virtualization specs
 type CommonSpec struct {
 	// Credentials specifies the credentials for the service.
 	Credentials *CredentialsSpec `json:"credentials,omitempty" yaml:"credentials,omitempty"`
@@ -52,7 +52,7 @@ type CommonSpec struct {
 
 	// Port is the port for the service process. Used by EnvoyProxy to expose the kode.
 	// +kubebuilder:default=8000
-	Port *Port `json:"port,omitempty" yaml:"port,omitempty"`
+	Port Port `json:"port,omitempty" yaml:"port,omitempty"`
 }
 
 // CommonStatus defines the common observed state
@@ -68,11 +68,14 @@ type CommonStatus struct {
 
 	// The timestamp when the last error occurred.
 	LastErrorTime *metav1.Time `json:"lastErrorTime,omitempty" yaml:"lastErrorTime,omitempty"`
+
+	// Phase is the current state of the resource.
+	Phase Phase `json:"phase,omitempty" yaml:"phase,omitempty"`
 }
 
 // Template represents a unified structure for different types of Kode templates
 type Template struct {
-	// Kind specifies the type of template (e.g., "ContainerTemplate", "ClusterContainerTemplate", "TofuTemplate", "ClusterTofuTemplate")
+	// Kind specifies the type of template (e.g., "ContainerTemplate", "ClusterContainerTemplate")
 	Kind Kind `json:"kind" yaml:"kind"`
 
 	// Name is the name of the template resource
@@ -87,8 +90,13 @@ type Template struct {
 	// ContainerTemplateSpec is a reference to a ContainerTemplate or ClusterContainerTemplate
 	ContainerTemplateSpec *ContainerTemplateSharedSpec `json:"container,omitempty" yaml:"container,omitempty"`
 
-	// TofuTemplateSpec is a reference to a TofuTemplate or ClusterTofuTemplate
-	TofuTemplateSpec *TofuSharedSpec `json:"tofu,omitempty" yaml:"tofu,omitempty"`
+	// VirtualTemplateSpec is a reference to a VirtualTemplate or ClusterVirtualTemplate
+	// VirtualTemplateSpec *VirtualTemplateSharedSpec `json:"virtual,omitempty" yaml:"virtual,omitempty"`
+
+	// EntryPointSpecRef is a reference to an EntryPointSpec
+	EntryPointRef *CrossNamespaceObjectReference `json:"entryPointSpecRef,omitempty" yaml:"entryPointSpecRef,omitempty"`
+
+	EntryPointSpec *EntryPointSpec `json:"entryPoint,omitempty" yaml:"entryPoint,omitempty"`
 }
 
 type TemplateKind string
@@ -98,8 +106,38 @@ const (
 	TemplateKindClusterContainer TemplateKind = "ClusterContainerTemplate"
 	TemplateKindVirtual          TemplateKind = "VirtualTemplate"
 	TemplateKindClusterVirtual   TemplateKind = "ClusterVirtualTemplate"
-	TemplateKindTofu             TemplateKind = "TofuTemplate"
-	TemplateKindClusterTofu      TemplateKind = "ClusterTofuTemplate"
+)
+
+type Phase string
+
+const (
+	// PhasePending indicates the initial state when a new resource is created.
+	// The controller has acknowledged the resource but hasn't started processing it yet.
+	PhasePending Phase = "Pending"
+	// PhaseConfiguring indicates that the controller is actively setting up the resource.
+	// This includes creating necessary Kubernetes resources, configuring storage, and applying user configurations.
+	PhaseConfiguring Phase = "Configuring"
+	// PhaseProvisioning indicates that all necessary resources have been created,
+	// but the system is waiting for these resources to become fully operational.
+	// This may include waiting for pods to be scheduled and reach a ready state or for any initialization processes to complete.
+	PhaseProvisioning Phase = "Provisioning"
+	// PhaseActive indicates that the resource is fully operational.
+	// All associated Kubernetes resources are created and ready to serve requests.
+	PhaseActive Phase = "Active"
+	// PhaseUpdating indicates that the resource is in the process of being updated.
+	// The controller is actively working on updating the environment with new configurations or resources.
+	PhaseUpdating Phase = "Updating"
+	// PhaseDeleting indicates the resource is being permanently removed.
+	// The controller is in the process of deleting all associated Kubernetes resources.
+	PhaseDeleting Phase = "Deleting"
+	// PhaseFailed indicates that an error occurred during the lifecycle of the resource.
+	// This could be during creation, updating, or management of the resource or its associated resources.
+	// The controller will typically attempt to recover from this state automatically.
+	PhaseFailed Phase = "Failed"
+	// PhaseUnknown indicates that the resource is in an indeterminate state.
+	// This may occur if the controller loses connection with the resource or encounters unexpected conditions.
+	// The controller will attempt to reconcile and determine the correct state.
+	PhaseUnknown Phase = "Unknown"
 )
 
 // Port for the service. Used by EnvoyProxy to expose the container. Defaults to '8000'.

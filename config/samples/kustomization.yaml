@@ -9,8 +9,4 @@ resources:
 - containertemplate/kode_v1alpha2_containertemplate_codeserver.yaml
 # - containertemplate/kode_v1alpha2_containertemplate_webtop.yaml
 
-# - tofutemplate/kode_v1alpha2_tofutemplate.yaml
-# - tofutemplate/kode_v1alpha2_clustertofutemplate.yaml
-
-
 #+kubebuilder:scaffold:manifestskustomizesamples

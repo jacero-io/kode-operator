@@ -17,6 +17,8 @@ spec:
   #     namespace: default
   routingType: "subdomain"
   baseDomain: "derp"
+  authSpec:
+    authType: "basicAuth"
   gatewaySpec:
     existingGatewayRef:
       kind: Gateway

@@ -21,7 +21,7 @@ Kode-Operator is a Kubernetes operator that manages the entire lifecycle of vari
 
 Currently, Kode-Operator supports Code-server, Webtop environments, with plans to support more in the future (eg. Jupyter). It is also relatively easily extendable to support other environments and tools beyond those listed. It supports containerd as kubernetes runtime with plans to include kata containers in the future.
 
-The project has planned to manage in-cluster virtual machines using [Virtink](https://github.com/smartxworks/virtink) or [KubeVirt](https://kubevirt.io/) or external resources with Tofu/Terraform using [tofu-controller](https://github.com/flux-iac/tofu-controller).
+The project has planned to manage in-cluster virtual machines using [Virtink](https://github.com/smartxworks/virtink) or [KubeVirt](https://kubevirt.io/).
 
 ## Description
 
@@ -127,7 +127,6 @@ spec:
 ### Features
 
 * [x] ContainerTemplate - Deploying `code-server`, `webtop`, and `jupyter` directly into kubernetes accessing them through your browser.
-* [ ] TofuTemplate - Deploying anything you can imagine in using Tofu.
 * [ ] Authentication - Enforce `Basic auth`, `OIDC`, `JWT`, or `x509` authentication.
 * [ ] Authorization - Make sure only you have access to your stuff!
 * [ ] Observability - Know exactly what is going wrong and how well your development environments are doing.

@@ -31,7 +31,7 @@ go.work
 __debug*
 coverage*
 random/*
-concatenated_output.txt
+concatenated_output_kode.txt
 .DS_Store
 output.log
 test.log
