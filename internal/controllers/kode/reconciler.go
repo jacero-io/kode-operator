@@ -83,7 +83,7 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	}
 	log.V(1).Info("Fetched Kode resource", "Name", kode.Name, "Namespace", kode.Namespace, "Generation", kode.Generation, "ObservedGeneration", kode.Status.ObservedGeneration, "Phase", kode.Status.Phase)
 
-	// Handle finalizer
+	// Handle finalizer / deletion
 	if !kode.DeletionTimestamp.IsZero() {
 		if !controllerutil.ContainsFinalizer(kode, kode.GetFinalizer()) {
 			// Consider the resource deleted, do nothing
@@ -117,7 +117,7 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	}
 
 	// Handle generation mismatch
-	if kode.Generation != kode.Status.ObservedGeneration {
+	if controllerutil.ContainsFinalizer(kode, kode.GetFinalizer()) && kode.Generation != kode.Status.ObservedGeneration {
 		return r.handleGenerationMismatch(ctx, kode)
 	}
 
@@ -146,7 +146,7 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 		return ctrl.Result{Requeue: true}, err
 	}
 
-	log.V(1).Info("Reconciliation completed", "phase", kode.Status.Phase)
+	log.Info("Reconciliation completed", "phase", kode.Status.Phase)
 	return result, nil
 }
 

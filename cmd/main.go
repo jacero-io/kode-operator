@@ -142,13 +142,14 @@ func main() {
 	}
 
 	if err = (&entrypointcontroller.EntryPointReconciler{
-		Client:         mgr.GetClient(),
-		Scheme:         mgr.GetScheme(),
-		Log:            ctrl.Log.WithName("EntryPoint").WithName("Reconcile"),
-		Resource:       resourcev1.NewDefaultResourceManager(mgr.GetClient(), ctrl.Log.WithName("EntryPoint").WithName("ResourceManager"), scheme),
-		Template:       template.NewDefaultTemplateManager(mgr.GetClient(), ctrl.Log.WithName("EntryPoint").WithName("TemplateManager")),
-		CleanupManager: cleanup.NewDefaultCleanupManager(mgr.GetClient(), ctrl.Log.WithName("EntryPoint").WithName("CleanupManager")),
-		EventManager:   event.NewEventManager(mgr.GetClient(), ctrl.Log.WithName("EntryPoint").WithName("EventManager"), mgr.GetScheme(), mgr.GetEventRecorderFor("entrypoint-controller")),
+		Client:            mgr.GetClient(),
+		Scheme:            mgr.GetScheme(),
+		Log:               ctrl.Log.WithName("EntryPoint").WithName("Reconcile"),
+		Resource:          resourcev1.NewDefaultResourceManager(mgr.GetClient(), ctrl.Log.WithName("EntryPoint").WithName("ResourceManager"), scheme),
+		Template:          template.NewDefaultTemplateManager(mgr.GetClient(), ctrl.Log.WithName("EntryPoint").WithName("TemplateManager")),
+		CleanupManager:    cleanup.NewDefaultCleanupManager(mgr.GetClient(), ctrl.Log.WithName("EntryPoint").WithName("CleanupManager")),
+		EventManager:      event.NewEventManager(mgr.GetClient(), ctrl.Log.WithName("EntryPoint").WithName("EventManager"), mgr.GetScheme(), mgr.GetEventRecorderFor("entrypoint-controller")),
+		IsTestEnvironment: false,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "EntryPoint")
 		os.Exit(1)

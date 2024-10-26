@@ -152,8 +152,8 @@ var _ = Describe("Kode Controller ContainerTemplate Integration", Ordered, func(
 				return nil
 			}, timeout, interval).Should(Succeed(), "Failed to clean up all resources")
 		},
-		Entry("code-server", containerTemplateNameCodeServer, "code-server", 1, int32(8000)),
-		Entry("webtop", containerTemplateNameWebtop, "webtop", 1, int32(8000)),
+		Entry("code-server", containerTemplateNameCodeServer, "code-server", 2, int32(8000)),
+		Entry("webtop", containerTemplateNameWebtop, "webtop", 2, int32(8000)),
 	)
 
 	It("should not create a PersistentVolumeClaim when storage is not specified", func() {

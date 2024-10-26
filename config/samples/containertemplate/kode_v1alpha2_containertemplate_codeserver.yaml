@@ -14,7 +14,7 @@ spec:
     namespace: default
   type: code-server
   # runtime: gvisor
-  image: linuxserver/code-server:latest
+  image: lscr.io/linuxserver/code-server:latest
   tz: "Europe/Stockholm"
   puid: 1000
   pgid: 1000

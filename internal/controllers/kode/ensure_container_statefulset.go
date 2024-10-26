@@ -18,12 +18,14 @@ package kode
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"path"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/intstr"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
@@ -43,46 +45,41 @@ func ensureStatefulSet(ctx context.Context, r statemachine.ReconcilerInterface, 
 
 	log.V(1).Info("Ensuring StatefulSet")
 
+	// Construct the desired state
+	desiredStatefulSet, err := constructStatefulSetSpec(ctx, r, resourcev1, kode, config)
+	if err != nil {
+		return fmt.Errorf("failed to construct StatefulSet spec: %w", err)
+	}
+
+	// Create the StatefulSet object
 	statefulSet := &appsv1.StatefulSet{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      config.CommonConfig.Name,
-			Namespace: config.CommonConfig.Namespace,
+			Name:      kode.GetStatefulSetName(),
+			Namespace: kode.Namespace,
 			Labels:    config.CommonConfig.Labels,
 		},
 	}
 
-	_, err := resourcev1.CreateOrPatch(ctx, statefulSet, func() error {
-		constructedStatefulSet, err := constructStatefulSetSpec(r, kode, config)
-		if err != nil {
-			return fmt.Errorf("failed to construct StatefulSet spec: %v", err)
+	_, err = resourcev1.CreateOrPatch(ctx, statefulSet, func() error {
+		// Copy all spec fields
+		statefulSet.Spec = desiredStatefulSet.Spec
+
+		// Ensure labels are updated
+		if statefulSet.Labels == nil {
+			statefulSet.Labels = make(map[string]string)
 		}
-
-		// Add sidecar containers
-		containers, sidecarInitContainers, err := ensureSidecarContainers(ctx, r, resourcev1, kode, config)
-		if err != nil {
-			return fmt.Errorf("failed to ensure sidecar containers: %v", err)
+		for k, v := range config.CommonConfig.Labels {
+			statefulSet.Labels[k] = v
 		}
-
-		constructedStatefulSet.Spec.Template.Spec.Containers = append(constructedStatefulSet.Spec.Template.Spec.Containers, containers...)
-		constructedStatefulSet.Spec.Template.Spec.InitContainers = append(constructedStatefulSet.Spec.Template.Spec.InitContainers, sidecarInitContainers...)
-
-		statefulSet.Spec = constructedStatefulSet.Spec
 
 		return controllerutil.SetControllerReference(kode, statefulSet, r.GetScheme())
 	})
 
-	if err != nil {
-		return fmt.Errorf("failed to create or patch StatefulSet: %v", err)
-	}
-
-	// maskedSpec := common.MaskSpec(statefulSet.Spec.Template.Spec.Containers[0]) // Mask sensitive values
-	// log.V(1).Info("StatefulSet object created", "StatefulSet", statefulSet, "Spec", maskedSpec)
-
-	return nil
+	return err
 }
 
 // constructStatefulSetSpec constructs a StatefulSet for the Kode instance
-func constructStatefulSetSpec(r statemachine.ReconcilerInterface, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig) (*appsv1.StatefulSet, error) {
+func constructStatefulSetSpec(ctx context.Context, r statemachine.ReconcilerInterface, resourcev1 resourcev1.ResourceManager, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig) (*appsv1.StatefulSet, error) {
 	log := r.GetLog().WithName("SatefulSetConstructor").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	replicas := int32(1)
@@ -117,6 +114,10 @@ func constructStatefulSetSpec(r statemachine.ReconcilerInterface, kode *kodev1al
 		return nil, fmt.Errorf("unknown template type: %s", templateSpec.Type)
 	}
 
+	// Add the port configuration to the first container
+	containers[0].Ports = []corev1.ContainerPort{constructContainerPort()}
+
+	// Construct and add volumes and volume mounts
 	volumes, volumeMounts := constructVolumesAndMounts(mountPath, kode, config)
 	log.V(1).Info("Constructed volumes and mounts", "volumes", volumes, "volumeMounts", volumeMounts)
 	containers[0].VolumeMounts = volumeMounts
@@ -125,8 +126,7 @@ func constructStatefulSetSpec(r statemachine.ReconcilerInterface, kode *kodev1al
 	if config.InitContainers != nil {
 		initContainers = append(initContainers, config.InitContainers...)
 		for _, container := range config.Containers {
-			log.V(1).Info("InitContainer added", "Name", container.Name)
-			log.V(2).Info("InitContainer added", "Name", container.Name, "Container", container)
+			log.V(1).Info("InitContainer added", "Name", container.Name, "Container", container)
 		}
 	}
 
@@ -134,20 +134,30 @@ func constructStatefulSetSpec(r statemachine.ReconcilerInterface, kode *kodev1al
 	if config.Containers != nil {
 		containers = append(containers, config.Containers...)
 		for _, container := range config.Containers {
-			log.V(1).Info("Container added", "Name", container.Name)
-			log.V(2).Info("Container added", "Name", container.Name, "Container", container)
+			log.V(1).Info("Container added", "Name", container.Name, "Container", container)
 		}
 	}
 
-	// Add TemplateInitPlugins as InitContainers
+	// Construct and add sidecar containers
+	sidecarContainers, sidecarInitContainers, err := ensureSidecarContainers(ctx, r, resourcev1, kode, config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to ensure sidecar containers: %v", err)
+	}
+	containers = append(containers, sidecarContainers...)
+	initContainers = append(initContainers, sidecarInitContainers...)
+
+	// Add TemplateInitPlugins
 	for _, initPlugin := range config.Template.ContainerTemplateSpec.InitPlugins {
 		initContainers = append(initContainers, constructInitPluginContainer(initPlugin))
 	}
 
-	// Add UserInitPlugins as InitContainers
+	// Add UserInitPlugins
 	for _, initPlugin := range config.UserInitPlugins {
 		initContainers = append(initContainers, constructInitPluginContainer(initPlugin))
 	}
+
+	// Calculate hash of the pod template
+	podTemplateHash := calculatePodTemplateHash(containers, initContainers, volumes)
 
 	statefulSet := &appsv1.StatefulSet{
 		Spec: appsv1.StatefulSetSpec{
@@ -158,13 +168,22 @@ func constructStatefulSetSpec(r statemachine.ReconcilerInterface, kode *kodev1al
 			ServiceName: config.ServiceName,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
-					Labels:            config.CommonConfig.Labels,
-					CreationTimestamp: metav1.Time{},
+					Labels: config.CommonConfig.Labels,
+					Annotations: map[string]string{
+						"kode.jacero.io/pod-template-hash": podTemplateHash,
+					},
 				},
 				Spec: corev1.PodSpec{
 					InitContainers: initContainers,
 					Containers:     containers,
 					Volumes:        volumes,
+				},
+			},
+			// Add update strategy
+			UpdateStrategy: appsv1.StatefulSetUpdateStrategy{
+				Type: appsv1.RollingUpdateStatefulSetStrategyType,
+				RollingUpdate: &appsv1.RollingUpdateStatefulSetStrategy{
+					MaxUnavailable: &intstr.IntOrString{Type: intstr.Int, IntVal: 1},
 				},
 			},
 		},
@@ -179,12 +198,20 @@ func constructStatefulSetSpec(r statemachine.ReconcilerInterface, kode *kodev1al
 	return statefulSet, nil
 }
 
+func constructContainerPort() corev1.ContainerPort {
+	return corev1.ContainerPort{
+		Name:          "main-http",
+		ContainerPort: int32(constant.DefaultKodePodPort),
+	}
+}
+
 func constructCodeServerContainers(kode *kodev1alpha2.Kode, config *common.KodeResourceConfig, workspace string) []corev1.Container {
+
 	env := []corev1.EnvVar{
 		{Name: "PUID", Value: fmt.Sprintf("%d", config.Template.ContainerTemplateSpec.PUID)},
 		{Name: "PGID", Value: fmt.Sprintf("%d", config.Template.ContainerTemplateSpec.PGID)},
 		{Name: "TZ", Value: config.Template.ContainerTemplateSpec.TZ},
-		{Name: "PORT", Value: fmt.Sprintf("%d", config.Port)},
+		{Name: "PORT", Value: fmt.Sprintf("%d", constant.DefaultKodePodPort)},
 		{Name: "USERNAME", Value: config.Credentials.Username},
 		{Name: "DEFAULT_WORKSPACE", Value: workspace},
 	}
@@ -207,10 +234,6 @@ func constructCodeServerContainers(kode *kodev1alpha2.Kode, config *common.KodeR
 		Name:  "code-server",
 		Image: config.Template.ContainerTemplateSpec.Image,
 		Env:   env,
-		Ports: []corev1.ContainerPort{{
-			Name:          "http",
-			ContainerPort: int32(config.Port),
-		}},
 	}}
 }
 
@@ -219,7 +242,7 @@ func constructWebtopContainers(kode *kodev1alpha2.Kode, config *common.KodeResou
 		{Name: "PUID", Value: fmt.Sprintf("%d", config.Template.ContainerTemplateSpec.PUID)},
 		{Name: "PGID", Value: fmt.Sprintf("%d", config.Template.ContainerTemplateSpec.PGID)},
 		{Name: "TZ", Value: config.Template.ContainerTemplateSpec.TZ},
-		{Name: "CUSTOM_PORT", Value: fmt.Sprintf("%d", config.Port)},
+		{Name: "CUSTOM_PORT", Value: fmt.Sprintf("%d", constant.DefaultKodePodPort)},
 		{Name: "CUSTOM_USER", Value: config.Credentials.Username},
 	}
 
@@ -241,10 +264,6 @@ func constructWebtopContainers(kode *kodev1alpha2.Kode, config *common.KodeResou
 		Name:  "webtop",
 		Image: config.Template.ContainerTemplateSpec.Image,
 		Env:   env,
-		Ports: []corev1.ContainerPort{{
-			Name:          "http",
-			ContainerPort: int32(config.Port),
-		}},
 	}}
 }
 
@@ -288,4 +307,32 @@ func constructInitPluginContainer(plugin kodev1alpha2.InitPluginSpec) corev1.Con
 		EnvFrom:      plugin.EnvFrom,
 		VolumeMounts: plugin.VolumeMounts,
 	}
+}
+
+func calculatePodTemplateHash(containers []corev1.Container, initContainers []corev1.Container, volumes []corev1.Volume) string {
+	hasher := sha256.New()
+
+	// Hash containers
+	for _, c := range containers {
+		hasher.Write([]byte(c.Image))
+		hasher.Write([]byte(c.Name))
+		// Hash env vars
+		for _, env := range c.Env {
+			hasher.Write([]byte(env.Name))
+			hasher.Write([]byte(env.Value))
+		}
+	}
+
+	// Hash init containers
+	for _, c := range initContainers {
+		hasher.Write([]byte(c.Image))
+		hasher.Write([]byte(c.Name))
+	}
+
+	// Hash volumes
+	for _, v := range volumes {
+		hasher.Write([]byte(v.Name))
+	}
+
+	return fmt.Sprintf("%x", hasher.Sum(nil))
 }

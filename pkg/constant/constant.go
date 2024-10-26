@@ -26,6 +26,7 @@ const (
 
 	// Resource related constants
 	DefaultKodeVolumeStorageName = "kode-storage"
+	DefaultKodePodPort           = 3000
 
 	// Credential related constants
 	DefaultUsername = "abc"

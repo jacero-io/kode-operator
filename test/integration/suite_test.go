@@ -140,15 +140,20 @@ var _ = BeforeSuite(func() {
 	err = setupStorageClass(ctx, k8sClient)
 	Expect(err).ToNot(HaveOccurred())
 
+	reconcileInterval := 5 * time.Second
+	longReconcileInterval := 5 * time.Minute
+
 	reconciler = &kodectrl.KodeReconciler{
-		Client:            k8sClient,
-		Scheme:            k8sManager.GetScheme(),
-		Log:               ctrl.Log.WithName("Kode").WithName("Reconcile"),
-		Resource:          resourcev1.NewDefaultResourceManager(k8sClient, ctrl.Log.WithName("Kode").WithName("ResourceManager"), k8sManager.GetScheme()),
-		Template:          template.NewDefaultTemplateManager(k8sClient, ctrl.Log.WithName("Kode").WithName("TemplateManager")),
-		CleanupManager:    cleanup.NewDefaultCleanupManager(k8sClient, ctrl.Log.WithName("Kode").WithName("CleanupManager")),
-		EventManager:      event.NewEventManager(k8sClient, ctrl.Log.WithName("Kode").WithName("EventManager"), k8sManager.GetScheme(), k8sManager.GetEventRecorderFor("kode-controller")),
-		IsTestEnvironment: true,
+		Client:                k8sClient,
+		Scheme:                k8sManager.GetScheme(),
+		Log:                   ctrl.Log.WithName("Kode").WithName("Reconcile"),
+		Resource:              resourcev1.NewDefaultResourceManager(k8sClient, ctrl.Log.WithName("Kode").WithName("ResourceManager"), k8sManager.GetScheme()),
+		Template:              template.NewDefaultTemplateManager(k8sClient, ctrl.Log.WithName("Kode").WithName("TemplateManager")),
+		CleanupManager:        cleanup.NewDefaultCleanupManager(k8sClient, ctrl.Log.WithName("Kode").WithName("CleanupManager")),
+		EventManager:          event.NewEventManager(k8sClient, ctrl.Log.WithName("Kode").WithName("EventManager"), k8sManager.GetScheme(), k8sManager.GetEventRecorderFor("kode-controller")),
+		IsTestEnvironment:     true,
+		ReconcileInterval:     reconcileInterval,
+		LongReconcileInterval: longReconcileInterval,
 	}
 
 	entrypointReconciler = &entrypointctrl.EntryPointReconciler{
@@ -168,10 +173,17 @@ var _ = BeforeSuite(func() {
 	err = entrypointReconciler.SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
+	// Start the Manager
 	go func() {
-		err = k8sManager.Start(ctx)
+		defer GinkgoRecover()
+		err := k8sManager.Start(ctx)
 		Expect(err).ToNot(HaveOccurred())
 	}()
+
+	// Wait for the manager to be ready
+	Eventually(func() bool {
+		return k8sManager.GetCache().WaitForCacheSync(ctx)
+	}, timeout, interval).Should(BeTrue())
 
 	// Create namespace
 	namespace = &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: resourceNamespace}}

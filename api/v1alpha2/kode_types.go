@@ -139,7 +139,7 @@ type KodeList struct {
 type Runtime struct {
 	// KodeRuntime is the runtime for the Kode resource. Can be one of 'container', 'virtual'.
 	// +kubebuilder:validation:Enum=container;virtual
-	Runtime KodeRuntime `json:"kodeRuntime"`
+	Runtime KodeRuntime `json:"runtime"`
 
 	// Type is the container runtime for Kode resource.
 	Type RuntimeType `json:"type,omitempty"`
@@ -287,9 +287,12 @@ func (k *Kode) GetPort() Port {
 	return k.Status.KodePort
 }
 
-func (k *Kode) SetRuntime(runtime Runtime, ctx context.Context, c client.Client) {
+func (k *Kode) SetRuntime(runtime Runtime, ctx context.Context, c client.Client) error {
 	k.Status.Runtime = &runtime
-	k.UpdateStatus(ctx, c)
+	if err := k.UpdateStatus(ctx, c); err != nil {
+		return fmt.Errorf("failed to update status with runtime: %w", err)
+	}
+	return nil
 }
 
 func (k *Kode) GetRuntime() *Runtime {

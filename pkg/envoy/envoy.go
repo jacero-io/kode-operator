@@ -35,27 +35,35 @@ func NewContainerConstructor(log logr.Logger, configGenerator ConfigGenerator) *
 }
 
 func (c *ContainerConstructor) ConstructEnvoyContainers(config *common.KodeResourceConfig) ([]corev1.Container, []corev1.Container, error) {
-	var containers []corev1.Container
-	var initContainers []corev1.Container
-
+	// Generate Envoy config
 	useBasicAuth := false
 	if config.Template != nil && config.Template.EntryPointSpec != nil &&
 		config.Template.EntryPointSpec.AuthSpec != nil {
 		useBasicAuth = config.Template.EntryPointSpec.AuthSpec.AuthType == "basicAuth"
 	}
 
-	// Generate Envoy config
 	envoyConfig, err := c.configGenerator.GenerateEnvoyConfig(config, useBasicAuth)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to generate Envoy config: %w", err)
 	}
 
+	var containers []corev1.Container
+	var initContainers []corev1.Container
+
 	// Create proxy setup container
 	proxySetupContainer := c.createProxySetupContainer(config)
 	initContainers = append(initContainers, proxySetupContainer)
 
-	// Create Envoy container
+	// Create Envoy container with a different port
 	envoyContainer := c.createEnvoyContainer(config, envoyConfig)
+	// Use proxy port and name it differently
+	envoyContainer.Ports = []corev1.ContainerPort{
+		{
+			Name:          "proxy-http",
+			ContainerPort: int32(config.Port),
+			Protocol:      corev1.ProtocolTCP,
+		},
+	}
 	containers = append(containers, envoyContainer)
 
 	// Add basic auth sidecar if required
@@ -88,7 +96,7 @@ func (c *ContainerConstructor) createEnvoyContainer(config *common.KodeResourceC
 		Image: EnvoyProxyContainerImage,
 		Args:  []string{"--config-yaml", envoyConfig},
 		Ports: []corev1.ContainerPort{
-			{Name: "http", ContainerPort: int32(config.Port)},
+			{Name: "envoy-http", ContainerPort: int32(config.Port)},
 		},
 		SecurityContext: &corev1.SecurityContext{
 			RunAsUser: common.Int64Ptr(EnvoyProxyRunAsUser),

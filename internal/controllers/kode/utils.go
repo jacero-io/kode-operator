@@ -19,12 +19,9 @@ package kode
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/util/wait"
-	"k8s.io/client-go/util/retry"
 	ctrl "sigs.k8s.io/controller-runtime"
 	client "sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -36,51 +33,63 @@ import (
 )
 
 func fetchTemplatesWithRetry(ctx context.Context, r statemachine.ReconcilerInterface, kode *kodev1alpha2.Kode) (*kodev1alpha2.Template, error) {
-	var template *kodev1alpha2.Template
-	var lastErr error
+	log := r.GetLog().WithValues(
+		"kode", client.ObjectKeyFromObject(kode),
+		"templateRef", kode.Spec.TemplateRef,
+	)
 
-	backoff := wait.Backoff{
-		Steps:    5,                      // Maximum number of retries
-		Duration: 100 * time.Millisecond, // Initial backoff duration
-		Factor:   2.0,                    // Factor to increase backoff each try
-		Jitter:   0.1,                    // Jitter factor
-	}
+	log.V(1).Info("Starting template fetch",
+		"templateKind", kode.Spec.TemplateRef.Kind,
+		"templateName", kode.Spec.TemplateRef.Name,
+		"templateNamespace", kode.Spec.TemplateRef.Namespace)
 
-	log := r.GetLog().WithValues("kode", client.ObjectKeyFromObject(kode))
-
-	retryErr := wait.ExponentialBackoff(backoff, func() (bool, error) {
-		var err error
-		template, err = r.GetTemplateManager().Fetch(ctx, kode.Spec.TemplateRef)
-		if err == nil {
-			return true, nil // Success
-		}
-
+	template, err := r.GetTemplateManager().Fetch(ctx, kode.Spec.TemplateRef)
+	if err != nil {
 		if errors.IsNotFound(err) {
-			log.Info("Template not found, will not retry", "error", err)
-			return false, err // Don't retry if not found
+			log.Error(err, "Template not found",
+				"templateKind", kode.Spec.TemplateRef.Kind,
+				"templateName", kode.Spec.TemplateRef.Name,
+				"templateNamespace", kode.Spec.TemplateRef.Namespace)
+			return nil, fmt.Errorf("template not found: %w", err)
 		}
-
-		// For other errors, log and retry
-		log.Error(err, "Failed to fetch template, will retry")
-		lastErr = err
-		return false, nil // Retry
-	})
-
-	if retryErr != nil {
-		if errors.IsNotFound(retryErr) {
-			return nil, fmt.Errorf("template not found after retries: %w", retryErr)
-		}
-		return nil, fmt.Errorf("failed to fetch template after retries: %w", lastErr)
+		log.Error(err, "Failed to fetch template")
+		return nil, fmt.Errorf("failed to fetch template: %w", err)
 	}
+
+	log.V(1).Info("Successfully fetched template",
+		"templateKind", template.Kind,
+		"port", template.Port)
+
+	// Log runtime update attempt
+	log.V(1).Info("Checking if runtime update is needed",
+		"templateKind", kode.Spec.TemplateRef.Kind,
+		"isContainer", kodev1alpha2.TemplateKind(kode.Spec.TemplateRef.Kind) == kodev1alpha2.TemplateKindContainer,
+		"isClusterContainer", kodev1alpha2.TemplateKind(kode.Spec.TemplateRef.Kind) == kodev1alpha2.TemplateKindClusterContainer)
 
 	// Update Runtime
-	if kodev1alpha2.TemplateKind(kode.Spec.TemplateRef.Kind) == kodev1alpha2.TemplateKindContainer || kodev1alpha2.TemplateKind(kode.Spec.TemplateRef.Kind) == kodev1alpha2.TemplateKindClusterContainer {
+	if kodev1alpha2.TemplateKind(kode.Spec.TemplateRef.Kind) == kodev1alpha2.TemplateKindContainer ||
+		kodev1alpha2.TemplateKind(kode.Spec.TemplateRef.Kind) == kodev1alpha2.TemplateKindClusterContainer {
 		runtime := kodev1alpha2.Runtime{
 			Runtime: kodev1alpha2.RuntimeContainer,
 			Type:    template.ContainerTemplateSpec.Runtime,
 		}
-		kode.SetRuntime(runtime, ctx, r.GetClient())
+		log.V(1).Info("Updating runtime",
+			"runtime", runtime.Runtime,
+			"type", runtime.Type)
+
+		if err := kode.SetRuntime(runtime, ctx, r.GetClient()); err != nil {
+			log.Error(err, "Failed to update runtime",
+				"runtime", runtime.Runtime,
+				"type", runtime.Type)
+			return template, fmt.Errorf("failed to update runtime: %w", err)
+		}
+		log.V(1).Info("Successfully updated runtime")
 	}
+
+	log.V(1).Info("Template fetch completed successfully",
+		"templateKind", template.Kind,
+		"templateName", template.Name,
+		"port", template.Port)
 
 	return template, nil
 }
@@ -142,20 +151,6 @@ func determineCurrentState(ctx context.Context, r statemachine.ReconcilerInterfa
 	// If everything is set up and ready, consider it active
 	log.Info("All resources are ready")
 	return kodev1alpha2.PhaseActive, nil
-}
-
-func (r *KodeReconciler) updateRetryCount(ctx context.Context, kode *kodev1alpha2.Kode, count int) error {
-	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
-		latestKode := &kodev1alpha2.Kode{}
-		err := r.Client.Get(ctx, client.ObjectKey{Name: kode.Name, Namespace: kode.Namespace}, latestKode)
-		if err != nil {
-			return err
-		}
-
-		latestKode.Status.RetryCount = count
-
-		return latestKode.UpdateStatus(ctx, r.Client)
-	})
 }
 
 func (r *KodeReconciler) handleGenerationMismatch(ctx context.Context, kode *kodev1alpha2.Kode) (ctrl.Result, error) {
