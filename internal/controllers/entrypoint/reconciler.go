@@ -30,7 +30,6 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	gwapiv1 "sigs.k8s.io/gateway-api/apis/v1"
 
@@ -39,7 +38,6 @@ import (
 	"github.com/jacero-io/kode-operator/internal/common"
 	"github.com/jacero-io/kode-operator/internal/event"
 	"github.com/jacero-io/kode-operator/internal/resourcev1"
-	"github.com/jacero-io/kode-operator/internal/statemachine"
 	"github.com/jacero-io/kode-operator/internal/template"
 
 	"github.com/jacero-io/kode-operator/pkg/constant"
@@ -82,12 +80,6 @@ func (r *EntryPointReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 	}
 
 	switch v := obj.(type) {
-	case *kodev1alpha2.EntryPoint:
-		// Skip reconciliation of EntryPoints because it is not yet implemented
-		log.V(1).Info("Skipping reconciliation of EntryPoint", "namespace", v.Namespace, "name", v.Name)
-		return ctrl.Result{}, nil
-		// log.V(1).Info("Reconciling EntryPoint", "namespace", v.Namespace, "name", v.Name)
-		// return r.reconcileEntryPoint(ctx, v)
 	case *kodev1alpha2.Kode:
 		log.V(1).Info("Reconciling Kode", "namespace", v.Namespace, "name", v.Name)
 		return r.reconcileKode(ctx, v)
@@ -95,80 +87,6 @@ func (r *EntryPointReconciler) Reconcile(ctx context.Context, req ctrl.Request) 
 		log.Error(nil, "Unknown resource type", "type", fmt.Sprintf("%T", obj))
 		return ctrl.Result{}, nil
 	}
-}
-
-func (r *EntryPointReconciler) reconcileEntryPoint(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := r.Log.WithValues("entrypoint", req.NamespacedName)
-	log.V(1).Info("Starting reconciliation")
-
-	entryPoint := &kodev1alpha2.EntryPoint{}
-	if err := r.Resource.Get(ctx, req.NamespacedName, entryPoint); err != nil {
-		if client.IgnoreNotFound(err) != nil {
-			log.Error(err, "Unable to fetch Kode")
-			return ctrl.Result{}, client.IgnoreNotFound(err)
-		}
-		return ctrl.Result{}, nil
-	}
-	log.V(1).Info("Fetched Kode resource", "Name", entryPoint.Name, "Namespace", entryPoint.Namespace, "Generation", entryPoint.Generation, "ObservedGeneration", entryPoint.Status.ObservedGeneration, "Phase", entryPoint.Status.Phase)
-
-	sm := statemachine.NewStateMachine(r.Client, r.Log)
-	// sm.RegisterHandler(kodev1alpha2.PhasePending, handlePendingState)
-	// sm.RegisterHandler(kodev1alpha2.PhaseConfiguring, handleConfiguringState)
-	// sm.RegisterHandler(kodev1alpha2.PhaseProvisioning, handleProvisioningState)
-	// sm.RegisterHandler(kodev1alpha2.PhaseActive, handleActiveState)
-	// sm.RegisterHandler(kodev1alpha2.PhaseUpdating, handleUpdatingState)
-	// sm.RegisterHandler(kodev1alpha2.PhaseDeleting, handleDeletingState)
-	// sm.RegisterHandler(kodev1alpha2.PhaseFailed, handleFailedState)
-	// sm.RegisterHandler(kodev1alpha2.PhaseUnknown, handleUnknownState)
-
-	// Handle finalizer
-	if !entryPoint.DeletionTimestamp.IsZero() {
-		if !controllerutil.ContainsFinalizer(entryPoint, constant.EntryPointFinalizerName) {
-			// Consider the resource deleted, do nothing
-			return ctrl.Result{}, nil
-		}
-		// Change to deleting state
-		entryPoint.Status.Phase = kodev1alpha2.PhaseDeleting
-		if err := entryPoint.UpdateStatus(ctx, r.Client); err != nil {
-			return ctrl.Result{Requeue: true}, err
-		}
-
-		// When the EntryPoint resource is completely new, add the finalizer and transition to Pending state
-	} else if !controllerutil.ContainsFinalizer(entryPoint, constant.EntryPointFinalizerName) {
-		controllerutil.AddFinalizer(entryPoint, constant.EntryPointFinalizerName)
-		log.Info("Added finalizer to EntryPoint resource")
-
-		// Transition to Pending state to begin initialization
-		log.Info("Transitioning to Pending state to begin initialization")
-		entryPoint.Status.Phase = kodev1alpha2.PhasePending
-		if err := entryPoint.UpdateStatus(ctx, r.Client); err != nil {
-			return ctrl.Result{Requeue: true}, err
-		}
-		return ctrl.Result{Requeue: true}, nil
-	}
-
-	// Handle generation mismatch
-	if entryPoint.Generation != entryPoint.Status.ObservedGeneration {
-		return r.handleGenerationMismatch(ctx, entryPoint)
-	}
-
-	// Reset retry count if not in failed state
-	if entryPoint.Status.Phase != kodev1alpha2.PhaseFailed && entryPoint.Status.RetryCount > 0 {
-		entryPoint.Status.RetryCount = 0
-		if err := entryPoint.UpdateStatus(ctx, r.Client); err != nil {
-			return ctrl.Result{Requeue: true}, err
-		}
-	}
-
-	// Run state machine
-	result, err := sm.HandleState(ctx, r, entryPoint)
-	if err != nil {
-		log.Error(err, "Error handling state", "phase", entryPoint.Status.Phase)
-		return ctrl.Result{Requeue: true}, err
-	}
-
-	log.V(1).Info("Reconciliation completed", "phase", entryPoint.Status.Phase)
-	return result, nil
 }
 
 func (r *EntryPointReconciler) reconcileKode(ctx context.Context, kode *kodev1alpha2.Kode) (ctrl.Result, error) {

@@ -29,16 +29,6 @@ type EntryPointCleanupResource struct {
 func (e *EntryPointCleanupResource) GetResources() []cleanup.Resource {
 	resources := []cleanup.Resource{}
 
-	// Add Gateway resource if GatewaySpec is defined
-	if e.EntryPoint.Spec.GatewaySpec != nil {
-		resources = append(resources, cleanup.Resource{
-			Name:      e.EntryPoint.Name,
-			Namespace: e.EntryPoint.Namespace,
-			Kind:      "Gateway",
-			Object:    &gatewayv1beta1.Gateway{},
-		})
-	}
-
 	// Add HTTPRoute resource
 	resources = append(resources, cleanup.Resource{
 		Name:      e.EntryPoint.Name,
