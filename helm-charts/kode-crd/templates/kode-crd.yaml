@@ -549,7 +549,7 @@ spec:
               runtime:
                 description: The runtime for the Kode.
                 properties:
-                  kodeRuntime:
+                  runtime:
                     description: KodeRuntime is the runtime for the Kode resource. Can
                       be one of 'container', 'virtual'.
                     enum:
@@ -560,7 +560,7 @@ spec:
                     description: Type is the container runtime for Kode resource.
                     type: string
                 required:
-                - kodeRuntime
+                - runtime
                 type: object
             type: object
         type: object
