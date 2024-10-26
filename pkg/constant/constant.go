@@ -26,6 +26,7 @@ const (
 
 	// Resource related constants
 	DefaultKodeVolumeStorageName = "kode-storage"
+	DefaultKodePodPort           = 3000
 
 	// Credential related constants
 	DefaultUsername = "abc"
@@ -48,6 +49,9 @@ const (
 
 	// ConditionTypeConfigured indicates that the resource has been properly configured with all necessary settings.
 	ConditionTypeConfigured ConditionType = "Configured"
+
+	// ConditionTypeValidated indicates that the resource has been validated and is ready for provisioning.
+	ConditionTypeValidated ConditionType = "Validated"
 
 	// ConditionTypeHTTPRouteReady indicates that the HTTP route is available and can be accessed.
 	ConditionTypeHTTPRouteReady ConditionType = "HTTPRouteReady"

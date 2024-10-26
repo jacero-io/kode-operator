@@ -19,19 +19,19 @@ package v1alpha2
 import (
 	"context"
 	"fmt"
-	"time"
 
-	"github.com/jacero-io/kode-operator/pkg/constant"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
+	"github.com/jacero-io/kode-operator/pkg/constant"
 )
 
 // KodeSpec defines the desired state of Kode
 type KodeSpec struct {
-	// The reference to a template. Either a ContainerTemplate, VirtualTemplate or TofuTemplate.
+	// The reference to a template. Either a ContainerTemplate or VirtualTemplate.
 	// +kubebuilder:validation:Required
 	TemplateRef CrossNamespaceObjectReference `json:"templateRef"`
 
@@ -87,9 +87,6 @@ type KodeStorageSpec struct {
 type KodeStatus struct {
 	CommonStatus `json:",inline" yaml:",inline"`
 
-	// Phase represents the current phase of the Kode resource.
-	Phase KodePhase `json:"phase"`
-
 	// The URL to access the Kode.
 	KodeUrl KodeUrl `json:"kodeUrl,omitempty"`
 
@@ -109,7 +106,7 @@ type KodeStatus struct {
 	RetryCount int `json:"retryCount,omitempty"`
 
 	// DeletionCycle keeps track of the number of deletion cycles. This is used to determine if the resource is deleting.
-	DeletionCycle int `json:"deletionCycle,omitempty"`
+	DeletionCycle int `json:"deletionCycle,omitempty"` // TODO: Remove this field and use RetryCount instead. Deleting and failure are not executing at the same time.
 }
 
 //+kubebuilder:object:root=true
@@ -139,78 +136,22 @@ type KodeList struct {
 	Items           []Kode `json:"items"`
 }
 
-// KodePhase represents the current state of the Kode resource.
-type KodePhase string
-
-const (
-	// KodePhasePending indicates the initial state when a new Kode resource is created.
-	// The controller has acknowledged the resource but hasn't started processing it yet.
-	KodePhasePending KodePhase = "Pending"
-
-	// KodePhaseConfiguring indicates that the controller is actively setting up the Kode resource.
-	// This includes creating necessary Kubernetes resources, configuring storage, and applying user configurations.
-	KodePhaseConfiguring KodePhase = "Configuring"
-
-	// KodePhaseProvisioning indicates that all necessary resources for the Kode have been created,
-	// but the system is waiting for these resources to become fully operational.
-	// This may include waiting for pods to be scheduled and reach a ready state or for any initialization processes to complete.
-	KodePhaseProvisioning KodePhase = "Provisioning"
-
-	// KodePhaseActive indicates that the Kode resource is fully operational.
-	// All associated Kubernetes resources are created and ready to serve requests.
-	// The Kode environment is accessible to users in this state.
-	KodePhaseActive KodePhase = "Active"
-
-	// KodePhaseInactive indicates that the Kode resource has been flagged for suspension.
-	// This could be due to inactivity or to free up resources.
-	// Some resources may be partially or fully removed to free up cluster resources.
-	KodePhaseInactive KodePhase = "Inactive"
-
-	// KodePhaseSuspending indicates that the Kode resource is in the process of being suspended.
-	// The controller is actively working on stopping the Kode environment and preserving its state.
-	KodePhaseSuspending KodePhase = "Suspending"
-
-	// KodePhaseSuspended indicates that the Kode resource is in a suspended state.
-	// The Kode environment is not running, but its configuration and data are preserved.
-	// It can be resumed later without loss of user data or settings.
-	KodePhaseSuspended KodePhase = "Suspended"
-
-	// KodePhaseResuming indicates that the Kode resource is in the process of being reactivated from a suspended state.
-	// The controller is recreating necessary resources and restoring the Kode environment to its previous active state.
-	KodePhaseResuming KodePhase = "Resuming"
-
-	// KodePhaseDeleting indicates the Kode resource is being permanently removed.
-	// The controller is in the process of deleting all associated Kubernetes resources.
-	KodePhaseDeleting KodePhase = "Deleting"
-
-	// KodePhaseFailed indicates that an error occurred during the lifecycle of the Kode resource.
-	// This could be during creation, updating, or management of the Kode or its associated resources.
-	// The controller will typically attempt to recover from this state automatically.
-	KodePhaseFailed KodePhase = "Failed"
-
-	// KodePhaseUnknown indicates that the Kode resource is in an indeterminate state.
-	// This may occur if the controller loses connection with the resource or encounters unexpected conditions.
-	// The controller will attempt to reconcile and determine the correct state.
-	KodePhaseUnknown KodePhase = "Unknown"
-)
-
 type Runtime struct {
-	// KodeRuntime is the runtime for the Kode resource. Can be one of 'container', 'virtual', 'tofu'.
-	// +kubebuilder:validation:Enum=container;virtual;tofu
-	Runtime KodeRuntime `json:"kodeRuntime"`
+	// KodeRuntime is the runtime for the Kode resource. Can be one of 'container', 'virtual'.
+	// +kubebuilder:validation:Enum=container;virtual
+	Runtime KodeRuntime `json:"runtime"`
 
 	// Type is the container runtime for Kode resource.
 	Type RuntimeType `json:"type,omitempty"`
 }
 
 // KodeRuntime specifies the runtime for the Kode resource.
-// Can be one of 'container', 'virtual', 'tofu'.
+// Can be one of 'container', 'virtual'.
 type KodeRuntime string
 
 const (
 	RuntimeContainer KodeRuntime = "container"
 	RuntimeVirtual   KodeRuntime = "virtual"
-	RuntimeTofu      KodeRuntime = "tofu"
 )
 
 // RuntimeType specifies the type of the runtime for the Kode resource.
@@ -235,17 +176,28 @@ func init() {
 	SchemeBuilder.Register(&Kode{}, &KodeList{})
 }
 
+func (k *Kode) GetName() string {
+	return k.Name
+}
+
+func (k *Kode) GetNamespace() string {
+	return k.Namespace
+}
+
+func (k *Kode) GetPhase() Phase {
+	return k.Status.Phase
+}
+
+func (k *Kode) SetPhase(phase Phase) {
+	k.Status.Phase = phase
+}
+
 func (k *Kode) UpdateStatus(ctx context.Context, c client.Client) error {
 	return retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		// Fetch the latest version of the Kode
 		latestKode := &Kode{}
-		err := c.Get(ctx, client.ObjectKey{Name: k.Name, Namespace: k.Namespace}, latestKode)
-		if err != nil {
-			if errors.IsNotFound(err) {
-				// Kode resource has been deleted, nothing to update
-				return nil
-			}
-			return err
+		if err := c.Get(ctx, client.ObjectKey{Name: k.Name, Namespace: k.Namespace}, latestKode); err != nil {
+			return client.IgnoreNotFound(err)
 		}
 
 		// Create a patch
@@ -254,11 +206,14 @@ func (k *Kode) UpdateStatus(ctx context.Context, c client.Client) error {
 		// Update the status
 		latestKode.Status = k.Status
 
-		// Apply the patch
-		if err := c.Status().Patch(ctx, latestKode, patch); err != nil {
-			return err
+		// When the Kode resource transitions from Failed to another state, reset the LastError and LastErrorTime fields
+		if k.Status.Phase != latestKode.Status.Phase && latestKode.Status.Phase != PhaseFailed {
+			k.Status.LastError = nil
+			k.Status.LastErrorTime = nil
 		}
-		return nil
+
+		// Apply the patch
+		return c.Status().Patch(ctx, latestKode, patch)
 	})
 }
 
@@ -274,28 +229,74 @@ func (k *Kode) DeleteCondition(conditionType constant.ConditionType) {
 	k.Status.DeleteCondition(conditionType)
 }
 
-func (k *Kode) SetRuntime(runtime Runtime, ctx context.Context, c client.Client) {
+func (k *Kode) GetFinalizer() string {
+	return constant.KodeFinalizerName
+}
+
+func (k *Kode) AddFinalizer(ctx context.Context, c client.Client) error {
+	// Fetch the latest version of the Kode
+	latestKode := &Kode{}
+	if err := c.Get(ctx, client.ObjectKey{Name: k.Name, Namespace: k.Namespace}, latestKode); err != nil {
+		return client.IgnoreNotFound(err)
+	}
+	controllerutil.AddFinalizer(latestKode, k.GetFinalizer())
+	if err := c.Update(ctx, latestKode); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (k *Kode) RemoveFinalizer(ctx context.Context, c client.Client) error {
+	// Fetch the latest version of the Kode
+	latestKode := &Kode{}
+	if err := c.Get(ctx, client.ObjectKey{Name: k.Name, Namespace: k.Namespace}, latestKode); err != nil {
+		return client.IgnoreNotFound(err)
+	}
+	controllerutil.RemoveFinalizer(latestKode, k.GetFinalizer())
+	if err := c.Update(ctx, latestKode); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (k *Kode) GetSecretName() string {
+	if k.Spec.Credentials != nil && k.Spec.Credentials.ExistingSecret != nil {
+		return *k.Spec.Credentials.ExistingSecret
+	} else { // If ExistingSecret is not specified, use Kode secret name
+		return fmt.Sprintf("%s-auth", k.Name)
+	}
+}
+
+func (k *Kode) GetServiceName() string {
+	return k.Name + "-svc"
+}
+
+func (k *Kode) GetStatefulSetName() string {
+	return k.Name
+}
+
+func (k *Kode) GetPVCName() string {
+	if k.Spec.Storage != nil && k.Spec.Storage.ExistingVolumeClaim != nil {
+		return *k.Spec.Storage.ExistingVolumeClaim
+	} else {
+		return k.Name + "-pvc"
+	}
+}
+
+func (k *Kode) GetPort() Port {
+	return k.Status.KodePort
+}
+
+func (k *Kode) SetRuntime(runtime Runtime, ctx context.Context, c client.Client) error {
 	k.Status.Runtime = &runtime
-	k.UpdateStatus(ctx, c)
+	if err := k.UpdateStatus(ctx, c); err != nil {
+		return fmt.Errorf("failed to update status with runtime: %w", err)
+	}
+	return nil
 }
 
 func (k *Kode) GetRuntime() *Runtime {
 	return k.Status.Runtime
-}
-
-func (k *Kode) SetPhase(phase KodePhase) {
-	k.Status.Phase = phase
-}
-
-func (k *Kode) UpdatePort(ctx context.Context, c client.Client, port Port) error {
-	patch := client.MergeFrom(k.DeepCopy())
-	k.Status.KodePort = port
-
-	err := c.Status().Patch(ctx, k, patch)
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 func (k *Kode) UpdateUrl(ctx context.Context, c client.Client, kodeUrl KodeUrl) error {
@@ -307,29 +308,6 @@ func (k *Kode) UpdateUrl(ctx context.Context, c client.Client, kodeUrl KodeUrl) 
 		return err
 	}
 	return nil
-}
-
-func (k *Kode) GetSecretName() string {
-	return fmt.Sprintf("%s-auth", k.Name)
-}
-
-func (k *Kode) GetServiceName() string {
-	return k.Name + "-svc"
-}
-
-func (k *Kode) GetPVCName() string {
-	return k.Name + "-pvc"
-}
-
-func (k *Kode) GetPort() Port {
-	return k.Status.KodePort
-}
-
-func (k *Kode) IsInactiveFor(duration time.Duration) bool {
-	if k.Status.LastActivityTime == nil {
-		return false
-	}
-	return time.Since(k.Status.LastActivityTime.Time) > duration
 }
 
 func (k *Kode) GenerateKodeUrlForEntryPoint(

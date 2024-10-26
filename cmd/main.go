@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"flag"
 	"os"
+	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -26,10 +27,8 @@ import (
 	entrypointcontroller "github.com/jacero-io/kode-operator/internal/controllers/entrypoint"
 	kodecontroller "github.com/jacero-io/kode-operator/internal/controllers/kode"
 	"github.com/jacero-io/kode-operator/internal/event"
-	"github.com/jacero-io/kode-operator/internal/resource"
+	"github.com/jacero-io/kode-operator/internal/resourcev1"
 	"github.com/jacero-io/kode-operator/internal/template"
-
-	"github.com/jacero-io/kode-operator/pkg/validation"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -52,6 +51,7 @@ func main() {
 	var secureMetrics bool
 	var enableHTTP2 bool
 	var logLevel string
+	var reconcileInterval, longReconcileInterval time.Duration
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -63,6 +63,8 @@ func main() {
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
 	flag.StringVar(&logLevel, "log-level", "info", "Log level for development (debug, info, warn, error, dpanic, panic, fatal)")
+	flag.DurationVar(&reconcileInterval, "reconcile-interval", 5*time.Second, "The general reconcile interval")
+	flag.DurationVar(&longReconcileInterval, "long-reconcile-interval", 5*time.Minute, "The interval to requeue during, for example active or failed state")
 	flag.Parse()
 
 	var loggerConfig zap.Config
@@ -101,6 +103,8 @@ func main() {
 		TLSOpts: tlsOpts,
 	})
 
+	// syncPeriod := time.Minute * 10
+
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme: scheme,
 		Metrics: metricsserver.Options{
@@ -112,44 +116,43 @@ func main() {
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "8d0abd8d.jacero.io",
+		// Cache: cache.Options{
+		// 	SyncPeriod: &syncPeriod,
+		// },
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
 		os.Exit(1)
 	}
 
-	// printKnownTypes(mgr.GetScheme())
-
 	if err = (&kodecontroller.KodeReconciler{
-		Client:            mgr.GetClient(),
-		Scheme:            mgr.GetScheme(),
-		Log:               ctrl.Log.WithName("Kode").WithName("Reconcile"),
-		Resource:          resource.NewDefaultResourceManager(mgr.GetClient(), ctrl.Log.WithName("Kode").WithName("ResourceManager"), scheme),
-		Template:          template.NewDefaultTemplateManager(mgr.GetClient(), ctrl.Log.WithName("Kode").WithName("TemplateManager")),
-		CleanupManager:    cleanup.NewDefaultCleanupManager(mgr.GetClient(), ctrl.Log.WithName("Kode").WithName("CleanupManager")),
-		Validator:         validation.NewValidator(),
-		Event:             event.NewEventManager(mgr.GetClient(), ctrl.Log.WithName("Kode").WithName("EventManager"), mgr.GetScheme(), mgr.GetEventRecorderFor("kode-controller")),
-		IsTestEnvironment: false,
+		Client:                mgr.GetClient(),
+		Scheme:                mgr.GetScheme(),
+		Log:                   ctrl.Log.WithName("Kode").WithName("Reconcile"),
+		Resource:              resourcev1.NewDefaultResourceManager(mgr.GetClient(), ctrl.Log.WithName("Kode").WithName("ResourceManager"), scheme),
+		Template:              template.NewDefaultTemplateManager(mgr.GetClient(), ctrl.Log.WithName("Kode").WithName("TemplateManager")),
+		CleanupManager:        cleanup.NewDefaultCleanupManager(mgr.GetClient(), ctrl.Log.WithName("Kode").WithName("CleanupManager")),
+		EventManager:          event.NewEventManager(mgr.GetClient(), ctrl.Log.WithName("Kode").WithName("EventManager"), mgr.GetScheme(), mgr.GetEventRecorderFor("kode-controller")),
+		IsTestEnvironment:     false,
+		ReconcileInterval:     reconcileInterval,
+		LongReconcileInterval: longReconcileInterval,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Kode")
 		os.Exit(1)
 	}
 
 	if err = (&entrypointcontroller.EntryPointReconciler{
-		Client:         mgr.GetClient(),
-		Scheme:         mgr.GetScheme(),
-		Log:            ctrl.Log.WithName("EntryPoint").WithName("Reconcile"),
-		Resource:       resource.NewDefaultResourceManager(mgr.GetClient(), ctrl.Log.WithName("EntryPoint").WithName("ResourceManager"), scheme),
-		Template:       template.NewDefaultTemplateManager(mgr.GetClient(), ctrl.Log.WithName("EntryPoint").WithName("TemplateManager")),
-		CleanupManager: cleanup.NewDefaultCleanupManager(mgr.GetClient(), ctrl.Log.WithName("EntryPoint").WithName("CleanupManager")),
-		Validator:      validation.NewValidator(),
-		Event:          event.NewEventManager(mgr.GetClient(), ctrl.Log.WithName("EntryPoint").WithName("EventManager"), mgr.GetScheme(), mgr.GetEventRecorderFor("entrypoint-controller")),
+		Client:            mgr.GetClient(),
+		Scheme:            mgr.GetScheme(),
+		Log:               ctrl.Log.WithName("EntryPoint").WithName("Reconcile"),
+		Resource:          resourcev1.NewDefaultResourceManager(mgr.GetClient(), ctrl.Log.WithName("EntryPoint").WithName("ResourceManager"), scheme),
+		Template:          template.NewDefaultTemplateManager(mgr.GetClient(), ctrl.Log.WithName("EntryPoint").WithName("TemplateManager")),
+		CleanupManager:    cleanup.NewDefaultCleanupManager(mgr.GetClient(), ctrl.Log.WithName("EntryPoint").WithName("CleanupManager")),
+		EventManager:      event.NewEventManager(mgr.GetClient(), ctrl.Log.WithName("EntryPoint").WithName("EventManager"), mgr.GetScheme(), mgr.GetEventRecorderFor("entrypoint-controller")),
+		IsTestEnvironment: false,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "EntryPoint")
 		os.Exit(1)
-		for gvk := range mgr.GetScheme().AllKnownTypes() {
-			setupLog.V(1).Info("Known type in manager scheme", "gvk", gvk)
-		}
 	}
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
@@ -165,11 +168,5 @@ func main() {
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
-	}
-}
-
-func printKnownTypes(scheme *runtime.Scheme) {
-	for gvk := range scheme.AllKnownTypes() {
-		setupLog.V(1).Info("Known type in scheme", "gvk", gvk)
 	}
 }

@@ -26,21 +26,15 @@ import (
 )
 
 func InitEntryPointResourcesConfig(entryPoint *kodev1alpha2.EntryPoint) *common.EntryPointResourceConfig {
-
-	var protocol kodev1alpha2.Protocol
 	var identityReference kodev1alpha2.IdentityReference
 	var gatewayName string
+	var gatewayNamespace string
 
 	if entryPoint.Spec.GatewaySpec.ExistingGatewayRef != nil {
 		gatewayName = string(entryPoint.Spec.GatewaySpec.ExistingGatewayRef.Name)
+		gatewayNamespace = string(*entryPoint.Spec.GatewaySpec.ExistingGatewayRef.Namespace)
 	} else {
 		gatewayName = fmt.Sprintf("%s-gateway", entryPoint.Name)
-	}
-
-	if entryPoint.Spec.GatewaySpec != nil && entryPoint.Spec.GatewaySpec.CertificateRefs != nil {
-		protocol = kodev1alpha2.ProtocolHTTPS
-	} else {
-		protocol = kodev1alpha2.ProtocolHTTP
 	}
 
 	if entryPoint.Spec.AuthSpec != nil && entryPoint.Spec.AuthSpec.IdentityReference != nil {
@@ -56,9 +50,9 @@ func InitEntryPointResourcesConfig(entryPoint *kodev1alpha2.EntryPoint) *common.
 		EntryPointSpec: entryPoint.Spec,
 
 		GatewayName:      gatewayName,
-		GatewayNamespace: entryPoint.Namespace,
+		GatewayNamespace: gatewayNamespace,
 
-		Protocol:          protocol,
+		Protocol:          entryPoint.Spec.GatewaySpec.Protocol,
 		IdentityReference: &identityReference,
 	}
 }

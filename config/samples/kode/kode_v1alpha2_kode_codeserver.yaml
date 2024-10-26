@@ -16,8 +16,8 @@ spec:
     kind: ContainerTemplate
     name: containertemplate-codeserver-sample
     namespace: default
-  storage:
-    existingVolumeClaim: kode1-existing-pvc
+  # storage:
+  #   existingVolumeClaim: kode1-existing-pvc
   # storage:
   #   accessModes:
   #     - ReadWriteOnce

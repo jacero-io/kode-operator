@@ -1,97 +1,86 @@
-/*
-Copyright 2024 Emil Larsson.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
-
 package kode
 
 import (
 	"context"
+	"fmt"
+
+	"gopkg.in/yaml.v2"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	basconfig "github.com/jacero-io/basic-auth-sidecar/pkg/config"
 
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 	"github.com/jacero-io/kode-operator/internal/common"
-	// "github.com/jacero-io/kode-operator/internal/envoy"
+	"github.com/jacero-io/kode-operator/internal/resourcev1"
+	"github.com/jacero-io/kode-operator/internal/statemachine"
+
+	"github.com/jacero-io/kode-operator/pkg/envoy"
 )
 
-// ensureSidecarContainers ensures that the Envoy container exists for the Kode instance
-func (r *KodeReconciler) ensureSidecarContainers(ctx context.Context, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig) error {
-	log := r.Log.WithName("SidecarContainerEnsurer").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
+func ensureSidecarContainers(ctx context.Context, r statemachine.ReconcilerInterface, resource resourcev1.ResourceManager, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig) ([]corev1.Container, []corev1.Container, error) {
+	log := r.GetLog().WithName("SidecarContainerEnsurer").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	log.V(1).Info("Ensuring sidecar containers")
 
-	// if err := ensureEnvoySidecar(config, log); err != nil {
-	// 	log.Error(err, "Failed to ensure Envoy sidecar container")
-
-	// 	if envoy.IsEnvoyError(err) {
-	// 		now := metav1.NewTime(time.Now())
-	// 		var condition metav1.Condition
-
-	// 		switch envoy.GetEnvoyErrorType(err) {
-	// 		case envoy.EnvoyErrorTypeConfiguration:
-	// 			condition = metav1.Condition{
-	// 				Type:               string(common.ConditionTypeConfigured),
-	// 				Status:             metav1.ConditionFalse,
-	// 				Reason:             "EnvoyConfigurationFailed",
-	// 				Message:            err.Error(),
-	// 				LastTransitionTime: now,
-	// 			}
-	// 		case envoy.EnvoyErrorTypeCreation:
-	// 			condition = metav1.Condition{
-	// 				Type:               "EnvoyContainerCreationFailed",
-	// 				Status:             metav1.ConditionTrue,
-	// 				Reason:             "EnvoyContainerCreationError",
-	// 				Message:            err.Error(),
-	// 				LastTransitionTime: now,
-	// 			}
-	// 		default:
-	// 			condition = metav1.Condition{
-	// 				Type:               "EnvoyError",
-	// 				Status:             metav1.ConditionTrue,
-	// 				Reason:             "UnknownEnvoyError",
-	// 				Message:            err.Error(),
-	// 				LastTransitionTime: now,
-	// 			}
-	// 		}
-	// 		return r.updateStatus(ctx, kode, kodev1alpha2.KodePhaseFailed, []metav1.Condition{condition}, err)
-	// 	}
-
-	// 	// Handle other sidecar container errors
-	// 	return r.updateStatus(ctx, kode, kodev1alpha2.KodePhaseFailed, []metav1.Condition{{
-	// 		Type:               "SidecarContainerCreationFailed",
-	// 		Status:             metav1.ConditionTrue,
-	// 		Reason:             "SidecarContainerCreationError",
-	// 		Message:            fmt.Sprintf("Failed to create sidecar container: %s", err.Error()),
-	// 		LastTransitionTime: metav1.NewTime(time.Now()),
-	// 	}}, err)
+	// Check if Basic Auth ConfigMap is needed
+	// useBasicAuth := false
+	// if config.Template != nil && config.Template.EntryPointSpec != nil &&
+	// 	config.Template.EntryPointSpec.AuthSpec != nil {
+	// 	useBasicAuth = config.Template.EntryPointSpec.AuthSpec.AuthType == "basicAuth"
 	// }
 
-	return nil
+	// Create Basic Auth ConfigMap if needed
+	// if useBasicAuth {
+	// 	basConfigMap := &corev1.ConfigMap{
+	// 		ObjectMeta: metav1.ObjectMeta{
+	// 			Name:      fmt.Sprintf("%s-basic-auth-config", kode.Name),
+	// 			Namespace: kode.Namespace,
+	// 			Labels:    config.CommonConfig.Labels,
+	// 		},
+	// 	},
+	// 	_, err := resource.CreateOrPatch(ctx, basConfigMap, func() error {
+	// 		if basConfigMap, err := createBasicAuthConfigMap(ctx, r, resource, kode, config); err != nil {
+	// 			return nil, nil, fmt.Errorf("failed to create Basic Auth ConfigMap: %w", err)
+	// 		}
+	// 		return controllerutil.SetControllerReference(kode, basConfigMap, r.GetScheme())
+	// 	}),
+	// },
+
+	// Create Envoy config
+	envoyConfigGenerator := envoy.NewBootstrapConfigGenerator(log)
+
+	// Create sidecar containers
+	envoyConstructor := envoy.NewContainerConstructor(log, envoyConfigGenerator)
+	containers, initContainers, err := envoyConstructor.ConstructEnvoyContainers(config)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to construct Envoy containers: %w", err)
+	}
+
+	return containers, initContainers, nil
 }
 
-// func ensureEnvoySidecar(config *common.KodeResourceConfig, log logr.Logger) error {
-// 	configGenerator := envoy.NewBootstrapConfigGenerator(log.WithName("EnvoyConfigGenerator").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig)))
-// 	envoyContainers, envoyInitContainers, err := envoy.NewContainerConstructor(
-// 		log.WithName("EnvoyContainerConstructor").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig)),
-// 		configGenerator).ConstructEnvoyContainers(config)
-// 	if err != nil {
-// 		if strings.Contains(err.Error(), "configuration") {
-// 			return envoy.NewEnvoyError(envoy.EnvoyErrorTypeConfiguration, "Failed to configure Envoy", err)
-// 		}
-// 		return envoy.NewEnvoyError(envoy.EnvoyErrorTypeCreation, "Failed to create Envoy container", err)
-// 	}
-// 	config.Containers = append(config.Containers, envoyContainers...)
-// 	config.InitContainers = append(config.InitContainers, envoyInitContainers...)
+func constructBasicAuthConfigMap(ctx context.Context, r statemachine.ReconcilerInterface, resource resourcev1.ResourceManager, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig) (*corev1.ConfigMap, error) {
+	log := r.GetLog().WithName("BasicAuthConfigMapConstructor").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 
-// 	return nil
-// }
+	log.V(1).Info("Constructing Basic Auth ConfigMap")
+
+	basicAuthConfig := basconfig.NewDefaultConfig()
+
+	yamlData, err := yaml.Marshal(basicAuthConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal basic auth config: %w", err)
+	}
+
+	configMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      fmt.Sprintf("%s-basic-auth-config", kode.Name),
+			Namespace: kode.Namespace,
+		},
+		Data: map[string]string{
+			"config.yaml": string(yamlData),
+		},
+	}
+
+	return configMap, nil
+}

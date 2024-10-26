@@ -26,18 +26,7 @@ import (
 func InitKodeResourcesConfig(
 	kode *kodev1alpha2.Kode,
 	template *kodev1alpha2.Template) *common.KodeResourceConfig {
-
 	var credentials *kodev1alpha2.CredentialsSpec
-	var kodePort *kodev1alpha2.Port
-	var secretName string
-	var pvcName string
-
-	// If ExistingSecret is specified, use it
-	if kode.Spec.Credentials != nil && kode.Spec.Credentials.ExistingSecret != nil {
-		secretName = *kode.Spec.Credentials.ExistingSecret
-	} else { // If ExistingSecret is not specified, use Kode secret name
-		secretName = kode.GetSecretName()
-	}
 
 	if kode.Spec.Credentials == nil {
 		credentials = &kodev1alpha2.CredentialsSpec{
@@ -47,16 +36,6 @@ func InitKodeResourcesConfig(
 		credentials = kode.Spec.Credentials
 	}
 
-	if kode.Spec.Storage != nil && kode.Spec.Storage.ExistingVolumeClaim != nil {
-		pvcName = *kode.Spec.Storage.ExistingVolumeClaim
-	} else {
-		pvcName = kode.GetPVCName()
-	}
-
-	kodePort = &template.Port
-
-	serviceName := kode.GetServiceName()
-
 	return &common.KodeResourceConfig{
 		CommonConfig: common.CommonConfig{
 			Labels:    createLabels(kode, template),
@@ -65,18 +44,13 @@ func InitKodeResourcesConfig(
 		},
 		KodeSpec:    kode.Spec,
 		Credentials: credentials,
-		Port:        kodePort,
-
-		SecretName:      secretName,
-		StatefulSetName: kode.Name,
-		PVCName:         pvcName,
-		ServiceName:     serviceName,
 
 		UserInitPlugins: kode.Spec.InitPlugins,
 		Containers:      []corev1.Container{},
 		InitContainers:  []corev1.Container{},
 
 		Template: template,
+		Port:     template.Port,
 	}
 }
 

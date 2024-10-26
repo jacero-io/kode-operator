@@ -46,10 +46,8 @@ import (
 	entrypointctrl "github.com/jacero-io/kode-operator/internal/controllers/entrypoint"
 	kodectrl "github.com/jacero-io/kode-operator/internal/controllers/kode"
 	"github.com/jacero-io/kode-operator/internal/event"
-	"github.com/jacero-io/kode-operator/internal/resource"
+	"github.com/jacero-io/kode-operator/internal/resourcev1"
 	"github.com/jacero-io/kode-operator/internal/template"
-
-	"github.com/jacero-io/kode-operator/pkg/validation"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -142,27 +140,31 @@ var _ = BeforeSuite(func() {
 	err = setupStorageClass(ctx, k8sClient)
 	Expect(err).ToNot(HaveOccurred())
 
+	reconcileInterval := 5 * time.Second
+	longReconcileInterval := 5 * time.Minute
+
 	reconciler = &kodectrl.KodeReconciler{
-		Client:            k8sClient,
-		Scheme:            k8sManager.GetScheme(),
-		Log:               ctrl.Log.WithName("Kode").WithName("Reconcile"),
-		Resource:          resource.NewDefaultResourceManager(k8sClient, ctrl.Log.WithName("Kode").WithName("ResourceManager"), k8sManager.GetScheme()),
-		Template:          template.NewDefaultTemplateManager(k8sClient, ctrl.Log.WithName("Kode").WithName("TemplateManager")),
-		CleanupManager:    cleanup.NewDefaultCleanupManager(k8sClient, ctrl.Log.WithName("Kode").WithName("CleanupManager")),
-		Validator:         validation.NewValidator(),
-		Event:             event.NewEventManager(k8sClient, ctrl.Log.WithName("Kode").WithName("EventManager"), k8sManager.GetScheme(), k8sManager.GetEventRecorderFor("kode-controller")),
-		IsTestEnvironment: true,
+		Client:                k8sClient,
+		Scheme:                k8sManager.GetScheme(),
+		Log:                   ctrl.Log.WithName("Kode").WithName("Reconcile"),
+		Resource:              resourcev1.NewDefaultResourceManager(k8sClient, ctrl.Log.WithName("Kode").WithName("ResourceManager"), k8sManager.GetScheme()),
+		Template:              template.NewDefaultTemplateManager(k8sClient, ctrl.Log.WithName("Kode").WithName("TemplateManager")),
+		CleanupManager:        cleanup.NewDefaultCleanupManager(k8sClient, ctrl.Log.WithName("Kode").WithName("CleanupManager")),
+		EventManager:          event.NewEventManager(k8sClient, ctrl.Log.WithName("Kode").WithName("EventManager"), k8sManager.GetScheme(), k8sManager.GetEventRecorderFor("kode-controller")),
+		IsTestEnvironment:     true,
+		ReconcileInterval:     reconcileInterval,
+		LongReconcileInterval: longReconcileInterval,
 	}
 
 	entrypointReconciler = &entrypointctrl.EntryPointReconciler{
-		Client:         k8sClient,
-		Scheme:         k8sManager.GetScheme(),
-		Log:            ctrl.Log.WithName("EntryPoint").WithName("Reconcile"),
-		Resource:       resource.NewDefaultResourceManager(k8sClient, ctrl.Log.WithName("EntryPoint").WithName("ResourceManager"), k8sManager.GetScheme()),
-		Template:       template.NewDefaultTemplateManager(k8sClient, ctrl.Log.WithName("EntryPoint").WithName("TemplateManager")),
-		CleanupManager: cleanup.NewDefaultCleanupManager(k8sClient, ctrl.Log.WithName("EntryPoint").WithName("CleanupManager")),
-		Validator:      validation.NewValidator(),
-		Event:          event.NewEventManager(k8sClient, ctrl.Log.WithName("Kode").WithName("EventManager"), k8sManager.GetScheme(), k8sManager.GetEventRecorderFor("entrypoint-controller")),
+		Client:            k8sClient,
+		Scheme:            k8sManager.GetScheme(),
+		Log:               ctrl.Log.WithName("EntryPoint").WithName("Reconcile"),
+		Resource:          resourcev1.NewDefaultResourceManager(k8sClient, ctrl.Log.WithName("EntryPoint").WithName("ResourceManager"), k8sManager.GetScheme()),
+		Template:          template.NewDefaultTemplateManager(k8sClient, ctrl.Log.WithName("EntryPoint").WithName("TemplateManager")),
+		CleanupManager:    cleanup.NewDefaultCleanupManager(k8sClient, ctrl.Log.WithName("EntryPoint").WithName("CleanupManager")),
+		EventManager:      event.NewEventManager(k8sClient, ctrl.Log.WithName("Kode").WithName("EventManager"), k8sManager.GetScheme(), k8sManager.GetEventRecorderFor("entrypoint-controller")),
+		IsTestEnvironment: true,
 	}
 
 	err = reconciler.SetupWithManager(k8sManager)
@@ -171,10 +173,17 @@ var _ = BeforeSuite(func() {
 	err = entrypointReconciler.SetupWithManager(k8sManager)
 	Expect(err).ToNot(HaveOccurred())
 
+	// Start the Manager
 	go func() {
-		err = k8sManager.Start(ctx)
+		defer GinkgoRecover()
+		err := k8sManager.Start(ctx)
 		Expect(err).ToNot(HaveOccurred())
 	}()
+
+	// Wait for the manager to be ready
+	Eventually(func() bool {
+		return k8sManager.GetCache().WaitForCacheSync(ctx)
+	}, timeout, interval).Should(BeTrue())
 
 	// Create namespace
 	namespace = &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: resourceNamespace}}
@@ -251,7 +260,7 @@ func createContainerTemplate(name, image, templateType string, entryPointName st
 		Spec: kodev1alpha2.ClusterContainerTemplateSpec{
 			ContainerTemplateSharedSpec: kodev1alpha2.ContainerTemplateSharedSpec{
 				CommonSpec: kodev1alpha2.CommonSpec{
-					Port: &port,
+					Port: port,
 				},
 				Type:  templateType,
 				Image: image,

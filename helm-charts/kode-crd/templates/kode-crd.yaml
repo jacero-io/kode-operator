@@ -409,8 +409,8 @@ spec:
                     type: string
                 type: object
               templateRef:
-                description: The reference to a template. Either a ContainerTemplate,
-                  VirtualTemplate or TofuTemplate.
+                description: The reference to a template. Either a ContainerTemplate
+                  or VirtualTemplate.
                 properties:
                   apiVersion:
                     description: API version of the referent.
@@ -540,7 +540,7 @@ spec:
                 format: int64
                 type: integer
               phase:
-                description: Phase represents the current phase of the Kode resource.
+                description: Phase is the current state of the resource.
                 type: string
               retryCount:
                 description: RetryCount keeps track of the number of retry attempts
@@ -549,22 +549,19 @@ spec:
               runtime:
                 description: The runtime for the Kode.
                 properties:
-                  kodeRuntime:
+                  runtime:
                     description: KodeRuntime is the runtime for the Kode resource. Can
-                      be one of 'container', 'virtual', 'tofu'.
+                      be one of 'container', 'virtual'.
                     enum:
                     - container
                     - virtual
-                    - tofu
                     type: string
                   type:
                     description: Type is the container runtime for Kode resource.
                     type: string
                 required:
-                - kodeRuntime
+                - runtime
                 type: object
-            required:
-            - phase
             type: object
         type: object
     served: true
