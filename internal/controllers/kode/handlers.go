@@ -76,12 +76,14 @@ func handleConfiguringState(ctx context.Context, r statemachine.ReconcilerInterf
 	log := r.GetLog().WithValues("kode", client.ObjectKeyFromObject(kode), "phase", kode.Status.Phase)
 	er := r.GetEventRecorder()
 
-	log.Info("Handling Configuring state")
+	isUpdate := kode.Status.Phase == kodev1alpha2.PhaseUpdating
+	log.Info("Handling configuration", "isUpdate", isUpdate)
 
 	// Fetch the template
 	template, err := fetchTemplatesWithRetry(ctx, r, kode)
 	if err != nil {
-		er.Record(ctx, kode, event.EventTypeWarning, "TemplateFetchFailed", fmt.Sprintf("Failed to fetch template: %v", err))
+		er.Record(ctx, kode, event.EventTypeWarning, "TemplateFetchFailed",
+			fmt.Sprintf("Failed to fetch template: %v", err))
 		return handleReconcileError(ctx, r, kode, err, "Failed to fetch template")
 	}
 
@@ -90,8 +92,25 @@ func handleConfiguringState(ctx context.Context, r statemachine.ReconcilerInterf
 	// Detect required changes
 	changes, err := detectChanges(ctx, r, kode, config)
 	if err != nil {
-		er.Record(ctx, kode, event.EventTypeWarning, "ChangeDetectionFailed", fmt.Sprintf("Failed to detect configuration changes: %v", err))
+		er.Record(ctx, kode, event.EventTypeWarning, "ChangeDetectionFailed",
+			fmt.Sprintf("Failed to detect configuration changes: %v", err))
 		return handleReconcileError(ctx, r, kode, err, "Failed to detect changes")
+	}
+
+	// If no changes in update phase, move to Active state
+	if len(changes) == 0 && isUpdate {
+		log.Info("No changes detected, moving to Active state")
+
+		kode.Status.ObservedGeneration = kode.Generation
+		kode.SetCondition(constant.ConditionTypeReady, metav1.ConditionTrue, "ResourcesHealthy", "All resources are healthy")
+		kode.SetCondition(constant.ConditionTypeAvailable, metav1.ConditionTrue, "ServiceAvailable", "Service is operating normally")
+		kode.SetCondition(constant.ConditionTypeProgressing, metav1.ConditionFalse, "NoChanges", "No changes detected")
+
+		if err := kode.UpdateStatus(ctx, r.GetClient()); err != nil {
+			return handleReconcileError(ctx, r, kode, err, "Failed to update status")
+		}
+
+		return kodev1alpha2.PhaseActive, ctrl.Result{Requeue: true}, nil
 	}
 
 	// Record significant changes if any
@@ -100,40 +119,82 @@ func handleConfiguringState(ctx context.Context, r statemachine.ReconcilerInterf
 		for resource := range changes {
 			changeList = append(changeList, resource)
 		}
-		er.Record(ctx, kode, event.EventTypeNormal, "ConfigurationRequired", fmt.Sprintf("Configuration required for: %s", strings.Join(changeList, ", ")))
+		er.Record(ctx, kode, event.EventTypeNormal, "ConfigurationRequired",
+			fmt.Sprintf("Configuration required for: %s", strings.Join(changeList, ", ")))
 	}
 
 	// Apply configuration
 	if err := applyConfiguration(ctx, r, kode, config, changes); err != nil {
-		er.Record(ctx, kode, event.EventTypeWarning, "ConfigurationFailed", fmt.Sprintf("Failed to apply configuration: %v", err))
+		er.Record(ctx, kode, event.EventTypeWarning, "ConfigurationFailed",
+			fmt.Sprintf("Failed to apply configuration: %v", err))
 		return handleReconcileError(ctx, r, kode, err, "Failed to apply configuration")
 	}
 
 	// Record successful configuration
 	if len(changes) > 0 {
-		er.Record(ctx, kode, event.EventTypeNormal, "ConfigurationApplied", "Successfully applied resource configuration")
+		er.Record(ctx, kode, event.EventTypeNormal, "ConfigurationApplied",
+			"Successfully applied resource configuration")
 	}
 
 	// Validate configuration
 	if err := validateConfiguration(ctx, r, kode, config); err != nil {
-		er.Record(ctx, kode, event.EventTypeWarning, "ValidationFailed", fmt.Sprintf("Configuration validation failed: %v", err))
+		er.Record(ctx, kode, event.EventTypeWarning, "ValidationFailed",
+			fmt.Sprintf("Configuration validation failed: %v", err))
 		return handleReconcileError(ctx, r, kode, err, "Failed to validate configuration")
 	}
 
-	// Update conditions
-	kode.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "Configuring", "Kode resources are being configured")
-	kode.SetCondition(constant.ConditionTypeAvailable, metav1.ConditionFalse, "Configuring", "Kode is not yet available")
-	kode.SetCondition(constant.ConditionTypeProgressing, metav1.ConditionTrue, "Configuring", "Kode resources are being configured")
+	// Check if resources are ready
+	ready, err := checkResourcesReady(ctx, r, kode, config)
+	if err != nil {
+		er.Record(ctx, kode, event.EventTypeWarning, "ReadinessCheckFailed",
+			fmt.Sprintf("Failed to check resource readiness: %v", err))
+		return handleReconcileError(ctx, r, kode, err, "Failed to check resource readiness")
+	}
+
+	if !ready {
+		// Update conditions for ongoing configuration/update
+		reason := "Configuring"
+		message := "Resources are being configured"
+		if isUpdate {
+			reason = "UpdateInProgress"
+			message = "Resources are being updated"
+		}
+
+		kode.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, reason, message)
+		kode.SetCondition(constant.ConditionTypeAvailable, metav1.ConditionFalse, reason, "Resources not yet available")
+		kode.SetCondition(constant.ConditionTypeProgressing, metav1.ConditionTrue, reason, message)
+
+		if err := kode.UpdateStatus(ctx, r.GetClient()); err != nil {
+			return handleReconcileError(ctx, r, kode, err, "Failed to update status")
+		}
+
+		er.Record(ctx, kode, event.EventTypeNormal, "ConfigurationInProgress", "Resource configuration in progress")
+
+		log.Info("Moving to Provisioning state")
+		return kodev1alpha2.PhaseProvisioning, ctrl.Result{RequeueAfter: r.GetReconcileInterval()}, nil
+	}
+
+	// Configuration/Update completed successfully
+	log.Info("Configuration completed successfully")
 
 	// Update status
+	if isUpdate {
+		kode.Status.ObservedGeneration = kode.Generation
+	}
+	kode.Status.KodePort = template.Port
+
+	kode.SetCondition(constant.ConditionTypeReady, metav1.ConditionTrue, "ConfigurationComplete", "Configuration completed successfully")
+	kode.SetCondition(constant.ConditionTypeAvailable, metav1.ConditionTrue, "ServiceAvailable", "Service is operating normally")
+	kode.SetCondition(constant.ConditionTypeProgressing, metav1.ConditionFalse, "ConfigurationComplete", "Configuration process has completed")
+
 	if err := kode.UpdateStatus(ctx, r.GetClient()); err != nil {
 		return handleReconcileError(ctx, r, kode, err, "Failed to update status")
 	}
 
-	// Move to Provisioning state
-	log.Info("Moving to Provisioning state")
+	er.Record(ctx, kode, event.EventTypeNormal, "ConfigurationComplete", "Resource configuration completed successfully")
 
-	return kodev1alpha2.PhaseProvisioning, ctrl.Result{Requeue: true}, nil
+	log.Info("Moving to Active state")
+	return kodev1alpha2.PhaseActive, ctrl.Result{Requeue: true}, nil
 }
 
 func handleProvisioningState(ctx context.Context, r statemachine.ReconcilerInterface, resource statemachine.StateManagedResource) (kodev1alpha2.Phase, ctrl.Result, error) {
@@ -199,7 +260,7 @@ func handleProvisioningState(ctx context.Context, r statemachine.ReconcilerInter
 	// Record successful provisioning
 	er.Record(ctx, kode, event.EventTypeNormal, "ProvisioningComplete", "All resources successfully provisioned and ready")
 
-	return kodev1alpha2.PhaseActive, ctrl.Result{}, nil
+	return kodev1alpha2.PhaseActive, ctrl.Result{Requeue: true}, nil
 }
 
 func handleActiveState(ctx context.Context, r statemachine.ReconcilerInterface, resource statemachine.StateManagedResource) (kodev1alpha2.Phase, ctrl.Result, error) {
@@ -217,8 +278,9 @@ func handleActiveState(ctx context.Context, r statemachine.ReconcilerInterface, 
 	if kode.Generation != kode.Status.ObservedGeneration {
 		log.Info("Spec changed, transitioning to Updating state", "currentGeneration", kode.Generation, "observedGeneration", kode.Status.ObservedGeneration)
 
-		kode.SetCondition(constant.ConditionTypeProgressing, metav1.ConditionTrue, "UpdateRequired", "Kode spec has changed and needs updating")
 		kode.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "UpdatePending", "Update is pending due to spec changes")
+		kode.SetCondition(constant.ConditionTypeAvailable, metav1.ConditionFalse, "ServiceUnavailable", "Service may be unavailable due to pending update")
+		kode.SetCondition(constant.ConditionTypeProgressing, metav1.ConditionTrue, "UpdateRequired", "Kode spec has changed and needs updating")
 
 		if err := kode.UpdateStatus(ctx, r.GetClient()); err != nil {
 			return handleReconcileError(ctx, r, kode, err, "Failed to update status")
@@ -259,7 +321,30 @@ func handleActiveState(ctx context.Context, r statemachine.ReconcilerInterface, 
 		return kodev1alpha2.PhaseUpdating, ctrl.Result{RequeueAfter: r.GetReconcileInterval()}, nil
 	}
 
-	// Update URL if template changed
+	// Detect changes
+	changes, err := detectChanges(ctx, r, kode, config)
+	if err != nil {
+		er.Record(ctx, kode, event.EventTypeWarning, "ChangeDetectionFailed", fmt.Sprintf("Failed to detect configuration changes: %v", err))
+		return handleReconcileError(ctx, r, kode, err, "Failed to detect changes")
+	}
+
+	// If changes detected, move to Updating state
+	if len(changes) > 0 {
+		log.Info("Changes detected, transitioning to Updating state", "changes", changes)
+
+		kode.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "UpdatePending", "Update is pending due to configuration drift")
+		kode.SetCondition(constant.ConditionTypeAvailable, metav1.ConditionFalse, "ServiceUnavailable", "Service may be unavailable due to pending update")
+		kode.SetCondition(constant.ConditionTypeProgressing, metav1.ConditionTrue, "UpdateRequired", "Configuration drift detected")
+
+		if err := kode.UpdateStatus(ctx, r.GetClient()); err != nil {
+			return handleReconcileError(ctx, r, kode, err, "Failed to update status")
+		}
+
+		er.Record(ctx, kode, event.EventTypeNormal, "UpdateRequired", "Configuration drift detected, initiating update")
+		return kodev1alpha2.PhaseUpdating, ctrl.Result{Requeue: true}, nil
+	}
+
+	// Update kode port if template has changed
 	if kode.Status.KodePort != template.Port {
 		kode.Status.KodePort = template.Port
 
@@ -299,102 +384,6 @@ func handleActiveState(ctx context.Context, r statemachine.ReconcilerInterface, 
 
 	log.Info("Kode remains in Active state")
 	return kodev1alpha2.PhaseActive, ctrl.Result{RequeueAfter: r.GetLongReconcileInterval()}, nil
-}
-
-func handleUpdatingState(ctx context.Context, r statemachine.ReconcilerInterface, resource statemachine.StateManagedResource) (kodev1alpha2.Phase, ctrl.Result, error) {
-	kode, ok := resource.(*kodev1alpha2.Kode)
-	if !ok {
-		return kodev1alpha2.PhaseFailed, ctrl.Result{}, fmt.Errorf("resource is not a Kode")
-	}
-
-	log := r.GetLog().WithValues("kode", client.ObjectKeyFromObject(kode), "phase", kode.Status.Phase)
-	er := r.GetEventRecorder()
-
-	log.Info("Handling Updating state")
-
-	// Fetch the template
-	template, err := fetchTemplatesWithRetry(ctx, r, kode)
-	if err != nil {
-		er.Record(ctx, kode, event.EventTypeWarning, "TemplateFetchFailed", fmt.Sprintf("Failed to fetch template during update: %v", err))
-		return handleReconcileError(ctx, r, kode, err, "Failed to fetch template")
-	}
-
-	config := InitKodeResourcesConfig(kode, template)
-
-	// Detect changes
-	changes, err := detectChanges(ctx, r, kode, config)
-	if err != nil {
-		er.Record(ctx, kode, event.EventTypeWarning, "ChangeDetectionFailed", fmt.Sprintf("Failed to detect configuration changes: %v", err))
-		return handleReconcileError(ctx, r, kode, err, "Failed to detect changes")
-	}
-
-	// If no changes, move to Active state
-	if len(changes) == 0 {
-		log.Info("No changes detected, moving to Active state")
-
-		kode.Status.ObservedGeneration = kode.Generation
-		kode.SetCondition(constant.ConditionTypeProgressing, metav1.ConditionFalse, "NoChanges", "No changes detected during update")
-		kode.SetCondition(constant.ConditionTypeReady, metav1.ConditionTrue, "ResourcesHealthy", "All resources are healthy")
-
-		if err := kode.UpdateStatus(ctx, r.GetClient()); err != nil {
-			return handleReconcileError(ctx, r, kode, err, "Failed to update status")
-		}
-
-		return kodev1alpha2.PhaseActive, ctrl.Result{Requeue: true}, nil
-	}
-
-	// Apply updates
-	log.Info("Applying configuration changes", "changes", changes)
-	if err := applyConfiguration(ctx, r, kode, config, changes); err != nil {
-		er.Record(ctx, kode, event.EventTypeWarning, "UpdateFailed", fmt.Sprintf("Failed to apply updates: %v", err))
-		return handleReconcileError(ctx, r, kode, err, "Failed to apply updates")
-	}
-
-	// Validate updates
-	if err := validateConfiguration(ctx, r, kode, config); err != nil {
-		er.Record(ctx, kode, event.EventTypeWarning, "ValidationFailed", fmt.Sprintf("Update validation failed: %v", err))
-		return handleReconcileError(ctx, r, kode, err, "Failed to validate updates")
-	}
-
-	// Check if resources are ready after update
-	ready, err := checkResourcesReady(ctx, r, kode, config)
-	if err != nil {
-		er.Record(ctx, kode, event.EventTypeWarning, "ReadinessCheckFailed", fmt.Sprintf("Failed to check resource readiness after update: %v", err))
-		return handleReconcileError(ctx, r, kode, err, "Failed to check resource readiness")
-	}
-
-	if !ready {
-		log.Info("Resources not ready after update, remaining in Updating state")
-
-		kode.SetCondition(constant.ConditionTypeProgressing, metav1.ConditionTrue, "UpdateInProgress", "Update in progress, waiting for resources to be ready")
-		kode.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "UpdateInProgress", "Resources are being updated")
-
-		if err := kode.UpdateStatus(ctx, r.GetClient()); err != nil {
-			return handleReconcileError(ctx, r, kode, err, "Failed to update status")
-		}
-
-		return kodev1alpha2.PhaseUpdating, ctrl.Result{RequeueAfter: r.GetReconcileInterval()}, nil
-	}
-
-	// Update completed successfully
-	log.Info("Update completed successfully")
-
-	// Update status
-	kode.Status.ObservedGeneration = kode.Generation
-	kode.Status.KodePort = template.Port
-
-	kode.SetCondition(constant.ConditionTypeReady, metav1.ConditionTrue, "UpdateComplete", "Update completed successfully")
-	kode.SetCondition(constant.ConditionTypeAvailable, metav1.ConditionTrue, "ServiceAvailable", "Service is operating normally")
-	kode.SetCondition(constant.ConditionTypeProgressing, metav1.ConditionFalse, "UpdateComplete", "Update process has completed")
-
-	if err := kode.UpdateStatus(ctx, r.GetClient()); err != nil {
-		return handleReconcileError(ctx, r, kode, err, "Failed to update status")
-	}
-
-	er.Record(ctx, kode, event.EventTypeNormal, "UpdateComplete", "Resource update completed successfully")
-
-	log.Info("Moving to Active state")
-	return kodev1alpha2.PhaseActive, ctrl.Result{}, nil
 }
 
 func handleDeletingState(ctx context.Context, r statemachine.ReconcilerInterface, resource statemachine.StateManagedResource) (kodev1alpha2.Phase, ctrl.Result, error) {

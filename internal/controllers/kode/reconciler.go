@@ -134,7 +134,7 @@ func (r *KodeReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.
 	sm.RegisterHandler(kodev1alpha2.PhaseConfiguring, handleConfiguringState)
 	sm.RegisterHandler(kodev1alpha2.PhaseProvisioning, handleProvisioningState)
 	sm.RegisterHandler(kodev1alpha2.PhaseActive, handleActiveState)
-	sm.RegisterHandler(kodev1alpha2.PhaseUpdating, handleUpdatingState)
+	sm.RegisterHandler(kodev1alpha2.PhaseUpdating, handleConfiguringState)
 	sm.RegisterHandler(kodev1alpha2.PhaseDeleting, handleDeletingState)
 	sm.RegisterHandler(kodev1alpha2.PhaseFailed, handleFailedState)
 	sm.RegisterHandler(kodev1alpha2.PhaseUnknown, handleUnknownState)
