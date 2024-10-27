@@ -19,11 +19,41 @@ stateDiagram-v2
 
     ResourcesEnsured --> [*] : All Resources Created/Updated
 
+    state EnsureStatefulSet {
+        [*] --> constructStatefulSet
+        constructStatefulSet --> ObjectMeta
+        constructStatefulSet --> UpdateStrategy
+        constructStatefulSet --> constructStatefulSetSpec
+
+        constructStatefulSetSpec --> constructContainers
+        constructStatefulSetSpec --> constructContainerPorts
+        constructStatefulSetSpec --> constructVolumesAndMounts
+        constructStatefulSetSpec --> config.InitContainers
+        constructStatefulSetSpec --> config.Containers
+        constructStatefulSetSpec --> ensureSidecarContainers
+        constructStatefulSetSpec --> initPlugins
+
+        constructContainers --> containers
+        constructContainerPorts --> containers
+        constructVolumesAndMounts --> containers
+        config.InitContainers --> initContainers
+        config.Containers --> containers
+        ensureSidecarContainers --> containers
+        ensureSidecarContainers --> initContainers
+        initPlugins --> initContainers
+        initPlugins --> containers
+
+        ObjectMeta --> [*]
+        UpdateStrategy --> [*]
+        containers --> [*]
+        initContainers --> [*]
+    }
+
     state HandleError {
         [*] --> LogError
-        LogError --> UpdateFailedStatus
-        UpdateFailedStatus --> ReturnError
-        ReturnError --> [*]
+        LogError --> SetConditions
+        SetConditions --> UpdateStatus
+        UpdateStatus --> [*]
     }
 
     note right of FetchTemplate
