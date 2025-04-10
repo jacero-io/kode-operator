@@ -40,36 +40,17 @@ const (
 	EventTypeWarning EventType = "Warning"
 
 	// Event reasons
-	ReasonCreated    EventReason = "Created"
-	ReasonUpdated    EventReason = "Updated"
-	ReasonFailed     EventReason = "Failed"
-	ReasonReconciled EventReason = "Reconciled"
-
-	// Kode event reasons
-	ReasonKodeConfiguring                    EventReason = "Configuring"
-	ReasonKodeProvisioning                   EventReason = "Provisioning"
-	ReasonKodeActive                         EventReason = "Active"
-	ReasonKodeSuspended                      EventReason = "Suspended"
-	ReasonKodeResuming                       EventReason = "Resuming"
-	ReasonKodeDeleting                       EventReason = "Deleting"
-	ReasonKodeFailed                         EventReason = "Failed"
-	ReasonKodeUnknown                        EventReason = "Unknown"
-	ReasonKodeCSIResizeCapabilityChecked     EventReason = "CSIResizeCapabilityChecked"
-	ReasonKodeCSIResizeCapabilityCheckFailed EventReason = "CSIResizeCapabilityCheckFailed"
-	ReasonKodePVCResizeAttempted             EventReason = "PVCResizeAttempted"
-	ReasonKodePVCResizeSkipped               EventReason = "PVCResizeSkipped"
-	ReasonKodePVCCreated                     EventReason = "PVCCreated"
-	ReasonKodeExistingPVCUsed                EventReason = "ExistingPVCUsed"
-
-	// EntryPoint event reasons
-	ReasonEntryPointConfiguring         EventReason = "EntryPointConfiguring"
-	ReasonEntryPointProvisioning        EventReason = "EntryPointProvisioning"
-	ReasonEntryPointActive              EventReason = "EntryPointActive"
-	ReasonEntryPointDeleting            EventReason = "EntryPointDeleting"
-	ReasonEntryPointFailed              EventReason = "EntryPointFailed"
-	ReasonEntryPointUnknown             EventReason = "EntryPointUnknown"
-	ReasonEntryPointValidationFailed    EventReason = "EntryPointValidationFailed"
-	ReasonEntryPointResourceCheckFailed EventReason = "EntryPointResourceCheckFailed"
+	ReasonCreated      EventReason = "Created"
+	ReasonUpdated      EventReason = "Updated"
+	ReasonFailed       EventReason = "Failed"
+	ReasonReconciled   EventReason = "Reconciled"
+	ReasonHTTPRouteCreated   EventReason = "HTTPRouteCreated"
+	ReasonHTTPRouteUpdated   EventReason = "HTTPRouteUpdated"
+	ReasonHTTPRouteDeleted   EventReason = "HTTPRouteDeleted"
+	ReasonPVCResizeAttempted EventReason = "PVCResizeAttempted"
+	ReasonPVCResizeSkipped   EventReason = "PVCResizeSkipped"
+	ReasonPVCCreated         EventReason = "PVCCreated"
+	ReasonExistingPVCUsed    EventReason = "ExistingPVCUsed"
 )
 
 // EventManager defines the interface for managing events

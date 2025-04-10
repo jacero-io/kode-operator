@@ -52,7 +52,7 @@ func ensurePersistentVolumeClaim(ctx context.Context, r statemachine.ReconcilerI
 	if config.KodeSpec.Storage.ExistingVolumeClaim != nil {
 		log.V(1).Info("ExistingVolumeClaim specified, skipping PVC creation", "ExistingVolumeClaim", config.KodeSpec.Storage.ExistingVolumeClaim)
 		eventMessage := fmt.Sprintf("Using existing PVC %s for Kode %s", *config.KodeSpec.Storage.ExistingVolumeClaim, kode.Name)
-		err := er.Record(ctx, kode, event.EventTypeNormal, event.ReasonKodeExistingPVCUsed, eventMessage)
+		err := er.Record(ctx, kode, event.EventTypeNormal, event.ReasonExistingPVCUsed, eventMessage)
 		if err != nil {
 			log.Error(err, "Failed to record event")
 		}
@@ -86,7 +86,7 @@ func ensurePersistentVolumeClaim(ctx context.Context, r statemachine.ReconcilerI
 
 					// Record event for resize attempt
 					eventMessage := fmt.Sprintf("Attempting to resize PVC %s to %s", pvc.Name, constructedPVC.Spec.Resources.Requests.Storage().String())
-					err := er.Record(ctx, kode, event.EventTypeNormal, event.ReasonKodePVCResizeAttempted, eventMessage)
+					err := er.Record(ctx, kode, event.EventTypeNormal, event.ReasonPVCResizeAttempted, eventMessage)
 					if err != nil {
 						log.Error(err, "Failed to record event")
 					}
@@ -96,7 +96,7 @@ func ensurePersistentVolumeClaim(ctx context.Context, r statemachine.ReconcilerI
 
 				// Record event for skipped resize
 				eventMessage := fmt.Sprintf("Skipped resizing PVC %s, CSI driver does not support volume expansion", pvc.Name)
-				err := er.Record(ctx, kode, event.EventTypeWarning, event.ReasonKodePVCResizeSkipped, eventMessage)
+				err := er.Record(ctx, kode, event.EventTypeWarning, event.ReasonPVCResizeSkipped, eventMessage)
 				if err != nil {
 					log.Error(err, "Failed to record event")
 				}
@@ -115,7 +115,7 @@ func ensurePersistentVolumeClaim(ctx context.Context, r statemachine.ReconcilerI
 
 			// Record event for PVC creation
 			eventMessage := fmt.Sprintf("Created new PVC %s with size %s", pvc.Name, constructedPVC.Spec.Resources.Requests.Storage().String())
-			err := er.Record(ctx, kode, event.EventTypeNormal, event.ReasonKodePVCCreated, eventMessage)
+			err := er.Record(ctx, kode, event.EventTypeNormal, event.ReasonPVCCreated, eventMessage)
 			if err != nil {
 				log.Error(err, "Failed to record event")
 			}

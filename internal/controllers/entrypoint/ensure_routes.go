@@ -86,10 +86,10 @@ func (r *EntryPointReconciler) createOrUpdateRoute(ctx context.Context, entrypoi
 	var message string
 	switch result {
 	case controllerutil.OperationResultCreated:
-		eventReason = event.ReasonCreated
+		eventReason = event.ReasonHTTPRouteCreated
 		message = fmt.Sprintf("HTTPRoute created, %s", route.Name)
 	case controllerutil.OperationResultUpdated:
-		eventReason = event.ReasonUpdated
+		eventReason = event.ReasonHTTPRouteUpdated
 		message = fmt.Sprintf("HTTPRoute updated, %s", route.Name)
 	case controllerutil.OperationResultNone:
 		// No changes were made, so we don't need to record an event
