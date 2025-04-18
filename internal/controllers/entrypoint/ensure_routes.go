@@ -21,7 +21,6 @@ import (
 	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	gwapiv1 "sigs.k8s.io/gateway-api/apis/v1"
 	gwapiv1a2 "sigs.k8s.io/gateway-api/apis/v1alpha2"
@@ -34,7 +33,7 @@ import (
 	"github.com/jacero-io/kode-operator/pkg/constant"
 )
 
-func (r *EntryPointReconciler) ensureHTTPRoutes(ctx context.Context, entrypoint *kodev1alpha2.EntryPoint, kode *kodev1alpha2.Kode, config *common.EntryPointResourceConfig, kodeHostname kodev1alpha2.KodeHostname, kodeDomain kodev1alpha2.KodeDomain) (ctrl.Result, error) {
+func (r *EntryPointReconciler) ensureHTTPRoutes(ctx context.Context, entrypoint *kodev1alpha2.EntryPoint, kode *kodev1alpha2.Kode, config *common.EntryPointResourceConfig, kodeHostname kodev1alpha2.KodeHostname, kodeDomain kodev1alpha2.KodeDomain) error {
 	log := r.Log.WithValues("entrypoint", common.ObjectKeyFromConfig(config.CommonConfig))
 	log.V(1).Info("Ensuring HTTPRoutes")
 
@@ -42,20 +41,20 @@ func (r *EntryPointReconciler) ensureHTTPRoutes(ctx context.Context, entrypoint 
 	if err != nil {
 		log.Error(err, "Failed to construct HTTPS route")
 		entrypoint.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "HTTPRouteConstructionFailed", fmt.Sprintf("Failed to construct HTTPS route: %v", err))
-		return ctrl.Result{}, err
+		return err
 	}
 
 	if err := r.createOrUpdateRoute(ctx, entrypoint, kode, httpsRoute); err != nil {
 		log.Error(err, "Failed to create or update HTTPRoute")
 		entrypoint.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "HTTPRouteCreationFailed", fmt.Sprintf("Failed to create or update HTTPRoute: %v", err))
-		return ctrl.Result{}, err
+		return err
 	}
 
 	if config.EntryPointSpec.AuthSpec != nil && config.EntryPointSpec.AuthSpec.SecurityPolicySpec != nil && config.Protocol == kodev1alpha2.ProtocolHTTPS {
 		if err := r.createOrUpdateSecurityPolicy(ctx, entrypoint, kode, config, httpsRoute.Name); err != nil {
 			log.Error(err, "Failed to create or update SecurityPolicy")
 			entrypoint.SetCondition(constant.ConditionTypeReady, metav1.ConditionFalse, "SecurityPolicyCreationFailed", fmt.Sprintf("Failed to create or update SecurityPolicy: %v", err))
-			return ctrl.Result{}, err
+			return err
 		}
 	}
 
@@ -67,11 +66,11 @@ func (r *EntryPointReconciler) ensureHTTPRoutes(ctx context.Context, entrypoint 
 	err = kode.UpdateStatus(ctx, r.Client)
 	if err != nil {
 		log.Error(err, "Failed to update Kode status")
-		return ctrl.Result{}, err
+		return err
 	}
 
 	log.Info("HTTPRoutes ensured successfully")
-	return ctrl.Result{}, nil
+	return nil
 }
 
 func (r *EntryPointReconciler) createOrUpdateRoute(ctx context.Context, entrypoint *kodev1alpha2.EntryPoint, kode *kodev1alpha2.Kode, route *gwapiv1.HTTPRoute) error {
@@ -86,10 +85,10 @@ func (r *EntryPointReconciler) createOrUpdateRoute(ctx context.Context, entrypoi
 	var message string
 	switch result {
 	case controllerutil.OperationResultCreated:
-		eventReason = event.ReasonCreated
+		eventReason = event.ReasonHTTPRouteCreated
 		message = fmt.Sprintf("HTTPRoute created, %s", route.Name)
 	case controllerutil.OperationResultUpdated:
-		eventReason = event.ReasonUpdated
+		eventReason = event.ReasonHTTPRouteUpdated
 		message = fmt.Sprintf("HTTPRoute updated, %s", route.Name)
 	case controllerutil.OperationResultNone:
 		// No changes were made, so we don't need to record an event
@@ -210,7 +209,7 @@ func constructBackendRule(kode *kodev1alpha2.Kode, kodePort gwapiv1.PortNumber) 
 		BackendRefs: []gwapiv1.HTTPBackendRef{{
 			BackendRef: gwapiv1.BackendRef{
 				BackendObjectReference: gwapiv1.BackendObjectReference{
-					Kind: (*gwapiv1.Kind)(&service),
+					Kind: &service,
 					Name: gwapiv1.ObjectName(kodeServiceName),
 					Port: &kodePort,
 				},
@@ -226,7 +225,7 @@ func constructRouteName(kode *kodev1alpha2.Kode, isRedirect bool) string {
 	return kode.Name
 }
 
-func (r *EntryPointReconciler) constructSecurityPolicy(config *common.EntryPointResourceConfig, kode *kodev1alpha2.Kode, httpsRouteName string) (*egv1alpha1.SecurityPolicy, error) {
+func (r *EntryPointReconciler) constructSecurityPolicy(config *common.EntryPointResourceConfig, _ *kodev1alpha2.Kode, httpsRouteName string) (*egv1alpha1.SecurityPolicy, error) {
 	log := r.Log.WithName("SecurityPolicyConstructor").WithValues("entrypoint", common.ObjectKeyFromConfig(config.CommonConfig))
 	log.V(1).Info("Constructing SecurityPolicy")
 
@@ -291,9 +290,11 @@ func configureExtAuth(extAuth *egv1alpha1.ExtAuth, config *common.EntryPointReso
 			extAuth.HTTP.HeadersToBackend = append(extAuth.HTTP.HeadersToBackend, "x-auth-user-id")
 		}
 
-		// If using gRPC ExtAuth, you might want to add additional configuration here
+		// If using gRPC ExtAuth, there's no additional configuration needed at this time
+		//nolint:staticcheck // SA9003: intentionally empty branch reserved for future gRPC configuration
 		if extAuth.GRPC != nil {
-			// Add gRPC-specific configuration if needed
+			// No additional GRPC configuration needed at this time
+			// This branch is reserved for future GRPC-specific configurations
 		}
 	}
 }

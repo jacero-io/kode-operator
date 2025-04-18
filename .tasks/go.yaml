@@ -1,5 +1,10 @@
 version: '3'
 
+includes:
+  utils:
+    taskfile: utils.yaml
+    internal: true
+
 tasks:
   fmt:
     internal: true
@@ -19,7 +24,7 @@ tasks:
     cmds:
       - '{{.GOLANGCI_LINT_CMD}} run'
     deps:
-      - golangci-lint
+      - utils:golangci-lint
 
   lint-fix:
     internal: true
@@ -27,4 +32,4 @@ tasks:
     cmds:
       - '{{.GOLANGCI_LINT_CMD}} run --fix'
     deps:
-      - golangci-lint
+      - utils:golangci-lint

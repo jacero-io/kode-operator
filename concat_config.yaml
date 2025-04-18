@@ -1,0 +1,20 @@
+directory: .
+output_file: "output_kode-operator.txt"
+
+exclude_patterns:
+  - "*_test.go"
+  - "zz_generated.deepcopy.go"
+  - "test/crd/*"
+
+include_patterns:
+  # - ".github/**"
+  # - ".tasks/**"
+  - "api/**"
+  - "cmd/**"
+  # - "config/**"
+  - "internal/**"
+  - "pkg/**"
+  - "test/**"
+  - "go.mod"
+  - "Dockerfile"
+  - "Taskfile.yaml"

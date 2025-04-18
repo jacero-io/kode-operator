@@ -2,3 +2,5 @@ certs/*
 dist
 config
 concatenated_output.txt
+kubeconfig
+kind-config.yaml

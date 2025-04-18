@@ -18,7 +18,9 @@ import (
 	"github.com/jacero-io/kode-operator/pkg/envoy"
 )
 
-func ensureSidecarContainers(ctx context.Context, r statemachine.ReconcilerInterface, resource resourcev1.ResourceManager, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig) ([]corev1.Container, []corev1.Container, error) {
+func ensureSidecarContainers(_ context.Context, r statemachine.ReconcilerInterface,
+	_ resourcev1.ResourceManager, _ *kodev1alpha2.Kode,
+	config *common.KodeResourceConfig) ([]corev1.Container, []corev1.Container, error) {
 	log := r.GetLog().WithName("SidecarContainerEnsurer").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	log.V(1).Info("Ensuring sidecar containers")
@@ -60,7 +62,10 @@ func ensureSidecarContainers(ctx context.Context, r statemachine.ReconcilerInter
 	return containers, initContainers, nil
 }
 
-func constructBasicAuthConfigMap(ctx context.Context, r statemachine.ReconcilerInterface, resource resourcev1.ResourceManager, kode *kodev1alpha2.Kode, config *common.KodeResourceConfig) (*corev1.ConfigMap, error) {
+// nolint:unused
+func constructBasicAuthConfigMap(_ context.Context, r statemachine.ReconcilerInterface,
+	_ resourcev1.ResourceManager, kode *kodev1alpha2.Kode,
+	config *common.KodeResourceConfig) (*corev1.ConfigMap, error) {
 	log := r.GetLog().WithName("BasicAuthConfigMapConstructor").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	log.V(1).Info("Constructing Basic Auth ConfigMap")

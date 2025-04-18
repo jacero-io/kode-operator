@@ -32,13 +32,16 @@ import (
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
 )
 
+const (
+	username = "abc"
+)
+
 var _ = Describe("Kode Controller ContainerTemplate Integration", Ordered, func() {
 
 	DescribeTable("Kode resource creation",
 		func(templateName string, templateType string, expectedContainerCount int, exposePort int32) {
 
 			kodeName := fmt.Sprintf("%s-%s", "kode-standard", templateName)
-			username := "abc"
 			password := "123"
 			statefulSetName := kodeName
 			storageClassName := "standard"
@@ -75,6 +78,7 @@ var _ = Describe("Kode Controller ContainerTemplate Integration", Ordered, func(
 
 			if templateType == "code-server" {
 				Expect(createdStatefulSet.Spec.Template.Spec.Containers[0].Image).To(Equal(containerTemplateImageCodeServer))
+				// nolint:lll
 				// Expect(createdStatefulSet.Spec.Template.Spec.Containers[0].Env).To(ContainElement(corev1.EnvVar{Name: "DEFAULT_WORKSPACE", Value: "/config/workspace"}))
 				Expect(createdStatefulSet.Spec.Template.Spec.Containers[0].Env).To(ContainElement(corev1.EnvVar{Name: "USERNAME", Value: "abc"}))
 			} else if templateType == "webtop" {
@@ -179,7 +183,8 @@ var _ = Describe("Kode Controller ContainerTemplate Integration", Ordered, func(
 
 		// Ensure no PVC-related volume or volumeMount exists
 		Expect(createdStatefulSet.Spec.Template.Spec.Volumes).NotTo(ContainElement(HaveField("Name", constant.DefaultKodeVolumeStorageName)))
-		Expect(createdStatefulSet.Spec.Template.Spec.Containers[0].VolumeMounts).NotTo(ContainElement(HaveField("Name", constant.DefaultKodeVolumeStorageName)))
+		Expect(createdStatefulSet.Spec.Template.Spec.Containers[0].VolumeMounts).
+			NotTo(ContainElement(HaveField("Name", constant.DefaultKodeVolumeStorageName)))
 
 		// Check that PVC doesn't exist
 		pvcName := fmt.Sprintf("%s-pvc", kodeName)

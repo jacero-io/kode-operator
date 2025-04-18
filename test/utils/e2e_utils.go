@@ -35,7 +35,12 @@ const (
 )
 
 func warnError(err error) {
-	fmt.Fprintf(GinkgoWriter, "warning: %v\n", err)
+	_, printErr := fmt.Fprintf(GinkgoWriter, "warning: %v\n", err)
+	if printErr != nil {
+		// Since this is a test utility, we could log it or just ignore it
+		// Typically with GinkgoWriter errors are unlikely but we should still check
+		fmt.Println("Error writing to GinkgoWriter:", printErr)
+	}
 }
 
 // InstallPrometheusOperator installs the prometheus Operator to be used to export the enabled metrics.
@@ -50,19 +55,22 @@ func InstallPrometheusOperator() error {
 func Run(cmd *exec.Cmd) ([]byte, error) {
 	dir, _ := GetProjectDir()
 	cmd.Dir = dir
-
 	if err := os.Chdir(cmd.Dir); err != nil {
-		fmt.Fprintf(GinkgoWriter, "chdir dir: %s\n", err)
+		_, printErr := fmt.Fprintf(GinkgoWriter, "chdir dir: %s\n", err)
+		if printErr != nil {
+			// In testing context, we might just want to log the error since failing the test for a print error might be too extreme
+			fmt.Println("Error writing to GinkgoWriter:", printErr)
+		}
 	}
-
 	cmd.Env = append(os.Environ(), "GO111MODULE=on")
 	command := strings.Join(cmd.Args, " ")
-	fmt.Fprintf(GinkgoWriter, "running: %s\n", command)
+	if _, err := fmt.Fprintf(GinkgoWriter, "running: %s\n", command); err != nil {
+		return []byte{}, err // Changed from "" to []byte{} to match return type
+	}
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return output, fmt.Errorf("%s failed with error: (%v) %s", command, err, string(output))
 	}
-
 	return output, nil
 }
 

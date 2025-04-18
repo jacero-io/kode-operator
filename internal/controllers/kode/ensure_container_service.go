@@ -48,10 +48,7 @@ func ensureService(ctx context.Context, r statemachine.ReconcilerInterface, reso
 	}
 
 	_, err := resource.CreateOrPatch(ctx, service, func() error {
-		constructedService, err := constructServiceSpec(r, config)
-		if err != nil {
-			return fmt.Errorf("failed to construct Service spec: %v", err)
-		}
+		constructedService := constructServiceSpec(r, config)
 
 		service.Spec = constructedService.Spec
 		service.ObjectMeta.Labels = constructedService.ObjectMeta.Labels
@@ -67,7 +64,7 @@ func ensureService(ctx context.Context, r statemachine.ReconcilerInterface, reso
 }
 
 // constructService constructs a Service for the Kode instance
-func constructServiceSpec(r statemachine.ReconcilerInterface, config *common.KodeResourceConfig) (*corev1.Service, error) {
+func constructServiceSpec(r statemachine.ReconcilerInterface, config *common.KodeResourceConfig) *corev1.Service {
 	log := r.GetLog().WithName("ServiceConstructor").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	service := &corev1.Service{
@@ -83,5 +80,5 @@ func constructServiceSpec(r statemachine.ReconcilerInterface, config *common.Kod
 
 	log.V(1).Info("Service object constructed", "Service", service, "Spec", service.Spec)
 
-	return service, nil
+	return service
 }

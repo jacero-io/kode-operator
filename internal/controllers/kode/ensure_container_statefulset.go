@@ -100,7 +100,7 @@ func constructStatefulSetSpec(ctx context.Context, r statemachine.ReconcilerInte
 	}
 
 	var containers []corev1.Container
-	var initContainers []corev1.Container
+	initContainers := make([]corev1.Container, 0)
 
 	if templateSpec.Type == "code-server" {
 		log.V(1).Info("Constructing CodeServer containers")
@@ -139,12 +139,12 @@ func constructStatefulSetSpec(ctx context.Context, r statemachine.ReconcilerInte
 	}
 
 	// Construct and add sidecar containers
-	sidecarContainers, sidecarInitContainers, err := ensureSidecarContainers(ctx, r, resourcev1, kode, config)
-	if err != nil {
-		return nil, fmt.Errorf("failed to ensure sidecar containers: %v", err)
-	}
-	containers = append(containers, sidecarContainers...)
-	initContainers = append(initContainers, sidecarInitContainers...)
+	// sidecarContainers, sidecarInitContainers, err := ensureSidecarContainers(ctx, r, resourcev1, kode, config)
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to ensure sidecar containers: %v", err)
+	// }
+	// containers = append(containers, sidecarContainers...)
+	// initContainers = append(initContainers, sidecarInitContainers...)
 
 	// Add TemplateInitPlugins
 	for _, initPlugin := range config.Template.ContainerTemplateSpec.InitPlugins {

@@ -17,7 +17,10 @@ func NewBootstrapConfigGenerator(log logr.Logger) *BootstrapConfigGenerator {
 	return &BootstrapConfigGenerator{log: log}
 }
 
-func (g *BootstrapConfigGenerator) GenerateEnvoyConfig(config *common.KodeResourceConfig, useBasicAuth bool) (string, error) {
+func (g *BootstrapConfigGenerator) GenerateEnvoyConfig(
+	config *common.KodeResourceConfig,
+	useBasicAuth bool,
+) (string, error) {
 	// Create HTTP connection manager config
 	httpConnManager := HTTPConnectionManager{
 		Type:       "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager",
@@ -91,7 +94,7 @@ func (g *BootstrapConfigGenerator) GenerateEnvoyConfig(config *common.KodeResour
 					},
 				},
 			},
-			Clusters: g.getClusters(config, useBasicAuth),
+			Clusters: g.getClusters(useBasicAuth),
 		},
 	}
 
@@ -107,7 +110,7 @@ func (g *BootstrapConfigGenerator) GenerateEnvoyConfig(config *common.KodeResour
 		"useBasicAuth", useBasicAuth,
 		"yaml", "\n"+string(yamlConfig))
 
-	clustersYAML, err := yaml.Marshal(g.getClusters(config, useBasicAuth))
+	clustersYAML, err := yaml.Marshal(g.getClusters(useBasicAuth))
 	if err != nil {
 		g.log.Error(err, "Failed to marshal clusters config for debugging")
 	} else {
@@ -152,7 +155,7 @@ func (g *BootstrapConfigGenerator) getHTTPFilters(useBasicAuth bool) []HTTPFilte
 	return filters
 }
 
-func (g *BootstrapConfigGenerator) getClusters(config *common.KodeResourceConfig, useBasicAuth bool) Clusters {
+func (g *BootstrapConfigGenerator) getClusters(useBasicAuth bool) Clusters {
 	clusters := Clusters{
 		{
 			Name:           "local_service",

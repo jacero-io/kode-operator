@@ -1,80 +1,88 @@
 version: '3'
 
 includes:
-  tools:
-    taskfile: tools.yaml
+  utils:
+    taskfile: utils.yaml
     internal: true
-  lint: 
-    taskfile: lint.yaml
+  kind:
+    taskfile: kind.yaml
     internal: true
-  clusters:
-    taskfile: minikube.yaml
+  operator:
+    taskfile: operator.yaml
     internal: true
-  build:
-    taskfile: build.yaml
-    internal: true
-  flux:
-    taskfile: flux.yaml
-    internal: true
-  envoy:
-    taskfile: envoy.yaml
-    internal: true
-
-vars:
-  KUBECTL_CMD: '{{.KUBECTL_CMD | default "kubectl"}}'
 
 tasks:
-  generate-manifests:
-    desc: Generate controller manifests
-    cmds:
-      - task: build:manifests
-      - task: build:generate
-    deps:
-      - tools:controller-gen
-
   install:
-    desc: Install CRDs into the cluster (Minikube by default, or existing kubecontext)
-    deps:
-      - tools:kustomize
+    desc: Install CRDs into the K8s cluster
     cmds:
-      - task: clusters:set-context
-      - '{{.KUSTOMIZE_CMD}} build {{.ROOT_DIR}}/config/crd | {{.KUBECTL_CMD}} apply -f -'
-      - echo "CRDs installed successfully"
-    silent: true
+      - mkdir -p {{.ROOT_DIR}}/config/crd/bases
+      - '{{.CONTROLLER_GEN_CMD}} rbac:roleName=manager-role crd webhook paths="{{.ROOT_DIR}}/..." output:crd:artifacts:config={{.ROOT_DIR}}/config/crd/bases'
+      - '{{.KUBECTL_CMD}} apply -f {{.ROOT_DIR}}/config/crd/bases'
+    deps:
+      - operator:generate
+      - operator:manifests
 
   uninstall:
-    desc: Uninstall CRDs from the cluster (Minikube by default, or existing kubecontext)
+    desc: Uninstall CRDs from the K8s cluster
     cmds:
-      - task: clusters:set-context
-      - '{{.KUSTOMIZE_CMD}} build {{.ROOT_DIR}}/config/crd | {{.KUBECTL_CMD}} delete --ignore-not-found={{.IGNORE_NOT_FOUND}} -f -'
-
-  deploy:
-    desc: Deploy controller to the specified cluster (Minikube or remote)
+      - '{{.KUBECTL_CMD}} delete -f {{.ROOT_DIR}}/config/crd/bases || true'
     deps:
-      - build:build-installer
-      - build:docker-build
-    vars:
-      DEPLOY_TYPE: '{{if eq .USE_MINIKUBE_CONTEXT "true"}}minikube{{else}}remote{{end}}'
-    cmds:
-      - task: clusters:deploy-{{.DEPLOY_TYPE}}
+      - utils:kubectl
 
-  undeploy:
-    desc: Undeploy controller from the specified cluster
-    vars:
-      DEPLOY_TYPE: '{{if eq .USE_MINIKUBE_CONTEXT "true"}}minikube{{else}}remote{{end}}'
+  run:
+    desc: Run controller locally and output logs to file
     cmds:
-      - task: clusters:undeploy-{{.DEPLOY_TYPE}}
-
-  run-controller:
-    desc: Run the controller
-    cmds:
-      - ENV={{.ENV}} go run ./cmd/main.go --log-level {{.LOG_LEVEL_ARG}} {{.CLI_ARGS}} 2>&1 | tee output.log
+      - |
+        go run ./cmd/main.go \
+          --metrics-bind-address=:8081 \
+          --health-probe-bind-address=:8082 \
+          --log-level {{.LOG_LEVEL_ARG}} \
+          --leader-elect=false > {{.ROOT_DIR}}/output.log 2>&1
+    env:
+      KUBECONFIG: '{{.KUBECONFIG}}'
     vars:
       LOG_LEVEL_ARG: '{{if .LOG_LEVEL}}{{.LOG_LEVEL}}{{else}}debug{{end}}'
 
-  run:
-    desc: Run a controller from your host
+  setup:
+    desc: Set up the complete development environment
     cmds:
-      - task: generate-manifests
-      - task: install
-      - task: run-controller
+      - task: kind:create-cluster
+      - task: kind:install-components
+      - echo "Development environment setup complete"
+
+  start:
+    desc: Start the development cluster
+    cmds:
+      - task: kind:start-cluster
+      
+  stop:
+    desc: Stop the development cluster
+    cmds:
+      - task: kind:stop-cluster
+      
+  cleanup:
+    desc: Clean up the development environment
+    cmds:
+      - task: kind:cleanup-cluster
+      - rm -rf {{.ROOT_DIR}}/hack/kubeconfig
+
+  apply-samples:
+    desc: Apply sample resources
+    cmds:
+      - '{{.KUBECTL_CMD}} apply -k {{.ROOT_DIR}}/config/samples'
+    deps:
+      - utils:kubectl
+
+  apply-eg:
+    desc: Apply Envoy Gateway
+    cmds:
+      - '{{.KUBECTL_CMD}} apply -f {{.ROOT_DIR}}/hack/envoy-gateway-config.yaml'
+    deps:
+      - utils:kubectl
+
+  delete-samples:
+    desc: Delete sample resources
+    cmds:
+      - '{{.KUBECTL_CMD}} delete -k {{.ROOT_DIR}}/config/samples || true'
+    deps:
+      - utils:kubectl

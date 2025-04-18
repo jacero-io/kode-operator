@@ -33,9 +33,12 @@ type ValidationResult struct {
 // SetValidationCondition updates the validation condition based on the validation result
 func SetValidationCondition(status *kodev1alpha2.CommonStatus, result ValidationResult) {
 	if result.Valid {
-		status.SetCondition(constant.ConditionTypeValidated, metav1.ConditionTrue, "ValidationSucceeded", "Resource validation succeeded")
+		status.SetCondition(
+			constant.ConditionTypeValidated, metav1.ConditionTrue,
+			"ValidationSucceeded", "Resource validation succeeded")
 	} else {
 		errorMsg := strings.Join(result.Errors, "; ")
-		status.SetCondition(constant.ConditionTypeValidated, metav1.ConditionFalse, "ValidationFailed", fmt.Sprintf("Resource validation failed: %s", errorMsg))
+		status.SetCondition(constant.ConditionTypeValidated, metav1.ConditionFalse,
+			"ValidationFailed", fmt.Sprintf("Resource validation failed: %s", errorMsg))
 	}
 }

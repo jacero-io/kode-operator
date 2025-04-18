@@ -1,0 +1,216 @@
+version: '3'
+
+includes:
+  utils:
+    taskfile: utils.yaml
+    internal: true
+
+vars:
+  CLUSTER_NAME: dev-cluster
+  KIND_CONFIG_FILE: '{{.ROOT_DIR}}/hack/kind-config.yaml'
+  HTTP_PORT: '8080'
+  HTTPS_PORT: '8443'
+
+tasks:
+  create-kind-config:
+    internal: true
+    silent: true
+    desc: Create a kind configuration file
+    cmds:
+      - |
+        cat > {{.KIND_CONFIG_FILE}} << 'EOF'
+        kind: Cluster
+        apiVersion: kind.x-k8s.io/v1alpha4
+        name: {{.CLUSTER_NAME}}
+        networking:
+          apiServerAddress: "127.0.0.1"
+          apiServerPort: 6443
+          disableDefaultCNI: true
+          podSubnet: "10.244.0.0/16"
+          serviceSubnet: "10.96.0.0/16"
+        nodes:
+        - role: control-plane
+        - role: worker
+          extraPortMappings:
+          - containerPort: 8080
+            hostPort: {{.HTTP_PORT}}
+            protocol: TCP
+          - containerPort: 8443
+            hostPort: {{.HTTPS_PORT}}
+            protocol: TCP
+        EOF
+        echo "Created kind config at {{.KIND_CONFIG_FILE}}"
+
+  create-cluster:
+    desc: Create a new kind cluster
+    cmds:
+      - |
+        if ! {{.KIND_CMD}} get clusters | grep -q "^{{.CLUSTER_NAME}}$"; then
+          echo "Creating kind cluster {{.CLUSTER_NAME}}..."
+          {{.KIND_CMD}} create cluster --name {{.CLUSTER_NAME}} --config {{.KIND_CONFIG_FILE}}
+          mkdir -p {{.ROOT_DIR}}/hack
+          {{.KIND_CMD}} export kubeconfig --name {{.CLUSTER_NAME}} --kubeconfig {{.KUBECONFIG}}
+          {{.KIND_CMD}} export kubeconfig --name {{.CLUSTER_NAME}} --kubeconfig $HOME/.kube/config
+        else
+          echo "Cluster {{.CLUSTER_NAME}} already exists"
+        fi
+    env:
+      KUBECONFIG: '{{.KUBECONFIG}}'
+    status:
+      - '{{.KIND_CMD}} get clusters | grep -q "^{{.CLUSTER_NAME}}$"'
+    deps:
+      - create-kind-config
+      - utils:kind
+
+  install-components:
+    desc: Install necessary components in the cluster
+    vars:
+      METALLB_VERSION: 0.14.9
+    cmds:
+      # Check API server connectivity first
+      - |
+        echo "Checking API server connectivity..."
+        RETRY_COUNT=0
+        MAX_RETRIES=10
+        until {{.KUBECTL_CMD}} get nodes &>/dev/null || [ $RETRY_COUNT -eq $MAX_RETRIES ]; do
+          echo "Waiting for API server to be accessible... (attempt $((RETRY_COUNT+1))/$MAX_RETRIES)"
+          sleep 5
+          RETRY_COUNT=$((RETRY_COUNT+1))
+        done
+        if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
+          echo "Failed to connect to API server after $MAX_RETRIES attempts"
+          exit 1
+        fi
+        echo "API server is accessible"
+
+      # Install cilium
+      - |
+        {{.HELM_CMD}} repo add cilium https://helm.cilium.io/
+        docker pull quay.io/cilium/cilium:v1.17.3
+        {{.KIND_CMD}} load --name {{.CLUSTER_NAME}} docker-image quay.io/cilium/cilium:v1.17.3
+        {{.HELM_CMD}} upgrade --install cilium cilium/cilium --version 1.17.3 \
+          --namespace kube-system \
+          --set image.pullPolicy=IfNotPresent \
+          --set ipam.mode=kubernetes
+      
+      # Install Metrics Server
+      - |
+        echo "Installing Metrics Server..."
+        {{.KUBECTL_CMD}} apply -f {{.ROOT_DIR}}/hack/metrics-server.yaml
+        
+      # Install Envoy Gateway using Helm
+      - |
+        echo "Installing Envoy Gateway..."
+        # Install using yaml
+        # {{.KUBECTL_CMD}} apply -f {{.ROOT_DIR}}/hack/envoy-gateway_1.3.2.yaml
+        # Install Envoy Gateway from OCI registry
+        {{.HELM_CMD}} upgrade --install envoy-gateway oci://docker.io/envoyproxy/gateway-helm \
+          --namespace envoy-gateway-system \
+          --create-namespace \
+          --wait
+    env:
+      KUBECONFIG: '{{.KUBECONFIG}}'
+    deps:
+      - create-cluster
+      - utils:kubectl
+      - utils:helm
+
+  start-cluster:
+    desc: Start an existing kind cluster
+    cmds:
+      - |
+        if ! {{.KIND_CMD}} get clusters | grep -q "^{{.CLUSTER_NAME}}$"; then
+          echo "Cluster {{.CLUSTER_NAME}} does not exist. Run 'task kind:create-cluster' first."
+          exit 1
+        fi
+        if ! docker ps | grep -q "{{.CLUSTER_NAME}}-control-plane"; then
+          echo "Starting kind cluster {{.CLUSTER_NAME}}..."
+          {{.KIND_CMD}} export kubeconfig --name {{.CLUSTER_NAME}} --kubeconfig {{.KUBECONFIG}}
+          echo "Cluster started successfully"
+        else
+          echo "Cluster {{.CLUSTER_NAME}} is already running"
+        fi
+    env:
+      KUBECONFIG: '{{.KUBECONFIG}}'
+    deps:
+      - utils:kind
+
+  stop-cluster:
+    desc: Stop the kind cluster without deleting it
+    cmds:
+      - |
+        if {{.KIND_CMD}} get clusters | grep -q "^{{.CLUSTER_NAME}}$"; then
+          echo "Stopping kind cluster {{.CLUSTER_NAME}}..."
+          # Find and stop the Docker containers for the cluster
+          CONTAINERS=$(docker ps -q --filter=name="{{.CLUSTER_NAME}}")
+          if [ -n "$CONTAINERS" ]; then
+            docker stop $CONTAINERS
+            echo "Cluster stopped successfully"
+          else
+            echo "No running containers found for cluster {{.CLUSTER_NAME}}"
+          fi
+        else
+          echo "Cluster {{.CLUSTER_NAME}} does not exist"
+        fi
+    deps:
+      - utils:kind
+
+  cleanup-cluster:
+    desc: Delete the kind cluster and clean up resources
+    cmds:
+      - |
+        if {{.KIND_CMD}} get clusters | grep -q "^{{.CLUSTER_NAME}}$"; then
+          echo "Deleting kind cluster {{.CLUSTER_NAME}}..."
+          {{.KIND_CMD}} delete cluster --name {{.CLUSTER_NAME}}
+          echo "Cluster deleted successfully"
+        else
+          echo "Cluster {{.CLUSTER_NAME}} does not exist"
+        fi
+      # Optionally remove config file
+      - |
+        if [ -f {{.KIND_CONFIG_FILE}} ]; then
+          rm {{.KIND_CONFIG_FILE}}
+          echo "Removed configuration file"
+        fi
+      # Clean up any stale Docker networks
+      - |
+        echo "Cleaning up any stale Docker networks..."
+        STALE_NETWORKS=$(docker network ls --filter label=io.k8s.sigs.kind.cluster --format '{{.Name}}' | grep kind || true)
+        if [ -n "$STALE_NETWORKS" ]; then
+          for NETWORK in $STALE_NETWORKS; do
+            if ! docker network inspect $NETWORK | grep -q '"Containers": {}'; then
+              echo "Removing containers from network $NETWORK"
+              CONTAINERS=$(docker network inspect $NETWORK -f '{{range $k, $v := .Containers}}{{$k}} {{end}}')
+              for CONTAINER in $CONTAINERS; do
+                docker network disconnect -f $NETWORK $CONTAINER || true
+              done
+            fi
+            docker network rm $NETWORK || true
+          done
+        fi
+    deps:
+      - utils:kind
+
+  status:
+    desc: Check the status of the kind cluster
+    cmds:
+      - |
+        if {{.KIND_CMD}} get clusters | grep -q "^{{.CLUSTER_NAME}}$"; then
+          echo "Cluster {{.CLUSTER_NAME}} exists"
+          if docker ps | grep -q "{{.CLUSTER_NAME}}-control-plane"; then
+            echo "Cluster status: Running"
+            echo "Nodes:"
+            {{.KUBECTL_CMD}} get nodes
+            echo "\nPods in kube-system:"
+            {{.KUBECTL_CMD}} get pods -n kube-system
+          else
+            echo "Cluster status: Stopped"
+          fi
+        else
+          echo "Cluster {{.CLUSTER_NAME}} does not exist"
+        fi
+    env:
+      KUBECONFIG: '{{.KUBECONFIG}}'
+    deps:
+      - utils:kind
+      - utils:kubectl

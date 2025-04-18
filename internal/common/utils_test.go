@@ -267,11 +267,12 @@ func TestMergeLabels(t *testing.T) {
 
 func TestAddTypeInformationToObject(t *testing.T) {
 	scheme := runtime.NewScheme()
-	corev1.AddToScheme(scheme)
+	err := corev1.AddToScheme(scheme)
+	assert.NoError(t, err)
 
 	obj := &corev1.Pod{}
 
-	err := AddTypeInformationToObject(scheme, obj)
+	err = AddTypeInformationToObject(scheme, obj)
 	assert.NoError(t, err)
 
 	gvk := obj.GetObjectKind().GroupVersionKind()

@@ -62,9 +62,19 @@ func main() {
 		"If set the metrics endpoint is served securely")
 	flag.BoolVar(&enableHTTP2, "enable-http2", false,
 		"If set, HTTP/2 will be enabled for the metrics and webhook servers")
-	flag.StringVar(&logLevel, "log-level", "info", "Log level for development (debug, info, warn, error, dpanic, panic, fatal)")
+	flag.StringVar(
+		&logLevel,
+		"log-level",
+		"info",
+		"Log level for development (debug, info, warn, error, dpanic, panic, fatal)",
+	)
 	flag.DurationVar(&reconcileInterval, "reconcile-interval", 5*time.Second, "The general reconcile interval")
-	flag.DurationVar(&longReconcileInterval, "long-reconcile-interval", 5*time.Minute, "The interval to requeue during, for example active or failed state")
+	flag.DurationVar(
+		&longReconcileInterval,
+		"long-reconcile-interval",
+		5*time.Minute,
+		"The interval to requeue during, for example active or failed state",
+	)
 	flag.Parse()
 
 	var loggerConfig zap.Config
@@ -126,13 +136,27 @@ func main() {
 	}
 
 	if err = (&kodecontroller.KodeReconciler{
-		Client:                mgr.GetClient(),
-		Scheme:                mgr.GetScheme(),
-		Log:                   ctrl.Log.WithName("Kode").WithName("Reconcile"),
-		Resource:              resourcev1.NewDefaultResourceManager(mgr.GetClient(), ctrl.Log.WithName("Kode").WithName("ResourceManager"), scheme),
-		Template:              template.NewDefaultTemplateManager(mgr.GetClient(), ctrl.Log.WithName("Kode").WithName("TemplateManager")),
-		CleanupManager:        cleanup.NewDefaultCleanupManager(mgr.GetClient(), ctrl.Log.WithName("Kode").WithName("CleanupManager")),
-		EventManager:          event.NewEventManager(mgr.GetClient(), ctrl.Log.WithName("Kode").WithName("EventManager"), mgr.GetScheme(), mgr.GetEventRecorderFor("kode-controller")),
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+		Log:    ctrl.Log.WithName("Kode").WithName("Reconcile"),
+		Resource: resourcev1.NewDefaultResourceManager(
+			mgr.GetClient(),
+			ctrl.Log.WithName("Kode").WithName("ResourceManager"),
+			scheme,
+		),
+		Template: template.NewDefaultTemplateManager(
+			mgr.GetClient(),
+			ctrl.Log.WithName("Kode").WithName("TemplateManager"),
+		),
+		CleanupManager: cleanup.NewDefaultCleanupManager(
+			mgr.GetClient(),
+			ctrl.Log.WithName("Kode").WithName("CleanupManager"),
+		),
+		EventManager: event.NewEventManager(mgr.GetClient(),
+			ctrl.Log.WithName("Kode").WithName("EventManager"),
+			mgr.GetScheme(),
+			mgr.GetEventRecorderFor("kode-controller"),
+		),
 		IsTestEnvironment:     false,
 		ReconcileInterval:     reconcileInterval,
 		LongReconcileInterval: longReconcileInterval,
@@ -142,13 +166,28 @@ func main() {
 	}
 
 	if err = (&entrypointcontroller.EntryPointReconciler{
-		Client:            mgr.GetClient(),
-		Scheme:            mgr.GetScheme(),
-		Log:               ctrl.Log.WithName("EntryPoint").WithName("Reconcile"),
-		Resource:          resourcev1.NewDefaultResourceManager(mgr.GetClient(), ctrl.Log.WithName("EntryPoint").WithName("ResourceManager"), scheme),
-		Template:          template.NewDefaultTemplateManager(mgr.GetClient(), ctrl.Log.WithName("EntryPoint").WithName("TemplateManager")),
-		CleanupManager:    cleanup.NewDefaultCleanupManager(mgr.GetClient(), ctrl.Log.WithName("EntryPoint").WithName("CleanupManager")),
-		EventManager:      event.NewEventManager(mgr.GetClient(), ctrl.Log.WithName("EntryPoint").WithName("EventManager"), mgr.GetScheme(), mgr.GetEventRecorderFor("entrypoint-controller")),
+		Client: mgr.GetClient(),
+		Scheme: mgr.GetScheme(),
+		Log:    ctrl.Log.WithName("EntryPoint").WithName("Reconcile"),
+		Resource: resourcev1.NewDefaultResourceManager(
+			mgr.GetClient(),
+			ctrl.Log.WithName("EntryPoint").WithName("ResourceManager"),
+			scheme,
+		),
+		Template: template.NewDefaultTemplateManager(
+			mgr.GetClient(),
+			ctrl.Log.WithName("EntryPoint").WithName("TemplateManager"),
+		),
+		CleanupManager: cleanup.NewDefaultCleanupManager(
+			mgr.GetClient(),
+			ctrl.Log.WithName("EntryPoint").WithName("CleanupManager"),
+		),
+		EventManager: event.NewEventManager(
+			mgr.GetClient(),
+			ctrl.Log.WithName("EntryPoint").WithName("EventManager"),
+			mgr.GetScheme(),
+			mgr.GetEventRecorderFor("entrypoint-controller"),
+		),
 		IsTestEnvironment: false,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "EntryPoint")

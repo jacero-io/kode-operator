@@ -112,6 +112,7 @@ func handleReconcileError(ctx context.Context, r statemachine.ReconcilerInterfac
 	return kodev1alpha2.PhaseFailed, ctrl.Result{RequeueAfter: r.GetReconcileInterval()}, err
 }
 
+// nolint:unused
 func determineCurrentState(ctx context.Context, r statemachine.ReconcilerInterface, kode *kodev1alpha2.Kode) (kodev1alpha2.Phase, error) {
 	log := r.GetLog().WithValues("kode", client.ObjectKeyFromObject(kode))
 
