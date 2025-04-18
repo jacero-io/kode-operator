@@ -143,7 +143,7 @@ type Cluster struct {
 	ConnectTimeout                string         `json:"connect_timeout" yaml:"connect_timeout"`
 	Type                          string         `json:"type" yaml:"type"`
 	LbPolicy                      string         `json:"lb_policy" yaml:"lb_policy"`
-	TypedExtensionProtocolOptions DynamicValue   `json:"typed_extension_protocol_options,omitempty" yaml:"typed_extension_protocol_options,omitempty"`
+	TypedExtensionProtocolOptions DynamicValue   `json:"typed_extension_protocol_options,omitempty"`
 	LoadAssignment                LoadAssignment `json:"load_assignment" yaml:"load_assignment"`
 }
 

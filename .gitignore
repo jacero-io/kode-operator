@@ -27,12 +27,12 @@ go.work
 *~
 
 # Other
+bin
 .task
 __debug*
 coverage*
 random/*
-output_kode.txt
-output.txt
+output_kode-operator.txt
 .DS_Store
 output.log
 test.log

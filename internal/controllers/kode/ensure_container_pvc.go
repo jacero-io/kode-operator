@@ -69,14 +69,11 @@ func ensurePersistentVolumeClaim(ctx context.Context, r statemachine.ReconcilerI
 
 	_, err := resource.CreateOrPatch(ctx, pvc, func() error {
 		// Construct the desired PVC spec
-		constructedPVC, err := constructPVCSpec(r, config)
-		if err != nil {
-			return fmt.Errorf("failed to construct PVC spec: %v", err)
-		}
+		constructedPVC := constructPVCSpec(r, config)
 
 		// Get the existing PVC
 		existing := &corev1.PersistentVolumeClaim{}
-		err = r.GetClient().Get(ctx, client.ObjectKeyFromObject(pvc), existing)
+		err := r.GetClient().Get(ctx, client.ObjectKeyFromObject(pvc), existing)
 		if err == nil {
 			// PVC exists, update only if resize is supported
 			if resizeSupported {
@@ -138,7 +135,7 @@ func ensurePersistentVolumeClaim(ctx context.Context, r statemachine.ReconcilerI
 }
 
 // constructPVCSpec constructs a PersistentVolumeClaim for the Kode instance
-func constructPVCSpec(r statemachine.ReconcilerInterface, config *common.KodeResourceConfig) (*corev1.PersistentVolumeClaim, error) {
+func constructPVCSpec(r statemachine.ReconcilerInterface, config *common.KodeResourceConfig) *corev1.PersistentVolumeClaim {
 	log := r.GetLog().WithName("PvcConstructor").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	pvc := &corev1.PersistentVolumeClaim{
@@ -154,5 +151,5 @@ func constructPVCSpec(r statemachine.ReconcilerInterface, config *common.KodeRes
 
 	log.V(1).Info("PVC object constructed", "PVC", pvc, "Spec", pvc.Spec)
 
-	return pvc, nil
+	return pvc
 }

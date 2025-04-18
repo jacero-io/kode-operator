@@ -172,10 +172,7 @@ func detectServiceChanges(ctx context.Context, r statemachine.ReconcilerInterfac
 		return err
 	}
 
-	desiredService, err := constructServiceSpec(r, config)
-	if err != nil {
-		return err
-	}
+	desiredService := constructServiceSpec(r, config)
 
 	// Compare and log specific differences
 	if !reflect.DeepEqual(existing.Spec.Ports, desiredService.Spec.Ports) {
@@ -303,11 +300,7 @@ func detectPVCChanges(ctx context.Context, r statemachine.ReconcilerInterface, r
 		return err
 	}
 
-	desiredPVC, err := constructPVCSpec(r, config)
-	if err != nil {
-		log.Error(err, "Failed to construct desired PVC spec")
-		return err
-	}
+	desiredPVC := constructPVCSpec(r, config)
 
 	// Compare storage size
 	if !existing.Spec.Resources.Requests.Storage().Equal(*desiredPVC.Spec.Resources.Requests.Storage()) {

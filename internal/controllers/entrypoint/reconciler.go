@@ -119,7 +119,9 @@ func (r *EntryPointReconciler) reconcileKode(ctx context.Context, kode *kodev1al
 			return ctrl.Result{RequeueAfter: 5 * time.Second}, fmt.Errorf("primary error: %v, kode status update error: %v", err, updateErr)
 		}
 
-		r.GetEventRecorder().Record(ctx, kode, event.EventTypeWarning, event.ReasonFailed, fmt.Sprintf("Failed to reconcile Kode: %v", err))
+		if err := r.GetEventRecorder().Record(ctx, kode, event.EventTypeWarning, event.ReasonFailed, fmt.Sprintf("Failed to reconcile Kode: %v", err)); err != nil {
+			log.Error(err, "Failed to record event")
+		}
 		return ctrl.Result{RequeueAfter: 5 * time.Second}, err
 	}
 
@@ -140,7 +142,9 @@ func (r *EntryPointReconciler) reconcileKode(ctx context.Context, kode *kodev1al
 			return ctrl.Result{RequeueAfter: 5 * time.Second}, fmt.Errorf("primary error: %v, kode status update error: %v", err, updateErr)
 		}
 
-		r.GetEventRecorder().Record(ctx, kode, event.EventTypeWarning, event.ReasonFailed, fmt.Sprintf("Failed to reconcile Kode: %v", err))
+		if err := r.GetEventRecorder().Record(ctx, kode, event.EventTypeWarning, event.ReasonFailed, fmt.Sprintf("Failed to reconcile Kode: %v", err)); err != nil {
+			log.Error(err, "Failed to record event")
+		}
 		return ctrl.Result{RequeueAfter: 5 * time.Second}, err
 	}
 	log.V(1).Info("Constructed Kode URL", "hostname", kodeHostname, "domain", kodeDomain, "url", kodeUrl, "path", kodePath, "protocol", config.Protocol)
@@ -159,7 +163,7 @@ func (r *EntryPointReconciler) reconcileKode(ctx context.Context, kode *kodev1al
 	}
 
 	// Ensure HTTPRoute
-	created, err := r.ensureHTTPRoutes(ctx, entryPoint, kode, config, kodeHostname, kodeDomain)
+	err = r.ensureHTTPRoutes(ctx, entryPoint, kode, config, kodeHostname, kodeDomain)
 	if err != nil {
 		log.Error(err, "Failed to ensure HTTPRoute for Kode", "namespace", kode.Namespace, "name", kode.Name)
 
@@ -173,7 +177,10 @@ func (r *EntryPointReconciler) reconcileKode(ctx context.Context, kode *kodev1al
 			return ctrl.Result{RequeueAfter: 5 * time.Second}, fmt.Errorf("primary error: %v, kode status update error: %v", err, updateErr)
 		}
 
-		r.GetEventRecorder().Record(ctx, kode, event.EventTypeWarning, event.ReasonFailed, fmt.Sprintf("Failed to reconcile Kode: %v", err))
+		if recordErr := r.GetEventRecorder().Record(ctx, kode, event.EventTypeWarning, event.ReasonFailed,
+			fmt.Sprintf("Failed to reconcile Kode: %v", err)); recordErr != nil {
+			log.Error(recordErr, "Failed to record event")
+		}
 		return ctrl.Result{RequeueAfter: 5 * time.Second}, err
 	}
 
@@ -187,7 +194,7 @@ func (r *EntryPointReconciler) reconcileKode(ctx context.Context, kode *kodev1al
 		}
 	}
 
-	log.Info("HTTPRoute configuration successful", "created", created, "kodeUrl", kodeUrl)
+	log.Info("HTTPRoute configuration successful", "kodeUrl", kodeUrl)
 	return ctrl.Result{}, nil
 }
 

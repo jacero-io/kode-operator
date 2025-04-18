@@ -1,8 +1,8 @@
 module github.com/jacero-io/kode-operator
 
-go 1.22.7
+go 1.24.1
 
-toolchain go1.22.8
+godebug default=go1.24
 
 replace github.com/imdario/mergo => github.com/imdario/mergo v0.3.16
 

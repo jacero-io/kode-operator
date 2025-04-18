@@ -16,6 +16,9 @@ issues:
       linters:
         - dupl
         - lll
+linters-settings:
+  lll:
+    line-length: 140
 linters:
   disable-all: true
   enable:

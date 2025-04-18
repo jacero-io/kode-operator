@@ -39,6 +39,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/envtest"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 	gwapiv1 "sigs.k8s.io/gateway-api/apis/v1"
 
 	kodev1alpha2 "github.com/jacero-io/kode-operator/api/v1alpha2"
@@ -94,6 +95,7 @@ func TestControllers(t *testing.T) {
 	RunSpecs(t, "Controllers Suite")
 }
 
+// nolint:unused
 type mockClient struct {
 	client.Client
 	deletedResources sync.Map
@@ -130,6 +132,9 @@ var _ = BeforeSuite(func() {
 
 	k8sManager, err = ctrl.NewManager(cfg, ctrl.Options{
 		Scheme: scheme.Scheme,
+		Metrics: metricsserver.Options{
+			BindAddress: ":8081",
+		},
 	})
 	Expect(err).ToNot(HaveOccurred())
 
@@ -144,26 +149,55 @@ var _ = BeforeSuite(func() {
 	longReconcileInterval := 5 * time.Minute
 
 	reconciler = &kodectrl.KodeReconciler{
-		Client:                k8sClient,
-		Scheme:                k8sManager.GetScheme(),
-		Log:                   ctrl.Log.WithName("Kode").WithName("Reconcile"),
-		Resource:              resourcev1.NewDefaultResourceManager(k8sClient, ctrl.Log.WithName("Kode").WithName("ResourceManager"), k8sManager.GetScheme()),
-		Template:              template.NewDefaultTemplateManager(k8sClient, ctrl.Log.WithName("Kode").WithName("TemplateManager")),
-		CleanupManager:        cleanup.NewDefaultCleanupManager(k8sClient, ctrl.Log.WithName("Kode").WithName("CleanupManager")),
-		EventManager:          event.NewEventManager(k8sClient, ctrl.Log.WithName("Kode").WithName("EventManager"), k8sManager.GetScheme(), k8sManager.GetEventRecorderFor("kode-controller")),
+		Client: k8sClient,
+		Scheme: k8sManager.GetScheme(),
+		Log:    ctrl.Log.WithName("Kode").WithName("Reconcile"),
+		Resource: resourcev1.NewDefaultResourceManager(
+			k8sClient,
+			ctrl.Log.WithName("Kode").WithName("ResourceManager"),
+			k8sManager.GetScheme(),
+		),
+		Template: template.NewDefaultTemplateManager(
+			k8sClient,
+			ctrl.Log.WithName("Kode").WithName("TemplateManager"),
+		),
+		CleanupManager: cleanup.NewDefaultCleanupManager(
+			k8sClient,
+			ctrl.Log.WithName("Kode").WithName("CleanupManager"),
+		),
+		EventManager: event.NewEventManager(
+			k8sClient,
+			ctrl.Log.WithName("Kode").WithName("EventManager"),
+			k8sManager.GetScheme(),
+			k8sManager.GetEventRecorderFor("kode-controller"),
+		),
 		IsTestEnvironment:     true,
 		ReconcileInterval:     reconcileInterval,
 		LongReconcileInterval: longReconcileInterval,
 	}
 
 	entrypointReconciler = &entrypointctrl.EntryPointReconciler{
-		Client:            k8sClient,
-		Scheme:            k8sManager.GetScheme(),
-		Log:               ctrl.Log.WithName("EntryPoint").WithName("Reconcile"),
-		Resource:          resourcev1.NewDefaultResourceManager(k8sClient, ctrl.Log.WithName("EntryPoint").WithName("ResourceManager"), k8sManager.GetScheme()),
-		Template:          template.NewDefaultTemplateManager(k8sClient, ctrl.Log.WithName("EntryPoint").WithName("TemplateManager")),
-		CleanupManager:    cleanup.NewDefaultCleanupManager(k8sClient, ctrl.Log.WithName("EntryPoint").WithName("CleanupManager")),
-		EventManager:      event.NewEventManager(k8sClient, ctrl.Log.WithName("Kode").WithName("EventManager"), k8sManager.GetScheme(), k8sManager.GetEventRecorderFor("entrypoint-controller")),
+		Client: k8sClient,
+		Scheme: k8sManager.GetScheme(),
+		Log:    ctrl.Log.WithName("EntryPoint").WithName("Reconcile"),
+		Resource: resourcev1.NewDefaultResourceManager(
+			k8sClient, ctrl.Log.WithName("EntryPoint").WithName("ResourceManager"),
+			k8sManager.GetScheme(),
+		),
+		Template: template.NewDefaultTemplateManager(
+			k8sClient,
+			ctrl.Log.WithName("EntryPoint").WithName("TemplateManager"),
+		),
+		CleanupManager: cleanup.NewDefaultCleanupManager(
+			k8sClient,
+			ctrl.Log.WithName("EntryPoint").WithName("CleanupManager"),
+		),
+		EventManager: event.NewEventManager(
+			k8sClient,
+			ctrl.Log.WithName("Kode").WithName("EventManager"),
+			k8sManager.GetScheme(),
+			k8sManager.GetEventRecorderFor("entrypoint-controller"),
+		),
 		IsTestEnvironment: true,
 	}
 
@@ -197,16 +231,40 @@ var _ = BeforeSuite(func() {
 	Expect(k8sClient.Create(ctx, entryPointPath)).To(Succeed())
 
 	// Create ContainerTemplates
-	containerTemplateCodeServer = createContainerTemplate(containerTemplateNameCodeServer, containerTemplateImageCodeServer, "code-server", entryPointSubdomain.Name, entryPointSubdomain.Namespace)
+	containerTemplateCodeServer = createContainerTemplate(
+		containerTemplateNameCodeServer,
+		containerTemplateImageCodeServer,
+		"code-server",
+		entryPointSubdomain.Name,
+		entryPointSubdomain.Namespace,
+	)
 	Expect(k8sClient.Create(ctx, containerTemplateCodeServer)).To(Succeed())
 
-	containerTemplateWebtop = createContainerTemplate(containerTemplateNameWebtop, containerTemplateImageWebtop, "webtop", entryPointSubdomain.Name, entryPointSubdomain.Namespace)
+	containerTemplateWebtop = createContainerTemplate(
+		containerTemplateNameWebtop,
+		containerTemplateImageWebtop,
+		"webtop",
+		entryPointSubdomain.Name,
+		entryPointSubdomain.Namespace,
+	)
 	Expect(k8sClient.Create(ctx, containerTemplateWebtop)).To(Succeed())
 
-	containerTemplateSubdomain = createContainerTemplate("pod-template-subdomain", containerTemplateImageCodeServer, "code-server", entryPointSubdomain.Name, entryPointSubdomain.Namespace)
+	containerTemplateSubdomain = createContainerTemplate(
+		"pod-template-subdomain",
+		containerTemplateImageCodeServer,
+		"code-server",
+		entryPointSubdomain.Name,
+		entryPointSubdomain.Namespace,
+	)
 	Expect(k8sClient.Create(ctx, containerTemplateSubdomain)).To(Succeed())
 
-	containerTemplatePath = createContainerTemplate("pod-template-path", containerTemplateImageCodeServer, "code-server", entryPointPath.Name, entryPointPath.Namespace)
+	containerTemplatePath = createContainerTemplate(
+		"pod-template-path",
+		containerTemplateImageCodeServer,
+		"code-server",
+		entryPointPath.Name,
+		entryPointPath.Namespace,
+	)
 	Expect(k8sClient.Create(ctx, containerTemplatePath)).To(Succeed())
 })
 
@@ -217,12 +275,14 @@ var _ = AfterSuite(func() {
 	Expect(err).NotTo(HaveOccurred())
 })
 
+// nolint:unused
 func (m *mockClient) Delete(ctx context.Context, obj client.Object, opts ...client.DeleteOption) error {
 	key := fmt.Sprintf("%T/%s/%s", obj, obj.GetNamespace(), obj.GetName())
 	m.deletedResources.Store(key, true)
 	return nil
 }
 
+// nolint:unused
 func (m *mockClient) Get(ctx context.Context, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
 	resourceKey := fmt.Sprintf("%T/%s/%s", obj, key.Namespace, key.Name)
 	_, deleted := m.deletedResources.Load(resourceKey)
@@ -250,7 +310,11 @@ func setupStorageClass(ctx context.Context, k8sClient client.Client) error {
 	return nil
 }
 
-func createContainerTemplate(name, image, templateType string, entryPointName string, entrypointNamespace string) *kodev1alpha2.ClusterContainerTemplate {
+func createContainerTemplate(
+	name, image, templateType string,
+	entryPointName string,
+	entrypointNamespace string,
+) *kodev1alpha2.ClusterContainerTemplate {
 	port := kodev1alpha2.Port(8000)
 
 	template := &kodev1alpha2.ClusterContainerTemplate{
@@ -280,7 +344,11 @@ func createContainerTemplate(name, image, templateType string, entryPointName st
 	return template
 }
 
-func createEntryPoint(name string, namespaceName string, routingType kodev1alpha2.RoutingType) *kodev1alpha2.EntryPoint {
+func createEntryPoint(
+	name string,
+	namespaceName string,
+	routingType kodev1alpha2.RoutingType,
+) *kodev1alpha2.EntryPoint {
 	return &kodev1alpha2.EntryPoint{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -293,7 +361,12 @@ func createEntryPoint(name string, namespaceName string, routingType kodev1alpha
 	}
 }
 
-func createKode(name, namespaceName string, containerTemplateName string, credentials *kodev1alpha2.CredentialsSpec, storage *kodev1alpha2.KodeStorageSpec) *kodev1alpha2.Kode {
+func createKode(
+	name, namespaceName string,
+	containerTemplateName string,
+	credentials *kodev1alpha2.CredentialsSpec,
+	storage *kodev1alpha2.KodeStorageSpec,
+) *kodev1alpha2.Kode {
 	kode := &kodev1alpha2.Kode{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,

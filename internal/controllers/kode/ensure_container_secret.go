@@ -71,10 +71,7 @@ func ensureSecret(ctx context.Context, r statemachine.ReconcilerInterface, resou
 		}
 		// ExistingSecret is not specified, create or patch the secret
 		_, err := resource.CreateOrPatch(ctx, secret, func() error {
-			constructedSecret, err := constructSecretSpec(r, config)
-			if err != nil {
-				return fmt.Errorf("failed to construct Secret spec: %v", err)
-			}
+			constructedSecret := constructSecretSpec(r, config)
 
 			// Update metadata for the secret
 			secret.Data = constructedSecret.Data
@@ -91,7 +88,7 @@ func ensureSecret(ctx context.Context, r statemachine.ReconcilerInterface, resou
 }
 
 // constructSecret constructs a Secret for the Kode instance
-func constructSecretSpec(r statemachine.ReconcilerInterface, config *common.KodeResourceConfig) (*corev1.Secret, error) {
+func constructSecretSpec(r statemachine.ReconcilerInterface, config *common.KodeResourceConfig) *corev1.Secret {
 	log := r.GetLog().WithName("SecretConstructor").WithValues("kode", common.ObjectKeyFromConfig(config.CommonConfig))
 
 	secret := &corev1.Secret{
@@ -103,5 +100,5 @@ func constructSecretSpec(r statemachine.ReconcilerInterface, config *common.Kode
 
 	log.V(1).Info("Using constructed secret", "Name", secret.Name, "Data", common.MaskSecretData(secret))
 
-	return secret, nil
+	return secret
 }

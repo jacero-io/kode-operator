@@ -40,10 +40,10 @@ const (
 	EventTypeWarning EventType = "Warning"
 
 	// Event reasons
-	ReasonCreated      EventReason = "Created"
-	ReasonUpdated      EventReason = "Updated"
-	ReasonFailed       EventReason = "Failed"
-	ReasonReconciled   EventReason = "Reconciled"
+	ReasonCreated            EventReason = "Created"
+	ReasonUpdated            EventReason = "Updated"
+	ReasonFailed             EventReason = "Failed"
+	ReasonReconciled         EventReason = "Reconciled"
 	ReasonHTTPRouteCreated   EventReason = "HTTPRouteCreated"
 	ReasonHTTPRouteUpdated   EventReason = "HTTPRouteUpdated"
 	ReasonHTTPRouteDeleted   EventReason = "HTTPRouteDeleted"

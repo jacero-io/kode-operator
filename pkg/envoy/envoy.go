@@ -34,7 +34,9 @@ func NewContainerConstructor(log logr.Logger, configGenerator ConfigGenerator) *
 	}
 }
 
-func (c *ContainerConstructor) ConstructEnvoyContainers(config *common.KodeResourceConfig) ([]corev1.Container, []corev1.Container, error) {
+func (c *ContainerConstructor) ConstructEnvoyContainers(
+	config *common.KodeResourceConfig,
+) ([]corev1.Container, []corev1.Container, error) {
 	// Generate Envoy config
 	useBasicAuth := false
 	if config.Template != nil && config.Template.EntryPointSpec != nil &&
@@ -90,7 +92,10 @@ func (c *ContainerConstructor) createProxySetupContainer(config *common.KodeReso
 	}
 }
 
-func (c *ContainerConstructor) createEnvoyContainer(config *common.KodeResourceConfig, envoyConfig string) corev1.Container {
+func (c *ContainerConstructor) createEnvoyContainer(
+	config *common.KodeResourceConfig,
+	envoyConfig string,
+) corev1.Container {
 	return corev1.Container{
 		Name:  EnvoyProxyContainerName,
 		Image: EnvoyProxyContainerImage,

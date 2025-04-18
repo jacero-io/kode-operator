@@ -4,8 +4,8 @@ includes:
   tools:
     taskfile: tools.yaml
     internal: true
-  lint: 
-    taskfile: lint.yaml
+  go: 
+    taskfile: go.yaml
     internal: true
 
 vars:
@@ -51,8 +51,8 @@ tasks:
   lint:
     desc: Run linters
     cmds:
-      - task: lint:fmt
-      - task: lint:vet
+      - task: go:fmt
+      - task: go:vet
 
   build-binary:
     desc: Build manager binary

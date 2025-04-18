@@ -1,0 +1,77 @@
+version: '3'
+
+includes:
+  tools:
+    taskfile: tools.yaml
+    internal: true
+  clusters:
+    taskfile: minikube.yaml
+    internal: true
+  build:
+    taskfile: build.yaml
+    internal: true
+  flux:
+    taskfile: flux.yaml
+    internal: true
+  envoy:
+    taskfile: envoy.yaml
+    internal: true
+
+vars:
+  KUBECTL_CMD: '{{.KUBECTL_CMD | default "kubectl"}}'
+
+tasks:
+  generate-manifests:
+    desc: Generate controller manifests
+    cmds:
+      - task: build:manifests
+      - task: build:generate
+    deps:
+      - tools:controller-gen
+
+  install:
+    desc: Install CRDs into the cluster (Minikube by default, or existing kubecontext)
+    deps:
+      - tools:kustomize
+    cmds:
+      - task: clusters:set-context
+      - '{{.KUSTOMIZE_CMD}} build {{.ROOT_DIR}}/config/crd | {{.KUBECTL_CMD}} apply -f -'
+      - echo "CRDs installed successfully"
+    silent: true
+
+  uninstall:
+    desc: Uninstall CRDs from the cluster (Minikube by default, or existing kubecontext)
+    cmds:
+      - task: clusters:set-context
+      - '{{.KUSTOMIZE_CMD}} build {{.ROOT_DIR}}/config/crd | {{.KUBECTL_CMD}} delete --ignore-not-found={{.IGNORE_NOT_FOUND}} -f -'
+
+  deploy:
+    desc: Deploy controller to the specified cluster (Minikube or remote)
+    deps:
+      - build:build-installer
+      - build:docker-build
+    vars:
+      DEPLOY_TYPE: '{{if eq .USE_MINIKUBE_CONTEXT "true"}}minikube{{else}}remote{{end}}'
+    cmds:
+      - task: clusters:deploy-{{.DEPLOY_TYPE}}
+
+  undeploy:
+    desc: Undeploy controller from the specified cluster
+    vars:
+      DEPLOY_TYPE: '{{if eq .USE_MINIKUBE_CONTEXT "true"}}minikube{{else}}remote{{end}}'
+    cmds:
+      - task: clusters:undeploy-{{.DEPLOY_TYPE}}
+
+  run-controller:
+    desc: Run the controller
+    cmds:
+      - ENV={{.ENV}} go run ./cmd/main.go --log-level {{.LOG_LEVEL_ARG}} {{.CLI_ARGS}} 2>&1 | tee output.log
+    vars:
+      LOG_LEVEL_ARG: '{{if .LOG_LEVEL}}{{.LOG_LEVEL}}{{else}}debug{{end}}'
+
+  run:
+    desc: Run a controller from your host
+    cmds:
+      - task: generate-manifests
+      - task: install
+      - task: run-controller

@@ -46,10 +46,10 @@ func handlePendingState(ctx context.Context, r statemachine.ReconcilerInterface,
 	result := validation.ValidateKode(ctx, kode)
 	if !result.Valid {
 		for _, errMsg := range result.Errors {
-			log.Error(fmt.Errorf(errMsg), "Kode validation failed")
+			log.Error(fmt.Errorf("%s", errMsg), "Kode validation failed")
 		}
 		combinedErrMsg := strings.Join(result.Errors, "; ")
-		return handleReconcileError(ctx, r, kode, fmt.Errorf(combinedErrMsg), "Validation failed")
+		return handleReconcileError(ctx, r, kode, fmt.Errorf("%s", combinedErrMsg), "Validation failed")
 	}
 
 	// Set conditions for Pending state
@@ -80,18 +80,17 @@ func handleConfiguringState(ctx context.Context, r statemachine.ReconcilerInterf
 
 	// Fetch the template
 	template, err := fetchTemplatesWithRetry(ctx, r, kode)
-	if err != nil {
-		er.Record(ctx, kode, event.EventTypeWarning, "TemplateFetchFailed", fmt.Sprintf("Failed to fetch template: %v", err))
-		return handleReconcileError(ctx, r, kode, err, "Failed to fetch template")
+	if err := er.Record(ctx, kode, event.EventTypeWarning, "TemplateFetchFailed", fmt.Sprintf("Failed to fetch template: %v", err)); err != nil {
+		log.Error(err, "Failed to record event")
 	}
 
 	config := InitKodeResourcesConfig(kode, template)
 
 	// Detect required changes
 	changes, err := detectChanges(ctx, r, kode, config)
-	if err != nil {
-		er.Record(ctx, kode, event.EventTypeWarning, "ChangeDetectionFailed", fmt.Sprintf("Failed to detect configuration changes: %v", err))
-		return handleReconcileError(ctx, r, kode, err, "Failed to detect changes")
+	if err := er.Record(ctx, kode, event.EventTypeWarning, "ChangeDetectionFailed",
+		fmt.Sprintf("Failed to detect configuration changes: %v", err)); err != nil {
+		log.Error(err, "Failed to record event")
 	}
 
 	// Record significant changes if any
@@ -100,23 +99,32 @@ func handleConfiguringState(ctx context.Context, r statemachine.ReconcilerInterf
 		for resource := range changes {
 			changeList = append(changeList, resource)
 		}
-		er.Record(ctx, kode, event.EventTypeNormal, "ConfigurationRequired", fmt.Sprintf("Configuration required for: %s", strings.Join(changeList, ", ")))
+		if err := er.Record(ctx, kode, event.EventTypeNormal, "ConfigurationRequired",
+			fmt.Sprintf("Configuration required for: %s", strings.Join(changeList, ", "))); err != nil {
+			log.Error(err, "Failed to record event")
+		}
 	}
 
 	// Apply configuration
 	if err := applyConfiguration(ctx, r, kode, config, changes); err != nil {
-		er.Record(ctx, kode, event.EventTypeWarning, "ConfigurationFailed", fmt.Sprintf("Failed to apply configuration: %v", err))
+		if err := er.Record(ctx, kode, event.EventTypeWarning, "ConfigurationFailed", fmt.Sprintf("Failed to apply configuration: %v", err)); err != nil {
+			log.Error(err, "Failed to record event")
+		}
 		return handleReconcileError(ctx, r, kode, err, "Failed to apply configuration")
 	}
 
 	// Record successful configuration
 	if len(changes) > 0 {
-		er.Record(ctx, kode, event.EventTypeNormal, "ConfigurationApplied", "Successfully applied resource configuration")
+		if err := er.Record(ctx, kode, event.EventTypeNormal, "ConfigurationApplied", "Successfully applied resource configuration"); err != nil {
+			log.Error(err, "Failed to record event")
+		}
 	}
 
 	// Validate configuration
 	if err := validateConfiguration(ctx, r, kode, config); err != nil {
-		er.Record(ctx, kode, event.EventTypeWarning, "ValidationFailed", fmt.Sprintf("Configuration validation failed: %v", err))
+		if err := er.Record(ctx, kode, event.EventTypeWarning, "ValidationFailed", fmt.Sprintf("Configuration validation failed: %v", err)); err != nil {
+			log.Error(err, "Failed to record event")
+		}
 		return handleReconcileError(ctx, r, kode, err, "Failed to validate configuration")
 	}
 
@@ -150,7 +158,9 @@ func handleProvisioningState(ctx context.Context, r statemachine.ReconcilerInter
 	// Fetch the template
 	template, err := fetchTemplatesWithRetry(ctx, r, kode)
 	if err != nil {
-		er.Record(ctx, kode, event.EventTypeWarning, "TemplateFetchFailed", fmt.Sprintf("Failed to fetch template: %v", err))
+		if err := er.Record(ctx, kode, event.EventTypeWarning, "TemplateFetchFailed", fmt.Sprintf("Failed to fetch template during update: %v", err)); err != nil {
+			log.Error(err, "Failed to record event")
+		}
 		return handleReconcileError(ctx, r, kode, err, "Failed to fetch template")
 	}
 
@@ -158,9 +168,8 @@ func handleProvisioningState(ctx context.Context, r statemachine.ReconcilerInter
 
 	// Check if all resources are ready
 	ready, err := checkResourcesReady(ctx, r, kode, config)
-	if err != nil {
-		er.Record(ctx, kode, event.EventTypeWarning, "ReadinessCheckFailed", fmt.Sprintf("Failed to check resource readiness: %v", err))
-		return handleReconcileError(ctx, r, kode, err, "Failed to check resource readiness")
+	if err := er.Record(ctx, kode, event.EventTypeWarning, "ReadinessCheckFailed", fmt.Sprintf("Failed to check resource readiness: %v", err)); err != nil {
+		log.Error(err, "Failed to record event")
 	}
 
 	if !ready {
@@ -197,7 +206,9 @@ func handleProvisioningState(ctx context.Context, r statemachine.ReconcilerInter
 	}
 
 	// Record successful provisioning
-	er.Record(ctx, kode, event.EventTypeNormal, "ProvisioningComplete", "All resources successfully provisioned and ready")
+	if err := er.Record(ctx, kode, event.EventTypeNormal, "ProvisioningComplete", "All resources successfully provisioned and ready"); err != nil {
+		log.Error(err, "Failed to record event")
+	}
 
 	return kodev1alpha2.PhaseActive, ctrl.Result{}, nil
 }
@@ -224,14 +235,18 @@ func handleActiveState(ctx context.Context, r statemachine.ReconcilerInterface, 
 			return handleReconcileError(ctx, r, kode, err, "Failed to update status")
 		}
 
-		er.Record(ctx, kode, event.EventTypeNormal, "UpdateDetected", "Configuration changes detected, initiating update")
+		if err := er.Record(ctx, kode, event.EventTypeNormal, "UpdateDetected", "Configuration changes detected, initiating update"); err != nil {
+			log.Error(err, "Failed to record event")
+		}
 		return kodev1alpha2.PhaseUpdating, ctrl.Result{Requeue: true}, nil
 	}
 
 	// Fetch the template
 	template, err := fetchTemplatesWithRetry(ctx, r, kode)
 	if err != nil {
-		er.Record(ctx, kode, event.EventTypeWarning, "TemplateFetchFailed", fmt.Sprintf("Failed to fetch template during active check: %v", err))
+		if err := er.Record(ctx, kode, event.EventTypeWarning, "TemplateFetchFailed", fmt.Sprintf("Failed to fetch template during active check: %v", err)); err != nil {
+			log.Error(err, "Failed to record event")
+		}
 		return handleReconcileError(ctx, r, kode, err, "Failed to fetch template")
 	}
 
@@ -239,9 +254,8 @@ func handleActiveState(ctx context.Context, r statemachine.ReconcilerInterface, 
 
 	// Verify resources are still healthy
 	ready, err := checkResourcesReady(ctx, r, kode, config)
-	if err != nil {
-		er.Record(ctx, kode, event.EventTypeWarning, "ReadinessCheckFailed", fmt.Sprintf("Failed to check resource health: %v", err))
-		return handleReconcileError(ctx, r, kode, err, "Failed to check resource readiness")
+	if err := er.Record(ctx, kode, event.EventTypeWarning, "ReadinessCheckFailed", fmt.Sprintf("Failed to check resource health: %v", err)); err != nil {
+		log.Error(err, "Failed to record event")
 	}
 
 	if !ready {
@@ -255,7 +269,9 @@ func handleActiveState(ctx context.Context, r statemachine.ReconcilerInterface, 
 			return handleReconcileError(ctx, r, kode, err, "Failed to update status")
 		}
 
-		er.Record(ctx, kode, event.EventTypeWarning, "HealthDegraded", "Resource health check failed, initiating recovery")
+		if err := er.Record(ctx, kode, event.EventTypeWarning, "HealthDegraded", "Resource health check failed, initiating recovery"); err != nil {
+			log.Error(err, "Failed to record event")
+		}
 		return kodev1alpha2.PhaseUpdating, ctrl.Result{RequeueAfter: r.GetReconcileInterval()}, nil
 	}
 
@@ -314,18 +330,17 @@ func handleUpdatingState(ctx context.Context, r statemachine.ReconcilerInterface
 
 	// Fetch the template
 	template, err := fetchTemplatesWithRetry(ctx, r, kode)
-	if err != nil {
-		er.Record(ctx, kode, event.EventTypeWarning, "TemplateFetchFailed", fmt.Sprintf("Failed to fetch template during update: %v", err))
-		return handleReconcileError(ctx, r, kode, err, "Failed to fetch template")
+	if err := er.Record(ctx, kode, event.EventTypeWarning, "TemplateFetchFailed", fmt.Sprintf("Failed to fetch template during update: %v", err)); err != nil {
+		log.Error(err, "Failed to record event")
 	}
 
 	config := InitKodeResourcesConfig(kode, template)
 
 	// Detect changes
 	changes, err := detectChanges(ctx, r, kode, config)
-	if err != nil {
-		er.Record(ctx, kode, event.EventTypeWarning, "ChangeDetectionFailed", fmt.Sprintf("Failed to detect configuration changes: %v", err))
-		return handleReconcileError(ctx, r, kode, err, "Failed to detect changes")
+	if err := er.Record(ctx, kode, event.EventTypeWarning, "ChangeDetectionFailed",
+		fmt.Sprintf("Failed to detect configuration changes: %v", err)); err != nil {
+		log.Error(err, "Failed to record event")
 	}
 
 	// If no changes, move to Active state
@@ -345,21 +360,21 @@ func handleUpdatingState(ctx context.Context, r statemachine.ReconcilerInterface
 
 	// Apply updates
 	log.Info("Applying configuration changes", "changes", changes)
-	if err := applyConfiguration(ctx, r, kode, config, changes); err != nil {
-		er.Record(ctx, kode, event.EventTypeWarning, "UpdateFailed", fmt.Sprintf("Failed to apply updates: %v", err))
-		return handleReconcileError(ctx, r, kode, err, "Failed to apply updates")
+	if err := er.Record(ctx, kode, event.EventTypeWarning, "UpdateFailed",
+		fmt.Sprintf("Failed to apply updates: %v", err)); err != nil {
+		log.Error(err, "Failed to record event")
 	}
 
 	// Validate updates
-	if err := validateConfiguration(ctx, r, kode, config); err != nil {
-		er.Record(ctx, kode, event.EventTypeWarning, "ValidationFailed", fmt.Sprintf("Update validation failed: %v", err))
-		return handleReconcileError(ctx, r, kode, err, "Failed to validate updates")
+	if err := er.Record(ctx, kode, event.EventTypeWarning, "ValidationFailed",
+		fmt.Sprintf("Update validation failed: %v", err)); err != nil {
+		log.Error(err, "Failed to record event")
 	}
 
 	// Check if resources are ready after update
 	ready, err := checkResourcesReady(ctx, r, kode, config)
-	if err != nil {
-		er.Record(ctx, kode, event.EventTypeWarning, "ReadinessCheckFailed", fmt.Sprintf("Failed to check resource readiness after update: %v", err))
+	if err := er.Record(ctx, kode, event.EventTypeWarning, "ReadinessCheckFailed",
+		fmt.Sprintf("Failed to check resource readiness after update: %v", err)); err != nil {
 		return handleReconcileError(ctx, r, kode, err, "Failed to check resource readiness")
 	}
 
@@ -391,7 +406,9 @@ func handleUpdatingState(ctx context.Context, r statemachine.ReconcilerInterface
 		return handleReconcileError(ctx, r, kode, err, "Failed to update status")
 	}
 
-	er.Record(ctx, kode, event.EventTypeNormal, "UpdateComplete", "Resource update completed successfully")
+	if err := er.Record(ctx, kode, event.EventTypeNormal, "UpdateComplete", "Resource update completed successfully"); err != nil {
+		log.Error(err, "Failed to record event")
+	}
 
 	log.Info("Moving to Active state")
 	return kodev1alpha2.PhaseActive, ctrl.Result{}, nil
@@ -420,8 +437,8 @@ func handleDeletingState(ctx context.Context, r statemachine.ReconcilerInterface
 
 	// Check if child resources are deleted
 	childResourcesDeleted, err := checkResourcesDeleted(ctx, r, kode)
-	if err != nil {
-		er.Record(ctx, kode, event.EventTypeWarning, "DeletionCheckFailed", fmt.Sprintf("Failed to check child resources deletion status: %v", err))
+	if err := er.Record(ctx, kode, event.EventTypeWarning, "DeletionCheckFailed",
+		fmt.Sprintf("Failed to check child resources deletion status: %v", err)); err != nil {
 		return handleReconcileError(ctx, r, kode, err, "Failed to check child resources deletion")
 	}
 
@@ -433,12 +450,13 @@ func handleDeletingState(ctx context.Context, r statemachine.ReconcilerInterface
 
 			cleanupResource := NewKodeCleanupResource(kode)
 			result, err := r.GetCleanupManager().Cleanup(ctx, cleanupResource)
-			if err != nil {
-				er.Record(ctx, kode, event.EventTypeWarning, "CleanupFailed", fmt.Sprintf("Failed to initiate cleanup: %v", err))
+			if err := er.Record(ctx, kode, event.EventTypeWarning, "CleanupFailed", fmt.Sprintf("Failed to initiate cleanup: %v", err)); err != nil {
 				return handleReconcileError(ctx, r, kode, err, "Failed to initiate cleanup")
 			}
 
-			er.Record(ctx, kode, event.EventTypeNormal, "DeletionStarted", "Resource cleanup initiated")
+			if err := er.Record(ctx, kode, event.EventTypeNormal, "DeletionStarted", "Resource cleanup initiated"); err != nil {
+				log.Error(err, "Failed to record event")
+			}
 
 			// Update the status
 			if err := kode.UpdateStatus(ctx, r.GetClient()); err != nil {
@@ -460,7 +478,10 @@ func handleDeletingState(ctx context.Context, r statemachine.ReconcilerInterface
 
 		// If deletion is taking too long, record a warning
 		if kode.Status.DeletionCycle > 10 {
-			er.Record(ctx, kode, event.EventTypeWarning, "DeletionDelayed", fmt.Sprintf("Resource deletion taking longer than expected (cycle %d)", kode.Status.DeletionCycle))
+			if err := er.Record(ctx, kode, event.EventTypeWarning, "DeletionDelayed",
+				fmt.Sprintf("Resource deletion taking longer than expected (cycle %d)", kode.Status.DeletionCycle)); err != nil {
+				log.Error(err, "Failed to record event")
+			}
 		}
 
 		return kodev1alpha2.PhaseDeleting, ctrl.Result{RequeueAfter: r.GetReconcileInterval()}, nil
@@ -471,11 +492,15 @@ func handleDeletingState(ctx context.Context, r statemachine.ReconcilerInterface
 
 	if controllerutil.ContainsFinalizer(kode, constant.KodeFinalizerName) {
 		if err := kode.RemoveFinalizer(ctx, r.GetClient()); err != nil {
-			er.Record(ctx, kode, event.EventTypeWarning, "FinalizerRemovalFailed", fmt.Sprintf("Failed to remove finalizer: %v", err))
+			if err := er.Record(ctx, kode, event.EventTypeWarning, "FinalizerRemovalFailed", fmt.Sprintf("Failed to remove finalizer: %v", err)); err != nil {
+				log.Error(err, "Failed to record event")
+			}
 			return handleReconcileError(ctx, r, kode, err, "Failed to remove finalizer")
 		}
 
-		er.Record(ctx, kode, event.EventTypeNormal, "DeletionComplete", "Resource cleanup completed successfully")
+		if err := er.Record(ctx, kode, event.EventTypeNormal, "DeletionComplete", "Resource cleanup completed successfully"); err != nil {
+			log.Error(err, "Failed to record event")
+		}
 	}
 
 	log.Info("Resource deletion completed")
@@ -508,7 +533,10 @@ func handleFailedState(ctx context.Context, r statemachine.ReconcilerInterface, 
 			return kodev1alpha2.PhaseFailed, ctrl.Result{Requeue: true}, nil
 		}
 
-		er.Record(ctx, kode, event.EventTypeWarning, "RecoveryAbandoned", fmt.Sprintf("Recovery abandoned after %d failed attempts. Manual intervention required", maxRetries))
+		if err := er.Record(ctx, kode, event.EventTypeWarning, "RecoveryAbandoned",
+			fmt.Sprintf("Recovery abandoned after %d failed attempts. Manual intervention required", maxRetries)); err != nil {
+			log.Error(err, "Failed to record event")
+		}
 
 		// Stay in Failed state but with longer requeue time
 		return kodev1alpha2.PhaseFailed, ctrl.Result{RequeueAfter: r.GetLongReconcileInterval()}, nil
@@ -534,14 +562,20 @@ func handleFailedState(ctx context.Context, r statemachine.ReconcilerInterface, 
 		return kodev1alpha2.PhaseFailed, ctrl.Result{Requeue: true}, nil
 	}
 
-	er.Record(ctx, kode, event.EventTypeNormal, "RecoveryAttempt", fmt.Sprintf("Starting recovery attempt %d of %d", kode.Status.RetryCount, maxRetries))
+	if err := er.Record(ctx, kode, event.EventTypeNormal, "RecoveryAttempt",
+		fmt.Sprintf("Starting recovery attempt %d of %d", kode.Status.RetryCount, maxRetries)); err != nil {
+		log.Error(err, "Failed to record event")
+	}
 
 	// Determine appropriate recovery phase
 	recoveryPhase := determineRecoveryPhase(ctx, r, kode)
 	log.Info("Determined recovery phase", "recoveryPhase", recoveryPhase)
 
 	// Record recovery transition
-	er.Record(ctx, kode, event.EventTypeNormal, "RecoveryTransition", fmt.Sprintf("Transitioning to %s phase for recovery", recoveryPhase))
+	if err := er.Record(ctx, kode, event.EventTypeNormal, "RecoveryTransition",
+		fmt.Sprintf("Transitioning to %s phase for recovery", recoveryPhase)); err != nil {
+		log.Error(err, "Failed to record event")
+	}
 
 	// Return to appropriate phase for recovery
 	return recoveryPhase, ctrl.Result{Requeue: true}, nil
@@ -568,7 +602,9 @@ func handleUnknownState(ctx context.Context, r statemachine.ReconcilerInterface,
 		return kodev1alpha2.PhaseUnknown, ctrl.Result{Requeue: true}, nil
 	}
 
-	er.Record(ctx, kode, event.EventTypeWarning, "StateUnknown", "Resource entered unknown state, attempting to determine correct state")
+	if err := er.Record(ctx, kode, event.EventTypeWarning, "StateUnknown", "Resource entered unknown state, attempting to determine correct state"); err != nil {
+		log.Error(err, "Failed to record event")
+	}
 
 	// Check if resource is being deleted
 	if !kode.DeletionTimestamp.IsZero() {
@@ -577,24 +613,7 @@ func handleUnknownState(ctx context.Context, r statemachine.ReconcilerInterface,
 	}
 
 	// Attempt to determine current state based on resource status
-	determinedPhase, err := determineResourceState(ctx, r, kode)
-	if err != nil {
-		log.Error(err, "Failed to determine resource state")
-		er.Record(ctx, kode, event.EventTypeWarning, "StateDeterminationFailed", fmt.Sprintf("Failed to determine resource state: %v", err))
-
-		// If we can't determine state, start from Pending
-		log.Info("Unable to determine state, falling back to Pending phase")
-		kode.Status.Phase = kodev1alpha2.PhasePending
-
-		if err := kode.UpdateStatus(ctx, r.GetClient()); err != nil {
-			log.Error(err, "Failed to update status when falling back to Pending")
-			return kodev1alpha2.PhaseUnknown, ctrl.Result{Requeue: true}, nil
-		}
-
-		er.Record(ctx, kode, event.EventTypeNormal, "StateResolution", "Unable to determine state, falling back to Pending phase")
-
-		return kodev1alpha2.PhasePending, ctrl.Result{Requeue: true}, nil
-	}
+	determinedPhase := determineResourceState(ctx, r, kode)
 
 	// If we successfully determined a phase
 	if determinedPhase != kodev1alpha2.PhaseUnknown {
@@ -606,7 +625,9 @@ func handleUnknownState(ctx context.Context, r statemachine.ReconcilerInterface,
 			return kodev1alpha2.PhaseUnknown, ctrl.Result{Requeue: true}, nil
 		}
 
-		er.Record(ctx, kode, event.EventTypeNormal, "StateDetermined", fmt.Sprintf("Successfully determined resource state: %s", determinedPhase))
+		if err := er.Record(ctx, kode, event.EventTypeNormal, "StateDetermined", fmt.Sprintf("Successfully determined resource state: %s", determinedPhase)); err != nil {
+			log.Error(err, "Failed to record event")
+		}
 
 		return determinedPhase, ctrl.Result{Requeue: true}, nil
 	}
@@ -620,20 +641,22 @@ func handleUnknownState(ctx context.Context, r statemachine.ReconcilerInterface,
 		return kodev1alpha2.PhaseUnknown, ctrl.Result{Requeue: true}, nil
 	}
 
-	er.Record(ctx, kode, event.EventTypeNormal, "StateFallback", "State determination inconclusive, falling back to Pending phase")
+	if err := er.Record(ctx, kode, event.EventTypeNormal, "StateFallback", "State determination inconclusive, falling back to Pending phase"); err != nil {
+		log.Error(err, "Failed to record event")
+	}
 
 	return kodev1alpha2.PhasePending, ctrl.Result{Requeue: true}, nil
 }
 
 // determineResourceState attempts to determine the current state of the resource
-func determineResourceState(ctx context.Context, r statemachine.ReconcilerInterface, kode *kodev1alpha2.Kode) (kodev1alpha2.Phase, error) {
+func determineResourceState(ctx context.Context, r statemachine.ReconcilerInterface, kode *kodev1alpha2.Kode) kodev1alpha2.Phase {
 	log := r.GetLog().WithValues("kode", client.ObjectKeyFromObject(kode))
 
 	// First check if template exists and can be fetched
 	template, err := fetchTemplatesWithRetry(ctx, r, kode)
 	if err != nil {
 		log.V(1).Info("Failed to fetch template", "error", err)
-		return kodev1alpha2.PhasePending, nil
+		return kodev1alpha2.PhasePending
 	}
 
 	config := InitKodeResourcesConfig(kode, template)
@@ -641,23 +664,23 @@ func determineResourceState(ctx context.Context, r statemachine.ReconcilerInterf
 	// Check for generation mismatch
 	if kode.Generation != kode.Status.ObservedGeneration {
 		log.V(1).Info("Detected generation mismatch", "current", kode.Generation, "observed", kode.Status.ObservedGeneration)
-		return kodev1alpha2.PhaseUpdating, nil
+		return kodev1alpha2.PhaseUpdating
 	}
 
 	// Check resource readiness
 	ready, err := checkResourcesReady(ctx, r, kode, config)
 	if err != nil {
 		log.V(1).Info("Error checking resource readiness", "error", err)
-		return kodev1alpha2.PhaseConfiguring, nil
+		return kodev1alpha2.PhaseConfiguring
 	}
 
 	if !ready {
 		// Resources exist but aren't ready
-		return kodev1alpha2.PhaseProvisioning, nil
+		return kodev1alpha2.PhaseProvisioning
 	}
 
 	// All resources are ready and no updates needed
-	return kodev1alpha2.PhaseActive, nil
+	return kodev1alpha2.PhaseActive
 }
 
 // determineRecoveryPhase decides which phase to transition to for recovery
