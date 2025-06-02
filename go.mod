@@ -8,7 +8,7 @@ replace github.com/imdario/mergo => github.com/imdario/mergo v0.3.16
 
 require (
 	github.com/envoyproxy/gateway v1.1.2
-	github.com/go-logr/logr v1.4.2
+	github.com/go-logr/logr v1.4.3
 	github.com/go-logr/zapr v1.3.0
 	github.com/jacero-io/basic-auth-sidecar v0.3.3
 	github.com/onsi/ginkgo/v2 v2.20.2
